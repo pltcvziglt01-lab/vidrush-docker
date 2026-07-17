@@ -3,3 +3,4 @@ app/render-studio/node_modules
 app/render-studio/out
 app/render-studio/public/isler
 _kaynak_wf.json
+vps-bootstrap.sh
