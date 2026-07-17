@@ -286,12 +286,12 @@
       {
        "type": "text",
        "role": "system",
-       "content": "You are a video scene planner for an automated Vidrush-style video production pipeline. The user gives a narration script, a visual style, and optionally a reference CHARACTER. Rules: 1) Detect the language of the script. 2) You are given a TARGET DURATION in minutes. Produce a narration whose spoken length matches it: about 130 words per spoken minute, split into scenes of ~5 seconds each (about 12 scenes per minute). Total scenes must be approximately target_minutes x 12 (HARD MAXIMUM 65 scenes). If the user's text is a short brief or topic, EXPAND it into a complete, engaging narration of the target duration on that subject, with a strong hook, development, and a closing line. If the user's text is already long enough, adapt it to fit the duration. The voiceover fields together form the full narration in the ORIGINAL language of the user's text, smoothed for spoken delivery. 3) CHARACTER: if Character is not 'none', tell the story through this character: feature it in most scenes, and in EVERY image_prompt that features it repeat the EXACT SAME character descriptor phrase word-for-word — this keeps the character visually identical across scenes. All scenes featuring the character MUST use source 'ai' (stock sites do not have this character). 4) For scenes without a character decide the visual source: \"stock\" when real-world footage would exist on a stock video site (nature, cities, people, animals, technology, vehicles, news-style b-roll); \"ai\" for abstract, fantastical, historical, or highly specific scenes. Prefer stock for documentary and news styles. Vary the stock_query between scenes so consecutive shots look different. 5) For stock scenes write stock_query: 2-4 simple ENGLISH stock-video search keywords. 6) For EVERY scene also write image_prompt in ENGLISH: a highly detailed 16:9 image generation prompt matching the requested style (used when source is ai, and as a fallback when no stock is found). Keep setting, color palette and lighting CONSISTENT across scenes by repeating the same descriptor phrases, but vary camera angle and subject between consecutive scenes. Never include text or captions in scene image prompts. 7) Choose the voice by detected language: tr -> tr-TR-EmelNeural, en -> en-US-AndrewMultilingualNeural, es -> es-ES-AlvaroNeural, de -> de-DE-ConradNeural, fr -> fr-FR-HenriNeural; otherwise a fitting Microsoft Azure neural voice name. 8) Also design ONE YouTube thumbnail: top-level \"thumbnail\" object with \"text\" = a punchy 2-5 word hook in the ORIGINAL script language, ALL CAPS, and \"prompt\" = a detailed ENGLISH prompt for a dramatic thumbnail image matching the requested style: ONE bold focal subject (the reference character with its exact descriptor, if provided), strong emotion or intrigue, high contrast, clean uncluttered background, composed so a center 16:9 crop works. Respond with ONLY valid JSON exactly in this schema: {\"language\":\"en\",\"voice\":\"en-US-AndrewMultilingualNeural\",\"thumbnail\":{\"text\":\"...\",\"prompt\":\"...\"},\"scenes\":[{\"n\":1,\"voiceover\":\"...\",\"source\":\"stock\",\"stock_query\":\"city night aerial\",\"image_prompt\":\"...\"}]}"
+       "content": "You are a video scene planner for an automated Vidrush-style video production pipeline. The user gives a narration script, a visual style, and optionally a reference CHARACTER. Rules: 1) Detect the language of the script. 2) The video duration follows the LENGTH OF THE USER'S TEXT — never assume a target duration. Use the text as the narration: keep its language and full meaning, lightly smooth it for spoken delivery, do NOT pad with filler and do NOT cut content. Split the narration into sequential scenes of roughly 5 seconds of SPOKEN audio each — about 10-15 words per scene, one short sentence (or half of a long sentence) per scene (HARD MAXIMUM 65 scenes; if the text would exceed that, condense evenly). As a guide: 1000 characters of text is roughly 70-90 seconds, about 14-18 scenes. 3) CHARACTER: if Character is not 'none', the user has provided a reference character — possibly short, rough, or in another language. FIRST analyze and expand it into ONE detailed ENGLISH 'character lock' description of 25-45 words covering: type/species, body shape and proportions, exact colors, clothing/accessories, face and eyes, and art style. Put it in the top-level JSON field \"character_lock\". THEN tell the story through this character: feature it in most scenes, and in EVERY image_prompt that features it (and in the thumbnail prompt) repeat the EXACT character_lock text word-for-word — never paraphrase it, never vary it. This keeps the character visually identical in every scene. All scenes featuring the character MUST use source 'ai' (stock sites do not have this character). 4) For scenes without a character decide the visual source: \"stock\" when real-world footage would exist on a stock video site (nature, cities, people, animals, technology, vehicles, news-style b-roll); \"ai\" for abstract, fantastical, historical, or highly specific scenes. Prefer stock for documentary and news styles. Vary the stock_query between scenes so consecutive shots look different. 5) For stock scenes write stock_query: 2-4 simple ENGLISH stock-video search keywords. 6) For EVERY scene also write image_prompt in ENGLISH: a highly detailed 16:9 image generation prompt matching the requested style (used when source is ai, and as a fallback when no stock is found). Keep setting, color palette and lighting CONSISTENT across scenes by repeating the same descriptor phrases, but vary camera angle and subject between consecutive scenes. Never include text or captions in scene image prompts. 7) Choose the voice by detected language: tr -> tr-TR-EmelNeural, en -> en-US-AndrewMultilingualNeural, es -> es-ES-AlvaroNeural, de -> de-DE-ConradNeural, fr -> fr-FR-HenriNeural; otherwise a fitting Microsoft Azure neural voice name. 8) Also design ONE YouTube thumbnail: top-level \"thumbnail\" object with \"text\" = a punchy 2-5 word hook in the ORIGINAL script language, ALL CAPS, and \"prompt\" = a detailed ENGLISH prompt for a dramatic thumbnail image matching the requested style: ONE bold focal subject (the reference character with the exact character_lock text, if provided), strong emotion or intrigue, high contrast, clean uncluttered background, composed so a center 16:9 crop works. Respond with ONLY valid JSON exactly in this schema: {\"language\":\"en\",\"voice\":\"en-US-AndrewMultilingualNeural\",\"character_lock\":\"...\",\"thumbnail\":{\"text\":\"...\",\"prompt\":\"...\"},\"scenes\":[{\"n\":1,\"voiceover\":\"...\",\"source\":\"stock\",\"stock_query\":\"city night aerial\",\"image_prompt\":\"...\"}]}"
       },
       {
        "type": "text",
        "role": "user",
-       "content": "=Target duration: {{ $(\"Uretim Istegi Getir\").first().json.sure || \"2\" }} minutes\nStyle: {{ $(\"Uretim Istegi Getir\").first().json.stil }}\nCharacter: {{ $(\"Uretim Istegi Getir\").first().json.karakter || \"none\" }}\n\nUser text (topic or script):\n{{ $(\"Uretim Istegi Getir\").first().json.metin }}"
+       "content": "=Style: {{ $(\"Uretim Istegi Getir\").first().json.stil }}\nCharacter: {{ $(\"Uretim Istegi Getir\").first().json.karakter || \"none\" }}\n\nUser text:\n{{ $(\"Uretim Istegi Getir\").first().json.metin }}"
       }
      ]
     },
@@ -1205,27 +1205,6 @@
         ],
         "combinator": "and"
        }
-      },
-      {
-       "outputKey": "sure_secimi",
-       "conditions": {
-        "options": {
-         "caseSensitive": true,
-         "leftValue": "",
-         "typeValidation": "loose"
-        },
-        "conditions": [
-         {
-          "leftValue": "={{ $('Telegram Trigger').first().json.callback_query.data }}",
-          "operator": {
-           "type": "string",
-           "operation": "startsWith"
-          },
-          "rightValue": "sure:"
-         }
-        ],
-        "combinator": "and"
-       }
       }
      ]
     },
@@ -1269,7 +1248,7 @@
      "mappingMode": "defineBelow",
      "value": {
       "karakter": "",
-      "durum": "sure_bekliyor"
+      "durum": "islemde"
      },
      "schema": [
       {
@@ -1331,7 +1310,7 @@
      "mappingMode": "defineBelow",
      "value": {
       "karakter": "a minimalist stickman character: pure black stick figure with a simple round head, thin clean strokes, expressive body poses, on a soft off-white paper background, subtle hand-drawn line wobble, 2D flat animation style",
-      "durum": "sure_bekliyor"
+      "durum": "islemde"
      },
      "schema": [
       {
@@ -1421,7 +1400,7 @@
     "resource": "message",
     "operation": "sendMessage",
     "chatId": "={{ $('Telegram Trigger').first().json.callback_query.message.chat.id }}",
-    "text": "✍️ Karakterini tek mesajda tarif et: gorunus + cizim stili. Ornek: \"kirmizi atkili sevimli kucuk bir robot, buyuk mavi gozler, yuvarlak govde, 3D pixar tarzi\". Simdi yazip gonder — video hemen uretilmeye baslar.",
+    "text": "✍️ Karakterini tek mesajda tarif et — Turkce ve kabaca yazabilirsin; ben detayli analiz edip her sahnede birebir ayni gorunecek sekilde kilitleyecegim. Ornek: \"kirmizi atkili sevimli kucuk bir robot, buyuk mavi gozler\". Simdi yazip gonder — video uretimi hemen baslar.",
     "additionalFields": {
      "appendAttribution": false
     }
@@ -1560,7 +1539,7 @@
      "mappingMode": "defineBelow",
      "value": {
       "karakter": "={{ $('Telegram Trigger').first().json.message.text }}",
-      "durum": "sure_bekliyor"
+      "durum": "islemde"
      },
      "schema": [
       {
@@ -1720,134 +1699,6 @@
    },
    "onError": "continueRegularOutput",
    "id": "135e33ec-b16d-4e6c-be76-41a2a23435ae"
-  },
-  {
-   "name": "Sure Sor",
-   "type": "n8n-nodes-base.telegram",
-   "typeVersion": 1.2,
-   "position": [
-    1560,
-    620
-   ],
-   "parameters": {
-    "resource": "message",
-    "operation": "sendMessage",
-    "chatId": "={{ $('Telegram Trigger').first().json.callback_query?.message?.chat?.id ?? $('Telegram Trigger').first().json.message?.chat?.id }}",
-    "text": "⏱ Video kac dakika olsun? (Sure uzadikca uretim ve render suresi de artar)",
-    "replyMarkup": "inlineKeyboard",
-    "inlineKeyboard": {
-     "rows": [
-      {
-       "row": {
-        "buttons": [
-         {
-          "text": "1 dk",
-          "additionalFields": {
-           "callback_data": "sure:1"
-          }
-         },
-         {
-          "text": "2 dk",
-          "additionalFields": {
-           "callback_data": "sure:2"
-          }
-         }
-        ]
-       }
-      },
-      {
-       "row": {
-        "buttons": [
-         {
-          "text": "3 dk",
-          "additionalFields": {
-           "callback_data": "sure:3"
-          }
-         },
-         {
-          "text": "5 dk",
-          "additionalFields": {
-           "callback_data": "sure:5"
-          }
-         }
-        ]
-       }
-      }
-     ]
-    },
-    "additionalFields": {
-     "appendAttribution": false
-    }
-   },
-   "credentials": {
-    "telegramApi": {
-     "name": "Telegram Bot"
-    }
-   },
-   "id": "deaa384d-1b27-4661-8936-f1897eeed6ad",
-   "webhookId": "be7e10fc-6070-4f7c-813d-9785c09c4fa0"
-  },
-  {
-   "name": "Sure Kaydet",
-   "type": "n8n-nodes-base.dataTable",
-   "typeVersion": 1.1,
-   "position": [
-    800,
-    1320
-   ],
-   "parameters": {
-    "resource": "row",
-    "operation": "update",
-    "dataTableId": {
-     "__rl": true,
-     "mode": "id",
-     "value": "AsJTzSVKYsokANxY",
-     "cachedResultName": "video_istekleri"
-    },
-    "matchType": "allConditions",
-    "filters": {
-     "conditions": [
-      {
-       "keyName": "chat_id",
-       "condition": "eq",
-       "keyValue": "={{ $('Telegram Trigger').first().json.callback_query.message.chat.id }}"
-      },
-      {
-       "keyName": "durum",
-       "condition": "eq",
-       "keyValue": "sure_bekliyor"
-      }
-     ]
-    },
-    "columns": {
-     "mappingMode": "defineBelow",
-     "value": {
-      "sure": "={{ $('Telegram Trigger').first().json.callback_query.data.replace('sure:', '') }}",
-      "durum": "islemde"
-     },
-     "schema": [
-      {
-       "id": "sure",
-       "displayName": "sure",
-       "required": false,
-       "defaultMatch": false,
-       "display": true,
-       "type": "string",
-       "canBeUsedToMatch": true
-      },
-      {
-       "id": "durum",
-       "displayName": "durum",
-       "required": false,
-       "defaultMatch": false,
-       "display": true,
-       "type": "string",
-       "canBeUsedToMatch": true
-      }
-     ]
-    }
-   },
-   "id": "c64a36af-6dbf-487d-990d-4f8df09563cb"
   }
  ],
  "connections": {
@@ -2200,13 +2051,6 @@
       "type": "main",
       "index": 0
      }
-    ],
-    [
-     {
-      "node": "Sure Kaydet",
-      "type": "main",
-      "index": 0
-     }
     ]
    ]
   },
@@ -2225,7 +2069,7 @@
    "main": [
     [
      {
-      "node": "Sure Sor",
+      "node": "Uretim Istegi Getir",
       "type": "main",
       "index": 0
      }
@@ -2236,7 +2080,7 @@
    "main": [
     [
      {
-      "node": "Sure Sor",
+      "node": "Uretim Istegi Getir",
       "type": "main",
       "index": 0
      }
@@ -2287,7 +2131,7 @@
    "main": [
     [
      {
-      "node": "Sure Sor",
+      "node": "Uretim Istegi Getir",
       "type": "main",
       "index": 0
      }
@@ -2394,17 +2238,6 @@
     [
      {
       "node": "Gorseller Uretildi Mi",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Sure Kaydet": {
-   "main": [
-    [
-     {
-      "node": "Uretim Istegi Getir",
       "type": "main",
       "index": 0
      }

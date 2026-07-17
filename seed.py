@@ -182,32 +182,38 @@ def main():
     pid = proje_id()
     tid = datatable_id(pid)
 
+    wf = json.load(open(WF_FILE))
+    # data table id'sini yeni tabloya yonlendir
+    s = json.dumps(wf)
+    s = s.replace("8Qq90K7BJNxaUPuF", tid).replace("AsJTzSVKYsokANxY", tid)
+    wf = json.loads(s)
+    # credential ID'lerini yeni ID'lerle esle
+    for n in wf["nodes"]:
+        if n.get("credentials"):
+            for t in list(n["credentials"].keys()):
+                if t in cred_map:
+                    n["credentials"][t] = cred_map[t]
+    govde = {"name": wf["name"], "nodes": wf["nodes"],
+             "connections": wf["connections"],
+             "settings": wf.get("settings", {"executionOrder": "v1"})}
+
     wfid = wf_var()
     if wfid:
-        print(f"[seed] workflow zaten var ({wfid})", flush=True)
+        sc, r = istek(f"/rest/workflows/{wfid}",
+                      {"nodes": govde["nodes"], "connections": govde["connections"]},
+                      method="PATCH")
+        d = r.get("data", r)
+        print(f"[seed] workflow guncellendi ({wfid})", flush=True)
     else:
-        wf = json.load(open(WF_FILE))
-        # data table id'sini yeni tabloya yonlendir
-        s = json.dumps(wf)
-        s = s.replace("8Qq90K7BJNxaUPuF", tid).replace("AsJTzSVKYsokANxY", tid)
-        wf = json.loads(s)
-        # credential ID'lerini yeni ID'lerle esle
-        for n in wf["nodes"]:
-            if n.get("credentials"):
-                for t in list(n["credentials"].keys()):
-                    if t in cred_map:
-                        n["credentials"][t] = cred_map[t]
-        govde = {"name": wf["name"], "nodes": wf["nodes"],
-                 "connections": wf["connections"],
-                 "settings": wf.get("settings", {"executionOrder": "v1"})}
         sc, r = istek("/rest/workflows", govde)
         d = r.get("data", r)
         wfid = d.get("id")
         print(f"[seed] workflow import edildi ({wfid})", flush=True)
-        vid = d.get("versionId")
-        sc, r = istek(f"/rest/workflows/{wfid}/activate", {"versionId": vid}, method="POST")
-        d = r.get("data", r)
-        print(f"[seed] workflow aktif: {d.get('active', r)}", flush=True)
+
+    vid = d.get("versionId")
+    sc, r = istek(f"/rest/workflows/{wfid}/activate", {"versionId": vid}, method="POST")
+    d = r.get("data", r)
+    print(f"[seed] workflow aktif: {d.get('active', r)}", flush=True)
 
     kopru_bilgisi_yaz(wfid)
     print("[seed] TAMAM", flush=True)
