@@ -1,0 +1,65 @@
+services:
+  n8n:
+    build: .
+    image: vidrush-bot:latest
+    container_name: vidrush-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    env_file: .env
+    environment:
+      N8N_SECURE_COOKIE: "false"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      NODES_EXCLUDE: "[]"
+      N8N_USER_FOLDER: /home/node
+      GENERIC_TIMEZONE: Europe/Istanbul
+      TZ: Europe/Istanbul
+      REMOTION_BROWSER_EXECUTABLE: /usr/bin/chromium
+      REMOTION_GL: swangle
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - render_isler:/opt/vidrush/render-studio/public/isler
+      - render_out:/opt/vidrush/render-studio/out
+    cap_add:
+      - SYS_ADMIN            # headless Chromium sandbox icin
+    shm_size: "1gb"          # Chrome cokmesini onler
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5678/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 40s
+
+  seed:
+    image: vidrush-bot:latest
+    container_name: vidrush-seed
+    depends_on:
+      n8n:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      N8N_URL: http://n8n:5678
+    volumes:
+      - seed_info:/opt/vidrush/seedinfo
+    command: ["python3", "/opt/vidrush/seed.py"]
+    restart: "no"
+
+  bridge:
+    image: vidrush-bot:latest
+    container_name: vidrush-bridge
+    restart: unless-stopped
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    env_file: .env
+    environment:
+      N8N_BASE: http://n8n:5678
+    volumes:
+      - seed_info:/opt/vidrush/seedinfo
+    command: ["python3", "/opt/vidrush/kopru.py"]
+
+volumes:
+  n8n_data:
+  render_isler:
+  render_out:
+  seed_info:

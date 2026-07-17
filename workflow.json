@@ -1,0 +1,2419 @@
+{
+ "id": "OrUAUA3rBeX05bBA",
+ "name": "Vidrush Tarzi Video Botu",
+ "nodes": [
+  {
+   "id": "84712b58-4ccd-4278-9f64-b6747a5d9299",
+   "name": "Telegram Trigger",
+   "type": "n8n-nodes-base.telegramTrigger",
+   "typeVersion": 1.4,
+   "position": [
+    0,
+    848
+   ],
+   "parameters": {
+    "updates": [
+     "message",
+     "callback_query"
+    ]
+   },
+   "webhookId": "9defa455-c351-40c0-aaa8-5c1a46ae633f",
+   "credentials": {
+    "telegramApi": {
+     "name": "Telegram Bot"
+    }
+   }
+  },
+  {
+   "id": "8b7b6efb-d110-4771-874a-ad48d0907b9d",
+   "name": "Guncelleme Turu",
+   "type": "n8n-nodes-base.switch",
+   "typeVersion": 3.4,
+   "position": [
+    224,
+    848
+   ],
+   "parameters": {
+    "rules": {
+     "values": [
+      {
+       "outputKey": "stil_secimi",
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "loose"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.callback_query?.id ?? \"\" }}",
+          "operator": {
+           "type": "string",
+           "operation": "notEmpty",
+           "singleValue": true
+          },
+          "rightValue": ""
+         }
+        ],
+        "combinator": "and"
+       }
+      },
+      {
+       "outputKey": "yeni_metin",
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "loose"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $json.message?.text ?? \"\" }}",
+          "operator": {
+           "type": "string",
+           "operation": "notEmpty",
+           "singleValue": true
+          },
+          "rightValue": ""
+         }
+        ],
+        "combinator": "and"
+       }
+      }
+     ]
+    },
+    "options": {}
+   }
+  },
+  {
+   "id": "c7d79074-10e8-4c38-985c-c38cead74d75",
+   "name": "Callback Yanitla",
+   "type": "n8n-nodes-base.telegram",
+   "typeVersion": 1.2,
+   "position": [
+    448,
+    576
+   ],
+   "parameters": {
+    "resource": "callback",
+    "operation": "answerQuery",
+    "queryId": "={{ $json.callback_query.id }}",
+    "additionalFields": {
+     "text": "✓"
+    }
+   },
+   "webhookId": "f98c7850-30e4-4c37-93d0-44f9cf8d7909",
+   "credentials": {
+    "telegramApi": {
+     "name": "Telegram Bot"
+    }
+   }
+  },
+  {
+   "id": "dfc93cb6-82c0-42b5-812f-171b1b948efa",
+   "name": "Istek Getir",
+   "type": "n8n-nodes-base.dataTable",
+   "typeVersion": 1.1,
+   "position": [
+    672,
+    576
+   ],
+   "parameters": {
+    "resource": "row",
+    "operation": "get",
+    "dataTableId": {
+     "__rl": true,
+     "mode": "id",
+     "value": "AsJTzSVKYsokANxY",
+     "cachedResultName": "video_istekleri"
+    },
+    "matchType": "allConditions",
+    "filters": {
+     "conditions": [
+      {
+       "keyName": "chat_id",
+       "condition": "eq",
+       "keyValue": "={{ $('Telegram Trigger').first().json.callback_query.message.chat.id }}"
+      }
+     ]
+    },
+    "returnAll": false,
+    "limit": 1
+   },
+   "alwaysOutputData": true
+  },
+  {
+   "id": "d6f7f42e-cf80-4da6-8af5-c7c5f16feb6e",
+   "name": "Bekleyen Istek Var Mi",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.3,
+   "position": [
+    896,
+    576
+   ],
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose"
+     },
+     "conditions": [
+      {
+       "leftValue": "={{ $json.metin ?? \"\" }}",
+       "operator": {
+        "type": "string",
+        "operation": "notEmpty",
+        "singleValue": true
+       },
+       "rightValue": ""
+      },
+      {
+       "leftValue": "={{ $json.durum ?? \"\" }}",
+       "operator": {
+        "type": "string",
+        "operation": "equals"
+       },
+       "rightValue": "stil_bekliyor"
+      }
+     ],
+     "combinator": "and"
+    }
+   }
+  },
+  {
+   "id": "f984d653-2222-4626-82a6-08bc342c86b0",
+   "name": "Stili Kaydet",
+   "type": "n8n-nodes-base.dataTable",
+   "typeVersion": 1.1,
+   "position": [
+    1120,
+    384
+   ],
+   "parameters": {
+    "resource": "row",
+    "operation": "update",
+    "dataTableId": {
+     "__rl": true,
+     "mode": "id",
+     "value": "AsJTzSVKYsokANxY",
+     "cachedResultName": "video_istekleri"
+    },
+    "matchType": "allConditions",
+    "filters": {
+     "conditions": [
+      {
+       "keyName": "chat_id",
+       "condition": "eq",
+       "keyValue": "={{ $('Telegram Trigger').first().json.callback_query.message.chat.id }}"
+      }
+     ]
+    },
+    "columns": {
+     "mappingMode": "defineBelow",
+     "value": {
+      "stil": "={{ ({\"sinematik\": \"cinematic film still, dramatic lighting, shallow depth of field\", \"belgesel\": \"realistic documentary photography, natural light\", \"anime\": \"anime illustration, vibrant colors, detailed background\", \"futuristik\": \"futuristic sci-fi concept art, neon, cyberpunk\", \"minimal\": \"minimalist flat design, clean composition, soft palette\", \"retro\": \"vintage retro film photo, grainy, warm tones\"})[$(\"Telegram Trigger\").first().json.callback_query.data.replace(\"stil:\", \"\")] ?? $(\"Telegram Trigger\").first().json.callback_query.data.replace(\"stil:\", \"\") }}",
+      "durum": "karakter_bekliyor"
+     },
+     "schema": [
+      {
+       "id": "stil",
+       "displayName": "stil",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "durum",
+       "displayName": "durum",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "57643c4f-b11e-4f63-8252-721bcd3b6f17",
+   "name": "Uretim Basladi Mesaji",
+   "type": "n8n-nodes-base.telegram",
+   "typeVersion": 1.2,
+   "position": [
+    1344,
+    240
+   ],
+   "parameters": {
+    "resource": "message",
+    "operation": "sendMessage",
+    "chatId": "={{ $('Telegram Trigger').first().json.callback_query?.message?.chat?.id ?? $('Telegram Trigger').first().json.message?.chat?.id }}",
+    "text": "🎬 Videon uretiliyor: sahneler planlaniyor, gorseller AI ile olusturuluyor, seslendirme ve montaj yapiliyor. Bu 5-15 dakika surebilir...",
+    "additionalFields": {
+     "appendAttribution": false
+    }
+   },
+   "webhookId": "95dc4eff-a6e7-4969-b67e-87dad91b74e8",
+   "credentials": {
+    "telegramApi": {
+     "name": "Telegram Bot"
+    }
+   }
+  },
+  {
+   "id": "ed4d5c63-3313-40b3-b936-4bb6964283c2",
+   "name": "Sahne Planla",
+   "type": "@n8n/n8n-nodes-langchain.openAi",
+   "typeVersion": 2.3,
+   "position": [
+    1568,
+    384
+   ],
+   "parameters": {
+    "resource": "text",
+    "operation": "response",
+    "modelId": {
+     "__rl": true,
+     "mode": "list",
+     "value": "gpt-4.1-mini",
+     "cachedResultName": "GPT-4.1-MINI"
+    },
+    "responses": {
+     "values": [
+      {
+       "type": "text",
+       "role": "system",
+       "content": "You are a video scene planner for an automated Vidrush-style video production pipeline. The user gives a narration script, a visual style, and optionally a reference CHARACTER. Rules: 1) Detect the language of the script. 2) You are given a TARGET DURATION in minutes. Produce a narration whose spoken length matches it: about 130 words per spoken minute, split into scenes of ~5 seconds each (about 12 scenes per minute). Total scenes must be approximately target_minutes x 12 (HARD MAXIMUM 65 scenes). If the user's text is a short brief or topic, EXPAND it into a complete, engaging narration of the target duration on that subject, with a strong hook, development, and a closing line. If the user's text is already long enough, adapt it to fit the duration. The voiceover fields together form the full narration in the ORIGINAL language of the user's text, smoothed for spoken delivery. 3) CHARACTER: if Character is not 'none', tell the story through this character: feature it in most scenes, and in EVERY image_prompt that features it repeat the EXACT SAME character descriptor phrase word-for-word — this keeps the character visually identical across scenes. All scenes featuring the character MUST use source 'ai' (stock sites do not have this character). 4) For scenes without a character decide the visual source: \"stock\" when real-world footage would exist on a stock video site (nature, cities, people, animals, technology, vehicles, news-style b-roll); \"ai\" for abstract, fantastical, historical, or highly specific scenes. Prefer stock for documentary and news styles. Vary the stock_query between scenes so consecutive shots look different. 5) For stock scenes write stock_query: 2-4 simple ENGLISH stock-video search keywords. 6) For EVERY scene also write image_prompt in ENGLISH: a highly detailed 16:9 image generation prompt matching the requested style (used when source is ai, and as a fallback when no stock is found). Keep setting, color palette and lighting CONSISTENT across scenes by repeating the same descriptor phrases, but vary camera angle and subject between consecutive scenes. Never include text or captions in scene image prompts. 7) Choose the voice by detected language: tr -> tr-TR-EmelNeural, en -> en-US-AndrewMultilingualNeural, es -> es-ES-AlvaroNeural, de -> de-DE-ConradNeural, fr -> fr-FR-HenriNeural; otherwise a fitting Microsoft Azure neural voice name. 8) Also design ONE YouTube thumbnail: top-level \"thumbnail\" object with \"text\" = a punchy 2-5 word hook in the ORIGINAL script language, ALL CAPS, and \"prompt\" = a detailed ENGLISH prompt for a dramatic thumbnail image matching the requested style: ONE bold focal subject (the reference character with its exact descriptor, if provided), strong emotion or intrigue, high contrast, clean uncluttered background, composed so a center 16:9 crop works. Respond with ONLY valid JSON exactly in this schema: {\"language\":\"en\",\"voice\":\"en-US-AndrewMultilingualNeural\",\"thumbnail\":{\"text\":\"...\",\"prompt\":\"...\"},\"scenes\":[{\"n\":1,\"voiceover\":\"...\",\"source\":\"stock\",\"stock_query\":\"city night aerial\",\"image_prompt\":\"...\"}]}"
+      },
+      {
+       "type": "text",
+       "role": "user",
+       "content": "=Target duration: {{ $(\"Uretim Istegi Getir\").first().json.sure || \"2\" }} minutes\nStyle: {{ $(\"Uretim Istegi Getir\").first().json.stil }}\nCharacter: {{ $(\"Uretim Istegi Getir\").first().json.karakter || \"none\" }}\n\nUser text (topic or script):\n{{ $(\"Uretim Istegi Getir\").first().json.metin }}"
+      }
+     ]
+    },
+    "simplify": true,
+    "options": {
+     "maxTokens": 14000,
+     "temperature": 0.7
+    }
+   },
+   "executeOnce": true,
+   "credentials": {
+    "openAiApi": {
+     "name": "OpenAI Kisisel"
+    }
+   }
+  },
+  {
+   "id": "74e7010a-9814-42c7-abb2-bb5bfbb55b58",
+   "name": "Plan Ayristir",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    1792,
+    384
+   ],
+   "parameters": {
+    "mode": "runOnceForAllItems",
+    "language": "javaScript",
+    "jsCode": "const item = $input.first().json;\nlet raw = item.output ?? item.text ?? item.output_text ?? (item.message && item.message.content) ?? item.content ?? '';\nif (Array.isArray(raw)) {\n  raw = raw.map(o => {\n    if (typeof o === 'string') return o;\n    if (o.content && Array.isArray(o.content)) return o.content.map(c => c.text ?? '').join('');\n    return o.text ?? '';\n  }).join('');\n} else if (typeof raw === 'object' && raw !== null) {\n  raw = JSON.stringify(raw);\n}\nraw = String(raw).trim();\nconst m = raw.match(/\\{[\\s\\S]*\\}/);\nlet plan;\ntry {\n  plan = JSON.parse(m ? m[0] : raw);\n} catch (e) {\n  throw new Error('Sahne plani JSON olarak ayristirilmadi: ' + raw.slice(0, 300));\n}\nif (!plan.scenes || !Array.isArray(plan.scenes) || plan.scenes.length === 0) {\n  throw new Error('Sahne plani bos geldi');\n}\nconst scenes = plan.scenes.map((s, i) => ({\n  n: s.n ?? i + 1,\n  voiceover: String(s.voiceover ?? '').trim(),\n  image_prompt: String(s.image_prompt ?? '').trim(),\n  source: s.source === 'stock' ? 'stock' : 'ai',\n  stock_query: String(s.stock_query ?? '').trim()\n})).filter(s => s.voiceover && s.image_prompt);\nif (scenes.length === 0) throw new Error('Gecerli sahne yok');\nconst t = plan.thumbnail ?? {};\nconst kapakText = String(t.text ?? '').trim();\nlet kapakPrompt = String(t.prompt ?? '').trim();\nif (!kapakPrompt) kapakPrompt = scenes[0].image_prompt + ', dramatic close-up, high contrast, YouTube thumbnail composition';\nif (kapakText) {\n  kapakPrompt += '. Render the exact text \"' + kapakText + '\" inside the image as huge bold eye-catching title typography baked into the artwork, perfectly readable, high contrast against the background, professional YouTube thumbnail style. No other text, no watermarks.';\n} else {\n  kapakPrompt += '. No text in the image.';\n}\nreturn [{ json: { language: plan.language ?? 'en', voice: plan.voice ?? 'en-US-AndrewMultilingualNeural', kapak_text: kapakText, kapak_prompt: kapakPrompt, scenes } }];"
+   }
+  },
+  {
+   "id": "ffae2381-8613-4abd-8ff8-0d60f42bb6c5",
+   "name": "Sahneleri Ayir",
+   "type": "n8n-nodes-base.splitOut",
+   "typeVersion": 1,
+   "position": [
+    2016,
+    384
+   ],
+   "parameters": {
+    "fieldToSplitOut": "scenes"
+   }
+  },
+  {
+   "id": "3ce25879-6012-4611-8833-79994bbaa24c",
+   "name": "Render Girdisi Olustur",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    2464,
+    192
+   ],
+   "parameters": {
+    "mode": "runOnceForAllItems",
+    "language": "javaScript",
+    "jsCode": "const results = $input.all().map(i => i.json).filter(s => s.gorsel_url);\nif (results.length === 0) return [{ json: { hata: true } }];\nresults.sort((a, b) => a.n - b.n);\nconst plan = $('Plan Ayristir').first().json;\nconst payload = {\n  is_adi: 'is_' + $execution.id,\n  voice: plan.voice,\n  sahneler: results.map(s => ({ n: s.n, voiceover: s.voiceover, gorsel_url: s.gorsel_url, tur: s.tur }))\n};\nconst b64 = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64');\nreturn [{ json: { hata: false, b64 } }];"
+   }
+  },
+  {
+   "id": "55146d63-0a00-42cc-ba5c-9c99d5f56aaa",
+   "name": "Gorseller Uretildi Mi",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.3,
+   "position": [
+    2688,
+    192
+   ],
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose"
+     },
+     "conditions": [
+      {
+       "leftValue": "={{ $json.hata }}",
+       "operator": {
+        "type": "boolean",
+        "operation": "false",
+        "singleValue": true
+       },
+       "rightValue": ""
+      }
+     ],
+     "combinator": "and"
+    }
+   }
+  },
+  {
+   "id": "1ddea0fe-678f-47c4-91c0-f7f45a5b8532",
+   "name": "Videoyu Gonder",
+   "type": "n8n-nodes-base.telegram",
+   "typeVersion": 1.2,
+   "position": [
+    3808,
+    0
+   ],
+   "parameters": {
+    "resource": "message",
+    "operation": "sendVideo",
+    "chatId": "={{ $('Telegram Trigger').first().json.callback_query?.message?.chat?.id ?? $('Telegram Trigger').first().json.message?.chat?.id }}",
+    "binaryData": true,
+    "additionalFields": {
+     "caption": "✨ Videon hazir!",
+     "appendAttribution": false
+    },
+    "binaryPropertyName": "data"
+   },
+   "onError": "continueErrorOutput",
+   "webhookId": "a8c46d44-df08-4590-8626-6b58c8103120",
+   "credentials": {
+    "telegramApi": {
+     "name": "Telegram Bot"
+    }
+   }
+  },
+  {
+   "id": "d5ebf247-179b-48c6-b426-dfcec04269bd",
+   "name": "Tamamlandi Isaretle",
+   "type": "n8n-nodes-base.dataTable",
+   "typeVersion": 1.1,
+   "position": [
+    4256,
+    0
+   ],
+   "parameters": {
+    "resource": "row",
+    "operation": "update",
+    "dataTableId": {
+     "__rl": true,
+     "mode": "id",
+     "value": "AsJTzSVKYsokANxY",
+     "cachedResultName": "video_istekleri"
+    },
+    "matchType": "allConditions",
+    "filters": {
+     "conditions": [
+      {
+       "keyName": "chat_id",
+       "condition": "eq",
+       "keyValue": "={{ $('Telegram Trigger').first().json.callback_query?.message?.chat?.id ?? $('Telegram Trigger').first().json.message?.chat?.id }}"
+      }
+     ]
+    },
+    "columns": {
+     "mappingMode": "defineBelow",
+     "value": {
+      "durum": "tamamlandi"
+     },
+     "schema": [
+      {
+       "id": "durum",
+       "displayName": "durum",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "624823e5-e662-42c1-b417-251f819acd5c",
+   "name": "Render Hatasi Mesaji",
+   "type": "n8n-nodes-base.telegram",
+   "typeVersion": 1.2,
+   "position": [
+    3808,
+    192
+   ],
+   "parameters": {
+    "resource": "message",
+    "operation": "sendMessage",
+    "chatId": "={{ $('Telegram Trigger').first().json.callback_query?.message?.chat?.id ?? $('Telegram Trigger').first().json.message?.chat?.id }}",
+    "text": "❌ Yerel video render sirasinda hata olustu (Remotion). n8n execution detayina bakmak gerek.",
+    "additionalFields": {
+     "appendAttribution": false
+    }
+   },
+   "webhookId": "3bfa4487-f666-4821-9ab7-b7df595baef6",
+   "credentials": {
+    "telegramApi": {
+     "name": "Telegram Bot"
+    }
+   }
+  },
+  {
+   "id": "6ab5ddd3-4916-4fbc-9274-bbdc54edfa5e",
+   "name": "Gorsel Hatasi Mesaji",
+   "type": "n8n-nodes-base.telegram",
+   "typeVersion": 1.2,
+   "position": [
+    2912,
+    288
+   ],
+   "parameters": {
+    "resource": "message",
+    "operation": "sendMessage",
+    "chatId": "={{ $('Telegram Trigger').first().json.callback_query?.message?.chat?.id ?? $('Telegram Trigger').first().json.message?.chat?.id }}",
+    "text": "❌ Uzgunum, gorseller uretilemedi (OpenAI gorsel API hatasi). Lutfen daha sonra tekrar dene.",
+    "additionalFields": {
+     "appendAttribution": false
+    }
+   },
+   "webhookId": "69b7ee91-dbb8-43c9-b9bd-93a78ff55fa4",
+   "credentials": {
+    "telegramApi": {
+     "name": "Telegram Bot"
+    }
+   }
+  },
+  {
+   "id": "25517250-5bc8-42ea-9e14-1a7ac19f5bc7",
+   "name": "Sahne Sonucu",
+   "type": "n8n-nodes-base.set",
+   "typeVersion": 3.4,
+   "position": [
+    3360,
+    624
+   ],
+   "parameters": {
+    "mode": "manual",
+    "includeOtherFields": false,
+    "assignments": {
+     "assignments": [
+      {
+       "id": "sahne-no",
+       "name": "n",
+       "value": "={{ $(\"Sahne Dongusu\").first().json.n }}",
+       "type": "number"
+      },
+      {
+       "id": "sahne-ses",
+       "name": "voiceover",
+       "value": "={{ $(\"Sahne Dongusu\").first().json.voiceover }}",
+       "type": "string"
+      },
+      {
+       "id": "sahne-gorsel",
+       "name": "gorsel_url",
+       "value": "={{ ($json.fileName || $binary?.data) ? (\"isler/is_\" + $execution.id + \"/sahne_\" + $(\"Sahne Dongusu\").first().json.n + \".png\") : \"\" }}",
+       "type": "string"
+      },
+      {
+       "id": "sahne-tur",
+       "name": "tur",
+       "value": "image",
+       "type": "string"
+      },
+      {
+       "id": "sahne-durum",
+       "name": "uretim_durumu",
+       "value": "={{ ($json.fileName || $binary?.data) ? \"completed\" : \"failed\" }}",
+       "type": "string"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "f09a1b6e-ed1b-4fc7-8541-379a990aaf72",
+   "name": "Sahne Dongusu",
+   "type": "n8n-nodes-base.splitInBatches",
+   "typeVersion": 3,
+   "position": [
+    2240,
+    384
+   ],
+   "parameters": {
+    "batchSize": 1
+   }
+  },
+  {
+   "id": "5172b1be-e6d7-4f18-93e8-5835d6229efa",
+   "name": "Once Metin Mesaji",
+   "type": "n8n-nodes-base.telegram",
+   "typeVersion": 1.2,
+   "position": [
+    1120,
+    576
+   ],
+   "parameters": {
+    "resource": "message",
+    "operation": "sendMessage",
+    "chatId": "={{ $('Telegram Trigger').first().json.callback_query.message.chat.id }}",
+    "text": "⚠️ Bekleyen bir video metnin yok. Once senaryonu duz mesaj olarak gonder.",
+    "additionalFields": {
+     "appendAttribution": false
+    }
+   },
+   "webhookId": "7221fd4c-f61a-4fda-a935-6752ad436c16",
+   "credentials": {
+    "telegramApi": {
+     "name": "Telegram Bot"
+    }
+   }
+  },
+  {
+   "id": "bee29396-317f-458b-9c50-94597a776e8f",
+   "name": "Start Komutu Mu",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.3,
+   "position": [
+    448,
+    944
+   ],
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose"
+     },
+     "conditions": [
+      {
+       "leftValue": "={{ $json.message.text }}",
+       "operator": {
+        "type": "string",
+        "operation": "startsWith"
+       },
+       "rightValue": "/start"
+      }
+     ],
+     "combinator": "and"
+    }
+   }
+  },
+  {
+   "id": "dd13fd7f-ee61-49ba-82d5-70bcc9834ec3",
+   "name": "Hosgeldin Mesaji",
+   "type": "n8n-nodes-base.telegram",
+   "typeVersion": 1.2,
+   "position": [
+    672,
+    768
+   ],
+   "parameters": {
+    "resource": "message",
+    "operation": "sendMessage",
+    "chatId": "={{ $json.message.chat.id }}",
+    "text": "Merhaba! 👋 Bana video metnini (senaryonu) duz mesaj olarak gonder. Sana stil secenekleri sunacagim, sonra videonu uretip gonderecegim. 🎬",
+    "additionalFields": {
+     "appendAttribution": false
+    }
+   },
+   "webhookId": "4eec733f-6bad-4749-8e84-50a3896a44b9",
+   "credentials": {
+    "telegramApi": {
+     "name": "Telegram Bot"
+    }
+   }
+  },
+  {
+   "id": "90cd62f8-170f-4efa-9cd7-dc8dfc178380",
+   "name": "Istek Kaydet",
+   "type": "n8n-nodes-base.dataTable",
+   "typeVersion": 1.1,
+   "position": [
+    672,
+    960
+   ],
+   "parameters": {
+    "resource": "row",
+    "operation": "upsert",
+    "dataTableId": {
+     "__rl": true,
+     "mode": "id",
+     "value": "AsJTzSVKYsokANxY",
+     "cachedResultName": "video_istekleri"
+    },
+    "matchType": "allConditions",
+    "filters": {
+     "conditions": [
+      {
+       "keyName": "chat_id",
+       "condition": "eq",
+       "keyValue": "={{ $('Telegram Trigger').first().json.message.chat.id }}"
+      }
+     ]
+    },
+    "columns": {
+     "mappingMode": "defineBelow",
+     "value": {
+      "chat_id": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+      "metin": "={{ $('Telegram Trigger').first().json.message.text }}",
+      "stil": "",
+      "durum": "stil_bekliyor",
+      "karakter": ""
+     },
+     "schema": [
+      {
+       "id": "chat_id",
+       "displayName": "chat_id",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "metin",
+       "displayName": "metin",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "stil",
+       "displayName": "stil",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "karakter",
+       "displayName": "karakter",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "durum",
+       "displayName": "durum",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "84cb83bf-980a-4671-b3cf-29a10bf834b9",
+   "name": "Stil Sor",
+   "type": "n8n-nodes-base.telegram",
+   "typeVersion": 1.2,
+   "position": [
+    896,
+    960
+   ],
+   "parameters": {
+    "resource": "message",
+    "operation": "sendMessage",
+    "chatId": "={{ $('Telegram Trigger').first().json.message.chat.id }}",
+    "text": "🎨 Metnini aldim! Ne stilde bir video icerigi istersin?",
+    "replyMarkup": "inlineKeyboard",
+    "inlineKeyboard": {
+     "rows": [
+      {
+       "row": {
+        "buttons": [
+         {
+          "text": "🎬 Sinematik",
+          "additionalFields": {
+           "callback_data": "stil:sinematik"
+          }
+         },
+         {
+          "text": "📷 Belgesel",
+          "additionalFields": {
+           "callback_data": "stil:belgesel"
+          }
+         }
+        ]
+       }
+      },
+      {
+       "row": {
+        "buttons": [
+         {
+          "text": "🌸 Anime",
+          "additionalFields": {
+           "callback_data": "stil:anime"
+          }
+         },
+         {
+          "text": "🤖 Futuristik",
+          "additionalFields": {
+           "callback_data": "stil:futuristik"
+          }
+         }
+        ]
+       }
+      },
+      {
+       "row": {
+        "buttons": [
+         {
+          "text": "⬜ Minimalist",
+          "additionalFields": {
+           "callback_data": "stil:minimal"
+          }
+         },
+         {
+          "text": "📼 Retro",
+          "additionalFields": {
+           "callback_data": "stil:retro"
+          }
+         }
+        ]
+       }
+      }
+     ]
+    },
+    "additionalFields": {
+     "appendAttribution": false
+    }
+   },
+   "webhookId": "bba78439-40f8-4abf-b362-a770ddd65663",
+   "credentials": {
+    "telegramApi": {
+     "name": "Telegram Bot"
+    }
+   }
+  },
+  {
+   "id": "883a1f93-8423-4474-adcf-9c81a562e738",
+   "name": "Gorsel Uret (OpenAI)",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    2464,
+    560
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.openai.com/v1/images/generations",
+    "authentication": "predefinedCredentialType",
+    "nodeCredentialType": "openAiApi",
+    "sendBody": true,
+    "contentType": "json",
+    "specifyBody": "json",
+    "jsonBody": "={{ { \"model\": \"gpt-image-1-mini\", \"prompt\": $(\"Sahne Dongusu\").first().json.image_prompt, \"size\": \"1536x1024\", \"quality\": \"medium\", \"n\": 1 } }}"
+   },
+   "onError": "continueRegularOutput",
+   "retryOnFail": true,
+   "maxTries": 2,
+   "waitBetweenTries": 5000,
+   "credentials": {
+    "openAiApi": {
+     "name": "OpenAI Kisisel"
+    }
+   }
+  },
+  {
+   "id": "930c0f51-12b3-4fd8-b1e6-dbd5ab460140",
+   "name": "Hiz Limiti Bekle",
+   "type": "n8n-nodes-base.wait",
+   "typeVersion": 1.1,
+   "position": [
+    3136,
+    624
+   ],
+   "parameters": {
+    "resume": "timeInterval",
+    "amount": 12,
+    "unit": "seconds"
+   },
+   "webhookId": "8b19fb65-ddb4-4354-9ae9-856fc34c2192"
+  },
+  {
+   "id": "235de3d4-33c8-418b-8cb8-4d511543aab0",
+   "name": "Stok Mu",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.3,
+   "position": [
+    2464,
+    720
+   ],
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose"
+     },
+     "conditions": [
+      {
+       "leftValue": "={{ $json.source }}",
+       "operator": {
+        "type": "string",
+        "operation": "equals"
+       },
+       "rightValue": "stock"
+      },
+      {
+       "leftValue": "={{ $json.stock_query ?? \"\" }}",
+       "operator": {
+        "type": "string",
+        "operation": "notEmpty",
+        "singleValue": true
+       },
+       "rightValue": ""
+      }
+     ],
+     "combinator": "and"
+    }
+   }
+  },
+  {
+   "id": "4be49f1f-4deb-4364-b841-1e97591bf979",
+   "name": "Stok Video Ara (Pexels)",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    2688,
+    800
+   ],
+   "parameters": {
+    "method": "GET",
+    "url": "https://api.pexels.com/videos/search",
+    "authentication": "genericCredentialType",
+    "genericAuthType": "httpHeaderAuth",
+    "sendQuery": true,
+    "specifyQuery": "keypair",
+    "queryParameters": {
+     "parameters": [
+      {
+       "name": "query",
+       "value": "={{ $json.stock_query }}"
+      },
+      {
+       "name": "orientation",
+       "value": "landscape"
+      },
+      {
+       "name": "per_page",
+       "value": "5"
+      },
+      {
+       "name": "size",
+       "value": "medium"
+      }
+     ]
+    }
+   },
+   "onError": "continueRegularOutput",
+   "credentials": {
+    "httpHeaderAuth": {
+     "name": "Pexels API"
+    }
+   }
+  },
+  {
+   "id": "c4c89d6f-9fed-484b-9e9f-a3e6964cf131",
+   "name": "Stok Videoyu Sec",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    2912,
+    800
+   ],
+   "parameters": {
+    "mode": "runOnceForAllItems",
+    "language": "javaScript",
+    "jsCode": "const r = $input.first().json;\nconst scene = $('Sahne Dongusu').first().json;\nconst vids = Array.isArray(r.videos) ? r.videos : [];\nlet best = null;\nfor (const v of vids) {\n  const file = (v.video_files || [])\n    .filter(f => (f.width || 0) >= 1280 && (f.width || 0) <= 1920 && f.link)\n    .sort((a, b) => (b.width || 0) - (a.width || 0))[0];\n  if (!file) continue;\n  const dur = v.duration || 0;\n  if (!best || dur > best.duration) best = { duration: dur, link: file.link };\n}\nreturn [{ json: {\n  n: scene.n,\n  voiceover: scene.voiceover,\n  gorsel_url: best ? best.link : '',\n  tur: 'video',\n  uretim_durumu: best ? 'completed' : 'stok_yok'\n} }];"
+   }
+  },
+  {
+   "id": "12cd2dda-f381-430c-b004-75f5230b650e",
+   "name": "Stok Bulundu Mu",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.3,
+   "position": [
+    3136,
+    800
+   ],
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose"
+     },
+     "conditions": [
+      {
+       "leftValue": "={{ $json.gorsel_url ?? \"\" }}",
+       "operator": {
+        "type": "string",
+        "operation": "notEmpty",
+        "singleValue": true
+       },
+       "rightValue": ""
+      }
+     ],
+     "combinator": "and"
+    }
+   }
+  },
+  {
+   "id": "b38436ea-b0f7-4975-bf16-9d36dccfec00",
+   "name": "Kapak Uret (OpenAI)",
+   "type": "n8n-nodes-base.httpRequest",
+   "typeVersion": 4.4,
+   "position": [
+    4480,
+    0
+   ],
+   "parameters": {
+    "method": "POST",
+    "url": "https://api.openai.com/v1/images/generations",
+    "authentication": "predefinedCredentialType",
+    "nodeCredentialType": "openAiApi",
+    "sendBody": true,
+    "contentType": "json",
+    "specifyBody": "json",
+    "jsonBody": "={{ { \"model\": \"gpt-image-1.5\", \"prompt\": $(\"Plan Ayristir\").first().json.kapak_prompt, \"size\": \"1536x1024\", \"quality\": \"high\", \"n\": 1 } }}"
+   },
+   "onError": "continueRegularOutput",
+   "retryOnFail": true,
+   "maxTries": 2,
+   "waitBetweenTries": 5000,
+   "credentials": {
+    "openAiApi": {
+     "name": "OpenAI Kisisel"
+    }
+   }
+  },
+  {
+   "id": "8e5cdcab-373f-42d5-84dc-f65db372dfcf",
+   "name": "Kapak Gonder",
+   "type": "n8n-nodes-base.telegram",
+   "typeVersion": 1.2,
+   "position": [
+    4928,
+    0
+   ],
+   "parameters": {
+    "resource": "message",
+    "operation": "sendPhoto",
+    "chatId": "={{ $('Telegram Trigger').first().json.callback_query?.message?.chat?.id ?? $('Telegram Trigger').first().json.message?.chat?.id }}",
+    "binaryData": true,
+    "additionalFields": {
+     "caption": "🖼 Kapak onerin hazir! (yazi gorselin icine islendi)",
+     "appendAttribution": false
+    },
+    "binaryPropertyName": "data"
+   },
+   "onError": "continueRegularOutput",
+   "webhookId": "5aa2d4c6-607d-493e-ac8d-5d7c5e73477a",
+   "credentials": {
+    "telegramApi": {
+     "name": "Telegram Bot"
+    }
+   }
+  },
+  {
+   "id": "61f5c295-101f-4928-8888-b442218ed5fb",
+   "name": "Karakter Sor",
+   "type": "n8n-nodes-base.telegram",
+   "typeVersion": 1.2,
+   "position": [
+    1344,
+    384
+   ],
+   "parameters": {
+    "resource": "message",
+    "operation": "sendMessage",
+    "chatId": "={{ $('Telegram Trigger').first().json.callback_query?.message?.chat?.id ?? $('Telegram Trigger').first().json.message?.chat?.id }}",
+    "text": "🧍 Referans karakterin var mi? Istersen hikaye bastan sona ayni karakter uzerinden anlatilir (her sahnede ayni gorunum).",
+    "replyMarkup": "inlineKeyboard",
+    "inlineKeyboard": {
+     "rows": [
+      {
+       "row": {
+        "buttons": [
+         {
+          "text": "🚫 Karakter Yok",
+          "additionalFields": {
+           "callback_data": "karakter:none"
+          }
+         },
+         {
+          "text": "🕴 Stickman",
+          "additionalFields": {
+           "callback_data": "karakter:stickman"
+          }
+         }
+        ]
+       }
+      },
+      {
+       "row": {
+        "buttons": [
+         {
+          "text": "✍️ Kendi Karakterimi Yazacagim",
+          "additionalFields": {
+           "callback_data": "karakter:custom"
+          }
+         }
+        ]
+       }
+      }
+     ]
+    },
+    "additionalFields": {
+     "appendAttribution": false
+    }
+   },
+   "webhookId": "5d801bf2-216e-4f5f-8deb-d1695374ed5b",
+   "credentials": {
+    "telegramApi": {
+     "name": "Telegram Bot"
+    }
+   }
+  },
+  {
+   "id": "1bc5f491-eab9-4527-b3cf-9c4cb0a275bb",
+   "name": "Callback Turu",
+   "type": "n8n-nodes-base.switch",
+   "typeVersion": 3.4,
+   "position": [
+    560,
+    720
+   ],
+   "parameters": {
+    "rules": {
+     "values": [
+      {
+       "outputKey": "stil_secimi",
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "loose"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $('Telegram Trigger').first().json.callback_query.data }}",
+          "operator": {
+           "type": "string",
+           "operation": "startsWith"
+          },
+          "rightValue": "stil:"
+         }
+        ],
+        "combinator": "and"
+       }
+      },
+      {
+       "outputKey": "karakter_yok",
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "loose"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $('Telegram Trigger').first().json.callback_query.data }}",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          },
+          "rightValue": "karakter:none"
+         }
+        ],
+        "combinator": "and"
+       }
+      },
+      {
+       "outputKey": "karakter_stickman",
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "loose"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $('Telegram Trigger').first().json.callback_query.data }}",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          },
+          "rightValue": "karakter:stickman"
+         }
+        ],
+        "combinator": "and"
+       }
+      },
+      {
+       "outputKey": "karakter_ozel",
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "loose"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $('Telegram Trigger').first().json.callback_query.data }}",
+          "operator": {
+           "type": "string",
+           "operation": "equals"
+          },
+          "rightValue": "karakter:custom"
+         }
+        ],
+        "combinator": "and"
+       }
+      },
+      {
+       "outputKey": "sure_secimi",
+       "conditions": {
+        "options": {
+         "caseSensitive": true,
+         "leftValue": "",
+         "typeValidation": "loose"
+        },
+        "conditions": [
+         {
+          "leftValue": "={{ $('Telegram Trigger').first().json.callback_query.data }}",
+          "operator": {
+           "type": "string",
+           "operation": "startsWith"
+          },
+          "rightValue": "sure:"
+         }
+        ],
+        "combinator": "and"
+       }
+      }
+     ]
+    },
+    "options": {}
+   }
+  },
+  {
+   "id": "6ce38eb9-445b-4090-bfed-60b93a249710",
+   "name": "Karakter Yok Kaydet",
+   "type": "n8n-nodes-base.dataTable",
+   "typeVersion": 1.1,
+   "position": [
+    800,
+    760
+   ],
+   "parameters": {
+    "resource": "row",
+    "operation": "update",
+    "dataTableId": {
+     "__rl": true,
+     "mode": "id",
+     "value": "AsJTzSVKYsokANxY",
+     "cachedResultName": "video_istekleri"
+    },
+    "matchType": "allConditions",
+    "filters": {
+     "conditions": [
+      {
+       "keyName": "chat_id",
+       "condition": "eq",
+       "keyValue": "={{ $('Telegram Trigger').first().json.callback_query.message.chat.id }}"
+      },
+      {
+       "keyName": "durum",
+       "condition": "eq",
+       "keyValue": "karakter_bekliyor"
+      }
+     ]
+    },
+    "columns": {
+     "mappingMode": "defineBelow",
+     "value": {
+      "karakter": "",
+      "durum": "sure_bekliyor"
+     },
+     "schema": [
+      {
+       "id": "karakter",
+       "displayName": "karakter",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "durum",
+       "displayName": "durum",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "5fa2dd3a-2249-428d-a26d-0dc3046ddd61",
+   "name": "Stickman Kaydet",
+   "type": "n8n-nodes-base.dataTable",
+   "typeVersion": 1.1,
+   "position": [
+    800,
+    900
+   ],
+   "parameters": {
+    "resource": "row",
+    "operation": "update",
+    "dataTableId": {
+     "__rl": true,
+     "mode": "id",
+     "value": "AsJTzSVKYsokANxY",
+     "cachedResultName": "video_istekleri"
+    },
+    "matchType": "allConditions",
+    "filters": {
+     "conditions": [
+      {
+       "keyName": "chat_id",
+       "condition": "eq",
+       "keyValue": "={{ $('Telegram Trigger').first().json.callback_query.message.chat.id }}"
+      },
+      {
+       "keyName": "durum",
+       "condition": "eq",
+       "keyValue": "karakter_bekliyor"
+      }
+     ]
+    },
+    "columns": {
+     "mappingMode": "defineBelow",
+     "value": {
+      "karakter": "a minimalist stickman character: pure black stick figure with a simple round head, thin clean strokes, expressive body poses, on a soft off-white paper background, subtle hand-drawn line wobble, 2D flat animation style",
+      "durum": "sure_bekliyor"
+     },
+     "schema": [
+      {
+       "id": "karakter",
+       "displayName": "karakter",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "durum",
+       "displayName": "durum",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "9503ecce-e363-4fb1-af98-fc9ab268f8a2",
+   "name": "Karakter Yazimi Isaretle",
+   "type": "n8n-nodes-base.dataTable",
+   "typeVersion": 1.1,
+   "position": [
+    800,
+    1040
+   ],
+   "parameters": {
+    "resource": "row",
+    "operation": "update",
+    "dataTableId": {
+     "__rl": true,
+     "mode": "id",
+     "value": "AsJTzSVKYsokANxY",
+     "cachedResultName": "video_istekleri"
+    },
+    "matchType": "allConditions",
+    "filters": {
+     "conditions": [
+      {
+       "keyName": "chat_id",
+       "condition": "eq",
+       "keyValue": "={{ $('Telegram Trigger').first().json.callback_query.message.chat.id }}"
+      },
+      {
+       "keyName": "durum",
+       "condition": "eq",
+       "keyValue": "karakter_bekliyor"
+      }
+     ]
+    },
+    "columns": {
+     "mappingMode": "defineBelow",
+     "value": {
+      "durum": "karakter_yazimi"
+     },
+     "schema": [
+      {
+       "id": "durum",
+       "displayName": "durum",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      }
+     ]
+    }
+   }
+  },
+  {
+   "id": "e6e1ced7-9c2e-4978-9a23-226c75c4f33d",
+   "name": "Karakter Tarifi Iste",
+   "type": "n8n-nodes-base.telegram",
+   "typeVersion": 1.2,
+   "position": [
+    1024,
+    1040
+   ],
+   "parameters": {
+    "resource": "message",
+    "operation": "sendMessage",
+    "chatId": "={{ $('Telegram Trigger').first().json.callback_query.message.chat.id }}",
+    "text": "✍️ Karakterini tek mesajda tarif et: gorunus + cizim stili. Ornek: \"kirmizi atkili sevimli kucuk bir robot, buyuk mavi gozler, yuvarlak govde, 3D pixar tarzi\". Simdi yazip gonder — video hemen uretilmeye baslar.",
+    "additionalFields": {
+     "appendAttribution": false
+    }
+   },
+   "webhookId": "a16be737-13ae-4cf1-aa73-c31e3582ce07",
+   "credentials": {
+    "telegramApi": {
+     "name": "Telegram Bot"
+    }
+   }
+  },
+  {
+   "id": "1559b30e-a84d-4471-967f-390af1e96c68",
+   "name": "Uretim Istegi Getir",
+   "type": "n8n-nodes-base.dataTable",
+   "typeVersion": 1.1,
+   "position": [
+    1120,
+    240
+   ],
+   "parameters": {
+    "resource": "row",
+    "operation": "get",
+    "dataTableId": {
+     "__rl": true,
+     "mode": "id",
+     "value": "AsJTzSVKYsokANxY",
+     "cachedResultName": "video_istekleri"
+    },
+    "matchType": "allConditions",
+    "filters": {
+     "conditions": [
+      {
+       "keyName": "chat_id",
+       "condition": "eq",
+       "keyValue": "={{ $('Telegram Trigger').first().json.callback_query?.message?.chat?.id ?? $('Telegram Trigger').first().json.message?.chat?.id }}"
+      }
+     ]
+    },
+    "returnAll": false,
+    "limit": 1
+   }
+  },
+  {
+   "id": "136dbd34-98a6-48c9-a67a-2accc7a04dcd",
+   "name": "Durum Getir",
+   "type": "n8n-nodes-base.dataTable",
+   "typeVersion": 1.1,
+   "position": [
+    672,
+    1180
+   ],
+   "parameters": {
+    "resource": "row",
+    "operation": "get",
+    "dataTableId": {
+     "__rl": true,
+     "mode": "id",
+     "value": "AsJTzSVKYsokANxY",
+     "cachedResultName": "video_istekleri"
+    },
+    "matchType": "allConditions",
+    "filters": {
+     "conditions": [
+      {
+       "keyName": "chat_id",
+       "condition": "eq",
+       "keyValue": "={{ $('Telegram Trigger').first().json.message.chat.id }}"
+      }
+     ]
+    },
+    "returnAll": false,
+    "limit": 1
+   },
+   "alwaysOutputData": true
+  },
+  {
+   "id": "25023952-1789-48c4-b2bf-96f9702edbf5",
+   "name": "Karakter Yazimi Mi",
+   "type": "n8n-nodes-base.if",
+   "typeVersion": 2.3,
+   "position": [
+    896,
+    1180
+   ],
+   "parameters": {
+    "conditions": {
+     "options": {
+      "caseSensitive": true,
+      "leftValue": "",
+      "typeValidation": "loose"
+     },
+     "conditions": [
+      {
+       "leftValue": "={{ $json.durum ?? \"\" }}",
+       "operator": {
+        "type": "string",
+        "operation": "equals"
+       },
+       "rightValue": "karakter_yazimi"
+      }
+     ],
+     "combinator": "and"
+    }
+   }
+  },
+  {
+   "id": "cbf741d3-e08b-4f5f-9fa5-3f7a84e7c65a",
+   "name": "Ozel Karakteri Kaydet",
+   "type": "n8n-nodes-base.dataTable",
+   "typeVersion": 1.1,
+   "position": [
+    1120,
+    1180
+   ],
+   "parameters": {
+    "resource": "row",
+    "operation": "update",
+    "dataTableId": {
+     "__rl": true,
+     "mode": "id",
+     "value": "AsJTzSVKYsokANxY",
+     "cachedResultName": "video_istekleri"
+    },
+    "matchType": "allConditions",
+    "filters": {
+     "conditions": [
+      {
+       "keyName": "chat_id",
+       "condition": "eq",
+       "keyValue": "={{ $('Telegram Trigger').first().json.message.chat.id }}"
+      }
+     ]
+    },
+    "columns": {
+     "mappingMode": "defineBelow",
+     "value": {
+      "karakter": "={{ $('Telegram Trigger').first().json.message.text }}",
+      "durum": "sure_bekliyor"
+     },
+     "schema": [
+      {
+       "id": "karakter",
+       "displayName": "karakter",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "durum",
+       "displayName": "durum",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      }
+     ]
+    }
+   }
+  },
+  {
+   "name": "Klasor Hazirla",
+   "type": "n8n-nodes-base.executeCommand",
+   "typeVersion": 1,
+   "position": [
+    1230,
+    240
+   ],
+   "parameters": {
+    "command": "=mkdir -p /opt/vidrush/render-studio/public/isler/is_{{ $execution.id }}"
+   },
+   "id": "e8d3412a-917d-4a75-83a3-252271e3864e"
+  },
+  {
+   "name": "Gorseli Dosyaya Cevir",
+   "type": "n8n-nodes-base.convertToFile",
+   "typeVersion": 1.1,
+   "position": [
+    2576,
+    560
+   ],
+   "parameters": {
+    "operation": "toBinary",
+    "sourceProperty": "data[0].b64_json",
+    "options": {
+     "fileName": "sahne.png",
+     "mimeType": "image/png"
+    }
+   },
+   "onError": "continueRegularOutput",
+   "id": "2e79d881-1b71-4ac7-996f-0761d9d40a01"
+  },
+  {
+   "name": "Gorseli Diske Yaz",
+   "type": "n8n-nodes-base.readWriteFile",
+   "typeVersion": 1,
+   "position": [
+    2760,
+    560
+   ],
+   "parameters": {
+    "operation": "write",
+    "fileName": "=/opt/vidrush/render-studio/public/isler/is_{{ $execution.id }}/sahne_{{ $(\"Sahne Dongusu\").first().json.n }}.png",
+    "dataPropertyName": "data",
+    "options": {}
+   },
+   "onError": "continueRegularOutput",
+   "id": "6b87e53e-b785-47db-b5ab-478a7c00630b"
+  },
+  {
+   "name": "Videoyu Render Et (Remotion)",
+   "type": "n8n-nodes-base.executeCommand",
+   "typeVersion": 1,
+   "position": [
+    2912,
+    96
+   ],
+   "parameters": {
+    "command": "=python3 /opt/vidrush/uret.py {{ $json.b64 }}"
+   },
+   "onError": "continueErrorOutput",
+   "id": "4d26a64c-754d-49a4-8b8b-fbcae48930fa"
+  },
+  {
+   "name": "Render Ciktisini Ayikla",
+   "type": "n8n-nodes-base.code",
+   "typeVersion": 2,
+   "position": [
+    3136,
+    96
+   ],
+   "parameters": {
+    "mode": "runOnceForAllItems",
+    "language": "javaScript",
+    "jsCode": "const out = String($input.first().json.stdout || '').trim().split('\\n');\nlet sonuc = null;\nfor (let i = out.length - 1; i >= 0; i--) {\n  try { sonuc = JSON.parse(out[i]); break; } catch (e) {}\n}\nif (!sonuc || !sonuc.video) throw new Error('Render ciktisi okunamadi: ' + out.slice(-3).join(' | '));\nreturn [{ json: { video_yolu: sonuc.video, sure: sonuc.sure, sahne_sayisi: sonuc.sahne_sayisi } }];"
+   },
+   "id": "7895d997-ae04-4d53-93be-431e6721b785"
+  },
+  {
+   "name": "Videoyu Oku",
+   "type": "n8n-nodes-base.readWriteFile",
+   "typeVersion": 1,
+   "position": [
+    3360,
+    96
+   ],
+   "parameters": {
+    "fileSelector": "={{ $json.video_yolu }}",
+    "options": {}
+   },
+   "id": "c8893aa2-778e-415e-91bf-56a9476fbe11"
+  },
+  {
+   "name": "Video Yolu Mesaji",
+   "type": "n8n-nodes-base.telegram",
+   "typeVersion": 1.2,
+   "position": [
+    4032,
+    96
+   ],
+   "parameters": {
+    "resource": "message",
+    "operation": "sendMessage",
+    "chatId": "={{ $('Telegram Trigger').first().json.callback_query?.message?.chat?.id ?? $('Telegram Trigger').first().json.message?.chat?.id }}",
+    "text": "=✨ Videon hazir ama Telegram limitini asiyor. Mac'te su yolda:\n{{ $('Render Ciktisini Ayikla').first().json.video_yolu }}",
+    "additionalFields": {
+     "appendAttribution": false
+    }
+   },
+   "credentials": {
+    "telegramApi": {
+     "name": "Telegram Bot"
+    }
+   },
+   "id": "11682f62-1bba-4de5-8511-b0c89dba5958",
+   "webhookId": "61590263-08f2-4414-be49-478721290024"
+  },
+  {
+   "name": "Kapagi Dosyaya Cevir",
+   "type": "n8n-nodes-base.convertToFile",
+   "typeVersion": 1.1,
+   "position": [
+    4704,
+    0
+   ],
+   "parameters": {
+    "operation": "toBinary",
+    "sourceProperty": "data[0].b64_json",
+    "options": {
+     "fileName": "kapak.png",
+     "mimeType": "image/png"
+    }
+   },
+   "onError": "continueRegularOutput",
+   "id": "135e33ec-b16d-4e6c-be76-41a2a23435ae"
+  },
+  {
+   "name": "Sure Sor",
+   "type": "n8n-nodes-base.telegram",
+   "typeVersion": 1.2,
+   "position": [
+    1560,
+    620
+   ],
+   "parameters": {
+    "resource": "message",
+    "operation": "sendMessage",
+    "chatId": "={{ $('Telegram Trigger').first().json.callback_query?.message?.chat?.id ?? $('Telegram Trigger').first().json.message?.chat?.id }}",
+    "text": "⏱ Video kac dakika olsun? (Sure uzadikca uretim ve render suresi de artar)",
+    "replyMarkup": "inlineKeyboard",
+    "inlineKeyboard": {
+     "rows": [
+      {
+       "row": {
+        "buttons": [
+         {
+          "text": "1 dk",
+          "additionalFields": {
+           "callback_data": "sure:1"
+          }
+         },
+         {
+          "text": "2 dk",
+          "additionalFields": {
+           "callback_data": "sure:2"
+          }
+         }
+        ]
+       }
+      },
+      {
+       "row": {
+        "buttons": [
+         {
+          "text": "3 dk",
+          "additionalFields": {
+           "callback_data": "sure:3"
+          }
+         },
+         {
+          "text": "5 dk",
+          "additionalFields": {
+           "callback_data": "sure:5"
+          }
+         }
+        ]
+       }
+      }
+     ]
+    },
+    "additionalFields": {
+     "appendAttribution": false
+    }
+   },
+   "credentials": {
+    "telegramApi": {
+     "name": "Telegram Bot"
+    }
+   },
+   "id": "deaa384d-1b27-4661-8936-f1897eeed6ad",
+   "webhookId": "be7e10fc-6070-4f7c-813d-9785c09c4fa0"
+  },
+  {
+   "name": "Sure Kaydet",
+   "type": "n8n-nodes-base.dataTable",
+   "typeVersion": 1.1,
+   "position": [
+    800,
+    1320
+   ],
+   "parameters": {
+    "resource": "row",
+    "operation": "update",
+    "dataTableId": {
+     "__rl": true,
+     "mode": "id",
+     "value": "AsJTzSVKYsokANxY",
+     "cachedResultName": "video_istekleri"
+    },
+    "matchType": "allConditions",
+    "filters": {
+     "conditions": [
+      {
+       "keyName": "chat_id",
+       "condition": "eq",
+       "keyValue": "={{ $('Telegram Trigger').first().json.callback_query.message.chat.id }}"
+      },
+      {
+       "keyName": "durum",
+       "condition": "eq",
+       "keyValue": "sure_bekliyor"
+      }
+     ]
+    },
+    "columns": {
+     "mappingMode": "defineBelow",
+     "value": {
+      "sure": "={{ $('Telegram Trigger').first().json.callback_query.data.replace('sure:', '') }}",
+      "durum": "islemde"
+     },
+     "schema": [
+      {
+       "id": "sure",
+       "displayName": "sure",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      },
+      {
+       "id": "durum",
+       "displayName": "durum",
+       "required": false,
+       "defaultMatch": false,
+       "display": true,
+       "type": "string",
+       "canBeUsedToMatch": true
+      }
+     ]
+    }
+   },
+   "id": "c64a36af-6dbf-487d-990d-4f8df09563cb"
+  }
+ ],
+ "connections": {
+  "Telegram Trigger": {
+   "main": [
+    [
+     {
+      "node": "Guncelleme Turu",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Guncelleme Turu": {
+   "main": [
+    [
+     {
+      "node": "Callback Yanitla",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Start Komutu Mu",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Istek Getir": {
+   "main": [
+    [
+     {
+      "node": "Bekleyen Istek Var Mi",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Bekleyen Istek Var Mi": {
+   "main": [
+    [
+     {
+      "node": "Stili Kaydet",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Once Metin Mesaji",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Uretim Basladi Mesaji": {
+   "main": [
+    [
+     {
+      "node": "Sahne Planla",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Sahne Planla": {
+   "main": [
+    [
+     {
+      "node": "Plan Ayristir",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Plan Ayristir": {
+   "main": [
+    [
+     {
+      "node": "Sahneleri Ayir",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Sahneleri Ayir": {
+   "main": [
+    [
+     {
+      "node": "Sahne Dongusu",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Gorseller Uretildi Mi": {
+   "main": [
+    [
+     {
+      "node": "Videoyu Render Et (Remotion)",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Gorsel Hatasi Mesaji",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Videoyu Gonder": {
+   "main": [
+    [
+     {
+      "node": "Tamamlandi Isaretle",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Video Yolu Mesaji",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Sahne Dongusu": {
+   "main": [
+    [
+     {
+      "node": "Render Girdisi Olustur",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Stok Mu",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Start Komutu Mu": {
+   "main": [
+    [
+     {
+      "node": "Hosgeldin Mesaji",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Durum Getir",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Istek Kaydet": {
+   "main": [
+    [
+     {
+      "node": "Stil Sor",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Gorsel Uret (OpenAI)": {
+   "main": [
+    [
+     {
+      "node": "Gorseli Dosyaya Cevir",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Sahne Sonucu": {
+   "main": [
+    [
+     {
+      "node": "Hiz Limiti Bekle",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Hiz Limiti Bekle": {
+   "main": [
+    [
+     {
+      "node": "Sahne Dongusu",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Stok Mu": {
+   "main": [
+    [
+     {
+      "node": "Stok Video Ara (Pexels)",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Gorsel Uret (OpenAI)",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Stok Video Ara (Pexels)": {
+   "main": [
+    [
+     {
+      "node": "Stok Videoyu Sec",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Stok Videoyu Sec": {
+   "main": [
+    [
+     {
+      "node": "Stok Bulundu Mu",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Stok Bulundu Mu": {
+   "main": [
+    [
+     {
+      "node": "Hiz Limiti Bekle",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Gorsel Uret (OpenAI)",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Tamamlandi Isaretle": {
+   "main": [
+    [
+     {
+      "node": "Kapak Uret (OpenAI)",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Kapak Uret (OpenAI)": {
+   "main": [
+    [
+     {
+      "node": "Kapagi Dosyaya Cevir",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Stili Kaydet": {
+   "main": [
+    [
+     {
+      "node": "Karakter Sor",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Callback Yanitla": {
+   "main": [
+    [
+     {
+      "node": "Callback Turu",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Callback Turu": {
+   "main": [
+    [
+     {
+      "node": "Istek Getir",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Karakter Yok Kaydet",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Stickman Kaydet",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Karakter Yazimi Isaretle",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Sure Kaydet",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Karakter Yazimi Isaretle": {
+   "main": [
+    [
+     {
+      "node": "Karakter Tarifi Iste",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Karakter Yok Kaydet": {
+   "main": [
+    [
+     {
+      "node": "Sure Sor",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Stickman Kaydet": {
+   "main": [
+    [
+     {
+      "node": "Sure Sor",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Uretim Istegi Getir": {
+   "main": [
+    [
+     {
+      "node": "Klasor Hazirla",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Durum Getir": {
+   "main": [
+    [
+     {
+      "node": "Karakter Yazimi Mi",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Karakter Yazimi Mi": {
+   "main": [
+    [
+     {
+      "node": "Ozel Karakteri Kaydet",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Istek Kaydet",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Ozel Karakteri Kaydet": {
+   "main": [
+    [
+     {
+      "node": "Sure Sor",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Klasor Hazirla": {
+   "main": [
+    [
+     {
+      "node": "Uretim Basladi Mesaji",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Gorseli Dosyaya Cevir": {
+   "main": [
+    [
+     {
+      "node": "Gorseli Diske Yaz",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Gorseli Diske Yaz": {
+   "main": [
+    [
+     {
+      "node": "Sahne Sonucu",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Videoyu Render Et (Remotion)": {
+   "main": [
+    [
+     {
+      "node": "Render Ciktisini Ayikla",
+      "type": "main",
+      "index": 0
+     }
+    ],
+    [
+     {
+      "node": "Render Hatasi Mesaji",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Render Ciktisini Ayikla": {
+   "main": [
+    [
+     {
+      "node": "Videoyu Oku",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Videoyu Oku": {
+   "main": [
+    [
+     {
+      "node": "Videoyu Gonder",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Video Yolu Mesaji": {
+   "main": [
+    [
+     {
+      "node": "Tamamlandi Isaretle",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Kapagi Dosyaya Cevir": {
+   "main": [
+    [
+     {
+      "node": "Kapak Gonder",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Render Girdisi Olustur": {
+   "main": [
+    [
+     {
+      "node": "Gorseller Uretildi Mi",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  },
+  "Sure Kaydet": {
+   "main": [
+    [
+     {
+      "node": "Uretim Istegi Getir",
+      "type": "main",
+      "index": 0
+     }
+    ]
+   ]
+  }
+ },
+ "settings": {
+  "executionOrder": "v1"
+ },
+ "active": false
+}

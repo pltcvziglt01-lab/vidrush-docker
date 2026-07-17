@@ -1,0 +1,20 @@
+{
+  "name": "vidrush-render-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Vidrush botu icin yerel Remotion render motoru (github.com/remotion-dev/remotion)",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render src/index.ts VidrushVideo"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.410",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.410"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.12",
+    "typescript": "5.6.3"
+  }
+}
