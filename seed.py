@@ -36,15 +36,22 @@ def istek(yol, veri=None, method=None, raw=False):
         data = json.dumps(veri).encode()
     req = urllib.request.Request(url, data=data, headers=headers,
                                  method=method or ("POST" if data else "GET"))
+    def guvenli_json(b):
+        try:
+            return json.loads(b) if b else {}
+        except Exception:
+            return {"_raw": b.decode(errors="replace")[:300]}
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
             sc = r.headers.get("Set-Cookie")
             if sc:
                 COOKIE["v"] = sc.split(";")[0]
             body = r.read()
-            return r.status, (body if raw else (json.loads(body) if body else {}))
+            return r.status, (body if raw else guvenli_json(body))
     except urllib.error.HTTPError as e:
-        return e.code, json.loads(e.read() or b"{}")
+        return e.code, guvenli_json(e.read())
+    except Exception as e:
+        return 0, {"_err": str(e)}
 
 
 def bekle():
