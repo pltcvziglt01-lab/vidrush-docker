@@ -168,10 +168,13 @@ def kopru_bilgisi_yaz(wfid):
         "secret": secret,
     }
     hedef = "/opt/vidrush/seedinfo"
-    os.makedirs(hedef, exist_ok=True)
-    with open(os.path.join(hedef, "bridge.json"), "w") as f:
-        json.dump(bilgi, f)
-    print(f"[seed] kopru bilgisi yazildi: {bilgi}", flush=True)
+    try:
+        os.makedirs(hedef, exist_ok=True)
+        with open(os.path.join(hedef, "bridge.json"), "w") as f:
+            json.dump(bilgi, f)
+        print(f"[seed] kopru bilgisi yazildi: {bilgi}", flush=True)
+    except Exception as e:
+        print(f"[seed] UYARI: kopru bilgisi yazilamadi ({e}) — kopru env fallback kullanacak", flush=True)
 
 
 def main():

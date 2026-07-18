@@ -42,7 +42,7 @@ COPY app/uret.py app/kopru.py ./
 COPY seed.py entrypoint.sh ./
 COPY workflow.json ./
 RUN chmod +x entrypoint.sh \
-    && mkdir -p render-studio/public/isler render-studio/out /home/node/.n8n \
+    && mkdir -p render-studio/public/isler render-studio/out seedinfo /home/node/.n8n \
     && chown -R node:node /opt/vidrush /home/node/.n8n
 
 # Remotion Docker ayarlari
