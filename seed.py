@@ -69,18 +69,23 @@ def bekle():
 
 
 def owner_login():
-    sc, r = istek("/rest/owner/setup", {
-        "email": EMAIL, "firstName": "Polat", "lastName": "Can", "password": PASS,
-    })
-    if sc in (200, 201):
-        print("[seed] owner kuruldu", flush=True)
-        return
-    # zaten kurulu -> login
-    sc, r = istek("/rest/login", {"emailOrLdapLoginId": EMAIL, "password": PASS})
-    if sc == 200:
-        print("[seed] login yapildi (zaten kurulu)", flush=True)
-    else:
-        raise SystemExit(f"[seed] owner/login basarisiz: {sc} {r}")
+    """healthz 'ok' dese de REST rotalari gec yuklenebilir — sabirla dene."""
+    sc = sc2 = None
+    r = r2 = None
+    for deneme in range(40):
+        sc, r = istek("/rest/owner/setup", {
+            "email": EMAIL, "firstName": "Polat", "lastName": "Can", "password": PASS,
+        })
+        if sc in (200, 201):
+            print("[seed] owner kuruldu", flush=True)
+            return
+        sc2, r2 = istek("/rest/login", {"emailOrLdapLoginId": EMAIL, "password": PASS})
+        if sc2 == 200:
+            print("[seed] login yapildi (zaten kurulu)", flush=True)
+            return
+        print(f"[seed] REST hazir degil (setup={sc}, login={sc2}), 5 sn sonra tekrar ({deneme+1}/40)", flush=True)
+        time.sleep(5)
+    raise SystemExit(f"[seed] owner/login basarisiz: setup={sc} {str(r)[:200]} | login={sc2} {str(r2)[:200]}")
 
 
 def cred_var(ad):
