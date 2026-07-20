@@ -231,8 +231,19 @@ async def calistir(payload: dict) -> dict:
         print(sonuc.stderr[-2000:], file=sys.stderr)
         raise SystemExit(f"Remotion render basarisiz (log: {log_yolu})")
 
+    # n8n readWriteFile sadece /home/node/.n8n-files'i okuyabiliyor -> son dosyalari oraya kopyala
+    import shutil
+    n8nfiles = "/home/node/.n8n-files"
+    os.makedirs(n8nfiles, exist_ok=True)
+    son_video = os.path.join(n8nfiles, f"{is_adi}.mp4")
+    shutil.copy(cikti, son_video)
+    son_kapak = None
+    if kapak_yolu and os.path.exists(kapak_yolu):
+        son_kapak = os.path.join(n8nfiles, f"{is_adi}_kapak.png")
+        shutil.copy(kapak_yolu, son_kapak)
+
     toplam = round(sum(s["sure"] for s in props_sahneler), 1)
-    return {"video": cikti, "kapak": kapak_yolu, "sure": toplam,
+    return {"video": son_video, "kapak": son_kapak, "sure": toplam,
             "sahne_sayisi": len(props_sahneler)}
 
 
