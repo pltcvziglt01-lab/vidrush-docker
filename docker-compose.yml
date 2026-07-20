@@ -58,8 +58,31 @@ services:
       - seed_info:/opt/vidrush/seedinfo
     command: ["python3", "/opt/vidrush/kopru.py"]
 
+  webapp:
+    image: vidrush-bot:latest
+    container_name: vidrush-webapp
+    restart: unless-stopped
+    depends_on:
+      - n8n
+    env_file: .env
+    environment:
+      REMOTION_BROWSER_EXECUTABLE: /usr/bin/chromium
+      REMOTION_GL: swangle
+    working_dir: /opt/vidrush/webapp
+    command: ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8080"]
+    ports:
+      - "8080:8080"
+    volumes:
+      - webapp_veri:/opt/vidrush/webapp/veri
+      - webapp_cikti:/opt/vidrush/webapp/ciktilar
+    cap_add:
+      - SYS_ADMIN
+    shm_size: "1gb"
+
 volumes:
   n8n_data:
   render_isler:
   render_out:
   seed_info:
+  webapp_veri:
+  webapp_cikti:

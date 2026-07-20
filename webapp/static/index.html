@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vidrush — Metinden Video</title>
+<style>
+  :root{--bg:#0e0f13;--card:#181a21;--line:#282b36;--txt:#e8eaf0;--dim:#9aa0ad;
+        --acc:#7c5cff;--acc2:#00d4a0;--danger:#ff5c72}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);
+       font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif}
+  .wrap{max-width:760px;margin:0 auto;padding:28px 18px 80px}
+  h1{font-size:26px;margin:0 0 4px;letter-spacing:-.5px}
+  h1 span{color:var(--acc)}
+  .sub{color:var(--dim);margin:0 0 26px;font-size:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;
+        padding:20px;margin-bottom:18px}
+  .card h2{font-size:15px;margin:0 0 14px;font-weight:600}
+  .card h2 .num{display:inline-flex;width:22px;height:22px;border-radius:50%;
+        background:var(--acc);color:#fff;align-items:center;justify-content:center;
+        font-size:12px;margin-right:8px}
+  .refs{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .drop{border:1.5px dashed var(--line);border-radius:12px;padding:16px;text-align:center;
+        cursor:pointer;transition:.15s;position:relative;min-height:150px;
+        display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+  .drop:hover{border-color:var(--acc);background:#1d2029}
+  .drop.dolu{border-style:solid;border-color:var(--acc2)}
+  .drop img{max-width:100%;max-height:120px;border-radius:8px;object-fit:cover}
+  .drop .lbl{font-size:13px;font-weight:600}
+  .drop .hint{font-size:11px;color:var(--dim)}
+  .drop input{display:none}
+  textarea{width:100%;min-height:130px;background:#12141a;border:1px solid var(--line);
+        border-radius:12px;color:var(--txt);padding:14px;font-size:14px;resize:vertical;
+        font-family:inherit;line-height:1.5}
+  textarea:focus{outline:none;border-color:var(--acc)}
+  .row{display:flex;gap:10px;align-items:center;margin-top:14px;flex-wrap:wrap}
+  button{background:var(--acc);color:#fff;border:0;border-radius:11px;padding:12px 22px;
+        font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
+  button:hover{filter:brightness(1.1)}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--txt)}
+  .durum{margin-top:6px;font-size:13px;color:var(--dim);min-height:18px}
+  .bar{height:8px;background:#12141a;border-radius:6px;overflow:hidden;margin-top:10px}
+  .bar > i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--acc),var(--acc2));
+        transition:width .4s}
+  video{width:100%;border-radius:12px;margin-top:6px;background:#000}
+  .dl{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+  a.btn{text-decoration:none;background:var(--acc2);color:#04211a;border-radius:11px;
+        padding:11px 18px;font-size:13px;font-weight:700;display:inline-block}
+  a.btn.sec{background:transparent;border:1px solid var(--line);color:var(--txt)}
+  .err{color:var(--danger);font-size:13px;margin-top:8px}
+  .ok{color:var(--acc2)}
+  .hidden{display:none}
+  .tag{display:inline-block;background:#1d2029;border:1px solid var(--line);border-radius:20px;
+        padding:3px 10px;font-size:11px;color:var(--dim);margin-left:8px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1><span>Vidrush</span> · Metinden Video</h1>
+  <p class="sub">Bir kez referans karakter + stil görseli yükle. Sonra sadece hikaye metnini ver — görsel üretimi, karakter tutarlılığı, seslendirme, senkron ve montaj araca ait.</p>
+
+  <div class="card">
+    <h2><span class="num">1</span>Referans Karakter & Stil <span class="tag" id="presetTag">kaydedilmedi</span></h2>
+    <div class="refs">
+      <label class="drop" id="dropKar">
+        <input type="file" id="fKar" accept="image/*">
+        <div id="karView"><div class="lbl">🧍 Karakter görseli</div><div class="hint">tıkla / sürükle · zorunlu</div></div>
+      </label>
+      <label class="drop" id="dropStil">
+        <input type="file" id="fStil" accept="image/*">
+        <div id="stilView"><div class="lbl">🎨 Stil görseli</div><div class="hint">tıkla / sürükle · opsiyonel</div></div>
+      </label>
+    </div>
+    <div class="row">
+      <button id="btnPreset" disabled>Referansları Kaydet</button>
+      <span class="durum" id="presetDurum"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2><span class="num">2</span>Hikaye Metni</h2>
+    <textarea id="story" placeholder="Hikayeni buraya yaz (herhangi bir dilde)... Örn: 'Küçük robot Pip her gece yıldızları izlerdi...'"></textarea>
+    <div class="row">
+      <button id="btnUret" disabled>🎬 Video Üret</button>
+      <span class="durum" id="uretDurum"></span>
+    </div>
+    <div class="bar hidden" id="barWrap"><i id="bar"></i></div>
+    <div class="err hidden" id="err"></div>
+  </div>
+
+  <div class="card hidden" id="sonucCard">
+    <h2>✨ Videon Hazır</h2>
+    <video id="player" controls></video>
+    <div class="dl">
+      <a class="btn" id="dlVideo" download>⬇ Videoyu İndir</a>
+      <a class="btn sec" id="dlKapak" download>🖼 Kapağı İndir</a>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let SID = localStorage.getItem("vidrush_sid");
+if(!SID){ SID = "u"+Math.random().toString(36).slice(2,10); localStorage.setItem("vidrush_sid",SID); }
+let karFile=null, stilFile=null, presetHazir=false;
+
+function onePik(input, view, hint){
+  input.addEventListener("change", e=>{
+    const f=e.target.files[0]; if(!f) return;
+    const url=URL.createObjectURL(f);
+    view.innerHTML = `<img src="${url}"><div class="hint">değiştir</div>`;
+    view.parentElement.classList.add("dolu");
+    if(input.id==="fKar"){karFile=f; $("#btnPreset").disabled=false;} else {stilFile=f;}
+  });
+}
+onePik($("#fKar"), $("#karView"));
+onePik($("#fStil"), $("#stilView"));
+
+$("#btnPreset").onclick = async ()=>{
+  if(!karFile){ return; }
+  $("#btnPreset").disabled=true; $("#presetDurum").textContent="Yükleniyor...";
+  const fd=new FormData(); fd.append("session",SID); fd.append("karakter",karFile);
+  if(stilFile) fd.append("stil",stilFile);
+  try{
+    const r=await fetch("/api/preset",{method:"POST",body:fd});
+    if(!r.ok) throw new Error(await r.text());
+    presetHazir=true;
+    $("#presetDurum").innerHTML='<span class="ok">✓ Kaydedildi</span>';
+    $("#presetTag").textContent="hazır"; $("#presetTag").classList.add("ok");
+    $("#btnUret").disabled=false; $("#btnPreset").disabled=false;
+  }catch(e){ $("#presetDurum").innerHTML='<span class="err">'+e.message+'</span>'; $("#btnPreset").disabled=false; }
+};
+
+$("#btnUret").onclick = async ()=>{
+  const story=$("#story").value.trim();
+  if(story.length<20){ $("#uretDurum").textContent="Metin çok kısa"; return; }
+  $("#btnUret").disabled=true; $("#err").classList.add("hidden");
+  $("#sonucCard").classList.add("hidden");
+  $("#barWrap").classList.remove("hidden");
+  $("#uretDurum").textContent="Başlatılıyor...";
+  const fd=new FormData(); fd.append("session",SID); fd.append("story",story);
+  let job;
+  try{
+    const r=await fetch("/api/generate",{method:"POST",body:fd});
+    if(!r.ok) throw new Error(await r.text());
+    job=(await r.json()).job_id;
+  }catch(e){ hata(e.message); return; }
+  takip(job);
+};
+
+function hata(m){
+  $("#err").textContent="⚠ "+m; $("#err").classList.remove("hidden");
+  $("#btnUret").disabled=false; $("#uretDurum").textContent="";
+}
+
+async function takip(job){
+  const poll=async ()=>{
+    try{
+      const r=await fetch("/api/job/"+job); const d=await r.json();
+      $("#bar").style.width=(d.ilerleme||0)+"%";
+      $("#uretDurum").textContent=d.mesaj||d.durum;
+      if(d.durum==="bitti"){
+        $("#player").src=d.video; $("#dlVideo").href=d.video;
+        if(d.kapak){ $("#dlKapak").href=d.kapak; $("#dlKapak").style.display=""; }
+        else $("#dlKapak").style.display="none";
+        $("#sonucCard").classList.remove("hidden");
+        $("#btnUret").disabled=false;
+        $("#uretDurum").innerHTML='<span class="ok">✓ '+(d.sahne_sayisi||"")+' sahne · '+(d.sure||"")+' sn</span>';
+        return;
+      }
+      if(d.durum==="hata"){ hata(d.hata||"Bilinmeyen hata"); return; }
+      setTimeout(poll, 3000);
+    }catch(e){ setTimeout(poll, 4000); }
+  };
+  poll();
+}
+
+// mevcut preset var mi?
+fetch("/api/preset/"+SID).then(r=>r.json()).then(d=>{
+  if(d.karakter){ presetHazir=true; $("#btnUret").disabled=false;
+    $("#presetTag").textContent="hazır"; $("#presetTag").classList.add("ok");
+    $("#presetDurum").innerHTML='<span class="ok">✓ Önceki referansın yüklü</span>'; }
+});
+</script>
+</body>
+</html>
