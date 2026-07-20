@@ -171,10 +171,11 @@
           <div>
             <div class="durum" style="margin-bottom:6px">Footage kaynağı</div>
             <div class="seg" id="segKaynak">
-              <button data-k="yt" class="on">YouTube</button>
+              <button data-k="kapali" class="on">Sadece AI</button>
               <button data-k="guvenli">Güvenli (stok)</button>
-              <button data-k="kapali">Sadece AI</button>
+              <button data-k="yt">YouTube</button>
             </div>
+            <div class="durum" style="margin-top:6px;font-size:11px">Footage için Pexels anahtarı (Güvenli) veya YT cookie (YouTube) gerekir — yoksa AI'a düşer.</div>
           </div>
           <div class="switch" id="swMag" style="margin-left:8px">
             <span class="tr"></span>
@@ -237,7 +238,7 @@
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 let SID=localStorage.getItem("vidrush_sid");
 if(!SID){SID="u"+Math.random().toString(36).slice(2,10);localStorage.setItem("vidrush_sid",SID);}
-let karFile=null, editStil=null, kaynakModu="yt", magnific=false;
+let karFile=null, editStil=null, kaynakModu="kapali", magnific=false;
 
 /* nav */
 $$(".nav").forEach(n=>n.onclick=()=>{
