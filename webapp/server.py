@@ -114,8 +114,8 @@ def _isci():
         try:
             sonuc = asyncio.run(pipeline.uret(is_id, story, kar, stil, ilerle))
             d.update({"durum": "bitti", "ilerleme": 100, "mesaj": "Hazir!",
-                      "video": "/ciktilar/" + sonuc["video"],
-                      "kapak": ("/ciktilar/" + sonuc["kapak"]) if sonuc.get("kapak") else None,
+                      "video": "ciktilar/" + sonuc["video"],
+                      "kapak": ("ciktilar/" + sonuc["kapak"]) if sonuc.get("kapak") else None,
                       "sure": sonuc.get("sure"), "sahne_sayisi": sonuc.get("sahne_sayisi")})
         except Exception as e:
             traceback.print_exc()

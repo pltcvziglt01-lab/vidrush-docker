@@ -69,15 +69,25 @@ services:
       REMOTION_BROWSER_EXECUTABLE: /usr/bin/chromium
       REMOTION_GL: swangle
     working_dir: /opt/vidrush/webapp
-    command: ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8080"]
+    command: ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8080", "--root-path", "/vidrush"]
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"   # sadece VPS-ici hata ayiklama; disari Traefik/443 ustunden
     volumes:
       - webapp_veri:/opt/vidrush/webapp/veri
       - webapp_cikti:/opt/vidrush/webapp/ciktilar
     cap_add:
       - SYS_ADMIN
     shm_size: "1gb"
+    # Traefik (host-mode, ayni VPS'te akademi n8n ile paylasilir) ile /vidrush yol yonlendirmesi.
+    # exposedbydefault=false oldugundan enable=true sart; entrypoint websecure, certresolver letsencrypt.
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.vidrush.rule=Host(`srv1833674.hstgr.cloud`) && PathPrefix(`/vidrush`)"
+      - "traefik.http.routers.vidrush.entrypoints=websecure"
+      - "traefik.http.routers.vidrush.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.vidrush.middlewares=vidrush-strip"
+      - "traefik.http.middlewares.vidrush-strip.stripprefix.prefixes=/vidrush"
+      - "traefik.http.services.vidrush.loadbalancer.server.port=8080"
 
 volumes:
   n8n_data:
