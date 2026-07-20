@@ -205,18 +205,32 @@ async def calistir(payload: dict) -> dict:
         json.dump(props, f, ensure_ascii=False)
 
     cikti = os.path.join(STUDYO, "out", f"{is_adi}.mp4")
+    log_yolu = os.path.join(STUDYO, "out", f"{is_adi}_render.log")
+
+    def logla(baslik, r):
+        with open(log_yolu, "a") as lf:
+            lf.write(f"\n===== {baslik} (exit={r.returncode}) =====\n")
+            lf.write("STDOUT:\n" + (r.stdout or "")[-4000:] + "\n")
+            lf.write("STDERR:\n" + (r.stderr or "")[-4000:] + "\n")
+
+    # Remotion kendi Chrome Headless Shell'ini indirsin (Docker/sandbox'i kendi yonetir)
+    print("remotion browser ensure...", file=sys.stderr)
+    ens = subprocess.run(["npx", "remotion", "browser", "ensure"],
+                         cwd=STUDYO, capture_output=True, text=True, timeout=900)
+    logla("browser ensure", ens)
+
     print("remotion render basliyor...", file=sys.stderr)
+    gl = os.environ.get("REMOTION_GL", "").strip()
     komut = ["npx", "remotion", "render", "src/index.ts", "VidrushVideo", cikti,
-             f"--props={props_yolu}"]
-    if os.environ.get("REMOTION_BROWSER_EXECUTABLE"):
-        komut.append(f"--browser-executable={os.environ['REMOTION_BROWSER_EXECUTABLE']}")
-    if os.environ.get("REMOTION_GL"):
-        komut.append(f"--gl={os.environ['REMOTION_GL']}")
+             f"--props={props_yolu}", "--concurrency=1", "--timeout=120000"]
+    if gl:
+        komut.append(f"--gl={gl}")
     sonuc = subprocess.run(komut, cwd=STUDYO, capture_output=True, text=True, timeout=5400)
+    logla("render", sonuc)
     if sonuc.returncode != 0:
-        print(sonuc.stdout[-1500:], file=sys.stderr)
-        print(sonuc.stderr[-1500:], file=sys.stderr)
-        raise SystemExit("Remotion render basarisiz")
+        print(sonuc.stdout[-2000:], file=sys.stderr)
+        print(sonuc.stderr[-2000:], file=sys.stderr)
+        raise SystemExit(f"Remotion render basarisiz (log: {log_yolu})")
 
     toplam = round(sum(s["sure"] for s in props_sahneler), 1)
     return {"video": cikti, "kapak": kapak_yolu, "sure": toplam,
