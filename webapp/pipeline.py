@@ -38,7 +38,7 @@ EDIT_STILLERI = {
         "ad": "Sinematik Belgesel",
         "ozet": "BBC Earth / Nat Geo — yavaş, hard-cut, gerçek footage, orkestral",
         "sahne_sn": 7, "kelime": 17, "footage_pct": 85, "overlay": "yok",
-        "motion": "sinematik", "mag": "films_n_photography",
+        "altyazi": "orta", "motion": "sinematik", "mag": "films_n_photography",
         "gorsel_ek": ("cinematic wildlife/nature documentary still, shot on a cinema camera, "
                       "85mm telephoto, shallow depth of field, natural golden-hour light, high "
                       "dynamic range, rich saturated greens and blues, deep shadows, "
@@ -48,7 +48,7 @@ EDIT_STILLERI = {
         "ad": "Anlatı Video-Essay",
         "ozet": "Johnny Harris / Vox Atlas — Ken Burns 2.0 push-in, analog texture, kinetik başlık",
         "sahne_sn": 4, "kelime": 11, "footage_pct": 55, "overlay": "yogun",
-        "motion": "anlati", "mag": "films_n_photography",
+        "altyazi": "orta", "motion": "anlati", "mag": "films_n_photography",
         "gorsel_ek": ("photojournalistic documentary frame, warm faded film tones, subtle film "
                       "grain and light leaks, tactile analog texture (old paper / wood grain), "
                       "archival photo aesthetic, cinematic depth, muted vintage color grade"),
@@ -57,7 +57,7 @@ EDIT_STILLERI = {
         "ad": "Hızlı Explainer",
         "ozet": "Vox / Insider — 1.5-3sn hızlı kesme, sürekli kinetik metin, flat grafik",
         "sahne_sn": 2.4, "kelime": 6, "footage_pct": 45, "overlay": "yogun",
-        "motion": "hizli", "mag": "standard",
+        "altyazi": "yogun", "motion": "hizli", "mag": "standard",
         "gorsel_ek": ("clean flat-design explainer graphic, bright saturated palette, bold "
                       "high-contrast infographic style, crisp vector shapes, solid or white "
                       "background, clear data-visualization aesthetic, modern editorial "
@@ -92,9 +92,11 @@ def plan_sistem(prof):
         "smoothed for narration.\n"
         f"3) About {footage}% of scenes must be REAL FOOTAGE: set kaynak='footage' and give "
         "footage_sorgu = a specific ENGLISH stock-footage search query (e.g. 'aerial drone "
-        "rainforest canopy 4k', 'busy tokyo street night timelapse'). The remaining scenes set "
-        "kaynak='ai' and give scene_prompt = a vivid 16:9 ENGLISH description of the action/place/"
-        "camera/mood featuring 'the character'. Never describe the character's colors/face.\n"
+        "rainforest canopy', 'busy tokyo street night timelapse'). The remaining scenes set "
+        "kaynak='ai'. IMPORTANT: give scene_prompt for EVERY scene (both ai and footage) = a "
+        "vivid 16:9 ENGLISH description of the action/place/camera/mood featuring 'the character' "
+        "(for footage scenes this is the fallback if no clip is found). Never describe the "
+        "character's colors/face.\n"
         f"4) {overlay_kural}\n"
         "5) Choose a Microsoft Azure neural voice by language: tr->tr-TR-EmelNeural, "
         "en->en-US-AndrewMultilingualNeural, es->es-ES-AlvaroNeural, de->de-DE-ConradNeural, "
@@ -115,11 +117,16 @@ def plan_uret(story: str, prof: dict) -> dict:
                      {"role": "user", "content": story}],
         "response_format": {"type": "json_object"},
         "temperature": 0.7,
+        "max_tokens": 12000,   # 45 sahne + voiceover + prompt'lar truncate olmasin
     }
     r = requests.post("https://api.openai.com/v1/chat/completions",
                       headers=OAI_H, json=body, timeout=120)
     r.raise_for_status()
-    plan = json.loads(r.json()["choices"][0]["message"]["content"])
+    icerik = r.json()["choices"][0]["message"]["content"]
+    try:
+        plan = json.loads(icerik)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"Plan JSON parse edilemedi (truncate?): {str(e)[:120]}")
     scenes = []
     for s in plan.get("scenes", []):
         if not str(s.get("voiceover", "")).strip():
@@ -189,6 +196,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, edit_id: str = VARSAYILAN_
     gorsel_ek = prof["gorsel_ek"]
     motion = prof["motion"]
     overlay_stil = prof["overlay"]
+    altyazi_stil = prof.get("altyazi", "orta")   # overlay'den AYRI (sinematikte de altyazi cikar)
     mag_profil = prof["mag"]
     yt_once = kaynak_modu != "guvenli"
     footage_acik = kaynak_modu != "kapali"
@@ -205,7 +213,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, edit_id: str = VARSAYILAN_
     toplam = len(scenes)
 
     for i, s in enumerate(scenes):
-        n = s.get("n", i + 1)
+        n = i + 1   # kanonik indeks (modelin 'n'i cakisirsa dosya uzerine yazilmasin)
         metin = s["voiceover"].strip()
         overlay = str(s.get("overlay", "")).strip() if overlay_stil != "yok" else ""
         yuzde = 8 + int(58 * i / max(1, toplam))
@@ -267,7 +275,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, edit_id: str = VARSAYILAN_
     # Render
     bildir("Video render ediliyor (birkaç dakika)...", 78)
     props = {"fps": 30, "genislik": 1920, "yukseklik": 1080,
-             "gecis": motion, "altyaziStil": overlay_stil, "sahneler": props_sahneler}
+             "gecis": motion, "altyaziStil": altyazi_stil, "sahneler": props_sahneler}
     props_yolu = os.path.join(is_dizini, "props.json")
     with open(props_yolu, "w") as f:
         json.dump(props, f, ensure_ascii=False)

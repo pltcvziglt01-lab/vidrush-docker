@@ -5,6 +5,7 @@ Uretim tek-cekirdek VPS'i korumak icin sirayla (kuyruk) yapilir.
 """
 import os
 import io
+import re
 import json
 import time
 import queue
@@ -13,8 +14,7 @@ import threading
 import traceback
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, FileResponse
 from PIL import Image
 
 import pipeline
@@ -29,6 +29,15 @@ app = FastAPI(title="Vidrush Web")
 
 isler = {}          # job_id -> durum
 is_kuyrugu = queue.Queue()
+
+# session yalnizca guvenli karakterler — path traversal (../, mutlak yol) engeli
+_SES_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def gecerli_session(session: str) -> str:
+    if not _SES_RE.match(session or ""):
+        raise HTTPException(400, "gecersiz session")
+    return session
 
 
 def _kucult(data: bytes, hedef: str, boyut=1024):
@@ -47,8 +56,7 @@ def anasayfa():
 async def preset_kaydet(session: str = Form(...),
                         karakter: UploadFile = File(...),
                         stil: UploadFile = File(None)):
-    if not session.strip():
-        raise HTTPException(400, "session gerekli")
+    session = gecerli_session(session)
     kdir = os.path.join(PRESET, session)
     os.makedirs(kdir, exist_ok=True)
     _kucult(await karakter.read(), os.path.join(kdir, "character.png"))
@@ -61,6 +69,7 @@ async def preset_kaydet(session: str = Form(...),
 
 @app.get("/api/preset/{session}")
 def preset_var(session: str):
+    session = gecerli_session(session)
     kdir = os.path.join(PRESET, session)
     return {"karakter": os.path.exists(os.path.join(kdir, "character.png")),
             "stil": os.path.exists(os.path.join(kdir, "style.png"))}
@@ -88,6 +97,7 @@ def uret_baslat(session: str = Form(...), story: str = Form(...),
                 edit: str = Form(pipeline.VARSAYILAN_EDIT),
                 magnific: str = Form("0"),
                 kaynak_modu: str = Form("yt")):
+    session = gecerli_session(session)
     kdir = os.path.join(PRESET, session)
     kar = os.path.join(kdir, "character.png")
     if not os.path.exists(kar):
@@ -120,28 +130,38 @@ def cikti(dosya: str):
     return FileResponse(yol)
 
 
+def _bir_is(is_id, story, kar, edit_id, magnific, kaynak_modu):
+    d = isler.get(is_id)
+    if not d:
+        return
+    d["durum"] = "uretiliyor"
+
+    def ilerle(msg, yuzde):
+        d["mesaj"] = msg
+        d["ilerleme"] = yuzde
+
+    try:
+        sonuc = asyncio.run(pipeline.uret(is_id, story, kar, edit_id, magnific,
+                                          kaynak_modu, ilerle))
+        d.update({"durum": "bitti", "ilerleme": 100, "mesaj": "Hazir!",
+                  "video": "ciktilar/" + sonuc["video"],
+                  "kapak": ("ciktilar/" + sonuc["kapak"]) if sonuc.get("kapak") else None,
+                  "sure": sonuc.get("sure"), "sahne_sayisi": sonuc.get("sahne_sayisi"),
+                  "edit": sonuc.get("edit")})
+    except Exception as e:
+        traceback.print_exc()
+        d.update({"durum": "hata", "hata": str(e)[:300], "mesaj": "Hata olustu"})
+
+
 def _isci():
-    """Tek isci: kuyruktan is alir, sirayla uretir (1 vCPU korumasi)."""
+    """Tek isci: kuyruktan is alir, sirayla uretir (1 vCPU korumasi).
+    Dis try/except: tek isteki beklenmedik hata isciyi OLDURMEZ (kuyruk donmaz)."""
     while True:
-        is_id, story, kar, edit_id, magnific, kaynak_modu = is_kuyrugu.get()
-        d = isler[is_id]
-        d["durum"] = "uretiliyor"
-
-        def ilerle(msg, yuzde):
-            d["mesaj"] = msg
-            d["ilerleme"] = yuzde
-
+        gorev = is_kuyrugu.get()
         try:
-            sonuc = asyncio.run(pipeline.uret(is_id, story, kar, edit_id, magnific,
-                                              kaynak_modu, ilerle))
-            d.update({"durum": "bitti", "ilerleme": 100, "mesaj": "Hazir!",
-                      "video": "ciktilar/" + sonuc["video"],
-                      "kapak": ("ciktilar/" + sonuc["kapak"]) if sonuc.get("kapak") else None,
-                      "sure": sonuc.get("sure"), "sahne_sayisi": sonuc.get("sahne_sayisi"),
-                      "edit": sonuc.get("edit")})
-        except Exception as e:
+            _bir_is(*gorev)
+        except Exception:
             traceback.print_exc()
-            d.update({"durum": "hata", "hata": str(e)[:300], "mesaj": "Hata olustu"})
         finally:
             is_kuyrugu.task_done()
 

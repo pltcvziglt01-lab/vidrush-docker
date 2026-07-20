@@ -113,7 +113,6 @@ const OverlayBaslik: React.FC<{metin: string; motion: string; kareSayisi: number
           fontSize: hizli ? 96 : 68,
           lineHeight: 1.05,
           letterSpacing: hizli ? 0 : -1,
-          textTransform: 'uppercase',
           color: hizli ? '#0a0a0a' : '#ffffff',
           background: hizli ? '#ffd400' : 'transparent',
           padding: hizli ? '10px 26px' : 0,
@@ -162,13 +161,26 @@ const Altyazi: React.FC<{parcalar: AltyaziParcasi[]; fps: number; stil: AltyaziS
 
 type Gorunum = {opaklik: number; transform: string; filtre: string};
 
-const sinematikHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
-  // hard-cut hissi: cok kisa (3 kare) giris/cikis fade, lineer hafif Ken Burns
-  const g = 3;
-  const opaklik = interpolate(frame, [0, g, K - g, K - 1], [0, 1, 1, 0], {
+// Guvenli fade opakligi: interpolate inputRange KESIN ARTAN olmali; kisa sahnede (K kucuk)
+// [0,g,K-g,K-1] cokerdi. Bu yardimci her K icin kesin-artan aralik garanti eder.
+const fadeOpaklik = (frame: number, K: number, g: number): number => {
+  if (K < 5) return 1; // cok kisa sahne: sabit gorunur (cokme yok)
+  const gu = Math.max(1, Math.min(g, Math.floor((K - 1) / 2) - 1));
+  if (gu < 2) {
+    return interpolate(frame, [0, 1, K - 1], [0, 1, 0], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+    });
+  }
+  return interpolate(frame, [0, gu, K - gu, K - 1], [0, 1, 1, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
+};
+
+const sinematikHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
+  // hard-cut hissi: cok kisa giris/cikis fade, lineer hafif Ken Burns
+  const opaklik = fadeOpaklik(frame, K, 3);
   const olcek = interpolate(frame, [0, K], sahne.zoom === 'in' ? [1, 1.06] : [1.06, 1], {
     extrapolateRight: 'clamp',
   });
@@ -194,10 +206,7 @@ const anlatiHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
   const kayma = interpolate(frame, [0, K], [0, 40], {extrapolateRight: 'clamp'});
   const kbTx = sahne.pan === 'right' ? -kayma : sahne.pan === 'left' ? kayma : 0;
   const kbTy = sahne.pan === 'bottom' ? -kayma : sahne.pan === 'top' ? kayma : 0;
-  const opaklik = interpolate(frame, [0, g, K - g, K - 1], [0, 1, 1, 0], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
+  const opaklik = fadeOpaklik(frame, K, g);
   return {
     opaklik,
     transform: `translate(${kbTx}px, ${kbTy}px) scale(${kb * girisOlcek})`,
@@ -226,10 +235,7 @@ const hizliHesapla = (sahne: Sahne, frame: number, K: number, indeks: number): G
   const kb = interpolate(frame, [0, K], sahne.zoom === 'in' ? [1, 1.08] : [1.08, 1], {
     extrapolateRight: 'clamp',
   });
-  const opaklik = interpolate(frame, [0, g, K - Math.min(g, 4), K - 1], [0, 1, 1, 0], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
+  const opaklik = fadeOpaklik(frame, K, g);
   return {
     opaklik,
     transform: `translateX(${girisX}px) scale(${kb * girisOlcek * cikisOlcek})`,

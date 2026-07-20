@@ -330,12 +330,12 @@ function guncelleUret(){ $("#btnUret").disabled=false; }
 $("#btnUret").onclick=async()=>{
   const story=$("#story").value.trim();
   if(story.length<20){$("#uretDurum").textContent="Metin çok kısa (min 20 karakter)";return;}
-  if(!editStil){$("#uretDurum").textContent="Edit stili seç";return;}
   $("#btnUret").disabled=true; $("#err").classList.add("hidden");
   $("#sonucCard").classList.add("hidden"); $("#barWrap").classList.remove("hidden");
   $("#uretDurum").textContent="Başlatılıyor...";
   const fd=new FormData();
-  fd.append("session",SID); fd.append("story",story); fd.append("edit",editStil);
+  fd.append("session",SID); fd.append("story",story);
+  if(editStil) fd.append("edit",editStil);   // null ise sunucu varsayılan stile düşer
   fd.append("kaynak_modu",kaynakModu); fd.append("magnific",magnific?"1":"0");
   let job;
   try{
@@ -348,9 +348,13 @@ $("#btnUret").onclick=async()=>{
 function hata(m){$("#err").textContent="⚠ "+m;$("#err").classList.remove("hidden");
   $("#btnUret").disabled=false;$("#uretDurum").textContent="";}
 async function takip(job){
+  let hataSayac=0;
   const poll=async()=>{
     try{
-      const r=await fetch("api/job/"+job); const d=await r.json();
+      const r=await fetch("api/job/"+job);
+      if(!r.ok){ if(++hataSayac>5){hata("İş bulunamadı (sunucu yeniden başlamış olabilir)");return;}
+                 setTimeout(poll,3000); return; }
+      const d=await r.json(); hataSayac=0;
       $("#bar").style.width=(d.ilerleme||0)+"%";
       $("#uretDurum").textContent=d.mesaj||d.durum;
       if(d.durum==="bitti"){
@@ -362,7 +366,7 @@ async function takip(job){
       }
       if(d.durum==="hata"){hata(d.hata||"Bilinmeyen hata");return;}
       setTimeout(poll,3000);
-    }catch(e){setTimeout(poll,4000);}
+    }catch(e){ if(++hataSayac>8){hata("Bağlantı kesildi");return;} setTimeout(poll,4000); }
   };
   poll();
 }
