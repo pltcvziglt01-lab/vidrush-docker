@@ -39,9 +39,11 @@ COPY app/render-studio/ ./render-studio/
 COPY app/uret.py app/kopru.py ./
 
 # Web arayuzu Python bagimliliklari (GEC katman: n8n/render-studio onbellegini bozmaz)
+# yt-dlp: YouTube arama/indirme (gercek footage). ffmpeg zaten kurulu (birlestirme icin).
 RUN /opt/venv/bin/pip install --no-cache-dir \
        fastapi==0.115.6 "uvicorn[standard]==0.34.0" \
-       python-multipart==0.0.20 requests==2.32.3 Pillow==11.1.0
+       python-multipart==0.0.20 requests==2.32.3 Pillow==11.1.0 \
+       yt-dlp==2025.6.9
 
 # Seed + web arayuzu + calisma dosyalari
 COPY seed.py entrypoint.sh ./
