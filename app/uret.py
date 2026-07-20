@@ -215,8 +215,11 @@ async def calistir(payload: dict) -> dict:
 
     print("remotion render basliyor...", file=sys.stderr)
     # concurrency=1 SART: VPS 1 vCPU, config'teki 4 hata verir
+    # scale=0.6667 -> 1080p kompozisyon 720p ciktisi (dosya kucuk + render hizli, Telegram 50MB limiti)
+    # crf=30 -> ek sikistirma (kalite/boyut dengesi)
     komut = ["npx", "remotion", "render", "src/index.ts", "VidrushVideo", cikti,
-             f"--props={props_yolu}", "--concurrency=1", "--timeout=120000"]
+             f"--props={props_yolu}", "--concurrency=1", "--timeout=120000",
+             "--scale=0.6667", "--crf=30"]
     if os.environ.get("REMOTION_BROWSER_EXECUTABLE"):
         komut.append(f"--browser-executable={os.environ['REMOTION_BROWSER_EXECUTABLE']}")
     if os.environ.get("REMOTION_GL"):
