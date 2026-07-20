@@ -94,9 +94,9 @@ def edit_listesi():
 
 @app.post("/api/generate")
 def uret_baslat(session: str = Form(...), story: str = Form(...),
-                edit: str = Form(pipeline.VARSAYILAN_EDIT),
-                magnific: str = Form("0"),
-                kaynak_modu: str = Form("yt")):
+                tur: str = Form("documentary"),
+                edit: str = Form(pipeline.VARSAYILAN_EDIT)):
+    # tur: animasyon | documentary. Magnific ve footage PLANA GORE OTOMATIK (manuel ayar YOK).
     session = gecerli_session(session)
     kdir = os.path.join(PRESET, session)
     kar = os.path.join(kdir, "character.png")
@@ -104,14 +104,13 @@ def uret_baslat(session: str = Form(...), story: str = Form(...),
         raise HTTPException(400, "Once referans karakter gorseli yukle")
     if len(story.strip()) < 20:
         raise HTTPException(400, "Hikaye metni cok kisa")
+    mod = tur if tur in ("animasyon", "documentary") else "documentary"
     edit_id = edit if edit in pipeline.EDIT_STILLERI else pipeline.VARSAYILAN_EDIT
-    mag = str(magnific).lower() in ("1", "true", "on", "evet")
-    modu = kaynak_modu if kaynak_modu in ("yt", "guvenli", "kapali") else "yt"
     is_id = f"job_{int(time.time()*1000)}_{session[:6]}"
     isler[is_id] = {"durum": "kuyrukta", "ilerleme": 0, "mesaj": "Sirada...",
                     "video": None, "kapak": None, "hata": None}
-    is_kuyrugu.put((is_id, story.strip(), kar, edit_id, mag, modu))
-    return {"job_id": is_id, "kuyruk": is_kuyrugu.qsize(), "edit": edit_id}
+    is_kuyrugu.put((is_id, story.strip(), kar, mod, edit_id))
+    return {"job_id": is_id, "kuyruk": is_kuyrugu.qsize(), "tur": mod, "edit": edit_id}
 
 
 @app.get("/api/job/{is_id}")
@@ -130,7 +129,7 @@ def cikti(dosya: str):
     return FileResponse(yol)
 
 
-def _bir_is(is_id, story, kar, edit_id, magnific, kaynak_modu):
+def _bir_is(is_id, story, kar, mod, edit_id):
     d = isler.get(is_id)
     if not d:
         return
@@ -141,8 +140,7 @@ def _bir_is(is_id, story, kar, edit_id, magnific, kaynak_modu):
         d["ilerleme"] = yuzde
 
     try:
-        sonuc = asyncio.run(pipeline.uret(is_id, story, kar, edit_id, magnific,
-                                          kaynak_modu, ilerle))
+        sonuc = asyncio.run(pipeline.uret(is_id, story, kar, mod, edit_id, ilerle))
         d.update({"durum": "bitti", "ilerleme": 100, "mesaj": "Hazir!",
                   "video": "ciktilar/" + sonuc["video"],
                   "kapak": ("ciktilar/" + sonuc["kapak"]) if sonuc.get("kapak") else None,

@@ -161,26 +161,24 @@
       </div>
 
       <div class="card">
-        <h2><span class="num">3</span> Edit Stili <span class="tag">metne göre kurgu</span></h2>
-        <div class="estiller" id="estiller"><span class="durum">Yükleniyor...</span></div>
-      </div>
+        <h2><span class="num">3</span> Video Türü</h2>
+        <div class="estiller" style="grid-template-columns:1fr 1fr" id="turler">
+          <div class="estil" data-tur="animasyon">
+            <span class="pick"></span><span class="en">🧍</span>
+            <b>Animasyon (Stickman)</b><p>xkcd / whiteboard tarzı stickman animasyon; tamamen AI.</p>
+            <div class="meta">stickman · footage/HD yok</div>
+          </div>
+          <div class="estil on" data-tur="documentary">
+            <span class="pick"></span><span class="en">🎬</span>
+            <b>Documentary</b><p>Gerçekçi belgesel; içinde stil seçimi + otomatik footage & HD.</p>
+            <div class="meta">3 stil · otomatik footage/Magnific</div>
+          </div>
+        </div>
 
-      <div class="card">
-        <h2><span class="num">4</span> Seçenekler</h2>
-        <div class="opt">
-          <div>
-            <div class="durum" style="margin-bottom:6px">Footage kaynağı</div>
-            <div class="seg" id="segKaynak">
-              <button data-k="kapali" class="on">Sadece AI</button>
-              <button data-k="guvenli">Güvenli (stok)</button>
-              <button data-k="yt">YouTube</button>
-            </div>
-            <div class="durum" style="margin-top:6px;font-size:11px">Footage için Pexels anahtarı (Güvenli) veya YT cookie (YouTube) gerekir — yoksa AI'a düşer.</div>
-          </div>
-          <div class="switch" id="swMag" style="margin-left:8px">
-            <span class="tr"></span>
-            <span>Magnific HD<small>kredi harcar · yavaşlatır</small></span>
-          </div>
+        <div id="editWrap">
+          <div class="lbl2">🎞️ Documentary stili</div>
+          <div class="estiller" id="estiller"><span class="durum">Yükleniyor...</span></div>
+          <div class="durum" style="margin-top:10px;font-size:11px">Footage (YouTube/stok) ve Magnific HD, metne göre <b>otomatik</b> kullanılır — ayar gerekmez.</div>
         </div>
       </div>
 
@@ -213,7 +211,7 @@
     <section class="view" id="view-sources">
       <p class="eyebrow">Görsel & footage kaynakları</p>
       <h1>Kaynaklar</h1>
-      <p class="lead">Sistem sahneleri edit stiline göre ya AI görseliyle ya da gerçek footage ile doldurur.</p>
+      <p class="lead">Documentary türünde sistem, her sahne için <b>metne göre otomatik</b> karar verir: gerçek footage mı (YouTube→Pexels→AI) yoksa AI görsel mi, ve hangi sahnenin HD (Magnific) gerektiğini. Animasyon türü tamamen AI'dır. Manuel ayar yok.</p>
       <div class="list">
         <div class="item"><span class="ci">🎥</span><div class="ct"><b>YouTube (yt-dlp)</b><p>Sahne için YouTube'da footage arayıp indirir. "YouTube" modunda herhangi bir video.</p></div><span class="pill free">Ücretsiz</span></div>
         <div class="item"><span class="ci">🟢</span><div class="ct"><b>Pexels (stok)</b><p>Lisanslı stok video. "Güvenli" modda öncelikli; YouTube modunda yedek.</p></div><span class="pill free">Ücretsiz</span></div>
@@ -238,7 +236,7 @@
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 let SID=localStorage.getItem("vidrush_sid");
 if(!SID){SID="u"+Math.random().toString(36).slice(2,10);localStorage.setItem("vidrush_sid",SID);}
-let karFile=null, editStil=null, kaynakModu="kapali", magnific=false;
+let karFile=null, editStil=null, videoTur="documentary";
 
 /* nav */
 $$(".nav").forEach(n=>n.onclick=()=>{
@@ -296,18 +294,19 @@ function editYukle(){
 }
 editYukle();
 
-/* seçenekler */
-$$("#segKaynak button").forEach(b=>b.onclick=()=>{
-  kaynakModu=b.dataset.k; $$("#segKaynak button").forEach(x=>x.classList.toggle("on",x===b));
+/* video türü (animasyon / documentary) */
+$$("#turler .estil").forEach(c=>c.onclick=()=>{
+  videoTur=c.dataset.tur;
+  $$("#turler .estil").forEach(x=>x.classList.toggle("on",x===c));
+  $("#editWrap").style.display = (videoTur==="documentary") ? "" : "none";
 });
-$("#swMag").onclick=()=>{magnific=!magnific; $("#swMag").classList.toggle("on",magnific);};
 
 /* krediler */
 function krediYukle(){
   fetch("api/saglik").then(r=>r.json()).then(h=>{
     const rows=[
       {ic:"🧠",ad:"OpenAI",p:"Görsel üretimi + plan. Sahne ~$0.01-0.02, kapak ~$0.15.",tip:"req",durum:h.openai},
-      {ic:"✨",ad:"Magnific.ai",p:"HD upscale (opsiyonel). Kredi bazlı.",tip:"req",durum:h.magnific},
+      {ic:"✨",ad:"Magnific.ai",p:"HD upscale — documentary'de metne göre otomatik. Kredi bazlı.",tip:"req",durum:h.magnific},
       {ic:"🟢",ad:"Pexels",p:"Stok footage. Anahtar bedava.",tip:"free",durum:h.pexels},
       {ic:"🎥",ad:"yt-dlp / YouTube",p:"Video indirme. Yazılım ücretsiz.",tip:"free",durum:true},
       {ic:"🔊",ad:"edge-tts",p:"Seslendirme (Azure Edge). Anahtar gerekmez.",tip:"free",durum:true},
@@ -335,9 +334,8 @@ $("#btnUret").onclick=async()=>{
   $("#sonucCard").classList.add("hidden"); $("#barWrap").classList.remove("hidden");
   $("#uretDurum").textContent="Başlatılıyor...";
   const fd=new FormData();
-  fd.append("session",SID); fd.append("story",story);
-  if(editStil) fd.append("edit",editStil);   // null ise sunucu varsayılan stile düşer
-  fd.append("kaynak_modu",kaynakModu); fd.append("magnific",magnific?"1":"0");
+  fd.append("session",SID); fd.append("story",story); fd.append("tur",videoTur);
+  if(videoTur==="documentary" && editStil) fd.append("edit",editStil);
   let job;
   try{
     const r=await fetch("api/generate",{method:"POST",body:fd});

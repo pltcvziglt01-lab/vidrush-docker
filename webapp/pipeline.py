@@ -67,47 +67,77 @@ EDIT_STILLERI = {
 }
 VARSAYILAN_EDIT = "sinematik-belgesel"
 
+# Animasyon (stickman) — Documentary'den AYRI ust-duzey tur. Tamamen AI, gercek footage/Magnific YOK.
+ANIMASYON_PROFIL = {
+    "ad": "Animasyon (Stickman)",
+    "ozet": "xkcd / whiteboard tarzı stickman animasyon; tamamen AI, hızlı ve anlaşılır",
+    "sahne_sn": 4, "kelime": 11, "footage_pct": 0, "overlay": "orta",
+    "altyazi": "orta", "motion": "anlati", "mag": None,
+    "gorsel_ek": ("minimalist stickman line animation, simple black stick-figure characters with "
+                  "round heads and thin clean outlines, flat solid pastel background, xkcd / "
+                  "whiteboard-explainer style, expressive simple poses, lots of empty space, "
+                  "2D vector, playful and clear, absolutely no photorealism, no real footage look"),
+}
 
-def edit_coz(edit_id):
+
+def profil_coz(tur, edit_id):
+    """tur: 'animasyon' -> stickman; 'documentary' -> edit_id ile 3 stilden biri."""
+    if tur == "animasyon":
+        return ANIMASYON_PROFIL
     return EDIT_STILLERI.get(edit_id or VARSAYILAN_EDIT, EDIT_STILLERI[VARSAYILAN_EDIT])
 
 
 def plan_sistem(prof):
     footage = prof["footage_pct"]
+    mag_var = bool(prof.get("mag"))
     overlay_kural = (
         "For EACH scene also give overlay: a punchy 2-5 word ALL-CAPS on-screen title in the "
         "ORIGINAL language that reinforces the narration (kinetic caption)."
         if prof["overlay"] != "yok" else
         "Leave overlay as an empty string for every scene (this style uses no on-screen titles)."
     )
+    # 3) footage karari OTOMATIK: animasyon (footage=0) hic footage kullanmaz.
+    if footage <= 0:
+        footage_kural = (
+            "3) This style uses NO real footage: set kaynak='ai' for EVERY scene. Still give "
+            "footage_sorgu as an empty string.")
+    else:
+        footage_kural = (
+            f"3) DECIDE per scene from the content: about {footage}% of scenes that depict a real "
+            "place/action better shown with real video must be REAL FOOTAGE (set kaynak='footage' "
+            "and footage_sorgu = a specific ENGLISH stock-footage query, e.g. 'aerial drone "
+            "rainforest canopy'); scenes centered on the character/abstract ideas set kaynak='ai'.")
+    # 7) HD (Magnific) karari OTOMATIK: sadece close-up/kilit detay AI sahnelerinde.
+    hd_kural = (
+        "7) hd (HD upscale need): set hd=true ONLY for AI scenes that are close-ups or key detail "
+        "hero shots that clearly benefit from extra sharpness; set hd=false for all other scenes."
+        if mag_var else
+        "7) Set hd=false for every scene.")
     return (
-        "You are a professional documentary video editor and scene planner. The user gives a "
-        "story/script. The main CHARACTER is provided separately as a REFERENCE IMAGE, so never "
-        "describe the character's appearance.\n"
-        f"EDIT STYLE: {prof['ad']} — {prof['ozet']}.\n"
+        "You are a professional video editor and scene planner. The user gives a story/script. "
+        "The main CHARACTER is provided separately as a REFERENCE IMAGE, so never describe the "
+        "character's appearance.\n"
+        f"MODE/STYLE: {prof['ad']} — {prof['ozet']}.\n"
         "Rules:\n"
         "1) Detect the language of the story.\n"
         f"2) Split into sequential scenes of about {prof['sahne_sn']} seconds of spoken audio each "
         f"(~{prof['kelime']} words per scene). Use as many scenes as the story needs (HARD MAX 45). "
         "The voiceover fields together cover the whole story in the ORIGINAL language, lightly "
         "smoothed for narration.\n"
-        f"3) About {footage}% of scenes must be REAL FOOTAGE: set kaynak='footage' and give "
-        "footage_sorgu = a specific ENGLISH stock-footage search query (e.g. 'aerial drone "
-        "rainforest canopy', 'busy tokyo street night timelapse'). The remaining scenes set "
-        "kaynak='ai'. IMPORTANT: give scene_prompt for EVERY scene (both ai and footage) = a "
-        "vivid 16:9 ENGLISH description of the action/place/camera/mood featuring 'the character' "
-        "(for footage scenes this is the fallback if no clip is found). Never describe the "
-        "character's colors/face.\n"
+        f"{footage_kural} IMPORTANT: give scene_prompt for EVERY scene = a vivid 16:9 ENGLISH "
+        "description of the action/place/camera/mood featuring 'the character' (for footage scenes "
+        "this is the fallback if no clip is found). Never describe the character's colors/face.\n"
         f"4) {overlay_kural}\n"
         "5) Choose a Microsoft Azure neural voice by language: tr->tr-TR-EmelNeural, "
         "en->en-US-AndrewMultilingualNeural, es->es-ES-AlvaroNeural, de->de-DE-ConradNeural, "
         "fr->fr-FR-HenriNeural; else a fitting one.\n"
         "6) Thumbnail: object with text = a punchy 2-5 word hook in the ORIGINAL language ALL CAPS, "
         "and prompt = a dramatic 16:9 scene featuring the character, strong emotion, high contrast.\n"
+        f"{hd_kural}\n"
         "Respond ONLY valid JSON: {\"language\":\"en\",\"voice\":\"...\","
         "\"thumbnail\":{\"text\":\"...\",\"prompt\":\"...\"},"
         "\"scenes\":[{\"n\":1,\"voiceover\":\"...\",\"kaynak\":\"ai|footage\","
-        "\"scene_prompt\":\"...\",\"footage_sorgu\":\"...\",\"overlay\":\"...\"}]}"
+        "\"scene_prompt\":\"...\",\"footage_sorgu\":\"...\",\"overlay\":\"...\",\"hd\":false}]}"
     )
 
 
@@ -186,21 +216,22 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
     return False
 
 
-async def uret(is_adi: str, story: str, kar_yol: str, edit_id: str = VARSAYILAN_EDIT,
-               magnific: bool = False, kaynak_modu: str = "yt", ilerle=None) -> dict:
-    """Tam hat. edit_id -> EDIT_STILLERI; magnific -> HD upscale; kaynak_modu: yt|guvenli|kapali."""
+async def uret(is_adi: str, story: str, kar_yol: str, mod: str = "documentary",
+               edit_id: str = VARSAYILAN_EDIT, ilerle=None) -> dict:
+    """Tam hat. mod: 'animasyon'|'documentary' (documentary'de edit_id ile 3 stilden biri).
+    Footage (documentary) ve Magnific HD, PLANA GORE OTOMATIK uygulanir — manuel ayar yok."""
     def bildir(mesaj, yuzde):
         if ilerle:
             ilerle(mesaj, yuzde)
 
-    prof = edit_coz(edit_id)
+    prof = profil_coz(mod, edit_id)
     gorsel_ek = prof["gorsel_ek"]
     motion = prof["motion"]
     overlay_stil = prof["overlay"]
     altyazi_stil = prof.get("altyazi", "orta")   # overlay'den AYRI (sinematikte de altyazi cikar)
-    mag_profil = prof["mag"]
-    yt_once = kaynak_modu != "guvenli"
-    footage_acik = kaynak_modu != "kapali"
+    mag_profil = prof.get("mag")                 # None -> Magnific KAPALI (animasyon)
+    footage_acik = prof.get("footage_pct", 0) > 0  # animasyon=0 -> footage YOK
+    yt_once = True                               # otomatik: YT once, Pexels yedek
 
     bildir("Hikaye sahnelere bölünüyor...", 4)
     plan = plan_uret(story, prof)
@@ -237,7 +268,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, edit_id: str = VARSAYILAN_
             if not referansli_gorsel(sp, kar_yol, gyol_full, stil_prompt=gorsel_ek):
                 print(f"sahne {n} atlandi", file=sys.stderr)
                 continue
-            if magnific:
+            if mag_profil and s.get("hd"):   # OTOMATIK: sadece plan HD isaretlediyse
                 bildir(f"Sahne {i+1}/{toplam}: Magnific HD...", yuzde)
                 kaynak.magnific_upscale(gyol_full, optimized_for=mag_profil, scale="2x")
             time.sleep(11)  # OpenAI Tier1 hiz limiti
@@ -269,7 +300,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, edit_id: str = VARSAYILAN_
                    "high contrast, professional YouTube thumbnail. No other text.")
         khedef = os.path.join(is_dizini, "kapak.png")
         if referansli_gorsel(kp, kar_yol, khedef, stil_prompt=gorsel_ek):
-            if magnific:
+            if mag_profil:   # kapak: documentary'de her zaman HD (thumbnail kalitesi kritik)
                 kaynak.magnific_upscale(khedef, optimized_for=mag_profil, scale="2x")
             kapak_yolu = khedef
 
