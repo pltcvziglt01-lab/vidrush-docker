@@ -320,20 +320,7 @@
    "parameters": {
     "mode": "runOnceForAllItems",
     "language": "javaScript",
-    "jsCode": "const item = $input.first().json;\nlet raw = item.output ?? item.text ?? item.output_text ?? (item.message && item.message.content) ?? item.content ?? '';\nif (Array.isArray(raw)) {\n  raw = raw.map(o => {\n    if (typeof o === 'string') return o;\n    if (o.content && Array.isArray(o.content)) return o.content.map(c => c.text ?? '').join('');\n    return o.text ?? '';\n  }).join('');\n} else if (typeof raw === 'object' && raw !== null) {\n  raw = JSON.stringify(raw);\n}\nraw = String(raw).trim();\nconst m = raw.match(/\\{[\\s\\S]*\\}/);\nlet plan;\ntry {\n  plan = JSON.parse(m ? m[0] : raw);\n} catch (e) {\n  throw new Error('Sahne plani JSON olarak ayristirilmadi: ' + raw.slice(0, 300));\n}\nif (!plan.scenes || !Array.isArray(plan.scenes) || plan.scenes.length === 0) {\n  throw new Error('Sahne plani bos geldi');\n}\nconst scenes = plan.scenes.map((s, i) => ({\n  n: s.n ?? i + 1,\n  voiceover: String(s.voiceover ?? '').trim(),\n  image_prompt: String(s.image_prompt ?? '').trim(),\n  source: s.source === 'stock' ? 'stock' : 'ai',\n  stock_query: String(s.stock_query ?? '').trim()\n})).filter(s => s.voiceover && s.image_prompt);\nif (scenes.length === 0) throw new Error('Gecerli sahne yok');\nconst t = plan.thumbnail ?? {};\nconst kapakText = String(t.text ?? '').trim();\nlet kapakPrompt = String(t.prompt ?? '').trim();\nif (!kapakPrompt) kapakPrompt = scenes[0].image_prompt + ', dramatic close-up, high contrast, YouTube thumbnail composition';\nif (kapakText) {\n  kapakPrompt += '. Render the exact text \"' + kapakText + '\" inside the image as huge bold eye-catching title typography baked into the artwork, perfectly readable, high contrast against the background, professional YouTube thumbnail style. No other text, no watermarks.';\n} else {\n  kapakPrompt += '. No text in the image.';\n}\nreturn [{ json: { language: plan.language ?? 'en', voice: plan.voice ?? 'en-US-AndrewMultilingualNeural', kapak_text: kapakText, kapak_prompt: kapakPrompt, scenes } }];"
-   }
-  },
-  {
-   "id": "ffae2381-8613-4abd-8ff8-0d60f42bb6c5",
-   "name": "Sahneleri Ayir",
-   "type": "n8n-nodes-base.splitOut",
-   "typeVersion": 1,
-   "position": [
-    2016,
-    384
-   ],
-   "parameters": {
-    "fieldToSplitOut": "scenes"
+    "jsCode": "const item = $input.first().json;\nlet raw = item.output ?? item.text ?? item.output_text ?? (item.message && item.message.content) ?? item.content ?? '';\nif (Array.isArray(raw)) { raw = raw.map(o => typeof o==='string'?o:(o.content&&Array.isArray(o.content)?o.content.map(c=>c.text??'').join(''):(o.text??''))).join(''); }\nelse if (typeof raw === 'object' && raw !== null) { raw = JSON.stringify(raw); }\nraw = String(raw).trim();\nconst m = raw.match(/\\{[\\s\\S]*\\}/);\nlet plan; try { plan = JSON.parse(m ? m[0] : raw); } catch(e){ throw new Error('Sahne plani ayristirilamadi: '+raw.slice(0,300)); }\nif (!plan.scenes || !Array.isArray(plan.scenes) || !plan.scenes.length) throw new Error('Sahne plani bos');\nconst lock = String(plan.character_lock || '').trim();\nconst scenes = plan.scenes.map((s,i) => {\n  let ip = String(s.image_prompt || '').trim();\n  const src = s.source === 'stock' ? 'stock' : 'ai';\n  // karakter varsa: kilidi her AI prompt'un basina ZORLA koy (birebir ayni)\n  if (lock && src !== 'stock') { if (!ip.includes(lock)) ip = lock + '. ' + ip; }\n  return { n: s.n ?? i+1, voiceover: String(s.voiceover||'').trim(), image_prompt: ip, source: src, stock_query: String(s.stock_query||'').trim() };\n}).filter(s => s.voiceover && (s.image_prompt || s.stock_query));\nif (!scenes.length) throw new Error('Gecerli sahne yok');\nconst t = plan.thumbnail || {};\nconst kText = String(t.text||'').trim();\nlet kPrompt = String(t.prompt||'').trim();\nif (!kPrompt) kPrompt = scenes[0].image_prompt + ', dramatic close-up, high contrast, YouTube thumbnail composition';\nif (lock && !kPrompt.includes(lock)) kPrompt = lock + '. ' + kPrompt;\nif (kText) kPrompt += '. Render the exact text \"' + kText + '\" inside the image as huge bold eye-catching title typography baked into the artwork, perfectly readable, high contrast, professional YouTube thumbnail style. No other text, no watermarks.';\nelse kPrompt += '. No text in the image.';\nreturn [{ json: { language: plan.language||'en', voice: plan.voice||'en-US-AndrewMultilingualNeural', character_lock: lock, kapak_text: kText, kapak_prompt: kPrompt, scenes } }];"
    }
   },
   {
@@ -348,38 +335,7 @@
    "parameters": {
     "mode": "runOnceForAllItems",
     "language": "javaScript",
-    "jsCode": "const results = $input.all().map(i => i.json).filter(s => s.gorsel_url);\nif (results.length === 0) return [{ json: { hata: true } }];\nresults.sort((a, b) => a.n - b.n);\nconst plan = $('Plan Ayristir').first().json;\nconst payload = {\n  is_adi: 'is_' + $execution.id,\n  voice: plan.voice,\n  sahneler: results.map(s => ({ n: s.n, voiceover: s.voiceover, gorsel_url: s.gorsel_url, tur: s.tur }))\n};\nconst b64 = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64');\nreturn [{ json: { hata: false, b64 } }];"
-   }
-  },
-  {
-   "id": "55146d63-0a00-42cc-ba5c-9c99d5f56aaa",
-   "name": "Gorseller Uretildi Mi",
-   "type": "n8n-nodes-base.if",
-   "typeVersion": 2.3,
-   "position": [
-    2688,
-    192
-   ],
-   "parameters": {
-    "conditions": {
-     "options": {
-      "caseSensitive": true,
-      "leftValue": "",
-      "typeValidation": "loose"
-     },
-     "conditions": [
-      {
-       "leftValue": "={{ $json.hata }}",
-       "operator": {
-        "type": "boolean",
-        "operation": "false",
-        "singleValue": true
-       },
-       "rightValue": ""
-      }
-     ],
-     "combinator": "and"
-    }
+    "jsCode": "const plan = $('Plan Ayristir').first().json;\nconst scenes = plan.scenes || [];\nif (!scenes.length) return [{ json: { hata: true } }];\nconst payload = {\n  is_adi: 'is_' + $execution.id,\n  voice: plan.voice,\n  kapak_prompt: plan.kapak_prompt || '',\n  sahneler: scenes.map(s => ({ n: s.n, voiceover: s.voiceover, image_prompt: s.image_prompt, source: s.source, stock_query: s.stock_query }))\n};\nconst b64 = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64');\nreturn [{ json: { hata: false, b64 } }];"
    }
   },
   {
@@ -505,67 +461,6 @@
     "telegramApi": {
      "name": "Telegram Bot"
     }
-   }
-  },
-  {
-   "id": "25517250-5bc8-42ea-9e14-1a7ac19f5bc7",
-   "name": "Sahne Sonucu",
-   "type": "n8n-nodes-base.set",
-   "typeVersion": 3.4,
-   "position": [
-    3360,
-    624
-   ],
-   "parameters": {
-    "mode": "manual",
-    "includeOtherFields": false,
-    "assignments": {
-     "assignments": [
-      {
-       "id": "sahne-no",
-       "name": "n",
-       "value": "={{ $(\"Sahne Dongusu\").first().json.n }}",
-       "type": "number"
-      },
-      {
-       "id": "sahne-ses",
-       "name": "voiceover",
-       "value": "={{ $(\"Sahne Dongusu\").first().json.voiceover }}",
-       "type": "string"
-      },
-      {
-       "id": "sahne-gorsel",
-       "name": "gorsel_url",
-       "value": "={{ ($json.fileName || $binary?.data) ? (\"isler/is_\" + $execution.id + \"/sahne_\" + $(\"Sahne Dongusu\").first().json.n + \".png\") : \"\" }}",
-       "type": "string"
-      },
-      {
-       "id": "sahne-tur",
-       "name": "tur",
-       "value": "image",
-       "type": "string"
-      },
-      {
-       "id": "sahne-durum",
-       "name": "uretim_durumu",
-       "value": "={{ ($json.fileName || $binary?.data) ? \"completed\" : \"failed\" }}",
-       "type": "string"
-      }
-     ]
-    }
-   }
-  },
-  {
-   "id": "f09a1b6e-ed1b-4fc7-8541-379a990aaf72",
-   "name": "Sahne Dongusu",
-   "type": "n8n-nodes-base.splitInBatches",
-   "typeVersion": 3,
-   "position": [
-    2240,
-    384
-   ],
-   "parameters": {
-    "batchSize": 1
    }
   },
   {
@@ -816,209 +711,6 @@
    "credentials": {
     "telegramApi": {
      "name": "Telegram Bot"
-    }
-   }
-  },
-  {
-   "id": "883a1f93-8423-4474-adcf-9c81a562e738",
-   "name": "Gorsel Uret (OpenAI)",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.4,
-   "position": [
-    2464,
-    560
-   ],
-   "parameters": {
-    "method": "POST",
-    "url": "https://api.openai.com/v1/images/generations",
-    "authentication": "predefinedCredentialType",
-    "nodeCredentialType": "openAiApi",
-    "sendBody": true,
-    "contentType": "json",
-    "specifyBody": "json",
-    "jsonBody": "={{ { \"model\": \"gpt-image-1-mini\", \"prompt\": $(\"Sahne Dongusu\").first().json.image_prompt, \"size\": \"1536x1024\", \"quality\": \"medium\", \"n\": 1 } }}"
-   },
-   "onError": "continueRegularOutput",
-   "retryOnFail": true,
-   "maxTries": 2,
-   "waitBetweenTries": 5000,
-   "credentials": {
-    "openAiApi": {
-     "name": "OpenAI Kisisel"
-    }
-   }
-  },
-  {
-   "id": "930c0f51-12b3-4fd8-b1e6-dbd5ab460140",
-   "name": "Hiz Limiti Bekle",
-   "type": "n8n-nodes-base.wait",
-   "typeVersion": 1.1,
-   "position": [
-    3136,
-    624
-   ],
-   "parameters": {
-    "resume": "timeInterval",
-    "amount": 12,
-    "unit": "seconds"
-   },
-   "webhookId": "8b19fb65-ddb4-4354-9ae9-856fc34c2192"
-  },
-  {
-   "id": "235de3d4-33c8-418b-8cb8-4d511543aab0",
-   "name": "Stok Mu",
-   "type": "n8n-nodes-base.if",
-   "typeVersion": 2.3,
-   "position": [
-    2464,
-    720
-   ],
-   "parameters": {
-    "conditions": {
-     "options": {
-      "caseSensitive": true,
-      "leftValue": "",
-      "typeValidation": "loose"
-     },
-     "conditions": [
-      {
-       "leftValue": "={{ $json.source }}",
-       "operator": {
-        "type": "string",
-        "operation": "equals"
-       },
-       "rightValue": "stock"
-      },
-      {
-       "leftValue": "={{ $json.stock_query ?? \"\" }}",
-       "operator": {
-        "type": "string",
-        "operation": "notEmpty",
-        "singleValue": true
-       },
-       "rightValue": ""
-      }
-     ],
-     "combinator": "and"
-    }
-   }
-  },
-  {
-   "id": "4be49f1f-4deb-4364-b841-1e97591bf979",
-   "name": "Stok Video Ara (Pexels)",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.4,
-   "position": [
-    2688,
-    800
-   ],
-   "parameters": {
-    "method": "GET",
-    "url": "https://api.pexels.com/videos/search",
-    "authentication": "genericCredentialType",
-    "genericAuthType": "httpHeaderAuth",
-    "sendQuery": true,
-    "specifyQuery": "keypair",
-    "queryParameters": {
-     "parameters": [
-      {
-       "name": "query",
-       "value": "={{ $json.stock_query }}"
-      },
-      {
-       "name": "orientation",
-       "value": "landscape"
-      },
-      {
-       "name": "per_page",
-       "value": "5"
-      },
-      {
-       "name": "size",
-       "value": "medium"
-      }
-     ]
-    }
-   },
-   "onError": "continueRegularOutput",
-   "credentials": {
-    "httpHeaderAuth": {
-     "name": "Pexels API"
-    }
-   }
-  },
-  {
-   "id": "c4c89d6f-9fed-484b-9e9f-a3e6964cf131",
-   "name": "Stok Videoyu Sec",
-   "type": "n8n-nodes-base.code",
-   "typeVersion": 2,
-   "position": [
-    2912,
-    800
-   ],
-   "parameters": {
-    "mode": "runOnceForAllItems",
-    "language": "javaScript",
-    "jsCode": "const r = $input.first().json;\nconst scene = $('Sahne Dongusu').first().json;\nconst vids = Array.isArray(r.videos) ? r.videos : [];\nlet best = null;\nfor (const v of vids) {\n  const file = (v.video_files || [])\n    .filter(f => (f.width || 0) >= 1280 && (f.width || 0) <= 1920 && f.link)\n    .sort((a, b) => (b.width || 0) - (a.width || 0))[0];\n  if (!file) continue;\n  const dur = v.duration || 0;\n  if (!best || dur > best.duration) best = { duration: dur, link: file.link };\n}\nreturn [{ json: {\n  n: scene.n,\n  voiceover: scene.voiceover,\n  gorsel_url: best ? best.link : '',\n  tur: 'video',\n  uretim_durumu: best ? 'completed' : 'stok_yok'\n} }];"
-   }
-  },
-  {
-   "id": "12cd2dda-f381-430c-b004-75f5230b650e",
-   "name": "Stok Bulundu Mu",
-   "type": "n8n-nodes-base.if",
-   "typeVersion": 2.3,
-   "position": [
-    3136,
-    800
-   ],
-   "parameters": {
-    "conditions": {
-     "options": {
-      "caseSensitive": true,
-      "leftValue": "",
-      "typeValidation": "loose"
-     },
-     "conditions": [
-      {
-       "leftValue": "={{ $json.gorsel_url ?? \"\" }}",
-       "operator": {
-        "type": "string",
-        "operation": "notEmpty",
-        "singleValue": true
-       },
-       "rightValue": ""
-      }
-     ],
-     "combinator": "and"
-    }
-   }
-  },
-  {
-   "id": "b38436ea-b0f7-4975-bf16-9d36dccfec00",
-   "name": "Kapak Uret (OpenAI)",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.4,
-   "position": [
-    4480,
-    0
-   ],
-   "parameters": {
-    "method": "POST",
-    "url": "https://api.openai.com/v1/images/generations",
-    "authentication": "predefinedCredentialType",
-    "nodeCredentialType": "openAiApi",
-    "sendBody": true,
-    "contentType": "json",
-    "specifyBody": "json",
-    "jsonBody": "={{ { \"model\": \"gpt-image-1.5\", \"prompt\": $(\"Plan Ayristir\").first().json.kapak_prompt, \"size\": \"1536x1024\", \"quality\": \"high\", \"n\": 1 } }}"
-   },
-   "onError": "continueRegularOutput",
-   "retryOnFail": true,
-   "maxTries": 2,
-   "waitBetweenTries": 5000,
-   "credentials": {
-    "openAiApi": {
-     "name": "OpenAI Kisisel"
     }
    }
   },
@@ -1578,42 +1270,6 @@
    "id": "e8d3412a-917d-4a75-83a3-252271e3864e"
   },
   {
-   "name": "Gorseli Dosyaya Cevir",
-   "type": "n8n-nodes-base.convertToFile",
-   "typeVersion": 1.1,
-   "position": [
-    2576,
-    560
-   ],
-   "parameters": {
-    "operation": "toBinary",
-    "sourceProperty": "data[0].b64_json",
-    "options": {
-     "fileName": "sahne.png",
-     "mimeType": "image/png"
-    }
-   },
-   "onError": "continueRegularOutput",
-   "id": "2e79d881-1b71-4ac7-996f-0761d9d40a01"
-  },
-  {
-   "name": "Gorseli Diske Yaz",
-   "type": "n8n-nodes-base.readWriteFile",
-   "typeVersion": 1,
-   "position": [
-    2760,
-    560
-   ],
-   "parameters": {
-    "operation": "write",
-    "fileName": "=/opt/vidrush/render-studio/public/isler/is_{{ $execution.id }}/sahne_{{ $(\"Sahne Dongusu\").first().json.n }}.png",
-    "dataPropertyName": "data",
-    "options": {}
-   },
-   "onError": "continueRegularOutput",
-   "id": "6b87e53e-b785-47db-b5ab-478a7c00630b"
-  },
-  {
    "name": "Videoyu Render Et (Remotion)",
    "type": "n8n-nodes-base.executeCommand",
    "typeVersion": 1,
@@ -1638,7 +1294,7 @@
    "parameters": {
     "mode": "runOnceForAllItems",
     "language": "javaScript",
-    "jsCode": "const out = String($input.first().json.stdout || '').trim().split('\\n');\nlet sonuc = null;\nfor (let i = out.length - 1; i >= 0; i--) {\n  try { sonuc = JSON.parse(out[i]); break; } catch (e) {}\n}\nif (!sonuc || !sonuc.video) throw new Error('Render ciktisi okunamadi: ' + out.slice(-3).join(' | '));\nreturn [{ json: { video_yolu: sonuc.video, sure: sonuc.sure, sahne_sayisi: sonuc.sahne_sayisi } }];"
+    "jsCode": "const out = String($input.first().json.stdout||'').trim().split('\\n');\nlet r=null;\nfor(let i=out.length-1;i>=0;i--){try{r=JSON.parse(out[i]);break;}catch(e){}}\nif(!r||!r.video) throw new Error('Render ciktisi okunamadi: '+out.slice(-4).join(' | '));\nreturn [{json:{video_yolu:r.video, kapak_yolu:r.kapak||'', sure:r.sure, sahne_sayisi:r.sahne_sayisi}}];"
    },
    "id": "7895d997-ae04-4d53-93be-431e6721b785"
   },
@@ -1682,23 +1338,18 @@
    "webhookId": "61590263-08f2-4414-be49-478721290024"
   },
   {
-   "name": "Kapagi Dosyaya Cevir",
-   "type": "n8n-nodes-base.convertToFile",
-   "typeVersion": 1.1,
+   "name": "Kapagi Oku",
+   "type": "n8n-nodes-base.readWriteFile",
+   "typeVersion": 1,
    "position": [
-    4704,
-    0
+    4256,
+    120
    ],
    "parameters": {
-    "operation": "toBinary",
-    "sourceProperty": "data[0].b64_json",
-    "options": {
-     "fileName": "kapak.png",
-     "mimeType": "image/png"
-    }
+    "fileSelector": "={{ $('Render Ciktisini Ayikla').first().json.kapak_yolu }}",
+    "options": {}
    },
-   "onError": "continueRegularOutput",
-   "id": "135e33ec-b16d-4e6c-be76-41a2a23435ae"
+   "onError": "continueRegularOutput"
   }
  ],
  "connections": {
@@ -1786,36 +1437,7 @@
    "main": [
     [
      {
-      "node": "Sahneleri Ayir",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Sahneleri Ayir": {
-   "main": [
-    [
-     {
-      "node": "Sahne Dongusu",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Gorseller Uretildi Mi": {
-   "main": [
-    [
-     {
-      "node": "Videoyu Render Et (Remotion)",
-      "type": "main",
-      "index": 0
-     }
-    ],
-    [
-     {
-      "node": "Gorsel Hatasi Mesaji",
+      "node": "Render Girdisi Olustur",
       "type": "main",
       "index": 0
      }
@@ -1834,24 +1456,6 @@
     [
      {
       "node": "Video Yolu Mesaji",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Sahne Dongusu": {
-   "main": [
-    [
-     {
-      "node": "Render Girdisi Olustur",
-      "type": "main",
-      "index": 0
-     }
-    ],
-    [
-     {
-      "node": "Stok Mu",
       "type": "main",
       "index": 0
      }
@@ -1887,113 +1491,11 @@
     ]
    ]
   },
-  "Gorsel Uret (OpenAI)": {
-   "main": [
-    [
-     {
-      "node": "Gorseli Dosyaya Cevir",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Sahne Sonucu": {
-   "main": [
-    [
-     {
-      "node": "Hiz Limiti Bekle",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Hiz Limiti Bekle": {
-   "main": [
-    [
-     {
-      "node": "Sahne Dongusu",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Stok Mu": {
-   "main": [
-    [
-     {
-      "node": "Stok Video Ara (Pexels)",
-      "type": "main",
-      "index": 0
-     }
-    ],
-    [
-     {
-      "node": "Gorsel Uret (OpenAI)",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Stok Video Ara (Pexels)": {
-   "main": [
-    [
-     {
-      "node": "Stok Videoyu Sec",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Stok Videoyu Sec": {
-   "main": [
-    [
-     {
-      "node": "Stok Bulundu Mu",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Stok Bulundu Mu": {
-   "main": [
-    [
-     {
-      "node": "Hiz Limiti Bekle",
-      "type": "main",
-      "index": 0
-     }
-    ],
-    [
-     {
-      "node": "Gorsel Uret (OpenAI)",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
   "Tamamlandi Isaretle": {
    "main": [
     [
      {
-      "node": "Kapak Uret (OpenAI)",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Kapak Uret (OpenAI)": {
-   "main": [
-    [
-     {
-      "node": "Kapagi Dosyaya Cevir",
+      "node": "Kapagi Oku",
       "type": "main",
       "index": 0
      }
@@ -2149,28 +1651,6 @@
     ]
    ]
   },
-  "Gorseli Dosyaya Cevir": {
-   "main": [
-    [
-     {
-      "node": "Gorseli Diske Yaz",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Gorseli Diske Yaz": {
-   "main": [
-    [
-     {
-      "node": "Sahne Sonucu",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
   "Videoyu Render Et (Remotion)": {
    "main": [
     [
@@ -2222,22 +1702,22 @@
     ]
    ]
   },
-  "Kapagi Dosyaya Cevir": {
+  "Render Girdisi Olustur": {
    "main": [
     [
      {
-      "node": "Kapak Gonder",
+      "node": "Videoyu Render Et (Remotion)",
       "type": "main",
       "index": 0
      }
     ]
    ]
   },
-  "Render Girdisi Olustur": {
+  "Kapagi Oku": {
    "main": [
     [
      {
-      "node": "Gorseller Uretildi Mi",
+      "node": "Kapak Gonder",
       "type": "main",
       "index": 0
      }
