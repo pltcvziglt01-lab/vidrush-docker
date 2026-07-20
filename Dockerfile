@@ -16,11 +16,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       libgbm1 libpango-1.0-0 libcairo2 libasound2 libatspi2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Python bagimliliklari: edge-tts (TTS) + web arayuzu (fastapi/uvicorn/multipart/requests/Pillow)
+# edge-tts (ucretsiz Azure sesleri) — sanal ortam PEP668 icin
 RUN python3 -m venv /opt/venv \
-    && /opt/venv/bin/pip install --no-cache-dir \
-       edge-tts==7.2.8 fastapi==0.115.6 "uvicorn[standard]==0.34.0" \
-       python-multipart==0.0.20 requests==2.32.3 Pillow==11.1.0
+    && /opt/venv/bin/pip install --no-cache-dir edge-tts==7.2.8
 ENV PATH="/opt/venv/bin:${PATH}"
 
 # n8n (host ile ayni surum). isolated-vm native derleme icin build araclari
@@ -39,6 +37,11 @@ COPY app/render-studio/package.json app/render-studio/package-lock.json ./render
 RUN cd render-studio && npm install --no-audit --no-fund && npm cache clean --force
 COPY app/render-studio/ ./render-studio/
 COPY app/uret.py app/kopru.py ./
+
+# Web arayuzu Python bagimliliklari (GEC katman: n8n/render-studio onbellegini bozmaz)
+RUN /opt/venv/bin/pip install --no-cache-dir \
+       fastapi==0.115.6 "uvicorn[standard]==0.34.0" \
+       python-multipart==0.0.20 requests==2.32.3 Pillow==11.1.0
 
 # Seed + web arayuzu + calisma dosyalari
 COPY seed.py entrypoint.sh ./
