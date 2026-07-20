@@ -2,6 +2,7 @@ import React from 'react';
 import {
   AbsoluteFill,
   Audio,
+  Easing,
   Img,
   OffthreadVideo,
   Series,
@@ -27,10 +28,15 @@ export type Sahne = {
   altyazi: AltyaziParcasi[];
 };
 
+// 'fade'    -> yumusak sinematik fade (varsayilan)
+// 'dinamik' -> After Effects tarzi belgesel: yonlu slide-in + zoom-punch + guclu Ken Burns + vinyet
+export type Gecis = 'fade' | 'dinamik';
+
 export type VideoProps = {
   fps: number;
   genislik: number;
   yukseklik: number;
+  gecis?: Gecis;
   sahneler: Sahne[];
 };
 
@@ -38,6 +44,7 @@ export const varsayilanProps: VideoProps = {
   fps: 30,
   genislik: 1920,
   yukseklik: 1080,
+  gecis: 'fade',
   sahneler: [
     {
       tur: 'image',
@@ -97,11 +104,8 @@ const Altyazi: React.FC<{parcalar: AltyaziParcasi[]; fps: number}> = ({
   );
 };
 
-const SahneGorunumu: React.FC<{sahne: Sahne}> = ({sahne}) => {
-  const frame = useCurrentFrame();
-  const {fps} = useVideoConfig();
-  const kareSayisi = Math.max(1, Math.round(sahne.sure * fps));
-
+// Yumusak sinematik gecis (mevcut davranis)
+const fadeHesapla = (sahne: Sahne, frame: number, kareSayisi: number) => {
   const gecis = Math.min(12, Math.floor(kareSayisi / 4));
   const opaklik = interpolate(
     frame,
@@ -109,7 +113,6 @@ const SahneGorunumu: React.FC<{sahne: Sahne}> = ({sahne}) => {
     [0, 1, 1, 0],
     {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'}
   );
-
   const olcek = interpolate(
     frame,
     [0, kareSayisi],
@@ -119,10 +122,85 @@ const SahneGorunumu: React.FC<{sahne: Sahne}> = ({sahne}) => {
   const kayma = interpolate(frame, [0, kareSayisi], [0, 26], {
     extrapolateRight: 'clamp',
   });
-  const tx =
-    sahne.pan === 'right' ? -kayma : sahne.pan === 'left' ? kayma : 0;
-  const ty =
-    sahne.pan === 'bottom' ? -kayma : sahne.pan === 'top' ? kayma : 0;
+  const tx = sahne.pan === 'right' ? -kayma : sahne.pan === 'left' ? kayma : 0;
+  const ty = sahne.pan === 'bottom' ? -kayma : sahne.pan === 'top' ? kayma : 0;
+  return {opaklik, transform: `scale(${olcek}) translate(${tx}px, ${ty}px)`};
+};
+
+// After Effects tarzi belgesel gecisi: yonlu slide-in reveal + zoom-punch cikis + guclu Ken Burns
+const dinamikHesapla = (
+  sahne: Sahne,
+  frame: number,
+  kareSayisi: number,
+  indeks: number
+) => {
+  const yon = indeks % 2 === 0 ? 1 : -1; // sahneler sirayla saga/sola kayar
+  const gf = Math.max(6, Math.min(16, Math.floor(kareSayisi / 4.5)));
+
+  // Giris: kenardan kayarak gelir + hafif buyukten normale oturur
+  const girisP = interpolate(frame, [0, gf], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: Easing.out(Easing.cubic),
+  });
+  const girisX = (1 - girisP) * yon * 150;
+  const girisOlcek = 1.12 - 0.12 * girisP;
+
+  // Cikis: ters yona hafif itilir + zoom-punch
+  const cikisP = interpolate(
+    frame,
+    [kareSayisi - gf, kareSayisi],
+    [0, 1],
+    {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+      easing: Easing.in(Easing.cubic),
+    }
+  );
+  const cikisX = cikisP * -yon * 100;
+  const cikisOlcek = 1 + cikisP * 0.08;
+
+  const opaklik = interpolate(
+    frame,
+    [0, gf, kareSayisi - gf, kareSayisi - 1],
+    [0, 1, 1, 0],
+    {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'}
+  );
+
+  // Ken Burns (fade'den daha guclu) + pan
+  const kb = interpolate(
+    frame,
+    [0, kareSayisi],
+    sahne.zoom === 'in' ? [1, 1.18] : [1.18, 1],
+    {extrapolateRight: 'clamp'}
+  );
+  const kayma = interpolate(frame, [0, kareSayisi], [0, 48], {
+    extrapolateRight: 'clamp',
+  });
+  const kbTx = sahne.pan === 'right' ? -kayma : sahne.pan === 'left' ? kayma : 0;
+  const kbTy = sahne.pan === 'bottom' ? -kayma : sahne.pan === 'top' ? kayma : 0;
+
+  const olcek = kb * girisOlcek * cikisOlcek;
+  const tx = kbTx + girisX + cikisX;
+  return {
+    opaklik,
+    transform: `translate(${tx}px, ${kbTy}px) scale(${olcek})`,
+  };
+};
+
+const SahneGorunumu: React.FC<{
+  sahne: Sahne;
+  indeks: number;
+  gecis: Gecis;
+}> = ({sahne, indeks, gecis}) => {
+  const frame = useCurrentFrame();
+  const {fps} = useVideoConfig();
+  const kareSayisi = Math.max(1, Math.round(sahne.sure * fps));
+
+  const dinamik = gecis === 'dinamik';
+  const {opaklik, transform} = dinamik
+    ? dinamikHesapla(sahne, frame, kareSayisi, indeks)
+    : fadeHesapla(sahne, frame, kareSayisi);
 
   return (
     <AbsoluteFill style={{backgroundColor: 'black'}}>
@@ -131,7 +209,12 @@ const SahneGorunumu: React.FC<{sahne: Sahne}> = ({sahne}) => {
           <OffthreadVideo
             src={kaynakCoz(sahne.medya)}
             muted
-            style={{width: '100%', height: '100%', objectFit: 'cover'}}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              transform: dinamik ? transform : undefined,
+            }}
           />
         ) : (
           <Img
@@ -140,10 +223,18 @@ const SahneGorunumu: React.FC<{sahne: Sahne}> = ({sahne}) => {
               width: '100%',
               height: '100%',
               objectFit: 'cover',
-              transform: `scale(${olcek}) translate(${tx}px, ${ty}px)`,
+              transform,
             }}
           />
         )}
+        {dinamik ? (
+          <AbsoluteFill
+            style={{
+              background:
+                'radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.38) 100%)',
+            }}
+          />
+        ) : null}
         <Altyazi parcalar={sahne.altyazi} fps={fps} />
       </AbsoluteFill>
       <Audio src={kaynakCoz(sahne.ses)} />
@@ -151,7 +242,8 @@ const SahneGorunumu: React.FC<{sahne: Sahne}> = ({sahne}) => {
   );
 };
 
-export const VidrushVideo: React.FC<VideoProps> = ({fps, sahneler}) => {
+export const VidrushVideo: React.FC<VideoProps> = ({fps, gecis, sahneler}) => {
+  const mod: Gecis = gecis === 'dinamik' ? 'dinamik' : 'fade';
   return (
     <AbsoluteFill style={{backgroundColor: 'black'}}>
       <Series>
@@ -160,7 +252,7 @@ export const VidrushVideo: React.FC<VideoProps> = ({fps, sahneler}) => {
             key={i}
             durationInFrames={Math.max(1, Math.round(sahne.sure * fps))}
           >
-            <SahneGorunumu sahne={sahne} />
+            <SahneGorunumu sahne={sahne} indeks={i} gecis={mod} />
           </Series.Sequence>
         ))}
       </Series>

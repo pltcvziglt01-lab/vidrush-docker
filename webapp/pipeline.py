@@ -24,6 +24,56 @@ os.makedirs(CIKTI_DIR, exist_ok=True)
 
 OAI_H = {"Authorization": f"Bearer {OPENAI_KEY}"}
 
+# Stil preset'leri. Her biri: gorsel uretimine eklenen ART-STYLE promptu + Remotion gecis modu.
+# 'referans' = kullanicinin yukledigi stil gorselini kullan (prompt bos).
+# 'gecis' = 'dinamik' -> After Effects tarzi belgesel hareketli gecisler; 'fade' -> yumusak sinematik.
+STILLER = {
+    "referans": {
+        "etiket": "Referans görselim",
+        "prompt": "",          # yuklenen stil gorseli tarzi belirler
+        "gecis": "fade",
+        "stil_gorseli": True,
+    },
+    "sinematik": {
+        "etiket": "Sinematik",
+        "prompt": ("Cinematic film still, shallow depth of field, dramatic volumetric "
+                   "lighting, subtle film grain, teal-and-orange color grade, anamorphic, "
+                   "ultra-detailed, high production value."),
+        "gecis": "fade",
+    },
+    "belgesel": {
+        "etiket": "Belgesel (Documentary)",
+        "prompt": ("Photorealistic documentary cinematography, natural realistic lighting, "
+                   "authentic textures, rich fine detail, shot on a full-frame cinema camera "
+                   "with a prime lens, shallow depth of field, National Geographic style, "
+                   "true-to-life colors, absolutely no illustration or cartoon look."),
+        "gecis": "dinamik",
+    },
+    "anime": {
+        "etiket": "Anime",
+        "prompt": ("High-quality anime illustration, clean cel shading, vibrant saturated "
+                   "colors, expressive, detailed studio-anime key visual."),
+        "gecis": "fade",
+    },
+    "uc_boyut": {
+        "etiket": "3D Animasyon",
+        "prompt": ("Pixar-style 3D render, soft global illumination, subsurface scattering, "
+                   "polished cinematic 3D animation, appealing character design."),
+        "gecis": "dinamik",
+    },
+    "gercekci": {
+        "etiket": "Gerçekçi Foto",
+        "prompt": ("Hyperrealistic photography, 50mm prime lens, natural lighting, lifelike "
+                   "skin and material detail, high dynamic range, sharp focus."),
+        "gecis": "fade",
+    },
+}
+VARSAYILAN_STIL = "sinematik"
+
+
+def stil_coz(stil_id):
+    return STILLER.get(stil_id or VARSAYILAN_STIL, STILLER[VARSAYILAN_STIL])
+
 PLAN_SISTEM = (
  "You are a video scene planner. The user gives a story/script. The visual CHARACTER and "
  "ART STYLE are provided separately as REFERENCE IMAGES, so do NOT describe the character's "
@@ -67,18 +117,30 @@ def plan_uret(story: str) -> dict:
 
 
 def referansli_gorsel(scene_prompt: str, kar_yol: str, stil_yol: str,
-                      hedef: str, deneme=3) -> bool:
-    """OpenAI images/edits: karakter + stil referansiyla sahne uretir."""
-    prompt = (scene_prompt +
-              ". Keep the SAME character from the first reference image (identical face, colors, "
-              "outfit, proportions). Apply the exact ART STYLE of the second reference image. "
-              "16:9 cinematic composition. No text or captions.")
+                      hedef: str, stil_prompt: str = "", stil_gorseli: bool = False,
+                      deneme=3) -> bool:
+    """OpenAI images/edits: karakter referansi + (stil gorseli VEYA stil promptu) ile sahne uretir."""
+    kar_var = bool(kar_yol and os.path.exists(kar_yol))
+    stil_gor_var = bool(stil_gorseli and stil_yol and os.path.exists(stil_yol))
+
+    prompt = scene_prompt.rstrip(". ") + "."
+    if kar_var:
+        prompt += (" Keep the SAME character from the first reference image (identical face, "
+                   "colors, outfit, proportions).")
+    if stil_gor_var:
+        prompt += " Apply the exact ART STYLE of the reference style image."
+    elif stil_prompt:
+        prompt += f" Art style: {stil_prompt}"
+    prompt += " 16:9 cinematic composition. No text or captions."
+
     for d in range(deneme):
         acik = []
         try:
-            fkar = open(kar_yol, "rb"); acik.append(fkar)
-            files = [("image[]", ("character.png", fkar, "image/png"))]
-            if stil_yol and os.path.exists(stil_yol):
+            files = []
+            if kar_var:
+                fkar = open(kar_yol, "rb"); acik.append(fkar)
+                files.append(("image[]", ("character.png", fkar, "image/png")))
+            if stil_gor_var:
                 fstil = open(stil_yol, "rb"); acik.append(fstil)
                 files.append(("image[]", ("style.png", fstil, "image/png")))
             data = {"model": "gpt-image-1", "prompt": prompt, "size": "1536x1024"}
@@ -103,11 +165,16 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, stil_yol: str,
 
 
 async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str,
-               ilerle=None) -> dict:
-    """Tam hat. ilerle(callback) durum bildirimi icin."""
+               stil_id: str = VARSAYILAN_STIL, ilerle=None) -> dict:
+    """Tam hat. ilerle(callback) durum bildirimi icin. stil_id -> STILLER preset'i."""
     def bildir(mesaj, yuzde):
         if ilerle:
             ilerle(mesaj, yuzde)
+
+    stil = stil_coz(stil_id)
+    stil_prompt = stil["prompt"]
+    stil_gorseli = bool(stil.get("stil_gorseli"))
+    gecis = stil.get("gecis", "fade")
 
     bildir("Hikaye sahnelere bolunuyor...", 5)
     plan = plan_uret(story)
@@ -125,7 +192,8 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str,
         sp = s["scene_prompt"].strip()
         bildir(f"Sahne {i+1}/{toplam} gorseli uretiliyor...", 10 + int(60 * i / max(1, toplam)))
         gyol = f"isler/{is_adi}/sahne_{n}.png"
-        if not referansli_gorsel(sp, kar_yol, stil_yol, os.path.join(PUBLIC, gyol)):
+        if not referansli_gorsel(sp, kar_yol, stil_yol, os.path.join(PUBLIC, gyol),
+                                 stil_prompt=stil_prompt, stil_gorseli=stil_gorseli):
             print(f"sahne {n} atlandi", file=sys.stderr)
             continue
         time.sleep(11)  # OpenAI Tier1 hiz limiti
@@ -151,12 +219,14 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str,
             kp += (f". Render the exact text \"{ktext}\" as huge bold baked-in title typography, "
                    "high contrast, professional YouTube thumbnail. No other text.")
         khedef = os.path.join(is_dizini, "kapak.png")
-        if referansli_gorsel(kp, kar_yol, stil_yol, khedef):
+        if referansli_gorsel(kp, kar_yol, stil_yol, khedef,
+                             stil_prompt=stil_prompt, stil_gorseli=stil_gorseli):
             kapak_yolu = khedef
 
     # Render
     bildir("Video render ediliyor (birkaç dakika)...", 78)
-    props = {"fps": 30, "genislik": 1920, "yukseklik": 1080, "sahneler": props_sahneler}
+    props = {"fps": 30, "genislik": 1920, "yukseklik": 1080,
+             "gecis": gecis, "sahneler": props_sahneler}
     props_yolu = os.path.join(is_dizini, "props.json")
     with open(props_yolu, "w") as f:
         json.dump(props, f, ensure_ascii=False)

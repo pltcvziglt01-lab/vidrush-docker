@@ -54,6 +54,16 @@
   .hidden{display:none}
   .tag{display:inline-block;background:#1d2029;border:1px solid var(--line);border-radius:20px;
         padding:3px 10px;font-size:11px;color:var(--dim);margin-left:8px}
+  .lbl2{font-size:13px;font-weight:600;margin:18px 0 10px;color:var(--txt)}
+  .stiller{display:flex;flex-wrap:wrap;gap:9px}
+  .stil{border:1.5px solid var(--line);background:#12141a;border-radius:11px;
+        padding:10px 14px;font-size:13px;font-weight:600;cursor:pointer;color:var(--txt);
+        transition:.15s;display:flex;align-items:center;gap:7px}
+  .stil:hover{border-color:var(--acc)}
+  .stil.sec{border-color:var(--acc);background:#221d3a;color:#fff}
+  .stil .em{font-size:15px}
+  .stil small{display:block;font-weight:400;color:var(--dim);font-size:10.5px;margin-top:1px}
+  #stilRefWrap{margin-top:14px}
 </style>
 </head>
 <body>
@@ -62,19 +72,24 @@
   <p class="sub">Bir kez referans karakter + stil görseli yükle. Sonra sadece hikaye metnini ver — görsel üretimi, karakter tutarlılığı, seslendirme, senkron ve montaj araca ait.</p>
 
   <div class="card">
-    <h2><span class="num">1</span>Referans Karakter & Stil <span class="tag" id="presetTag">kaydedilmedi</span></h2>
-    <div class="refs">
-      <label class="drop" id="dropKar">
-        <input type="file" id="fKar" accept="image/*">
-        <div id="karView"><div class="lbl">🧍 Karakter görseli</div><div class="hint">tıkla / sürükle · zorunlu</div></div>
-      </label>
-      <label class="drop" id="dropStil">
+    <h2><span class="num">1</span>Referans Karakter <span class="tag" id="presetTag">kaydedilmedi</span></h2>
+    <label class="drop" id="dropKar" style="min-height:150px">
+      <input type="file" id="fKar" accept="image/*">
+      <div id="karView"><div class="lbl">🧍 Karakter görseli</div><div class="hint">tıkla / sürükle · zorunlu · her sahnede aynı karakter</div></div>
+    </label>
+
+    <div class="lbl2">🎨 Stil seç</div>
+    <div class="stiller" id="stiller"><span class="durum">Yükleniyor...</span></div>
+
+    <div id="stilRefWrap" class="hidden">
+      <label class="drop" id="dropStil" style="min-height:130px">
         <input type="file" id="fStil" accept="image/*">
-        <div id="stilView"><div class="lbl">🎨 Stil görseli</div><div class="hint">tıkla / sürükle · opsiyonel</div></div>
+        <div id="stilView"><div class="lbl">🖼 Stil referans görseli</div><div class="hint">tıkla / sürükle · bu görselin tarzı uygulanır</div></div>
       </label>
     </div>
+
     <div class="row">
-      <button id="btnPreset" disabled>Referansları Kaydet</button>
+      <button id="btnPreset" disabled>Kaydet</button>
       <span class="durum" id="presetDurum"></span>
     </div>
   </div>
@@ -104,7 +119,32 @@
 const $ = s => document.querySelector(s);
 let SID = localStorage.getItem("vidrush_sid");
 if(!SID){ SID = "u"+Math.random().toString(36).slice(2,10); localStorage.setItem("vidrush_sid",SID); }
-let karFile=null, stilFile=null, presetHazir=false;
+let karFile=null, stilFile=null, presetHazir=false, secilenStil="sinematik";
+
+const STIL_EMOJI={sinematik:"🎬",belgesel:"🎞️",anime:"🌸",uc_boyut:"🧊",gercekci:"📷",referans:"🖼️"};
+const STIL_ACIKLAMA={belgesel:"AE motion geçişli",sinematik:"film havası",anime:"2D anime",
+  uc_boyut:"Pixar tarzı",gercekci:"foto gerçekçi",referans:"kendi görselin"};
+
+function stilleriYukle(){
+  fetch("api/stiller").then(r=>r.json()).then(list=>{
+    const c=$("#stiller"); c.innerHTML="";
+    list.forEach(s=>{
+      const b=document.createElement("button");
+      b.type="button"; b.className="stil"+(s.id===secilenStil?" sec":"");
+      b.dataset.id=s.id;
+      b.innerHTML=`<span class="em">${STIL_EMOJI[s.id]||"🎨"}</span><span>${s.etiket}`
+        +(STIL_ACIKLAMA[s.id]?`<small>${STIL_ACIKLAMA[s.id]}</small>`:"")+`</span>`;
+      b.onclick=()=>stilSec(s.id);
+      c.appendChild(b);
+    });
+  }).catch(()=>{ $("#stiller").innerHTML='<span class="err">stiller yüklenemedi</span>'; });
+}
+function stilSec(id){
+  secilenStil=id;
+  document.querySelectorAll(".stil").forEach(b=>b.classList.toggle("sec",b.dataset.id===id));
+  $("#stilRefWrap").classList.toggle("hidden", id!=="referans");
+}
+stilleriYukle();
 
 function onePik(input, view, hint){
   input.addEventListener("change", e=>{
@@ -141,6 +181,7 @@ $("#btnUret").onclick = async ()=>{
   $("#barWrap").classList.remove("hidden");
   $("#uretDurum").textContent="Başlatılıyor...";
   const fd=new FormData(); fd.append("session",SID); fd.append("story",story);
+  fd.append("stil",secilenStil);
   let job;
   try{
     const r=await fetch("api/generate",{method:"POST",body:fd});
