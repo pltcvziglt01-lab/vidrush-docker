@@ -2,4 +2,4 @@ import {Config} from '@remotion/cli/config';
 
 Config.setOverwriteOutput(true);
 Config.setVideoImageFormat('jpeg');
-Config.setConcurrency(4);
+Config.setConcurrency(1);

@@ -213,18 +213,14 @@ async def calistir(payload: dict) -> dict:
             lf.write("STDOUT:\n" + (r.stdout or "")[-4000:] + "\n")
             lf.write("STDERR:\n" + (r.stderr or "")[-4000:] + "\n")
 
-    # Remotion kendi Chrome Headless Shell'ini indirsin (Docker/sandbox'i kendi yonetir)
-    print("remotion browser ensure...", file=sys.stderr)
-    ens = subprocess.run(["npx", "remotion", "browser", "ensure"],
-                         cwd=STUDYO, capture_output=True, text=True, timeout=900)
-    logla("browser ensure", ens)
-
     print("remotion render basliyor...", file=sys.stderr)
-    gl = os.environ.get("REMOTION_GL", "").strip()
+    # concurrency=1 SART: VPS 1 vCPU, config'teki 4 hata verir
     komut = ["npx", "remotion", "render", "src/index.ts", "VidrushVideo", cikti,
              f"--props={props_yolu}", "--concurrency=1", "--timeout=120000"]
-    if gl:
-        komut.append(f"--gl={gl}")
+    if os.environ.get("REMOTION_BROWSER_EXECUTABLE"):
+        komut.append(f"--browser-executable={os.environ['REMOTION_BROWSER_EXECUTABLE']}")
+    if os.environ.get("REMOTION_GL"):
+        komut.append(f"--gl={os.environ['REMOTION_GL']}")
     sonuc = subprocess.run(komut, cwd=STUDYO, capture_output=True, text=True, timeout=5400)
     logla("render", sonuc)
     if sonuc.returncode != 0:

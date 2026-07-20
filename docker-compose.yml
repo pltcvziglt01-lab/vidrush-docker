@@ -14,12 +14,12 @@ services:
       N8N_USER_FOLDER: /home/node
       GENERIC_TIMEZONE: Europe/Istanbul
       TZ: Europe/Istanbul
+      REMOTION_BROWSER_EXECUTABLE: /usr/bin/chromium
       REMOTION_GL: swangle
     volumes:
       - n8n_data:/home/node/.n8n
       - render_isler:/opt/vidrush/render-studio/public/isler
       - render_out:/opt/vidrush/render-studio/out
-      - browser_cache:/home/node/.cache
     cap_add:
       - SYS_ADMIN            # headless Chromium sandbox icin
     shm_size: "1gb"          # Chrome cokmesini onler
@@ -63,4 +63,3 @@ volumes:
   render_isler:
   render_out:
   seed_info:
-  browser_cache:
