@@ -16,7 +16,8 @@ import subprocess
 import requests
 
 sys.path.insert(0, "/opt/vidrush")
-import uret  # seslendir, altyazi_parcala
+import uret as uretmod  # seslendir, altyazi_parcala (DIKKAT: bu dosyada 'uret' adli fonksiyon var,
+                        # modulu takma adla al ki golgelenmesin)
 
 import kaynak  # YT/Pexels footage + Magnific upscale
 
@@ -250,7 +251,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, edit_id: str = VARSAYILAN_
             "tur": tur, "medya": medya, "ses": syol, "sure": round(sure, 3),
             "zoom": "in" if i % 2 == 0 else "out", "pan": panlar[i % 4],
             "overlay": overlay,
-            "altyazi": uret.altyazi_parcala(kelimeler, sure),
+            "altyazi": uretmod.altyazi_parcala(kelimeler, sure),
         })
 
     if not props_sahneler:
@@ -310,4 +311,4 @@ async def uret(is_adi: str, story: str, kar_yol: str, edit_id: str = VARSAYILAN_
 
 
 async def uret_seslendir(metin, ses, yol):
-    return await uret.seslendir(metin, ses, yol)
+    return await uretmod.seslendir(metin, ses, yol)

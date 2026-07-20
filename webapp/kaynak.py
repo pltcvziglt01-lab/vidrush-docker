@@ -17,14 +17,24 @@ MAGNIFIC_KEY = os.environ.get("MAGNIFIC_KEY", "")
 PEXELS_KEY = os.environ.get("PEXELS_KEY", "")
 MAG_BASE = "https://api.magnific.com/v1/ai/image-upscaler"
 
+# YouTube veri-merkezi IP'lerinden "Sign in to confirm you're not a bot" verir.
+# Cozum: tarayicidan disa aktarilan Netscape cookies dosyasi (varsa) kullanilir.
+YT_COOKIES = os.environ.get("YT_COOKIES_FILE", "/opt/vidrush/webapp/veri/yt_cookies.txt")
+
+
+def _yt_cookie_opts(opts: dict) -> dict:
+    if YT_COOKIES and os.path.exists(YT_COOKIES):
+        opts["cookiefile"] = YT_COOKIES
+    return opts
+
 
 # ─────────────────────────── YouTube (yt-dlp) ───────────────────────────
 
 def youtube_ara(sorgu: str, adet: int = 6):
     """yt-dlp ile YouTube araması. [{baslik,url,sure,kanal}] döner."""
     import yt_dlp
-    opts = {"quiet": True, "skip_download": True, "extract_flat": True,
-            "noplaylist": True, "no_warnings": True}
+    opts = _yt_cookie_opts({"quiet": True, "skip_download": True, "extract_flat": True,
+                            "noplaylist": True, "no_warnings": True})
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
             r = ydl.extract_info(f"ytsearch{adet}:{sorgu}", download=False)
@@ -60,6 +70,7 @@ def youtube_indir(url: str, hedef: str, maks_sure: int = 60) -> bool:
         "retries": 2,
         "socket_timeout": 30,
     }
+    _yt_cookie_opts(opts)
     if maks_sure:
         try:
             opts["download_ranges"] = yt_dlp.utils.download_range_func(None, [(0, maks_sure)])
