@@ -88,6 +88,14 @@ services:
       - "traefik.http.routers.vidrush.middlewares=vidrush-strip"
       - "traefik.http.middlewares.vidrush-strip.stripprefix.prefixes=/vidrush"
       - "traefik.http.services.vidrush.loadbalancer.server.port=8080"
+      # Kisa adres kolayligi (mobil): bare host kokunu /vidrush/'a yonlendir.
+      # srv1833674.hstgr.cloud -> srv1833674.hstgr.cloud/vidrush/ (kullanici /vidrush yazmasa da acilir)
+      - "traefik.http.routers.vidrush-kok.rule=Host(`srv1833674.hstgr.cloud`) && Path(`/`)"
+      - "traefik.http.routers.vidrush-kok.entrypoints=websecure"
+      - "traefik.http.routers.vidrush-kok.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.vidrush-kok.middlewares=vidrush-kokyonlendir"
+      - "traefik.http.middlewares.vidrush-kokyonlendir.redirectregex.regex=.*"
+      - "traefik.http.middlewares.vidrush-kokyonlendir.redirectregex.replacement=https://srv1833674.hstgr.cloud/vidrush/"
 
 volumes:
   n8n_data:
