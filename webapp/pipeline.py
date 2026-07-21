@@ -72,7 +72,7 @@ ANIMASYON_PROFIL = {
     "ad": "Animasyon (Stickman)",
     "ozet": "xkcd / whiteboard tarzı stickman animasyon; tamamen AI, hızlı ve anlaşılır",
     "sahne_sn": 4, "kelime": 11, "footage_pct": 0, "overlay": "yok",
-    "altyazi": "yok", "motion": "anlati", "mag": None,   # animasyonda EKRANDA YAZI YOK
+    "altyazi": "yok", "motion": "sinematik", "mag": None,  # yazi YOK + blur YOK (1080p render hizli)
     "gorsel_ek": ("minimalist stickman line animation, simple black stick-figure characters with "
                   "round heads and thin clean outlines, flat solid pastel background, xkcd / "
                   "whiteboard-explainer style, expressive simple poses, lots of empty space, "
