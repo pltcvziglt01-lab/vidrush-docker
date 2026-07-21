@@ -87,7 +87,39 @@ def profil_coz(tur, edit_id):
     return EDIT_STILLERI.get(edit_id or VARSAYILAN_EDIT, EDIT_STILLERI[VARSAYILAN_EDIT])
 
 
-def plan_sistem(prof):
+def karakter_analiz(kar_yol: str) -> str:
+    """Referans karakteri gpt-4.1-mini vision ile DETAYLI analiz eder -> character_lock metni.
+    Bu metin her AI sahne promptuna KELIMESI KELIMESINE eklenir (gorsel referansla birlikte
+    ikili garanti: karakter her sahnede birebir ayni cikar)."""
+    if not kar_yol or not os.path.exists(kar_yol):
+        return ""
+    try:
+        import base64
+        with open(kar_yol, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+        body = {
+            "model": "gpt-4.1-mini",
+            "messages": [{"role": "user", "content": [
+                {"type": "text", "text": (
+                    "Describe this reference CHARACTER as a precise, reusable visual lock in ONE "
+                    "compact English paragraph (35-60 words): species/type, exact colors, face, "
+                    "hair, outfit/markings, body proportions, distinctive features. No scene/"
+                    "background, ONLY the character so it can be redrawn IDENTICALLY every time. "
+                    "Start with 'The character is'.")},
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+            ]}],
+            "max_tokens": 200, "temperature": 0.2,
+        }
+        r = requests.post("https://api.openai.com/v1/chat/completions",
+                          headers=OAI_H, json=body, timeout=90)
+        r.raise_for_status()
+        return r.json()["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        print(f"  karakter_analiz hata: {str(e)[:160]}", file=sys.stderr)
+        return ""
+
+
+def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
     footage = prof["footage_pct"]
     mag_var = bool(prof.get("mag"))
     overlay_kural = (
@@ -113,17 +145,26 @@ def plan_sistem(prof):
         "hero shots that clearly benefit from extra sharpness; set hd=false for all other scenes."
         if mag_var else
         "7) Set hd=false for every scene.")
+    hedef = hedef_sahne or 40
+    devam_kural = (
+        f"\nCONTINUATION: This is a CONTINUING part of a longer video. Story so far (summary): "
+        f"\"{onceki_ozet[:600]}\". Do NOT repeat it; continue the narrative naturally from where it "
+        "left off, developing NEW points/scenes."
+        if devam else "")
     return (
         "You are a professional video editor and scene planner. The user gives a story/script. "
         "The main CHARACTER is provided separately as a REFERENCE IMAGE, so never describe the "
         "character's appearance.\n"
         f"MODE/STYLE: {prof['ad']} — {prof['ozet']}.\n"
+        f"{devam_kural}\n"
         "Rules:\n"
         "1) Detect the language of the story.\n"
-        f"2) Split into sequential scenes of about {prof['sahne_sn']} seconds of spoken audio each "
-        f"(~{prof['kelime']} words per scene). Use as many scenes as the story needs (HARD MAX 45). "
-        "The voiceover fields together cover the whole story in the ORIGINAL language, lightly "
-        "smoothed for narration.\n"
+        f"2) Produce EXACTLY {hedef} sequential scenes, each about {prof['sahne_sn']} seconds of "
+        f"spoken audio (~{prof['kelime']} words per scene). If the source text is short, EXPAND it "
+        "richly (more detail, examples, vivid narration) to fill the scenes. The voiceover fields "
+        "together form continuous narration in the ORIGINAL language.\n"
+        "8) Also return \"ozet\": a 2-sentence summary (in the story's language) of what THIS part "
+        "covered, for continuity.\n"
         f"{footage_kural} IMPORTANT: give scene_prompt for EVERY scene = a vivid 16:9 ENGLISH "
         "description of the action/place/camera/mood featuring 'the character' (for footage scenes "
         "this is the fallback if no clip is found). Never describe the character's colors/face.\n"
@@ -134,24 +175,25 @@ def plan_sistem(prof):
         "6) Thumbnail: object with text = a punchy 2-5 word hook in the ORIGINAL language ALL CAPS, "
         "and prompt = a dramatic 16:9 scene featuring the character, strong emotion, high contrast.\n"
         f"{hd_kural}\n"
-        "Respond ONLY valid JSON: {\"language\":\"en\",\"voice\":\"...\","
+        "Respond ONLY valid JSON: {\"language\":\"en\",\"voice\":\"...\",\"ozet\":\"...\","
         "\"thumbnail\":{\"text\":\"...\",\"prompt\":\"...\"},"
         "\"scenes\":[{\"n\":1,\"voiceover\":\"...\",\"kaynak\":\"ai|footage\","
         "\"scene_prompt\":\"...\",\"footage_sorgu\":\"...\",\"overlay\":\"...\",\"hd\":false}]}"
     )
 
 
-def plan_uret(story: str, prof: dict) -> dict:
+def plan_uret(story: str, prof: dict, hedef_sahne=40, devam=False, onceki_ozet="") -> dict:
     body = {
         "model": "gpt-4.1-mini",
-        "messages": [{"role": "system", "content": plan_sistem(prof)},
+        "messages": [{"role": "system",
+                      "content": plan_sistem(prof, hedef_sahne, devam, onceki_ozet)},
                      {"role": "user", "content": story}],
         "response_format": {"type": "json_object"},
         "temperature": 0.7,
-        "max_tokens": 12000,   # 45 sahne + voiceover + prompt'lar truncate olmasin
+        "max_tokens": 16000,
     }
     r = requests.post("https://api.openai.com/v1/chat/completions",
-                      headers=OAI_H, json=body, timeout=120)
+                      headers=OAI_H, json=body, timeout=180)
     r.raise_for_status()
     icerik = r.json()["choices"][0]["message"]["content"]
     try:
@@ -168,18 +210,54 @@ def plan_uret(story: str, prof: dict) -> dict:
         scenes.append(s)
     if not scenes:
         raise RuntimeError("Sahne plani bos")
-    plan["scenes"] = scenes[:45]
+    plan["scenes"] = scenes[:60]   # tek cagri tavani (parca basina)
     return plan
 
 
+# Uzun video (30 dk'ya kadar): parca parca planla, sahneleri birlestir.
+MAKS_SAHNE = 420   # ~30 dk tavani (maliyet/render sinir)
+
+
+def uzun_plan(story: str, prof: dict, sure_dk: float) -> dict:
+    hedef_sahne = int(min(MAKS_SAHNE, max(1, (sure_dk * 60) / prof["sahne_sn"])))
+    if hedef_sahne <= 55:
+        return plan_uret(story, prof, hedef_sahne=hedef_sahne)
+    # cok sahne -> parca parca (her parca ~40 sahne), sureklilik icin ozet aktarilir
+    parca = 40
+    toplam_plan = None
+    ozet = ""
+    scenes = []
+    while len(scenes) < hedef_sahne:
+        kalan = hedef_sahne - len(scenes)
+        bu = min(parca, kalan)
+        p = plan_uret(story, prof, hedef_sahne=bu, devam=bool(scenes), onceki_ozet=ozet)
+        yeni = p.get("scenes", [])
+        if not yeni:
+            break
+        scenes.extend(yeni)
+        ozet = (ozet + " " + str(p.get("ozet", ""))).strip()[-1200:]
+        if toplam_plan is None:
+            toplam_plan = p            # ilk parca voice/thumbnail'i tasir
+    if not scenes:
+        raise RuntimeError("Sahne plani bos")
+    toplam_plan["scenes"] = scenes[:hedef_sahne]
+    return toplam_plan
+
+
 def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
-                      stil_prompt: str = "", deneme=3) -> bool:
-    """OpenAI images/edits: karakter referansi + art-direction promptu ile sahne uretir."""
+                      stil_prompt: str = "", kar_kilit: str = "", stil_yol: str = "",
+                      deneme=3) -> bool:
+    """OpenAI images/edits: karakter referansi (+character_lock metni) + stil gorseli/art-direction.
+    kar_kilit: karakter_analiz'den gelen birebir tarif -> her sahnede ayni karakter (ikili garanti)."""
     kar_var = bool(kar_yol and os.path.exists(kar_yol))
+    stil_gor = bool(stil_yol and os.path.exists(stil_yol))
     prompt = scene_prompt.rstrip(". ") + "."
     if kar_var:
-        prompt += (" Keep the SAME character from the reference image (identical face, colors, "
-                   "outfit, proportions).")
+        prompt += " Keep the EXACT SAME character from the first reference image in every detail."
+        if kar_kilit:
+            prompt += f" {kar_kilit}"   # character_lock: birebir tarif
+    if stil_gor:
+        prompt += " Apply the exact ART STYLE/look of the last reference image."
     if stil_prompt:
         prompt += f" Art direction: {stil_prompt}."
     prompt += " 16:9 cinematic composition. No captions or watermark."
@@ -191,6 +269,9 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
             if kar_var:
                 fkar = open(kar_yol, "rb"); acik.append(fkar)
                 files.append(("image[]", ("character.png", fkar, "image/png")))
+            if stil_gor:
+                fstil = open(stil_yol, "rb"); acik.append(fstil)
+                files.append(("image[]", ("style.png", fstil, "image/png")))
             data = {"model": "gpt-image-1", "prompt": prompt, "size": "1536x1024"}
             if files:
                 r = requests.post("https://api.openai.com/v1/images/edits",
@@ -216,25 +297,35 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
     return False
 
 
-async def uret(is_adi: str, story: str, kar_yol: str, mod: str = "documentary",
-               edit_id: str = VARSAYILAN_EDIT, ilerle=None) -> dict:
-    """Tam hat. mod: 'animasyon'|'documentary' (documentary'de edit_id ile 3 stilden biri).
-    Footage (documentary) ve Magnific HD, PLANA GORE OTOMATIK uygulanir — manuel ayar yok."""
+async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
+               mod: str = "documentary", edit_id: str = VARSAYILAN_EDIT,
+               sure_dk: float = 2, gecis_acik: bool = True, zoom_acik: bool = True,
+               ilerle=None) -> dict:
+    """Tam hat. mod: 'animasyon'|'documentary'. stil_yol: referans stil gorseli (opsiyonel).
+    sure_dk: hedef sure (maks 30). gecis_acik/zoom_acik: kullanicinin gecis/zoom tercihi.
+    Footage (documentary) ve Magnific HD PLANA GORE OTOMATIK."""
     def bildir(mesaj, yuzde):
         if ilerle:
             ilerle(mesaj, yuzde)
 
     prof = profil_coz(mod, edit_id)
     gorsel_ek = prof["gorsel_ek"]
-    motion = prof["motion"]
+    motion = prof["motion"] if gecis_acik else "kesme"   # gecis kapali -> sade kesme
     overlay_stil = prof["overlay"]
-    altyazi_stil = prof.get("altyazi", "orta")   # overlay'den AYRI (sinematikte de altyazi cikar)
-    mag_profil = prof.get("mag")                 # None -> Magnific KAPALI (animasyon)
-    footage_acik = prof.get("footage_pct", 0) > 0  # animasyon=0 -> footage YOK
-    yt_once = True                               # otomatik: YT once, Pexels yedek
+    altyazi_stil = prof.get("altyazi", "orta")
+    mag_profil = prof.get("mag")
+    footage_acik = prof.get("footage_pct", 0) > 0
+    yt_once = True
+    sure_dk = max(0.3, min(30.0, float(sure_dk or 2)))   # 30 dk tavan
 
-    bildir("Hikaye sahnelere bölünüyor...", 4)
-    plan = plan_uret(story, prof)
+    # Karakter DETAY analizi (her sahnede birebir ayni karakter icin ikili garanti)
+    kar_kilit = ""
+    if kar_yol and os.path.exists(kar_yol):
+        bildir("Karakter analiz ediliyor...", 3)
+        kar_kilit = karakter_analiz(kar_yol)
+
+    bildir("Hikaye sahnelere bölünüyor...", 5)
+    plan = uzun_plan(story, prof, sure_dk)
     scenes = plan["scenes"]
     ses = plan.get("voice", "en-US-AndrewMultilingualNeural")
 
@@ -265,7 +356,8 @@ async def uret(is_adi: str, story: str, kar_yol: str, mod: str = "documentary",
             bildir(f"Sahne {i+1}/{toplam}: görsel üretiliyor...", yuzde)
             sp = str(s.get("scene_prompt", "")).strip() or str(s.get("footage_sorgu", "")).strip()
             gyol_full = os.path.join(PUBLIC, "isler", is_adi, f"sahne_{n}.png")
-            if not referansli_gorsel(sp, kar_yol, gyol_full, stil_prompt=gorsel_ek):
+            if not referansli_gorsel(sp, kar_yol, gyol_full, stil_prompt=gorsel_ek,
+                                     kar_kilit=kar_kilit, stil_yol=stil_yol):
                 print(f"sahne {n} atlandi", file=sys.stderr)
                 continue
             if mag_profil and s.get("hd"):   # OTOMATIK: sadece plan HD isaretlediyse
@@ -280,7 +372,8 @@ async def uret(is_adi: str, story: str, kar_yol: str, mod: str = "documentary",
         kelimeler, sure = await uret_seslendir(metin, ses, os.path.join(PUBLIC, syol))
         props_sahneler.append({
             "tur": tur, "medya": medya, "ses": syol, "sure": round(sure, 3),
-            "zoom": "in" if i % 2 == 0 else "out", "pan": panlar[i % 4],
+            "zoom": ("in" if i % 2 == 0 else "out") if zoom_acik else "yok",
+            "pan": panlar[i % 4] if zoom_acik else "yok",
             "overlay": overlay,
             "altyazi": uretmod.altyazi_parcala(kelimeler, sure),
         })
@@ -299,7 +392,8 @@ async def uret(is_adi: str, story: str, kar_yol: str, mod: str = "documentary",
             kp += (f". Render the exact text \"{ktext}\" as huge bold baked-in title typography, "
                    "high contrast, professional YouTube thumbnail. No other text.")
         khedef = os.path.join(is_dizini, "kapak.png")
-        if referansli_gorsel(kp, kar_yol, khedef, stil_prompt=gorsel_ek):
+        if referansli_gorsel(kp, kar_yol, khedef, stil_prompt=gorsel_ek,
+                             kar_kilit=kar_kilit, stil_yol=stil_yol):
             if mag_profil:   # kapak: documentary'de her zaman HD (thumbnail kalitesi kritik)
                 kaynak.magnific_upscale(khedef, optimized_for=mag_profil, scale="2x")
             kapak_yolu = khedef

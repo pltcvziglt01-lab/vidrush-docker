@@ -19,8 +19,8 @@ export type Sahne = {
   medya: string;
   ses: string;
   sure: number;
-  zoom: 'in' | 'out';
-  pan: 'right' | 'left' | 'top' | 'bottom';
+  zoom: 'in' | 'out' | 'yok';   // 'yok' -> Ken Burns / zoom KAPALI
+  pan: 'right' | 'left' | 'top' | 'bottom' | 'yok';
   overlay?: string;
   altyazi: AltyaziParcasi[];
 };
@@ -29,7 +29,7 @@ export type Sahne = {
 // 'sinematik' -> BBC Earth: hard-cut, hafif Ken Burns, overlay yok
 // 'anlati'    -> Johnny Harris: blur->net Ken Burns 2.0 push-in, vinyet, kinetik baslik
 // 'hizli'     -> Vox: hizli zoom-punch + blur, surekli kinetik merkez metin
-export type Motion = 'sinematik' | 'anlati' | 'hizli' | 'fade' | 'dinamik';
+export type Motion = 'sinematik' | 'anlati' | 'hizli' | 'kesme' | 'fade' | 'dinamik';
 export type AltyaziStil = 'yok' | 'orta' | 'yogun';
 
 export type VideoProps = {
@@ -64,10 +64,23 @@ export const varsayilanProps: VideoProps = {
 const kaynakCoz = (yol: string): string =>
   yol.startsWith('http://') || yol.startsWith('https://') ? yol : staticFile(yol);
 
-const normMotion = (m?: Motion): 'sinematik' | 'anlati' | 'hizli' => {
+const normMotion = (m?: Motion): 'sinematik' | 'anlati' | 'hizli' | 'kesme' => {
+  if (m === 'kesme') return 'kesme';
   if (m === 'dinamik' || m === 'anlati') return 'anlati';
   if (m === 'hizli') return 'hizli';
   return 'sinematik';
+};
+
+// Ken Burns olcek/pan — zoom 'yok' ise sabit (hareket kapali)
+const kbHesap = (sahne: Sahne, frame: number, K: number, buyume: number, panPx: number) => {
+  if (sahne.zoom === 'yok') return {olcek: 1, tx: 0, ty: 0};
+  const olcek = interpolate(frame, [0, K], sahne.zoom === 'in' ? [1, buyume] : [buyume, 1], {
+    extrapolateRight: 'clamp',
+  });
+  const kayma = interpolate(frame, [0, K], [0, panPx], {extrapolateRight: 'clamp'});
+  const tx = sahne.pan === 'right' ? -kayma : sahne.pan === 'left' ? kayma : 0;
+  const ty = sahne.pan === 'bottom' ? -kayma : sahne.pan === 'top' ? kayma : 0;
+  return {olcek, tx, ty};
 };
 
 // ─── Kinetik baslik overlay (anlati + hizli) ───
@@ -179,19 +192,18 @@ const fadeOpaklik = (frame: number, K: number, g: number): number => {
 };
 
 const sinematikHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
-  // hard-cut hissi: cok kisa giris/cikis fade, lineer hafif Ken Burns
   const opaklik = fadeOpaklik(frame, K, 3);
-  const olcek = interpolate(frame, [0, K], sahne.zoom === 'in' ? [1, 1.06] : [1.06, 1], {
-    extrapolateRight: 'clamp',
-  });
-  const kayma = interpolate(frame, [0, K], [0, 22], {extrapolateRight: 'clamp'});
-  const tx = sahne.pan === 'right' ? -kayma : sahne.pan === 'left' ? kayma : 0;
-  const ty = sahne.pan === 'bottom' ? -kayma : sahne.pan === 'top' ? kayma : 0;
+  const {olcek, tx, ty} = kbHesap(sahne, frame, K, 1.06, 22);
   return {opaklik, transform: `scale(${olcek}) translate(${tx}px, ${ty}px)`, filtre: 'none'};
 };
 
+// Gecis KAPALI: fade/reveal/blur yok — sade hard cut (Ken Burns zoom acik ise kalir)
+const kesmeHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
+  const {olcek, tx, ty} = kbHesap(sahne, frame, K, 1.06, 20);
+  return {opaklik: 1, transform: `scale(${olcek}) translate(${tx}px, ${ty}px)`, filtre: 'none'};
+};
+
 const anlatiHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
-  // Ken Burns 2.0: blur->net + hafif buyukten normale ease-out push-in
   const g = Math.max(8, Math.min(16, Math.floor(K / 4)));
   const girisP = interpolate(frame, [0, g], [0, 1], {
     extrapolateLeft: 'clamp',
@@ -200,12 +212,7 @@ const anlatiHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
   });
   const blur = (1 - girisP) * 22;
   const girisOlcek = 1.1 - 0.1 * girisP;
-  const kb = interpolate(frame, [0, K], sahne.zoom === 'in' ? [1, 1.12] : [1.12, 1], {
-    extrapolateRight: 'clamp',
-  });
-  const kayma = interpolate(frame, [0, K], [0, 40], {extrapolateRight: 'clamp'});
-  const kbTx = sahne.pan === 'right' ? -kayma : sahne.pan === 'left' ? kayma : 0;
-  const kbTy = sahne.pan === 'bottom' ? -kayma : sahne.pan === 'top' ? kayma : 0;
+  const {olcek: kb, tx: kbTx, ty: kbTy} = kbHesap(sahne, frame, K, 1.12, 40);
   const opaklik = fadeOpaklik(frame, K, g);
   return {
     opaklik,
@@ -215,7 +222,6 @@ const anlatiHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
 };
 
 const hizliHesapla = (sahne: Sahne, frame: number, K: number, indeks: number): Gorunum => {
-  // hizli zoom-punch + blur giris; ters yona cikis
   const yon = indeks % 2 === 0 ? 1 : -1;
   const g = Math.max(4, Math.min(9, Math.floor(K / 4)));
   const girisP = interpolate(frame, [0, g], [0, 1], {
@@ -232,9 +238,7 @@ const hizliHesapla = (sahne: Sahne, frame: number, K: number, indeks: number): G
     easing: Easing.in(Easing.cubic),
   });
   const cikisOlcek = 1 + cikisP * 0.12;
-  const kb = interpolate(frame, [0, K], sahne.zoom === 'in' ? [1, 1.08] : [1.08, 1], {
-    extrapolateRight: 'clamp',
-  });
+  const {olcek: kb} = kbHesap(sahne, frame, K, 1.08, 0);
   const opaklik = fadeOpaklik(frame, K, g);
   return {
     opaklik,
@@ -246,7 +250,7 @@ const hizliHesapla = (sahne: Sahne, frame: number, K: number, indeks: number): G
 const SahneGorunumu: React.FC<{
   sahne: Sahne;
   indeks: number;
-  motion: 'sinematik' | 'anlati' | 'hizli';
+  motion: 'sinematik' | 'anlati' | 'hizli' | 'kesme';
   altyaziStil: AltyaziStil;
 }> = ({sahne, indeks, motion, altyaziStil}) => {
   const frame = useCurrentFrame();
@@ -258,6 +262,8 @@ const SahneGorunumu: React.FC<{
       ? anlatiHesapla(sahne, frame, K)
       : motion === 'hizli'
       ? hizliHesapla(sahne, frame, K, indeks)
+      : motion === 'kesme'
+      ? kesmeHesapla(sahne, frame, K)
       : sinematikHesapla(sahne, frame, K);
 
   const gorselStil: React.CSSProperties = {
@@ -276,7 +282,7 @@ const SahneGorunumu: React.FC<{
         ) : (
           <Img src={kaynakCoz(sahne.medya)} style={gorselStil} />
         )}
-        {motion !== 'sinematik' ? (
+        {motion === 'anlati' || motion === 'hizli' ? (
           <AbsoluteFill
             style={{
               background:

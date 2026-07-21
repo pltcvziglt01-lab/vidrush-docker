@@ -60,6 +60,7 @@
     color:var(--txt);padding:14px;font-size:14px;resize:vertical;font-family:inherit;line-height:1.55}
   textarea:focus{outline:none;border-color:var(--acc)}
   /* edit stil kartları */
+  .refs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .estiller{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
   .estil{background:var(--card2);border:1.5px solid var(--line);border-radius:14px;padding:16px;
     cursor:pointer;transition:.15s;position:relative}
@@ -122,7 +123,8 @@
       align-items:center;gap:4px;padding:12px}
     .side .brand{padding:6px 10px 6px 4px}.navlbl{display:none}.side .foot{display:none}
     .nav{padding:8px 12px}.content{padding:24px 18px 80px}
-    .estiller{grid-template-columns:1fr}
+    .estiller,.refs{grid-template-columns:1fr}
+    .opt{flex-direction:column;gap:16px!important}
   }
 </style>
 </head>
@@ -147,12 +149,18 @@
       <p class="lead">Hikaye metnini ver, türü/stili seç, Video Üret'e bas. Görsel üretimi, gerçek footage, seslendirme, senkron ve profesyonel kurgu araca ait. Karakterli hikayeler için isteğe bağlı referans karakter yükleyebilirsin.</p>
 
       <div class="card">
-        <h2><span class="num">1</span> Referans Karakter <span class="tag" id="karTag">opsiyonel</span></h2>
-        <label class="drop" id="dropKar">
-          <input type="file" id="fKar" accept="image/*">
-          <div id="karView"><div class="lbl">🧍 Karakter görseli</div><div class="hint">opsiyonel · sadece karakterli hikayelerde tutarlılık için · manzara/belgeselde gerek yok</div></div>
-        </label>
-        <div class="row"><button class="btn ghost" id="btnKar" disabled>Kaydet</button><span class="durum" id="karDurum"></span></div>
+        <h2><span class="num">1</span> Referanslar <span class="tag">her videoda yeniden yükle</span></h2>
+        <div class="refs">
+          <label class="drop" id="dropKar">
+            <input type="file" id="fKar" accept="image/*">
+            <div id="karView"><div class="lbl">🧍 Karakter görseli</div><div class="hint">opsiyonel · detaylı analiz edilip HER sahnede birebir aynı karakter</div></div>
+          </label>
+          <label class="drop" id="dropStil">
+            <input type="file" id="fStil" accept="image/*">
+            <div id="stilView"><div class="lbl">🎨 Stil görseli</div><div class="hint">opsiyonel · tüm videonun görsel stilini bu görsel belirler</div></div>
+          </label>
+        </div>
+        <div class="durum" style="margin-top:10px;font-size:11px">Görseller <b>kaydedilmez</b> — gizlilik için her video sonrası silinir, her seferinde yeniden yükle.</div>
       </div>
 
       <div class="card">
@@ -179,6 +187,23 @@
           <div class="lbl2">🎞️ Documentary stili</div>
           <div class="estiller" id="estiller"><span class="durum">Yükleniyor...</span></div>
           <div class="durum" style="margin-top:10px;font-size:11px">Footage (YouTube/stok) ve Magnific HD, metne göre <b>otomatik</b> kullanılır — ayar gerekmez.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="num">4</span> Ayarlar</h2>
+        <div class="opt" style="align-items:flex-start;gap:26px">
+          <div>
+            <div class="durum" style="margin-bottom:8px">Süre: <b id="sureLbl">2 dk</b></div>
+            <input type="range" id="sure" min="1" max="30" step="1" value="2" style="width:220px;accent-color:var(--acc)">
+            <div class="durum" style="font-size:11px;margin-top:4px">1–30 dk. Uzun sürede render dakikalarca sürebilir.</div>
+          </div>
+          <div class="switch on" id="swGecis" style="margin-top:4px">
+            <span class="tr"></span><span>Geçişler<small>kapalıysa sade kesme</small></span>
+          </div>
+          <div class="switch on" id="swZoom" style="margin-top:4px">
+            <span class="tr"></span><span>Zoom (Ken Burns)<small>görselde yakınlaşma/kaydırma</small></span>
+          </div>
         </div>
       </div>
 
@@ -236,7 +261,8 @@
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 let SID=localStorage.getItem("vidrush_sid");
 if(!SID){SID="u"+Math.random().toString(36).slice(2,10);localStorage.setItem("vidrush_sid",SID);}
-let karFile=null, editStil=null, videoTur="documentary";
+let karFile=null, stilFile=null, editStil=null, videoTur="documentary";
+let sureDk=2, gecisAcik=true, zoomAcik=true;
 
 /* nav */
 $$(".nav").forEach(n=>n.onclick=()=>{
@@ -246,25 +272,21 @@ $$(".nav").forEach(n=>n.onclick=()=>{
   window.scrollTo(0,0);
 });
 
-/* karakter upload */
-$("#fKar").addEventListener("change",e=>{
-  const f=e.target.files[0]; if(!f)return; karFile=f;
-  $("#karView").innerHTML=`<img src="${URL.createObjectURL(f)}"><div class="hint">değiştir</div>`;
-  $("#dropKar").classList.add("dolu"); $("#btnKar").disabled=false;
-});
-$("#btnKar").onclick=async()=>{
-  if(!karFile)return;
-  $("#btnKar").disabled=true; $("#karDurum").textContent="Yükleniyor...";
-  const fd=new FormData(); fd.append("session",SID); fd.append("karakter",karFile);
-  try{
-    const r=await fetch("api/preset",{method:"POST",body:fd});
-    if(!r.ok)throw new Error(await r.text());
-    $("#karDurum").innerHTML='<span class="ok">✓ Kaydedildi</span>';
-    $("#karTag").textContent="hazır"; $("#karTag").classList.add("ok");
-    guncelleUret();
-  }catch(e){$("#karDurum").innerHTML='<span class="err" style="display:inline;padding:2px 8px">'+e.message+'</span>';}
-  $("#btnKar").disabled=false;
-};
+/* referans görseller (kaydetmeden, sadece bellekte) */
+function gorselSec(inputId, viewId, dropId, ata){
+  $(inputId).addEventListener("change",e=>{
+    const f=e.target.files[0]; if(!f)return; ata(f);
+    $(viewId).innerHTML=`<img src="${URL.createObjectURL(f)}"><div class="hint">değiştir</div>`;
+    $(dropId).classList.add("dolu");
+  });
+}
+gorselSec("#fKar","#karView","#dropKar",f=>karFile=f);
+gorselSec("#fStil","#stilView","#dropStil",f=>stilFile=f);
+
+/* ayarlar: süre + geçiş + zoom */
+$("#sure").addEventListener("input",e=>{sureDk=+e.target.value; $("#sureLbl").textContent=sureDk+" dk";});
+$("#swGecis").onclick=()=>{gecisAcik=!gecisAcik; $("#swGecis").classList.toggle("on",gecisAcik);};
+$("#swZoom").onclick=()=>{zoomAcik=!zoomAcik; $("#swZoom").classList.toggle("on",zoomAcik);};
 
 /* edit stilleri */
 const EMOJI={"sinematik-belgesel":"🎬","anlati-video-essay":"📜","hizli-explainer":"⚡"};
@@ -326,7 +348,6 @@ function krediYukle(){
 krediYukle();
 
 /* üret */
-function guncelleUret(){ $("#btnUret").disabled=false; }
 $("#btnUret").onclick=async()=>{
   const story=$("#story").value.trim();
   if(story.length<20){$("#uretDurum").textContent="Metin çok kısa (min 20 karakter)";return;}
@@ -336,6 +357,9 @@ $("#btnUret").onclick=async()=>{
   const fd=new FormData();
   fd.append("session",SID); fd.append("story",story); fd.append("tur",videoTur);
   if(videoTur==="documentary" && editStil) fd.append("edit",editStil);
+  fd.append("sure_dk",sureDk); fd.append("gecis",gecisAcik?"1":"0"); fd.append("zoom",zoomAcik?"1":"0");
+  if(karFile) fd.append("karakter",karFile);
+  if(stilFile) fd.append("stil",stilFile);
   let job;
   try{
     const r=await fetch("api/generate",{method:"POST",body:fd});
@@ -369,12 +393,6 @@ async function takip(job){
   };
   poll();
 }
-
-/* mevcut karakter var mı */
-fetch("api/preset/"+SID).then(r=>r.json()).then(d=>{
-  if(d.karakter){$("#karTag").textContent="hazır";$("#karTag").classList.add("ok");
-    $("#karDurum").innerHTML='<span class="ok">✓ Önceki karakterin yüklü</span>'; $("#btnUret").disabled=false;}
-});
 </script>
 </body>
 </html>

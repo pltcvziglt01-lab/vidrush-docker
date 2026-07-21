@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-"""Vidrush Web sunucusu (FastAPI).
-Kullanici referans KARAKTER + STIL gorseli yukler (bir kez), sonra hikaye metni gonderir.
-Uretim tek-cekirdek VPS'i korumak icin sirayla (kuyruk) yapilir.
+"""Vidrush/BEDOSAHO Web sunucusu (FastAPI).
+Kullanici HER video icin karakter (opsiyonel) + stil (opsiyonel) gorselini DOGRUDAN yukler
+(KALICI KAYIT YOK), metni + turu + gecis/zoom/sure tercihlerini verir. Uretim tek-cekirdek
+VPS'i korumak icin sirayla (kuyruk) yapilir.
 """
 import os
 import io
 import re
-import json
 import time
 import queue
+import shutil
 import asyncio
 import threading
 import traceback
@@ -22,15 +23,14 @@ import pipeline
 KOK = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(KOK, "static")
 VERI = os.path.join(KOK, "veri")
-PRESET = os.path.join(VERI, "presets")
-os.makedirs(PRESET, exist_ok=True)
+GECICI = os.path.join(VERI, "gecici")     # is basina yuklenen gorseller (uretim sonrasi silinir)
+os.makedirs(GECICI, exist_ok=True)
 
-app = FastAPI(title="Vidrush Web")
+app = FastAPI(title="BEDOSAHO AI")
 
-isler = {}          # job_id -> durum
+isler = {}
 is_kuyrugu = queue.Queue()
 
-# session yalnizca guvenli karakterler — path traversal (../, mutlak yol) engeli
 _SES_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
@@ -46,33 +46,14 @@ def _kucult(data: bytes, hedef: str, boyut=1024):
     im.save(hedef, "PNG")
 
 
+def _bayrak(v) -> bool:
+    return str(v).lower() in ("1", "true", "on", "evet", "yes")
+
+
 @app.get("/", response_class=HTMLResponse)
 def anasayfa():
     with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:
         return f.read()
-
-
-@app.post("/api/preset")
-async def preset_kaydet(session: str = Form(...),
-                        karakter: UploadFile = File(...),
-                        stil: UploadFile = File(None)):
-    session = gecerli_session(session)
-    kdir = os.path.join(PRESET, session)
-    os.makedirs(kdir, exist_ok=True)
-    _kucult(await karakter.read(), os.path.join(kdir, "character.png"))
-    var_stil = False
-    if stil is not None:
-        _kucult(await stil.read(), os.path.join(kdir, "style.png"))
-        var_stil = True
-    return {"ok": True, "stil": var_stil}
-
-
-@app.get("/api/preset/{session}")
-def preset_var(session: str):
-    session = gecerli_session(session)
-    kdir = os.path.join(PRESET, session)
-    return {"karakter": os.path.exists(os.path.join(kdir, "character.png")),
-            "stil": os.path.exists(os.path.join(kdir, "style.png"))}
 
 
 @app.get("/api/saglik")
@@ -93,22 +74,47 @@ def edit_listesi():
 
 
 @app.post("/api/generate")
-def uret_baslat(session: str = Form(...), story: str = Form(...),
-                tur: str = Form("documentary"),
-                edit: str = Form(pipeline.VARSAYILAN_EDIT)):
-    # tur: animasyon | documentary. Magnific ve footage PLANA GORE OTOMATIK (manuel ayar YOK).
+async def uret_baslat(session: str = Form(...), story: str = Form(...),
+                      tur: str = Form("documentary"),
+                      edit: str = Form(pipeline.VARSAYILAN_EDIT),
+                      sure_dk: str = Form("2"),
+                      gecis: str = Form("1"),
+                      zoom: str = Form("1"),
+                      karakter: UploadFile = File(None),
+                      stil: UploadFile = File(None)):
+    """Karakter/stil gorselleri her video icin DOGRUDAN yuklenir (kalici kayit yok).
+    Magnific ve footage plana gore OTOMATIK. tur: animasyon|documentary."""
     session = gecerli_session(session)
-    kdir = os.path.join(PRESET, session)
-    kar = os.path.join(kdir, "character.png")
-    kar = kar if os.path.exists(kar) else ""   # karakter OPSIYONEL (yoksa referanssiz uretir)
     if len(story.strip()) < 20:
         raise HTTPException(400, "Hikaye metni cok kisa")
     mod = tur if tur in ("animasyon", "documentary") else "documentary"
     edit_id = edit if edit in pipeline.EDIT_STILLERI else pipeline.VARSAYILAN_EDIT
+    try:
+        sd = max(0.3, min(30.0, float(sure_dk)))
+    except Exception:
+        sd = 2.0
+    gecis_acik = _bayrak(gecis)
+    zoom_acik = _bayrak(zoom)
+
     is_id = f"job_{int(time.time()*1000)}_{session[:6]}"
+    idir = os.path.join(GECICI, is_id)
+    os.makedirs(idir, exist_ok=True)
+    kar = ""
+    if karakter is not None:
+        data = await karakter.read()
+        if data:
+            kar = os.path.join(idir, "character.png")
+            _kucult(data, kar)
+    stil_yol = ""
+    if stil is not None:
+        data = await stil.read()
+        if data:
+            stil_yol = os.path.join(idir, "style.png")
+            _kucult(data, stil_yol)
+
     isler[is_id] = {"durum": "kuyrukta", "ilerleme": 0, "mesaj": "Sirada...",
                     "video": None, "kapak": None, "hata": None}
-    is_kuyrugu.put((is_id, story.strip(), kar, mod, edit_id))
+    is_kuyrugu.put((is_id, story.strip(), kar, stil_yol, mod, edit_id, sd, gecis_acik, zoom_acik))
     return {"job_id": is_id, "kuyruk": is_kuyrugu.qsize(), "tur": mod, "edit": edit_id}
 
 
@@ -128,7 +134,7 @@ def cikti(dosya: str):
     return FileResponse(yol)
 
 
-def _bir_is(is_id, story, kar, mod, edit_id):
+def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom_acik):
     d = isler.get(is_id)
     if not d:
         return
@@ -139,7 +145,8 @@ def _bir_is(is_id, story, kar, mod, edit_id):
         d["ilerleme"] = yuzde
 
     try:
-        sonuc = asyncio.run(pipeline.uret(is_id, story, kar, mod, edit_id, ilerle))
+        sonuc = asyncio.run(pipeline.uret(is_id, story, kar, stil_yol, mod, edit_id,
+                                          sure_dk, gecis_acik, zoom_acik, ilerle))
         d.update({"durum": "bitti", "ilerleme": 100, "mesaj": "Hazir!",
                   "video": "ciktilar/" + sonuc["video"],
                   "kapak": ("ciktilar/" + sonuc["kapak"]) if sonuc.get("kapak") else None,
@@ -148,6 +155,12 @@ def _bir_is(is_id, story, kar, mod, edit_id):
     except Exception as e:
         traceback.print_exc()
         d.update({"durum": "hata", "hata": str(e)[:300], "mesaj": "Hata olustu"})
+    finally:
+        # yuklenen karakter/stil KALICI DEGIL — is dizinini temizle
+        try:
+            shutil.rmtree(os.path.join(GECICI, is_id), ignore_errors=True)
+        except Exception:
+            pass
 
 
 def _isci():
