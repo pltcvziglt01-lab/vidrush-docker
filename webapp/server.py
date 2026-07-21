@@ -100,8 +100,7 @@ def uret_baslat(session: str = Form(...), story: str = Form(...),
     session = gecerli_session(session)
     kdir = os.path.join(PRESET, session)
     kar = os.path.join(kdir, "character.png")
-    if not os.path.exists(kar):
-        raise HTTPException(400, "Once referans karakter gorseli yukle")
+    kar = kar if os.path.exists(kar) else ""   # karakter OPSIYONEL (yoksa referanssiz uretir)
     if len(story.strip()) < 20:
         raise HTTPException(400, "Hikaye metni cok kisa")
     mod = tur if tur in ("animasyon", "documentary") else "documentary"

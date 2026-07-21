@@ -144,13 +144,13 @@
     <section class="view on" id="view-studio">
       <p class="eyebrow">Metinden Video</p>
       <h1>Yeni Video</h1>
-      <p class="lead">Bir kez referans karakter yükle, hikaye metnini ver, edit stilini seç. Görsel üretimi, karakter tutarlılığı, gerçek footage, seslendirme, senkron ve profesyonel kurgu araca ait.</p>
+      <p class="lead">Hikaye metnini ver, türü/stili seç, Video Üret'e bas. Görsel üretimi, gerçek footage, seslendirme, senkron ve profesyonel kurgu araca ait. Karakterli hikayeler için isteğe bağlı referans karakter yükleyebilirsin.</p>
 
       <div class="card">
-        <h2><span class="num">1</span> Referans Karakter <span class="tag" id="karTag">kaydedilmedi</span></h2>
+        <h2><span class="num">1</span> Referans Karakter <span class="tag" id="karTag">opsiyonel</span></h2>
         <label class="drop" id="dropKar">
           <input type="file" id="fKar" accept="image/*">
-          <div id="karView"><div class="lbl">🧍 Karakter görseli</div><div class="hint">tıkla / sürükle · zorunlu · her sahnede aynı karakter</div></div>
+          <div id="karView"><div class="lbl">🧍 Karakter görseli</div><div class="hint">opsiyonel · sadece karakterli hikayelerde tutarlılık için · manzara/belgeselde gerek yok</div></div>
         </label>
         <div class="row"><button class="btn ghost" id="btnKar" disabled>Kaydet</button><span class="durum" id="karDurum"></span></div>
       </div>
@@ -183,7 +183,7 @@
       </div>
 
       <div class="row">
-        <button class="btn" id="btnUret" disabled>🎬 Video Üret</button>
+        <button class="btn" id="btnUret">🎬 Video Üret</button>
         <span class="durum" id="uretDurum"></span>
       </div>
       <div class="bar hidden" id="barWrap"><i id="bar"></i></div>
