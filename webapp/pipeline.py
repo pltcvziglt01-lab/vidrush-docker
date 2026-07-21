@@ -71,8 +71,8 @@ VARSAYILAN_EDIT = "sinematik-belgesel"
 ANIMASYON_PROFIL = {
     "ad": "Animasyon (Stickman)",
     "ozet": "xkcd / whiteboard tarzı stickman animasyon; tamamen AI, hızlı ve anlaşılır",
-    "sahne_sn": 4, "kelime": 11, "footage_pct": 0, "overlay": "orta",
-    "altyazi": "orta", "motion": "anlati", "mag": None,
+    "sahne_sn": 4, "kelime": 11, "footage_pct": 0, "overlay": "yok",
+    "altyazi": "yok", "motion": "anlati", "mag": None,   # animasyonda EKRANDA YAZI YOK
     "gorsel_ek": ("minimalist stickman line animation, simple black stick-figure characters with "
                   "round heads and thin clean outlines, flat solid pastel background, xkcd / "
                   "whiteboard-explainer style, expressive simple poses, lots of empty space, "
@@ -408,9 +408,12 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
 
     ham = os.path.join(STUDYO, "out", f"{is_adi}.mp4")
     os.makedirs(os.path.join(STUDYO, "out"), exist_ok=True)
+    # Full HD 1080p 16:9 (kompozisyon 1920x1080, scale YOK). Web aracinda boyut limiti yok.
+    # concurrency ortamdan (Hetzner cok cekirdek): REMOTION_CONCURRENCY.
+    konk = os.environ.get("REMOTION_CONCURRENCY", "1")
     komut = ["npx", "remotion", "render", "src/index.ts", "VidrushVideo", ham,
-             f"--props={props_yolu}", "--concurrency=1", "--timeout=120000",
-             "--scale=0.6667", "--crf=30"]
+             f"--props={props_yolu}", f"--concurrency={konk}", "--timeout=180000",
+             "--crf=21"]
     if os.environ.get("REMOTION_BROWSER_EXECUTABLE"):
         komut.append(f"--browser-executable={os.environ['REMOTION_BROWSER_EXECUTABLE']}")
     if os.environ.get("REMOTION_GL"):
