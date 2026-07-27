@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<base href="/vidrush/"><title>BEDOSAHO AI</title>
+<base href="/"><title>BEDOSAHO AI</title>
 <style>
   :root{
     --bg:#0a0a0a; --panel:#0e1015; --card:#14171e; --card2:#191d26; --line:#252a34;
@@ -62,6 +62,7 @@
   /* edit stil kartları */
   .refs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .estiller{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .lbl2{font-size:13px;font-weight:600;color:var(--dim);margin:2px 0 12px}
   .estil{background:var(--card2);border:1.5px solid var(--line);border-radius:14px;padding:16px;
     cursor:pointer;transition:.15s;position:relative}
   .estil:hover{border-color:var(--acc)}
@@ -173,8 +174,8 @@
         <div class="estiller" style="grid-template-columns:1fr 1fr" id="turler">
           <div class="estil" data-tur="animasyon">
             <span class="pick"></span><span class="en">🧍</span>
-            <b>Animasyon (Stickman)</b><p>xkcd / whiteboard tarzı stickman animasyon; tamamen AI.</p>
-            <div class="meta">stickman · footage/HD yok</div>
+            <b>Animasyon</b><p>Elle çizilmiş karakter animasyonu; anlatı veya eğitici stil.</p>
+            <div class="meta">2 stil · footage/HD yok</div>
           </div>
           <div class="estil on" data-tur="documentary">
             <span class="pick"></span><span class="en">🎬</span>
@@ -188,6 +189,12 @@
           <div class="estiller" id="estiller"><span class="durum">Yükleniyor...</span></div>
           <div class="durum" style="margin-top:10px;font-size:11px">Footage (YouTube/stok) ve Magnific HD, metne göre <b>otomatik</b> kullanılır — ayar gerekmez.</div>
         </div>
+
+        <div id="animWrap" style="display:none">
+          <div class="lbl2">🎨 Animasyon stili</div>
+          <div class="estiller" id="animStiller"><span class="durum">Yükleniyor...</span></div>
+          <div class="durum" style="margin-top:10px;font-size:11px"><b>Anlatı</b>: psikoloji/felsefe/deneme — soluk palet, detaylı ortamlar. <b>Eğitici</b>: tarih/bilim/nasıl-çalışır — canlı renkler, diyagram kartları. <b>Hikaye</b>: macera/what-if — sade beyaz stickman + boyalı sinematik dünya.</div>
+        </div>
       </div>
 
       <div class="card">
@@ -195,8 +202,8 @@
         <div class="opt" style="align-items:flex-start;gap:26px">
           <div>
             <div class="durum" style="margin-bottom:8px">Süre: <b id="sureLbl">2 dk</b></div>
-            <input type="range" id="sure" min="1" max="30" step="1" value="2" style="width:220px;accent-color:var(--acc)">
-            <div class="durum" style="font-size:11px;margin-top:4px">1–30 dk. Uzun sürede render dakikalarca sürebilir.</div>
+            <input type="range" id="sure" min="1" max="14" step="1" value="2" style="width:220px;accent-color:var(--acc)">
+            <div class="durum" style="font-size:11px;margin-top:4px">1–14 dk. Uzun sürede render dakikalarca sürebilir.</div>
           </div>
           <div class="switch on" id="swGecis" style="margin-top:4px">
             <span class="tr"></span><span>Geçişler<small>kapalıysa sade kesme</small></span>
@@ -300,7 +307,7 @@ function editYukle(){
       d.innerHTML=`<span class="pick"></span><span class="en">${EMOJI[s.id]||"🎞️"}</span>
         <b>${s.ad}</b><p>${s.ozet}</p>
         <div class="meta">~${s.sahne_sn}sn/sahne · %${s.footage_pct} footage</div>`;
-      d.onclick=()=>{editStil=s.id; $$(".estil").forEach(x=>x.classList.toggle("on",x.dataset.id===s.id));};
+      d.onclick=()=>{editStil=s.id; $$("#estiller .estil").forEach(x=>x.classList.toggle("on",x.dataset.id===s.id));};
       c.appendChild(d);
     });
     // edit stilleri dokümanı
@@ -316,11 +323,32 @@ function editYukle(){
 }
 editYukle();
 
+/* animasyon alt-stilleri */
+const ANIM_EMOJI={"anlati-deneme":"🖋️","egitici-explainer":"📊","hikaye-whatif":"🏞️"};
+let animStil=null, animListe=[];
+function animYukle(){
+  fetch("api/animasyon-stilleri").then(r=>r.json()).then(list=>{
+    animListe=list; if(list.length) animStil=list[0].id;
+    const c=$("#animStiller"); if(!c) return; c.innerHTML="";
+    list.forEach((s,i)=>{
+      const d=document.createElement("div");
+      d.className="estil"+(i===0?" on":""); d.dataset.id=s.id;
+      d.innerHTML=`<span class="pick"></span><span class="en">${ANIM_EMOJI[s.id]||"🎨"}</span>
+        <b>${s.ad}</b><p>${s.ozet}</p>
+        <div class="meta">~${s.sahne_sn}sn/sahne</div>`;
+      d.onclick=()=>{animStil=s.id; $$("#animStiller .estil").forEach(x=>x.classList.toggle("on",x.dataset.id===s.id));};
+      c.appendChild(d);
+    });
+  }).catch(()=>{});
+}
+animYukle();
+
 /* video türü (animasyon / documentary) */
 $$("#turler .estil").forEach(c=>c.onclick=()=>{
   videoTur=c.dataset.tur;
   $$("#turler .estil").forEach(x=>x.classList.toggle("on",x===c));
   $("#editWrap").style.display = (videoTur==="documentary") ? "" : "none";
+  const aw=$("#animWrap"); if(aw) aw.style.display = (videoTur==="animasyon") ? "" : "none";
 });
 
 /* krediler */
@@ -357,6 +385,7 @@ $("#btnUret").onclick=async()=>{
   const fd=new FormData();
   fd.append("session",SID); fd.append("story",story); fd.append("tur",videoTur);
   if(videoTur==="documentary" && editStil) fd.append("edit",editStil);
+  if(videoTur==="animasyon" && animStil) fd.append("edit",animStil);
   fd.append("sure_dk",sureDk); fd.append("gecis",gecisAcik?"1":"0"); fd.append("zoom",zoomAcik?"1":"0");
   if(karFile) fd.append("karakter",karFile);
   if(stilFile) fd.append("stil",stilFile);
@@ -379,12 +408,15 @@ async function takip(job){
                  setTimeout(poll,3000); return; }
       const d=await r.json(); hataSayac=0;
       $("#bar").style.width=(d.ilerleme||0)+"%";
-      $("#uretDurum").textContent=d.mesaj||d.durum;
+      let dm=d.mesaj||d.durum;
+      if(d.durum==="kuyrukta"&&d.kuyruk_sira){dm="Sırada "+d.kuyruk_sira+". ("+d.kuyruk_toplam+" iş bekliyor)";}
+      $("#uretDurum").textContent=dm;
       if(d.durum==="bitti"){
         $("#player").src=d.video; $("#dlVideo").href=d.video;
         if(d.kapak){$("#dlKapak").href=d.kapak;$("#dlKapak").style.display="";}else $("#dlKapak").style.display="none";
         $("#sonucCard").classList.remove("hidden"); $("#btnUret").disabled=false;
         $("#uretDurum").innerHTML='<span class="ok">✓ '+(d.edit||"")+' · '+(d.sahne_sayisi||"")+' sahne · '+(d.sure||"")+' sn</span>';
+        if(d.uyari){$("#err").textContent="⚠ "+d.uyari; $("#err").classList.remove("hidden");}
         return;
       }
       if(d.durum==="hata"){hata(d.hata||"Bilinmeyen hata");return;}

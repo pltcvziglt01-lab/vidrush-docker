@@ -1,5 +1,5 @@
 import {Composition} from 'remotion';
-import {VidrushVideo, varsayilanProps, VideoProps} from './Video';
+import {VidrushVideo, varsayilanProps, VideoProps, normMotion, hesaplaKareler} from './Video';
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -13,10 +13,8 @@ export const RemotionRoot: React.FC = () => {
       defaultProps={varsayilanProps}
       calculateMetadata={({props}) => {
         const p = props as VideoProps;
-        const toplam = p.sahneler.reduce(
-          (a, s) => a + Math.max(1, Math.round(s.sure * p.fps)),
-          0
-        );
+        // Crossfade gecisler kare TUKETIR -> toplam sure ortusme kadar KISA olmali
+        const {toplam} = hesaplaKareler(p.sahneler, p.fps, normMotion(p.gecis));
         return {
           durationInFrames: Math.max(30, toplam),
           fps: p.fps,

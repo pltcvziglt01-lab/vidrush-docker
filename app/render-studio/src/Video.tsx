@@ -5,12 +5,13 @@ import {
   Easing,
   Img,
   OffthreadVideo,
-  Series,
   interpolate,
   staticFile,
   useCurrentFrame,
   useVideoConfig,
 } from 'remotion';
+import {TransitionSeries, linearTiming} from '@remotion/transitions';
+import {fade} from '@remotion/transitions/fade';
 
 export type AltyaziParcasi = {t0: number; t1: number; metin: string};
 
@@ -19,16 +20,12 @@ export type Sahne = {
   medya: string;
   ses: string;
   sure: number;
-  zoom: 'in' | 'out' | 'yok';   // 'yok' -> Ken Burns / zoom KAPALI
+  zoom: 'in' | 'out' | 'yok';
   pan: 'right' | 'left' | 'top' | 'bottom' | 'yok';
   overlay?: string;
   altyazi: AltyaziParcasi[];
 };
 
-// Edit stili motion profili:
-// 'sinematik' -> BBC Earth: hard-cut, hafif Ken Burns, overlay yok
-// 'anlati'    -> Johnny Harris: blur->net Ken Burns 2.0 push-in, vinyet, kinetik baslik
-// 'hizli'     -> Vox: hizli zoom-punch + blur, surekli kinetik merkez metin
 export type Motion = 'sinematik' | 'anlati' | 'hizli' | 'kesme' | 'fade' | 'dinamik';
 export type AltyaziStil = 'yok' | 'orta' | 'yogun';
 
@@ -64,26 +61,54 @@ export const varsayilanProps: VideoProps = {
 const kaynakCoz = (yol: string): string =>
   yol.startsWith('http://') || yol.startsWith('https://') ? yol : staticFile(yol);
 
-const normMotion = (m?: Motion): 'sinematik' | 'anlati' | 'hizli' | 'kesme' => {
+export const normMotion = (m?: Motion): 'sinematik' | 'anlati' | 'hizli' | 'kesme' => {
   if (m === 'kesme') return 'kesme';
   if (m === 'dinamik' || m === 'anlati') return 'anlati';
   if (m === 'hizli') return 'hizli';
   return 'sinematik';
 };
 
-// Ken Burns olcek/pan — zoom 'yok' ise sabit (hareket kapali)
+// PREMIUM: eased Ken Burns egrisi (lineer degil -> yumusak ivme; bedava, sadece egri)
+const KB_EASING = Easing.bezier(0.33, 0, 0.2, 1);
+
+const sahneKare = (sure: number, fps: number) => Math.max(1, Math.round(sure * fps));
+
+// Motion basina crossfade suresi (kare). 0 = hard cut (BBC tarzi, ses tam senkron, flash yok).
+const gecisTemel = (motion: 'sinematik' | 'anlati' | 'hizli' | 'kesme'): number =>
+  motion === 'anlati' ? 12 : motion === 'hizli' ? 8 : 0;
+
+// TEK KAYNAK: Video ve Root ayni kareyi kullansin. Cok kisa sahnede gecisi guvenli kucultur.
+export const hesaplaKareler = (
+  sahneler: Sahne[],
+  fps: number,
+  motion: 'sinematik' | 'anlati' | 'hizli' | 'kesme',
+) => {
+  const Ks = sahneler.map((s) => sahneKare(s.sure, fps));
+  const temel = gecisTemel(motion);
+  const gecisler = Ks.slice(0, -1).map((_, i) => {
+    if (temel === 0) return 0;
+    const maxT = Math.floor(Math.min(Ks[i], Ks[i + 1]) / 2);
+    return Math.max(0, Math.min(temel, maxT));
+  });
+  const toplam = Ks.reduce((a, b) => a + b, 0) - gecisler.reduce((a, b) => a + b, 0);
+  return {Ks, gecisler, toplam: Math.max(1, toplam)};
+};
+
 const kbHesap = (sahne: Sahne, frame: number, K: number, buyume: number, panPx: number) => {
   if (sahne.zoom === 'yok') return {olcek: 1, tx: 0, ty: 0};
   const olcek = interpolate(frame, [0, K], sahne.zoom === 'in' ? [1, buyume] : [buyume, 1], {
     extrapolateRight: 'clamp',
+    easing: KB_EASING,
   });
-  const kayma = interpolate(frame, [0, K], [0, panPx], {extrapolateRight: 'clamp'});
+  const kayma = interpolate(frame, [0, K], [0, panPx], {
+    extrapolateRight: 'clamp',
+    easing: KB_EASING,
+  });
   const tx = sahne.pan === 'right' ? -kayma : sahne.pan === 'left' ? kayma : 0;
   const ty = sahne.pan === 'bottom' ? -kayma : sahne.pan === 'top' ? kayma : 0;
   return {olcek, tx, ty};
 };
 
-// ─── Kinetik baslik overlay (anlati + hizli) ───
 const OverlayBaslik: React.FC<{metin: string; motion: string; kareSayisi: number}> = ({
   metin,
   motion,
@@ -97,7 +122,6 @@ const OverlayBaslik: React.FC<{metin: string; motion: string; kareSayisi: number
     easing: Easing.out(Easing.cubic),
   });
   const hizli = motion === 'hizli';
-  // hizli: sahneler kisa, baslik sahne boyunca kalir; anlati: ~2sn sonra soner
   const cikisBas = hizli ? kareSayisi - 6 : Math.min(kareSayisi - 6, 60);
   const cik = interpolate(frame, [cikisBas, kareSayisi], [1, 0], {
     extrapolateLeft: 'clamp',
@@ -120,6 +144,8 @@ const OverlayBaslik: React.FC<{metin: string; motion: string; kareSayisi: number
           transform: `translateY(${ty}px)`,
           maxWidth: '84%',
           textAlign: 'center',
+          overflowWrap: 'anywhere',
+          wordBreak: 'break-word',
           fontFamily:
             '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
           fontWeight: 800,
@@ -154,8 +180,10 @@ const Altyazi: React.FC<{parcalar: AltyaziParcasi[]; fps: number; stil: AltyaziS
       <div
         style={{
           maxWidth: '80%',
-          backgroundColor: 'rgba(0, 0, 0, 0.6)',
+          backgroundColor: 'rgba(0, 0, 0, 0.72)',
           color: 'white',
+          overflowWrap: 'anywhere',
+          wordBreak: 'break-word',
           fontFamily:
             '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
           fontSize: yogun ? 52 : 44,
@@ -164,6 +192,7 @@ const Altyazi: React.FC<{parcalar: AltyaziParcasi[]; fps: number; stil: AltyaziS
           textAlign: 'center',
           padding: '13px 28px',
           borderRadius: 14,
+          textShadow: '0 2px 6px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.9)',
         }}
       >
         {aktif.metin}
@@ -172,37 +201,19 @@ const Altyazi: React.FC<{parcalar: AltyaziParcasi[]; fps: number; stil: AltyaziS
   );
 };
 
-type Gorunum = {opaklik: number; transform: string; filtre: string};
-
-// Guvenli fade opakligi: interpolate inputRange KESIN ARTAN olmali; kisa sahnede (K kucuk)
-// [0,g,K-g,K-1] cokerdi. Bu yardimci her K icin kesin-artan aralik garanti eder.
-const fadeOpaklik = (frame: number, K: number, g: number): number => {
-  if (K < 5) return 1; // cok kisa sahne: sabit gorunur (cokme yok)
-  const gu = Math.max(1, Math.min(g, Math.floor((K - 1) / 2) - 1));
-  if (gu < 2) {
-    return interpolate(frame, [0, 1, K - 1], [0, 1, 0], {
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    });
-  }
-  return interpolate(frame, [0, gu, K - gu, K - 1], [0, 1, 1, 0], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
-};
+type Gorunum = {transform: string};
 
 const sinematikHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
-  const opaklik = fadeOpaklik(frame, K, 3);
   const {olcek, tx, ty} = kbHesap(sahne, frame, K, 1.06, 22);
-  return {opaklik, transform: `scale(${olcek}) translate(${tx}px, ${ty}px)`, filtre: 'none'};
+  return {transform: `scale(${olcek}) translate(${tx}px, ${ty}px)`};
 };
 
-// Gecis KAPALI: fade/reveal/blur yok — sade hard cut (Ken Burns zoom acik ise kalir)
 const kesmeHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
   const {olcek, tx, ty} = kbHesap(sahne, frame, K, 1.06, 20);
-  return {opaklik: 1, transform: `scale(${olcek}) translate(${tx}px, ${ty}px)`, filtre: 'none'};
+  return {transform: `scale(${olcek}) translate(${tx}px, ${ty}px)`};
 };
 
+// blur YOK. Push-in reveal transform ile. fade her sahnede degil -> gecis crossfade yapar (flash yok).
 const anlatiHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
   const g = Math.max(8, Math.min(16, Math.floor(K / 4)));
   const girisP = interpolate(frame, [0, g], [0, 1], {
@@ -210,15 +221,9 @@ const anlatiHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
     extrapolateRight: 'clamp',
     easing: Easing.out(Easing.cubic),
   });
-  const blur = (1 - girisP) * 22;
-  const girisOlcek = 1.1 - 0.1 * girisP;
+  const girisOlcek = 1.12 - 0.12 * girisP;
   const {olcek: kb, tx: kbTx, ty: kbTy} = kbHesap(sahne, frame, K, 1.12, 40);
-  const opaklik = fadeOpaklik(frame, K, g);
-  return {
-    opaklik,
-    transform: `translate(${kbTx}px, ${kbTy}px) scale(${kb * girisOlcek})`,
-    filtre: `blur(${blur.toFixed(2)}px)`,
-  };
+  return {transform: `translate(${kbTx}px, ${kbTy}px) scale(${kb * girisOlcek})`};
 };
 
 const hizliHesapla = (sahne: Sahne, frame: number, K: number, indeks: number): Gorunum => {
@@ -229,7 +234,6 @@ const hizliHesapla = (sahne: Sahne, frame: number, K: number, indeks: number): G
     extrapolateRight: 'clamp',
     easing: Easing.out(Easing.cubic),
   });
-  const blur = (1 - girisP) * 16;
   const girisOlcek = 1.18 - 0.18 * girisP;
   const girisX = (1 - girisP) * yon * 60;
   const cikisP = interpolate(frame, [K - g, K], [0, 1], {
@@ -239,12 +243,18 @@ const hizliHesapla = (sahne: Sahne, frame: number, K: number, indeks: number): G
   });
   const cikisOlcek = 1 + cikisP * 0.12;
   const {olcek: kb} = kbHesap(sahne, frame, K, 1.08, 0);
-  const opaklik = fadeOpaklik(frame, K, g);
-  return {
-    opaklik,
-    transform: `translateX(${girisX}px) scale(${kb * girisOlcek * cikisOlcek})`,
-    filtre: `blur(${blur.toFixed(2)}px)`,
-  };
+  return {transform: `translateX(${girisX}px) scale(${kb * girisOlcek * cikisOlcek})`};
+};
+
+// Bozuk/eksik gorsel ya da footage TUM render'i cokertmesin: onError -> koyu fallback kare.
+const GuvenliGorsel: React.FC<{sahne: Sahne; stil: React.CSSProperties}> = ({sahne, stil}) => {
+  const [hata, setHata] = React.useState(false);
+  if (hata) return <AbsoluteFill style={{backgroundColor: '#0e0e12'}} />;
+  return sahne.tur === 'video' ? (
+    <OffthreadVideo src={kaynakCoz(sahne.medya)} muted style={stil} onError={() => setHata(true)} />
+  ) : (
+    <Img src={kaynakCoz(sahne.medya)} style={stil} onError={() => setHata(true)} />
+  );
 };
 
 const SahneGorunumu: React.FC<{
@@ -252,10 +262,11 @@ const SahneGorunumu: React.FC<{
   indeks: number;
   motion: 'sinematik' | 'anlati' | 'hizli' | 'kesme';
   altyaziStil: AltyaziStil;
-}> = ({sahne, indeks, motion, altyaziStil}) => {
+  kareSayisi: number;
+}> = ({sahne, indeks, motion, altyaziStil, kareSayisi}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
-  const K = Math.max(1, Math.round(sahne.sure * fps));
+  const K = kareSayisi;
 
   const g =
     motion === 'anlati'
@@ -271,28 +282,22 @@ const SahneGorunumu: React.FC<{
     height: '100%',
     objectFit: 'cover',
     transform: g.transform,
-    filter: g.filtre,
   };
 
   return (
     <AbsoluteFill style={{backgroundColor: 'black'}}>
-      <AbsoluteFill style={{opacity: g.opaklik}}>
-        {sahne.tur === 'video' ? (
-          <OffthreadVideo src={kaynakCoz(sahne.medya)} muted style={gorselStil} />
-        ) : (
-          <Img src={kaynakCoz(sahne.medya)} style={gorselStil} />
-        )}
-        {motion === 'anlati' || motion === 'hizli' ? (
-          <AbsoluteFill
-            style={{
-              background:
-                'radial-gradient(ellipse at center, rgba(0,0,0,0) 52%, rgba(0,0,0,0.4) 100%)',
-            }}
-          />
-        ) : null}
-        <OverlayBaslik metin={sahne.overlay || ''} motion={motion} kareSayisi={K} />
-        <Altyazi parcalar={sahne.altyazi} fps={fps} stil={altyaziStil} />
-      </AbsoluteFill>
+      <GuvenliGorsel sahne={sahne} stil={gorselStil} />
+      {/* Vinyet (yalnizca documentary anlati/hizli): tek radial-gradient, per-frame maliyet yok */}
+      {motion === 'anlati' || motion === 'hizli' ? (
+        <AbsoluteFill
+          style={{
+            background:
+              'radial-gradient(ellipse at center, rgba(0,0,0,0) 52%, rgba(0,0,0,0.4) 100%)',
+          }}
+        />
+      ) : null}
+      <OverlayBaslik metin={sahne.overlay || ''} motion={motion} kareSayisi={K} />
+      <Altyazi parcalar={sahne.altyazi} fps={fps} stil={altyaziStil} />
       <Audio src={kaynakCoz(sahne.ses)} />
     </AbsoluteFill>
   );
@@ -300,16 +305,36 @@ const SahneGorunumu: React.FC<{
 
 export const VidrushVideo: React.FC<VideoProps> = ({fps, gecis, altyaziStil, sahneler}) => {
   const motion = normMotion(gecis);
-  const alt: AltyaziStil = altyaziStil || 'orta';
+  const alt: AltyaziStil = altyaziStil ?? 'orta';   // yalnizca undefined/null -> 'orta' ('yok' korunur)
+  const {Ks, gecisler} = hesaplaKareler(sahneler, fps, motion);
+
+  const cocuklar: React.ReactNode[] = [];
+  sahneler.forEach((sahne, i) => {
+    cocuklar.push(
+      <TransitionSeries.Sequence key={`s${i}`} durationInFrames={Ks[i]}>
+        <SahneGorunumu
+          sahne={sahne}
+          indeks={i}
+          motion={motion}
+          altyaziStil={alt}
+          kareSayisi={Ks[i]}
+        />
+      </TransitionSeries.Sequence>,
+    );
+    if (i < sahneler.length - 1 && gecisler[i] > 0) {
+      cocuklar.push(
+        <TransitionSeries.Transition
+          key={`t${i}`}
+          presentation={fade()}
+          timing={linearTiming({durationInFrames: gecisler[i]})}
+        />,
+      );
+    }
+  });
+
   return (
     <AbsoluteFill style={{backgroundColor: 'black'}}>
-      <Series>
-        {sahneler.map((sahne, i) => (
-          <Series.Sequence key={i} durationInFrames={Math.max(1, Math.round(sahne.sure * fps))}>
-            <SahneGorunumu sahne={sahne} indeks={i} motion={motion} altyaziStil={alt} />
-          </Series.Sequence>
-        ))}
-      </Series>
+      <TransitionSeries>{cocuklar}</TransitionSeries>
     </AbsoluteFill>
   );
 };

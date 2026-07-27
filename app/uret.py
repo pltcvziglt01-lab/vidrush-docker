@@ -109,8 +109,27 @@ def pexels_video(query: str, hedef: str) -> bool:
 import urllib.parse  # noqa: E402
 
 
+def _ses_suresi(mp3_yolu: str) -> float:
+    """Gercek ses uzunlugu (ffprobe). WordBoundary gelmezse/yanlissa sahne suresi buna gore
+    ayarlanir -> anlatim kesilmez."""
+    try:
+        r = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=nw=1:nk=1", mp3_yolu],
+            capture_output=True, text=True, timeout=30)
+        return float((r.stdout or "").strip() or 0)
+    except Exception:
+        return 0.0
+
+
 async def seslendir(metin: str, ses: str, mp3_yolu: str):
-    com = edge_tts.Communicate(metin, ses)
+    # HIZ: edge-tts varsayilani ~100-110 kelime/dk cikiyordu (yavas, sahneler hedeften uzun).
+    # Referans videolarin temposu icin +%15 hiz. TTS_RATE env'i ile ayarlanir ("+0%" = kapali).
+    hiz = os.environ.get("TTS_RATE", "+15%")
+    try:
+        com = edge_tts.Communicate(metin, ses, rate=hiz)
+    except TypeError:      # eski edge-tts imzasi
+        com = edge_tts.Communicate(metin, ses)
     kelimeler = []
     with open(mp3_yolu, "wb") as f:
         async for olay in com.stream():
@@ -120,8 +139,16 @@ async def seslendir(metin: str, ses: str, mp3_yolu: str):
                 t0 = olay["offset"] / TICK
                 t1 = (olay["offset"] + olay["duration"]) / TICK
                 kelimeler.append({"t0": t0, "t1": t1, "kelime": olay["text"]})
-    sure = kelimeler[-1]["t1"] + 0.55 if kelimeler else max(2.5, len(metin.split()) * 0.45)
-    return kelimeler, max(2.0, sure)
+    # Gercek dosya suresini olc; sahne, sesten KISA olmasin (anlatim kesilmesin).
+    olculen = _ses_suresi(mp3_yolu)
+    # Sahne sonu bosluk: 0.55 -> 0.30 sn. Referans videolarda olu hava az (%25 sessizlik);
+    # her sahnede 0.25 sn kazanc, 100 sahnede 25 sn daha sikilastirilmis akis.
+    kuyruk = float(os.environ.get("TTS_KUYRUK", "0.30"))
+    if kelimeler:
+        sure = max(kelimeler[-1]["t1"] + kuyruk, (olculen + 0.12) if olculen else 0)
+    else:
+        sure = (olculen + kuyruk) if olculen else max(2.5, len(metin.split()) * 0.40)
+    return kelimeler, max(1.6, sure)
 
 
 def altyazi_parcala(kelimeler, sure):
