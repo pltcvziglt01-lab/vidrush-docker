@@ -18,6 +18,7 @@ PEXELS_KEY = os.environ.get("PEXELS_KEY", "")
 PIXABAY_KEY = os.environ.get("PIXABAY_KEY", "")
 MAG_BASE = "https://api.magnific.com/v1/ai/image-upscaler"
 _MAG_KAPALI = False   # 402/401 gorulunce oturum boyunca kapat (bosa cagri yok)
+_MAG_5XX = 0          # ust uste 5xx sayaci: servis coktuyse (or. 502) her sahnede bosuna deneme
 
 # YouTube veri-merkezi IP'lerinden "Sign in to confirm you're not a bot" verir.
 # Cozum: tarayicidan disa aktarilan Netscape cookies dosyasi (varsa) kullanilir.
@@ -311,7 +312,7 @@ def magnific_upscale(gorsel_yolu: str, optimized_for: str = "films_n_photography
                      scale: str = "2x", zaman_asimi: int = 210) -> bool:
     """Gorseli Magnific ile upscale eder; yerinde uzerine yazar. Basarili ise True.
     Async: POST -> task_id -> GET poll -> COMPLETED URL indir."""
-    global _MAG_KAPALI
+    global _MAG_KAPALI, _MAG_5XX
     if _MAG_KAPALI or not MAGNIFIC_KEY or not os.path.exists(gorsel_yolu):
         return False
     try:
@@ -325,7 +326,13 @@ def magnific_upscale(gorsel_yolu: str, optimized_for: str = "films_n_photography
             print(f"  magnific POST {r.status_code}: {r.text[:160]}", file=sys.stderr)
             if r.status_code in (401, 402, 403):
                 _MAG_KAPALI = True   # kredi/yetki bitti -> bu is boyunca bir daha deneme
+            elif r.status_code >= 500:
+                _MAG_5XX += 1        # servis tarafi coktu (or. 502 Bad Gateway)
+                if _MAG_5XX >= 3:    # ust uste 3 kez -> bu is boyunca kapat, sahne basina bosa deneme olmasin
+                    print("  magnific: ust uste 5xx, bu is boyunca devre disi", file=sys.stderr)
+                    _MAG_KAPALI = True
             return False
+        _MAG_5XX = 0
         tid = r.json()["data"]["task_id"]
         bas = time.time()
         while time.time() - bas < zaman_asimi:

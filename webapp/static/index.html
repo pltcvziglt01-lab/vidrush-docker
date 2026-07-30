@@ -171,7 +171,7 @@
 
       <div class="card">
         <h2><span class="num">3</span> Video Türü</h2>
-        <div class="estiller" style="grid-template-columns:1fr 1fr" id="turler">
+        <div class="estiller" style="grid-template-columns:1fr 1fr 1fr" id="turler">
           <div class="estil" data-tur="animasyon">
             <span class="pick"></span><span class="en">🧍</span>
             <b>Animasyon</b><p>Elle çizilmiş karakter animasyonu; anlatı veya eğitici stil.</p>
@@ -181,6 +181,11 @@
             <span class="pick"></span><span class="en">🎬</span>
             <b>Documentary</b><p>Gerçekçi belgesel; içinde stil seçimi + otomatik footage & HD.</p>
             <div class="meta">3 stil · otomatik footage/Magnific</div>
+          </div>
+          <div class="estil" data-tur="hikaye">
+            <span class="pick"></span><span class="en">📖</span>
+            <b>Hikaye</b><p>Hikaye kanalı formatı: film karesi görseller, hareketli açılış, altyazı.</p>
+            <div class="meta">sinematik gerçekçi · tutarlı karakter</div>
           </div>
         </div>
 
@@ -194,6 +199,10 @@
           <div class="lbl2">🎨 Animasyon stili</div>
           <div class="estiller" id="animStiller"><span class="durum">Yükleniyor...</span></div>
           <div class="durum" style="margin-top:10px;font-size:11px"><b>Anlatı</b>: psikoloji/felsefe/deneme — soluk palet, detaylı ortamlar. <b>Eğitici</b>: tarih/bilim/nasıl-çalışır — canlı renkler, diyagram kartları. <b>Hikaye</b>: macera/what-if — sade beyaz stickman + boyalı sinematik dünya.</div>
+        </div>
+
+        <div id="hikayeWrap" style="display:none">
+          <div class="durum" style="margin-top:10px;font-size:11px">📖 Hazır hikaye metnini yapıştır. İlk ~2,5 dakika <b>yoğun hareketli açılış</b> (izleyiciyi tutmak için), sonrası efektli sinematik kareler + altyazı. <b>Karakter baştan sona aynı kalır</b>; istersen yukarıdan karakter görseli de yükleyebilirsin.</div>
         </div>
       </div>
 
@@ -349,6 +358,7 @@ $$("#turler .estil").forEach(c=>c.onclick=()=>{
   $$("#turler .estil").forEach(x=>x.classList.toggle("on",x===c));
   $("#editWrap").style.display = (videoTur==="documentary") ? "" : "none";
   const aw=$("#animWrap"); if(aw) aw.style.display = (videoTur==="animasyon") ? "" : "none";
+  const hw=$("#hikayeWrap"); if(hw) hw.style.display = (videoTur==="hikaye") ? "" : "none";
 });
 
 /* krediler */

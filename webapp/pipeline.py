@@ -259,6 +259,41 @@ EDIT_STILLERI = {
 }
 VARSAYILAN_EDIT = "sinematik-belgesel"
 
+# ───────── HİKAYE KANALI (sinematik gerçekçi) — üçüncü üst tür ─────────
+# YouTube hikaye kanalı formatı: normal tempolu anlatım, foto-gerçekçi "film karesi" görseller.
+# İLK DAKİKALAR (HIKAYE_ACILIS_SN) yoğun hareketli açılış (izleyici tutma), sonrası standart
+# Ken Burns + altyazı. Karakter tutarlılığı: çapa referansı + sabit karakter kuralı (aşağıda).
+HKANAL_STIL = (
+    "cinematic photorealistic film still, shot on 35mm anamorphic cinema lenses, shallow depth "
+    "of field, dramatic motivated lighting, moody filmic color grade, subtle film grain, high "
+    "dynamic range, realistic skin and fabric texture, professional movie production value, "
+    "absolutely no text, no captions, no watermark, no logo, no illustration, no 3D render"
+)
+# Karakter yuklenmezse: gorunusu SABITLEMEZ (hikayeye gore model secer), ayni kalmasini SART kosar.
+HKANAL_VARSAYILAN_KARAKTER = (
+    "The recurring main character is the SAME real person in every scene: identical face, age, "
+    "hair, build and outfit throughout the whole story — never swap, restyle or replace them"
+)
+HKANAL_CERCEVE = (
+    "Frame like a narrative feature film: vary shot sizes deliberately across scenes (wide "
+    "establishing, medium, close-up), keep the main character clearly visible and emotionally "
+    "readable, single continuous frame, never split screens or collages"
+)
+HIKAYE_KANALI_PROFIL = {
+    "ad": "Sinematik Hikaye",
+    "ozet": "Hikaye kanalı formatı — film karesi görseller, hareketli açılış, altyazı, tutarlı karakter",
+    "sahne_sn": float(os.environ.get("HIKAYE_SAHNE_SN", "6")), "kelime": 15,
+    "footage_pct": 0, "overlay": "yok",
+    "altyazi": "orta", "motion": "hikaye", "mag": "films_n_photography",
+    "gorsel_ek": HKANAL_STIL,
+    "varsayilan_karakter": HKANAL_VARSAYILAN_KARAKTER,
+    "cerceve": HKANAL_CERCEVE,
+}
+HIKAYE_STILLERI = {"sinematik-hikaye": HIKAYE_KANALI_PROFIL}
+VARSAYILAN_HIKAYE = "sinematik-hikaye"
+# Açılış süresi (sn): bu süredeki sahneler props'ta "vurgu"=true alır -> Video.tsx yoğun hareket verir
+HIKAYE_ACILIS_SN = float(os.environ.get("HIKAYE_ACILIS_SN", "150"))
+
 # Animasyon (stickman) — Documentary'den AYRI ust-duzey tur. Tamamen AI, gercek footage/Magnific YOK.
 # ───────── ANIMASYON SANAT YONETIMI (referans video analizinden turetildi) ─────────
 # Hedef: elle cizilmis editorial karikatur — murekkep kontur + gouache dolgu + cel golge,
@@ -548,10 +583,13 @@ VARSAYILAN_ANIM = "anlati-deneme"
 
 
 def profil_coz(tur, edit_id):
-    """tur: 'animasyon' -> ANIMASYON_STILLERI'nden biri; 'documentary' -> EDIT_STILLERI'nden biri."""
+    """tur: 'animasyon' -> ANIMASYON_STILLERI; 'hikaye' -> HIKAYE_STILLERI; digeri -> EDIT_STILLERI."""
     if tur == "animasyon":
         return ANIMASYON_STILLERI.get(edit_id or VARSAYILAN_ANIM,
                                       ANIMASYON_STILLERI[VARSAYILAN_ANIM])
+    if tur == "hikaye":
+        return HIKAYE_STILLERI.get(edit_id or VARSAYILAN_HIKAYE,
+                                   HIKAYE_STILLERI[VARSAYILAN_HIKAYE])
     return EDIT_STILLERI.get(edit_id or VARSAYILAN_EDIT, EDIT_STILLERI[VARSAYILAN_EDIT])
 
 
@@ -712,6 +750,13 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
         "6) Thumbnail: object with text = a punchy 2-5 word hook in the ORIGINAL language ALL CAPS, "
         "and prompt = a dramatic 16:9 scene featuring the character, strong emotion, high contrast.\n"
         f"{hd_kural}\n"
+        # Gorsel API'leri gercek kisi tasvirini ISIMLE isteyince 400 basiyor (policy).
+        # Isimsiz ama iyi tarif edilirse uretiyor -> planlayici ismi degil gorunusu yazsin.
+        "REAL PEOPLE: NEVER write a real person's name inside scene_prompt or thumbnail.prompt "
+        "(image APIs reject named-likeness requests). Instead describe an era-appropriate figure by "
+        "APPEARANCE only: build, outfit, hairstyle, pose, decade styling — without naming or claiming "
+        "identity (e.g. 'a slim pop star in a red leather jacket, 1980s stage lighting'). Real names "
+        "ARE allowed in footage_sorgu (stock search).\n"
         "Respond ONLY valid JSON: {\"language\":\"en\",\"voice\":\"...\",\"ozet\":\"...\","
         "\"thumbnail\":{\"text\":\"...\",\"prompt\":\"...\"},"
         "\"scenes\":[{\"n\":1,\"voiceover\":\"...\",\"kaynak\":\"ai|footage\","
@@ -899,7 +944,14 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
         except BakiyeHatasi:
             raise            # bakiye/limit: retry etme, yukari firlat (para bosa gitmesin)
         except Exception as e:
-            print(f"  referansli gorsel hata: {str(e)[:200]}", file=sys.stderr)
+            # HTTP hatasinda API'nin donduğu govdeyi de yaz (400'un GERCEK sebebi orada:
+            # policy reddi mi, parametre mi). Yoksa sadece "400 Bad Request" gorup kor kaliyoruz.
+            govde = ""
+            try:
+                govde = f" | yanit: {e.response.text[:300]}"
+            except Exception:
+                pass
+            print(f"  referansli gorsel hata: {str(e)[:200]}{govde}", file=sys.stderr)
             time.sleep(6)
         finally:
             for f in acik:
@@ -955,6 +1007,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     props_sahneler = []
     toplam = len(scenes)
     capa_yol = ""   # gorsel capa: ilk uretilen sahne -> sonrakilere karakter+stil kilidi
+    kumulatif_sn = 0.0   # hikaye modu: acilis bolumu (HIKAYE_ACILIS_SN) takibi icin toplam sure
 
     bakiye_bitti = False   # bakiye/limit doldu mu (elde olanla kurtarma icin)
     ard_arda = 0           # ust uste basarisiz sahne sayaci
@@ -1003,7 +1056,11 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                     break
                 continue
             ard_arda = 0
-            if not capa_yol:   # ilk basarili AI sahne = capa. Magnific ONCESI kucuk kopya al
+            # CAPA yalnizca ANIMASYON + HIKAYE'de: documentary'de ilk sahnenin ICERIGI (or. hayvan,
+            # obje) sonraki tum sahnelere kopyalaniyordu (referans gorseldeki icerik bulasmasi).
+            # Animasyon/hikayede AYNI KARAKTER her sahnede sart -> capa istenen davranis;
+            # documentary'de stil_yol + stil_kilit yeter.
+            if not capa_yol and mod in ("animasyon", "hikaye"):   # ilk basarili AI sahne = capa. Magnific ONCESI kucuk kopya al
                 capa_yol = os.path.join(is_dizini, "_capa.png")   # (dev upscale'i her sahnede yuklemesin)
                 try:
                     shutil.copy(gyol_full, capa_yol)
@@ -1028,7 +1085,10 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             "pan": panlar[i % 4] if zoom_acik else "yok",
             "overlay": overlay,
             "altyazi": uretmod.altyazi_parcala(kelimeler, sure),
+            # Hikaye kanali: acilis dakikalarindaki sahneler yogun hareket alir (Video.tsx "vurgu")
+            "vurgu": mod == "hikaye" and kumulatif_sn < HIKAYE_ACILIS_SN,
         })
+        kumulatif_sn += sure
 
     if not props_sahneler:
         # Hicbir sahne yoksa: sebebi bakiye ise NET soyle (kullanici 'neden' bilsin)
@@ -1062,7 +1122,9 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
 
     # Render
     bildir("Video render ediliyor (birkaç dakika)...", 78)
-    props = {"fps": 30, "genislik": 1920, "yukseklik": 1080,
+    # fps 30->24: %20 daha az kare = %20 hizli render (darbogaz Chromium kare uretimi).
+    # Statik gorsel + Ken Burns'te 24 fps sinematik durur, fark hissedilmez. VIDEO_FPS env ile geri alinir.
+    props = {"fps": int(os.environ.get("VIDEO_FPS", "24")), "genislik": 1920, "yukseklik": 1080,
              "gecis": motion, "altyaziStil": altyazi_stil, "sahneler": props_sahneler}
     props_yolu = os.path.join(is_dizini, "props.json")
     with open(props_yolu, "w") as f:
@@ -1079,7 +1141,8 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
              # onerisi 8 Mbps). Render suresine etkisi kucuk (darbogaz Chromium kare uretimi).
              # jpeg-quality 100 = kare yakalama kaybi yok.
              f"--crf={os.environ.get('RENDER_CRF','18')}", "--x264-preset=faster",
-             "--jpeg-quality=100"]
+             # 100->90: kare yakalama belirgin hizlanir, gozle gorulur kalite farki yok
+             "--jpeg-quality=90"]
     if os.environ.get("REMOTION_BROWSER_EXECUTABLE"):
         komut.append(f"--browser-executable={os.environ['REMOTION_BROWSER_EXECUTABLE']}")
     if os.environ.get("REMOTION_GL"):

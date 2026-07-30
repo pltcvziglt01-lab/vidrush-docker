@@ -23,7 +23,7 @@ SSH anahtarı: `~/.ssh/bedosaho_hetzner` (repo'da DEĞİL; sahibinden alınır).
 - `webapp/server.py` — FastAPI: `/api/generate` (kuyruk), `/api/job/{id}`, `/api/animasyon-stilleri`, `/api/edit-stilleri`. Tek-işçi kuyruk (1 video/seferde).
 - `webapp/pipeline.py` — üretim hattı. Önemli:
   - `uret()` ana akış: plan → sahne görselleri → seslendirme → props → Remotion render
-  - `ANIMASYON_STILLERI` (3 stil) ve `EDIT_STILLERI` (3 documentary stili)
+  - `ANIMASYON_STILLERI` (3 stil), `EDIT_STILLERI` (3 documentary stili) ve `HIKAYE_STILLERI` (hikaye kanalı — sinematik gerçekçi film kareleri, ilk `HIKAYE_ACILIS_SN` sn "vurgu" yoğun hareket, altyazı, çapa ile karakter tutarlılığı)
   - Stil promptları `ANIM_STIL/EXP_STIL/HIK_STIL` + `*_SOZLESME` (planlayıcı) + `*_CERCEVE` (kompozisyon) sabitlerinde — **kalite ayarı buradan yapılır**
   - `referansli_gorsel()` — OpenAI/Gemini görsel üretimi (karakter+çapa+stil çoklu referans)
   - `oai_chat()` — dayanıklı LLM çağrısı (retry, bakiye hatası ayrımı)
@@ -34,7 +34,8 @@ SSH anahtarı: `~/.ssh/bedosaho_hetzner` (repo'da DEĞİL; sahibinden alınır).
 
 ## Ayarlanabilir env (konteynerde /root/bedosaho/.env)
 `AI_SAGLAYICI` (openai/gemini), `IMAGE_QUALITY` (medium), `IMAGE_MODEL*`, `GEMINI_*`,
-`ANIM_SAHNE_SN` (5), `TTS_RATE`, `RENDER_CRF` (18), `PEXELS_KEY`, `PIXABAY_KEY`.
+`ANIM_SAHNE_SN` (5), `TTS_RATE`, `RENDER_CRF` (18), `PEXELS_KEY`, `PIXABAY_KEY`,
+`VIDEO_FPS` (24), `HIKAYE_SAHNE_SN` (6), `HIKAYE_ACILIS_SN` (150).
 
 ## Kural
 - Değişikliği **gerçek 1 dk'lık videoyla** test et (tahminle "çalışır" deme). Kareleri ffmpeg ile çıkarıp gözle bak.

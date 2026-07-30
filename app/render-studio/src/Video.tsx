@@ -24,9 +24,10 @@ export type Sahne = {
   pan: 'right' | 'left' | 'top' | 'bottom' | 'yok';
   overlay?: string;
   altyazi: AltyaziParcasi[];
+  vurgu?: boolean; // hikaye kanalı açılış sahnesi: yoğun hareket (derin zoom + push-in + paralaks)
 };
 
-export type Motion = 'sinematik' | 'anlati' | 'hizli' | 'kesme' | 'fade' | 'dinamik';
+export type Motion = 'sinematik' | 'anlati' | 'hizli' | 'kesme' | 'fade' | 'dinamik' | 'hikaye';
 export type AltyaziStil = 'yok' | 'orta' | 'yogun';
 
 export type VideoProps = {
@@ -61,10 +62,13 @@ export const varsayilanProps: VideoProps = {
 const kaynakCoz = (yol: string): string =>
   yol.startsWith('http://') || yol.startsWith('https://') ? yol : staticFile(yol);
 
-export const normMotion = (m?: Motion): 'sinematik' | 'anlati' | 'hizli' | 'kesme' => {
+export type NormMotion = 'sinematik' | 'anlati' | 'hizli' | 'kesme' | 'hikaye';
+
+export const normMotion = (m?: Motion): NormMotion => {
   if (m === 'kesme') return 'kesme';
   if (m === 'dinamik' || m === 'anlati') return 'anlati';
   if (m === 'hizli') return 'hizli';
+  if (m === 'hikaye') return 'hikaye';
   return 'sinematik';
 };
 
@@ -74,14 +78,15 @@ const KB_EASING = Easing.bezier(0.33, 0, 0.2, 1);
 const sahneKare = (sure: number, fps: number) => Math.max(1, Math.round(sure * fps));
 
 // Motion basina crossfade suresi (kare). 0 = hard cut (BBC tarzi, ses tam senkron, flash yok).
-const gecisTemel = (motion: 'sinematik' | 'anlati' | 'hizli' | 'kesme'): number =>
-  motion === 'anlati' ? 12 : motion === 'hizli' ? 8 : 0;
+// hikaye: 10 kare yumusak crossfade (sinematik hikaye akisi).
+const gecisTemel = (motion: NormMotion): number =>
+  motion === 'anlati' ? 12 : motion === 'hizli' ? 8 : motion === 'hikaye' ? 10 : 0;
 
 // TEK KAYNAK: Video ve Root ayni kareyi kullansin. Cok kisa sahnede gecisi guvenli kucultur.
 export const hesaplaKareler = (
   sahneler: Sahne[],
   fps: number,
-  motion: 'sinematik' | 'anlati' | 'hizli' | 'kesme',
+  motion: NormMotion,
 ) => {
   const Ks = sahneler.map((s) => sahneKare(s.sure, fps));
   const temel = gecisTemel(motion);
@@ -246,6 +251,25 @@ const hizliHesapla = (sahne: Sahne, frame: number, K: number, indeks: number): G
   return {transform: `translateX(${girisX}px) scale(${kb * girisOlcek * cikisOlcek})`};
 };
 
+// Hikaye kanali: ACILIS sahneleri (vurgu=true, ilk ~2.5dk) yogun hareket alir — derin zoom +
+// push-in giris + genis paralaks pan (izleyici tutma). Sonraki sahneler sakin sinematik Ken Burns.
+// Hepsi transform-only: render maliyetine etkisi yok.
+const hikayeHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
+  if (sahne.vurgu) {
+    const g = Math.max(6, Math.min(14, Math.floor(K / 4)));
+    const girisP = interpolate(frame, [0, g], [0, 1], {
+      extrapolateLeft: 'clamp',
+      extrapolateRight: 'clamp',
+      easing: Easing.out(Easing.cubic),
+    });
+    const girisOlcek = 1.14 - 0.14 * girisP; // hizli push-in giris
+    const {olcek, tx, ty} = kbHesap(sahne, frame, K, 1.16, 48); // derin zoom + genis pan
+    return {transform: `translate(${tx}px, ${ty}px) scale(${olcek * girisOlcek})`};
+  }
+  const {olcek, tx, ty} = kbHesap(sahne, frame, K, 1.07, 26); // sakin bolum: standart Ken Burns
+  return {transform: `scale(${olcek}) translate(${tx}px, ${ty}px)`};
+};
+
 // Bozuk/eksik gorsel ya da footage TUM render'i cokertmesin: onError -> koyu fallback kare.
 const GuvenliGorsel: React.FC<{sahne: Sahne; stil: React.CSSProperties}> = ({sahne, stil}) => {
   const [hata, setHata] = React.useState(false);
@@ -260,7 +284,7 @@ const GuvenliGorsel: React.FC<{sahne: Sahne; stil: React.CSSProperties}> = ({sah
 const SahneGorunumu: React.FC<{
   sahne: Sahne;
   indeks: number;
-  motion: 'sinematik' | 'anlati' | 'hizli' | 'kesme';
+  motion: NormMotion;
   altyaziStil: AltyaziStil;
   kareSayisi: number;
 }> = ({sahne, indeks, motion, altyaziStil, kareSayisi}) => {
@@ -275,6 +299,8 @@ const SahneGorunumu: React.FC<{
       ? hizliHesapla(sahne, frame, K, indeks)
       : motion === 'kesme'
       ? kesmeHesapla(sahne, frame, K)
+      : motion === 'hikaye'
+      ? hikayeHesapla(sahne, frame, K)
       : sinematikHesapla(sahne, frame, K);
 
   const gorselStil: React.CSSProperties = {
@@ -287,8 +313,9 @@ const SahneGorunumu: React.FC<{
   return (
     <AbsoluteFill style={{backgroundColor: 'black'}}>
       <GuvenliGorsel sahne={sahne} stil={gorselStil} />
-      {/* Vinyet (yalnizca documentary anlati/hizli): tek radial-gradient, per-frame maliyet yok */}
-      {motion === 'anlati' || motion === 'hizli' ? (
+      {/* Vinyet (anlati/hizli/hikaye): tek radial-gradient, per-frame maliyet yok.
+          Hikayede film-karesi hissi verir. */}
+      {motion === 'anlati' || motion === 'hizli' || motion === 'hikaye' ? (
         <AbsoluteFill
           style={{
             background:

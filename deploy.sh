@@ -27,9 +27,19 @@ if [ "$N" -gt 0 ]; then
 fi
 
 echo "== 2/5 Python syntax kontrol =="
-python3 -c "import ast,glob,sys
-[ast.parse(open(f).read()) for f in glob.glob('$KOK/webapp/*.py')+['$KOK/app/uret.py']]
-print('  ✓ syntax OK')" || { echo 'SYNTAX HATASI — deploy iptal'; exit 3; }
+# Windows Git Bash uyumu: python3 yoksa python/py kullan; /c/.. yolunu C:/.. yap (cygpath),
+# dosyalari UTF-8 oku (Turkce karakterli yol/iceriklerde varsayilan codec patliyor).
+# NOT: Windows'ta python3.exe cogu zaman Store yonlendirme SAHTESI -> gercekten calisani sec.
+PYBIN=""
+for c in python3 python py; do
+  if "$c" -c "pass" >/dev/null 2>&1; then PYBIN="$c"; break; fi
+done
+[ -n "$PYBIN" ] || { echo "HATA: calisan python bulunamadi"; exit 3; }
+KOKPY="$(cygpath -m "$KOK" 2>/dev/null || echo "$KOK")"
+PYTHONUTF8=1 "$PYBIN" -c "import ast,glob,sys
+yollar = glob.glob('$KOKPY/webapp/*.py')+['$KOKPY/app/uret.py']
+[ast.parse(open(f, encoding='utf-8').read()) for f in yollar]
+print('  ✓ syntax OK (%d dosya)' % len(yollar))" || { echo 'SYNTAX HATASI — deploy iptal'; exit 3; }
 
 echo "== 3/5 Dosyalari konteynere kopyala =="
 # webapp (pipeline/server/kaynak/static)
@@ -45,8 +55,10 @@ echo "  ✓ kopyalandi"
 
 echo "== 4/5 Yeniden baslat + saglik =="
 $SSH "docker restart bedosaho >/dev/null"
-sleep 9
-$SSH "curl -s -m 15 http://localhost:8080/api/saglik" ; echo ""
+# Saglik: tek deneme yerine ~30 sn'ye kadar bekle (acilis 9 sn'yi asinca deploy yarim kalmasin,
+# kalicilas tirma adimi atlaniyordu)
+# NOT: konteyner 8080 -> host 80 esli (docker port bedosaho). localhost:8080 DEGIL :80!
+$SSH 'for i in 1 2 3 4 5 6 7; do sleep 4; R=$(curl -s -m 15 http://localhost:80/api/saglik); [ -n "$R" ] && { echo "$R"; exit 0; }; done; echo "HATA: saglik yaniti alinamadi"; exit 7' ; echo ""
 
 echo "== 5/5 Durumu imaja bas (kalici) =="
 $SSH "docker commit bedosaho bedosaho:latest >/dev/null && docker tag bedosaho:latest bedosaho && echo '  ✓ kalici'"

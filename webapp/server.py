@@ -149,14 +149,16 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
                       karakter: UploadFile = File(None),
                       stil: UploadFile = File(None)):
     """Karakter/stil gorselleri her video icin DOGRUDAN yuklenir (kalici kayit yok).
-    Magnific ve footage plana gore OTOMATIK. tur: animasyon|documentary."""
+    Magnific ve footage plana gore OTOMATIK. tur: animasyon|documentary|hikaye."""
     session = gecerli_session(session)
     if len(story.strip()) < 20:
         raise HTTPException(400, "Hikaye metni cok kisa")
-    mod = tur if tur in ("animasyon", "documentary") else "documentary"
-    # edit: animasyonda ANIMASYON_STILLERI'nden, documentary'de EDIT_STILLERI'nden secilir
+    mod = tur if tur in ("animasyon", "documentary", "hikaye") else "documentary"
+    # edit: turun kendi stil sozlugunden secilir
     if mod == "animasyon":
         edit_id = edit if edit in pipeline.ANIMASYON_STILLERI else pipeline.VARSAYILAN_ANIM
+    elif mod == "hikaye":
+        edit_id = edit if edit in pipeline.HIKAYE_STILLERI else pipeline.VARSAYILAN_HIKAYE
     else:
         edit_id = edit if edit in pipeline.EDIT_STILLERI else pipeline.VARSAYILAN_EDIT
     try:
