@@ -246,7 +246,8 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
     else:
         edit_id = edit if edit in pipeline.EDIT_STILLERI else pipeline.VARSAYILAN_EDIT
     try:
-        sd = max(0.3, min(14.0, float(sure_dk)))
+        # Sure tavani ture gore: hikaye kanali 60 dk, diger turler 14 dk (pipeline ile ayni)
+        sd = max(0.3, min(60.0 if mod == "hikaye" else 14.0, float(sure_dk)))
     except Exception:
         sd = 2.0
     gecis_acik = _bayrak(gecis)

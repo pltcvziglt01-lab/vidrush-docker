@@ -880,7 +880,7 @@ def plan_uret(story: str, prof: dict, hedef_sahne=40, devam=False, onceki_ozet="
 
 
 # Uzun video (30 dk'ya kadar): parca parca planla, sahneleri birlestir.
-MAKS_SAHNE = 420   # ~30 dk tavani (maliyet/render sinir)
+MAKS_SAHNE = 620   # ~60 dk hikaye tavani (6 sn/sahne x 600 + pay). Maliyet siniri sure tavaninda.
 
 
 def uzun_plan(story: str, prof: dict, sure_dk: float) -> dict:
@@ -1041,7 +1041,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                ilerle=None, profil_id: str = "", altyazi_sablon: str = "",
                altyazi_ac: str = "") -> dict:
     """Tam hat. mod: 'animasyon'|'documentary'. stil_yol: referans stil gorseli (opsiyonel).
-    sure_dk: hedef sure (maks 14). gecis_acik/zoom_acik: kullanicinin gecis/zoom tercihi.
+    sure_dk: hedef sure (hikaye maks 60, digerleri maks 14). gecis_acik/zoom_acik: kullanicinin tercihi.
     profil_id: KANAL PROFILI — verilirse karakter/capa/kilitler profilden gelir ve tum
     videolar ayni gorunur (evergreen kanal tutarliligi). Footage/Magnific plana gore OTOMATIK."""
     def bildir(mesaj, yuzde):
@@ -1080,7 +1080,10 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # Maliyet/kalite: animasyon (duz vektor) ucuz mini, documentary (foto-gercekci) gpt-image-2
     gorsel_model = GORSEL_MODEL_ANIM if mod == "animasyon" else GORSEL_MODEL_DOC
     yt_once = True
-    sure_dk = max(0.3, min(14.0, float(sure_dk or 2)))   # 14 dk tavan
+    # Sure tavani: hikaye kanali 60 dk (uzun hikaye formati), diger turler 14 dk.
+    # DIKKAT: 60 dk hikaye = ~600 sahne gorseli + 2 vCPU'da ~10-12 saat render.
+    tavan_dk = 60.0 if mod == "hikaye" else 14.0
+    sure_dk = max(0.3, min(tavan_dk, float(sure_dk or 2)))
 
     # ── Karakter + STIL kilitleri ──
     # PROFIL VARSA: kayitli referans/kilitler kullanilir -> hem videolar arasi TUTARLILIK,
@@ -1270,9 +1273,10 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         komut.append(f"--browser-executable={os.environ['REMOTION_BROWSER_EXECUTABLE']}")
     if os.environ.get("REMOTION_GL"):
         komut.append(f"--gl={os.environ['REMOTION_GL']}")
-    # Render suresi videoya gore olcekli: min 30dk, video dakikasi basina ~12dk duvar,
-    # tavan 5 saat. Uzun 1080p videoda sabit 5400s yetmiyordu (TimeoutExpired -> is coku).
-    render_timeout = int(min(18000, max(1800, sure_dk * 720)))
+    # Render suresi videoya gore olcekli: min 30dk, video dakikasi basina ~12dk duvar.
+    # Tavan 13 saat: 60 dk hikaye 2 vCPU'da ~10-12 saat surer; eski 5 saat tavani
+    # 14 dk'lik videoda bile kil payiydi (2s45d gercek olcum), uzunu kesinlikle olduruyordu.
+    render_timeout = int(min(46800, max(1800, sure_dk * 720)))
     try:
         sonuc = subprocess.run(komut, cwd=STUDYO, capture_output=True, text=True,
                                timeout=render_timeout)

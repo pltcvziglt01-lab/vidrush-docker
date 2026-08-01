@@ -212,7 +212,7 @@
           <div>
             <div class="durum" style="margin-bottom:8px">Süre: <b id="sureLbl">2 dk</b></div>
             <input type="range" id="sure" min="1" max="14" step="1" value="2" style="width:220px;accent-color:var(--acc)">
-            <div class="durum" style="font-size:11px;margin-top:4px">1–14 dk. Uzun sürede render dakikalarca sürebilir.</div>
+            <div class="durum" id="sureHint" style="font-size:11px;margin-top:4px">1–14 dk. Uzun sürede render dakikalarca sürebilir.</div>
           </div>
           <div class="switch on" id="swGecis" style="margin-top:4px">
             <span class="tr"></span><span>Geçişler<small>kapalıysa sade kesme</small></span>
@@ -473,6 +473,15 @@ $$("#turler .estil").forEach(c=>c.onclick=()=>{
   $("#editWrap").style.display = (videoTur==="documentary") ? "" : "none";
   const aw=$("#animWrap"); if(aw) aw.style.display = (videoTur==="animasyon") ? "" : "none";
   const hw=$("#hikayeWrap"); if(hw) hw.style.display = (videoTur==="hikaye") ? "" : "none";
+  /* sure tavani ture gore: hikaye 60 dk, digerleri 14 dk (sunucu da ayni siniri uygular) */
+  const maxDk = (videoTur==="hikaye") ? 60 : 14;
+  const s=$("#sure"); s.max=maxDk;
+  if(+s.value>maxDk){ s.value=maxDk; }
+  sureDk=+s.value; $("#sureLbl").textContent=sureDk+" dk";
+  const h=$("#sureHint");
+  if(h) h.textContent = (videoTur==="hikaye")
+    ? "1–60 dk. DİKKAT: uzun hikayede render SAATLER sürer (60 dk ≈ 10-12 saat) ve görsel maliyeti artar."
+    : "1–14 dk. Uzun sürede render dakikalarca sürebilir.";
 });
 
 /* krediler */
