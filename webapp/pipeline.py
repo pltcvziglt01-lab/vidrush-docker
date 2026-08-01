@@ -1849,44 +1849,65 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
 
     ham = os.path.join(STUDYO, "out", f"{is_adi}.mp4")
     os.makedirs(os.path.join(STUDYO, "out"), exist_ok=True)
+
+    # ── HIZLI MOTOR (ffmpeg, Chrome'suz — ~8x hizli) ──
+    # Acma: env RENDER_MOTOR=ffmpeg VEYA /opt/vidrush/RENDER_MOTOR dosyasina "ffmpeg" yaz
+    # (docker exec ile konteyner yeniden yaratmadan). Kapsam disi is/hata -> Remotion'a duser.
+    motor = os.environ.get("RENDER_MOTOR", "")
+    if not motor:
+        try:
+            with open("/opt/vidrush/RENDER_MOTOR") as f:
+                motor = f.read().strip()
+        except Exception:
+            motor = ""
+    hizli_ok = False
+    if motor == "ffmpeg":
+        try:
+            import hizli_render
+            hizli_ok = hizli_render.ffmpeg_render(is_adi, props, ham, ilerle=bildir)
+        except Exception as e:
+            print(f"  hizli motor hata: {str(e)[:200]}", file=sys.stderr)
+        if not hizli_ok:
+            print("  hizli motor kullanilamadi -> Remotion ile devam", file=sys.stderr)
+
     # Full HD 1080p 16:9 (kompozisyon 1920x1080, scale YOK). Web aracinda boyut limiti yok.
     # concurrency ortamdan (Hetzner cok cekirdek): REMOTION_CONCURRENCY.
     konk = os.environ.get("REMOTION_CONCURRENCY", "1")
-    komut = ["npx", "remotion", "render", "src/index.ts", "VidrushVideo", ham,
-             f"--props={props_yolu}", f"--concurrency={konk}", "--timeout=180000",
-             # HD indirme: crf 23 -> 18 (bit hizi ~3 Mbps'ten ~8-10 Mbps'e cikar, YouTube 1080p
-             # onerisi 8 Mbps). Render suresine etkisi kucuk (darbogaz Chromium kare uretimi).
-             # jpeg-quality 100 = kare yakalama kaybi yok.
-             f"--crf={os.environ.get('RENDER_CRF','18')}", "--x264-preset=faster",
-             # 100->90: kare yakalama belirgin hizlanir, gozle gorulur kalite farki yok
-             "--jpeg-quality=90"]
-    if os.environ.get("REMOTION_BROWSER_EXECUTABLE"):
-        komut.append(f"--browser-executable={os.environ['REMOTION_BROWSER_EXECUTABLE']}")
-    if os.environ.get("REMOTION_GL"):
-        komut.append(f"--gl={os.environ['REMOTION_GL']}")
-    # Render suresi videoya gore olcekli: min 30dk, video dakikasi basina ~12dk duvar.
-    # Tavan 13 saat: 60 dk hikaye 2 vCPU'da ~10-12 saat surer; eski 5 saat tavani
-    # 14 dk'lik videoda bile kil payiydi (2s45d gercek olcum), uzunu kesinlikle olduruyordu.
-    render_timeout = int(min(46800, max(1800, sure_dk * 720)))
-    try:
-        sonuc = subprocess.run(komut, cwd=STUDYO, capture_output=True, text=True,
-                               timeout=render_timeout)
-    except subprocess.TimeoutExpired as e:
-        # yetim remotion/chromium cocuklarini temizle ki kuyruk tikanmasin
+    if not hizli_ok:
+        komut = ["npx", "remotion", "render", "src/index.ts", "VidrushVideo", ham,
+                 f"--props={props_yolu}", f"--concurrency={konk}", "--timeout=180000",
+                 # HD indirme: crf 23 -> 18 (bit hizi ~3 Mbps'ten ~8-10 Mbps'e cikar, YouTube 1080p
+                 # onerisi 8 Mbps). Render suresine etkisi kucuk (darbogaz Chromium kare uretimi).
+                 # jpeg-quality 100 = kare yakalama kaybi yok.
+                 f"--crf={os.environ.get('RENDER_CRF','18')}", "--x264-preset=faster",
+                 # 100->90: kare yakalama belirgin hizlanir, gozle gorulur kalite farki yok
+                 "--jpeg-quality=90"]
+        if os.environ.get("REMOTION_BROWSER_EXECUTABLE"):
+            komut.append(f"--browser-executable={os.environ['REMOTION_BROWSER_EXECUTABLE']}")
+        if os.environ.get("REMOTION_GL"):
+            komut.append(f"--gl={os.environ['REMOTION_GL']}")
+        # Render suresi videoya gore olcekli: min 30dk, video dakikasi basina ~12dk duvar.
+        # Tavan 13 saat (60 dk hikaye eski 2 vCPU'da ~10-12 saatti; hizli motor bunu asmaz zaten).
+        render_timeout = int(min(46800, max(1800, sure_dk * 720)))
         try:
-            subprocess.run(["pkill", "-9", "-f", "remotion"], timeout=20)
-            subprocess.run(["pkill", "-9", "-f", "chrome"], timeout=20)
-        except Exception:
-            pass
-        cikti = (e.stderr or b"")
-        if isinstance(cikti, bytes):
-            cikti = cikti.decode("utf-8", "ignore")
-        print(cikti[-2000:], file=sys.stderr)
-        raise RuntimeError(f"Render zaman aşımına uğradı ({render_timeout//60} dk). "
-                           "Daha kısa süre deneyin.")
-    if sonuc.returncode != 0:
-        print(sonuc.stderr[-2000:], file=sys.stderr)
-        raise RuntimeError("Remotion render basarisiz")
+            sonuc = subprocess.run(komut, cwd=STUDYO, capture_output=True, text=True,
+                                   timeout=render_timeout)
+        except subprocess.TimeoutExpired as e:
+            # yetim remotion/chromium cocuklarini temizle ki kuyruk tikanmasin
+            try:
+                subprocess.run(["pkill", "-9", "-f", "remotion"], timeout=20)
+                subprocess.run(["pkill", "-9", "-f", "chrome"], timeout=20)
+            except Exception:
+                pass
+            cikti = (e.stderr or b"")
+            if isinstance(cikti, bytes):
+                cikti = cikti.decode("utf-8", "ignore")
+            print(cikti[-2000:], file=sys.stderr)
+            raise RuntimeError(f"Render zaman aşımına uğradı ({render_timeout//60} dk). "
+                               "Daha kısa süre deneyin.")
+        if sonuc.returncode != 0:
+            print(sonuc.stderr[-2000:], file=sys.stderr)
+            raise RuntimeError("Remotion render basarisiz")
 
     bildir("Tamamlanıyor...", 96)
     son_video = os.path.join(CIKTI_DIR, f"{is_adi}.mp4")
