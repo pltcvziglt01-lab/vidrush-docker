@@ -62,7 +62,22 @@
   /* edit stil kartları */
   .refs{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .estiller{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  /* Altyazı önizlemesi GERÇEK fontla çizilsin (render'daki fontların aynısı) */
+  @font-face{font-family:Montserrat;src:url("fonts/Montserrat-Bold.ttf") format("truetype");font-weight:100 900;font-display:swap}
+  @font-face{font-family:Anton;src:url("fonts/Anton-Regular.ttf") format("truetype");font-display:swap}
+  @font-face{font-family:"Bebas Neue";src:url("fonts/BebasNeue-Regular.ttf") format("truetype");font-display:swap}
+  @font-face{font-family:Poppins;src:url("fonts/Poppins-Bold.ttf") format("truetype");font-display:swap}
+  @font-face{font-family:Oswald;src:url("fonts/Oswald-Bold.ttf") format("truetype");font-weight:100 900;font-display:swap}
   .lbl2{font-size:13px;font-weight:600;color:var(--dim);margin:2px 0 12px}
+  /* altyazı ince ayar kontrolleri */
+  .ay{display:flex;flex-direction:column;gap:7px;font-size:12px;color:var(--dim);font-weight:600}
+  .ay>span{display:flex;justify-content:space-between;align-items:center}
+  .ay>span b{color:var(--txt);font-family:ui-monospace,Menlo,monospace;font-size:11px}
+  .ay select{background:#0e1117;border:1px solid var(--line);color:var(--txt);border-radius:9px;
+    padding:9px 10px;font:inherit;font-size:12.5px;font-weight:500}
+  .ay input[type=range]{accent-color:var(--acc);width:100%}
+  .ay input[type=color]{width:100%;height:36px;background:#0e1117;border:1px solid var(--line);
+    border-radius:9px;padding:3px;cursor:pointer}
   .estil{background:var(--card2);border:1.5px solid var(--line);border-radius:14px;padding:16px;
     cursor:pointer;transition:.15s;position:relative}
   .estil:hover{border-color:var(--acc)}
@@ -204,6 +219,21 @@
         <div id="hikayeWrap" style="display:none">
           <div class="durum" style="margin-top:10px;font-size:11px">📖 Hazır hikaye metnini yapıştır. İlk ~2,5 dakika <b>yoğun hareketli açılış</b> (izleyiciyi tutmak için), sonrası efektli sinematik kareler + altyazı.<br>🧍 <b>Karakter</b>: yukarıya görsel yüklersen her sahnede birebir o; <b>yüklemesen de</b> karakter baştan sona otomatik aynı tutulur.<br>🎨 <b>Görsel tarzı</b>: yukarıdaki "Stil görseli" alanına örnek bir fotoğraf yüklersen bütün sahneler <b>o fotoğrafın tarzında</b> üretilir (yüklemezsen sinematik film karesi stili).</div>
         </div>
+
+        <!-- ══ RENK PALETİ: kanal genelinde sabit renk kimliği ══ -->
+        <div style="margin-top:22px;border-top:1px solid var(--line);padding-top:18px">
+          <div class="lbl2">🎨 Renk paleti <span style="font-weight:400;color:var(--dim2)">— kanalın renk kimliği, her videoda aynı</span></div>
+          <div class="estiller" id="paletler"><span class="durum">Yükleniyor...</span></div>
+          <div id="ozelPaletWrap" style="display:none;margin-top:14px;padding:14px;border-radius:12px;
+               border:1px solid var(--line);background:#14141c">
+            <div class="durum" style="margin-bottom:10px;font-size:12px">Kendi renklerin — en az 2, en fazla 6:</div>
+            <div id="ozelRenkler" style="display:flex;gap:10px;flex-wrap:wrap"></div>
+          </div>
+          <div class="durum" style="margin-top:10px;font-size:11px">
+            Palet <b>kesin HEX kodu</b> olarak prompta girer (kelimeyle tarif değil) — bu yüzden sahneler arası renk kaymaz.
+            Palet <b>dünyayı</b> yönetir; ana karakterin kendi kilitli renkleri her zaman önceliklidir.
+          </div>
+        </div>
       </div>
 
       <div class="card">
@@ -224,9 +254,65 @@
             <span class="tr"></span><span>Altyazı<small>konuşmayı ekrana yaz</small></span>
           </div>
         </div>
-        <div id="altyaziWrap" style="display:none;margin-top:16px">
-          <div class="lbl2">🔤 Altyazı şablonu</div>
+        <div id="altyaziWrap" style="display:none;margin-top:18px">
+          <div class="lbl2">🔤 Hazır şablonlar <span style="font-weight:400;color:var(--dim2)">— YouTube'da yaygın kullanılanlar</span></div>
           <div class="estiller" id="altSablonlar"><span class="durum">Yükleniyor...</span></div>
+
+          <!-- CANLI ÖNİZLEME -->
+          <div style="margin-top:18px">
+            <div class="lbl2">👁️ Canlı önizleme</div>
+            <div id="altOnizleme" style="position:relative;border-radius:14px;overflow:hidden;
+                 border:1px solid var(--line);aspect-ratio:16/9;max-height:260px;
+                 background:linear-gradient(140deg,#2c3e50 0%,#4a6572 40%,#8a7f6d 100%);
+                 display:flex;align-items:flex-end;justify-content:center">
+              <div id="altOnizYazi" style="margin-bottom:9%;max-width:84%;text-align:center"></div>
+            </div>
+            <div class="durum" style="font-size:11px;margin-top:6px">Görseldeki gibi videoda da böyle görünecek.</div>
+          </div>
+
+          <!-- İNCE AYAR -->
+          <div class="lbl2" style="margin-top:20px">🎛️ İnce ayar</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px">
+            <label class="ay"><span>Font</span>
+              <select id="ayFont">
+                <option value="montserrat">Montserrat (kalın, modern)</option>
+                <option value="anton">Anton (çok kalın, viral)</option>
+                <option value="bebas">Bebas Neue (dar, uzun)</option>
+                <option value="poppins">Poppins (yuvarlak)</option>
+                <option value="oswald">Oswald (ince, sinematik)</option>
+              </select></label>
+            <label class="ay"><span>Boyut <b id="ayBoyutV">52</b>px</span>
+              <input type="range" id="ayBoyut" min="28" max="96" step="2" value="52"></label>
+            <label class="ay"><span>Kalınlık <b id="ayAgirlikV">800</b></span>
+              <input type="range" id="ayAgirlik" min="300" max="900" step="100" value="800"></label>
+            <label class="ay"><span>Yazı rengi</span>
+              <input type="color" id="ayRenk" value="#ffffff"></label>
+            <label class="ay"><span>Kontur (kenar) rengi</span>
+              <input type="color" id="ayKonturRenk" value="#000000"></label>
+            <label class="ay"><span>Kontur kalınlığı <b id="ayKonturV">5</b>px</span>
+              <input type="range" id="ayKontur" min="0" max="14" step="1" value="5"></label>
+            <label class="ay"><span>Konum</span>
+              <select id="ayKonum">
+                <option value="alt">Alt (klasik)</option>
+                <option value="orta">Orta (kısa video tarzı)</option>
+                <option value="ust">Üst</option>
+              </select></label>
+            <label class="ay"><span>Arka plan kutusu</span>
+              <select id="ayArka">
+                <option value="yok">Yok (şeffaf)</option>
+                <option value="rgba(0,0,0,0.72)">Siyah kutu</option>
+                <option value="rgba(0,0,0,0.45)">Hafif siyah</option>
+                <option value="rgba(255,212,0,0.95)">Sarı kutu</option>
+                <option value="rgba(255,255,255,0.92)">Beyaz kutu</option>
+              </select></label>
+            <label class="ay"><span>Harf aralığı <b id="ayAralikV">0</b></span>
+              <input type="range" id="ayAralik" min="-1" max="6" step="0.5" value="0"></label>
+          </div>
+          <div class="opt" style="margin-top:14px">
+            <div class="switch" id="swBuyukHarf"><span class="tr"></span><span>BÜYÜK HARF<small>tümü kapital</small></span></div>
+            <div class="switch on" id="swGolge"><span class="tr"></span><span>Gölge<small>yumuşak dış gölge</small></span></div>
+            <button class="btn ghost" id="btnAltSifirla" style="padding:9px 18px;font-size:13px">↺ Şablona dön</button>
+          </div>
         </div>
       </div>
 
@@ -307,6 +393,11 @@ let sureDk=2, gecisAcik=true, zoomAcik=true;
 /* animStil/animListe BURADA tanimlanmali: pfOzetGuncelle() asagida hemen cagriliyor ve bunlari
    okuyor — tanim daha asagida kalirsa TDZ ReferenceError ile TUM script olur (hicbir sey secilemez) */
 let animStil=null, animListe=[];
+/* renk paleti — pfOzetGuncelle bunlari da okuyor, TDZ olmasin diye BURADA */
+let seciliPalet = localStorage.getItem("bedosaho_palet") || "otomatik";
+let paletListe = [];
+let ozelHex = (localStorage.getItem("bedosaho_palet_ozel") || "#F0E4CC,#7B8B5A,#B5651D,#7A97B8")
+                .split(",").filter(Boolean);
 
 /* nav */
 $$(".nav").forEach(n=>n.onclick=()=>{
@@ -332,25 +423,88 @@ $("#sure").addEventListener("input",e=>{sureDk=+e.target.value; $("#sureLbl").te
 $("#swGecis").onclick=()=>{gecisAcik=!gecisAcik; $("#swGecis").classList.toggle("on",gecisAcik);};
 $("#swZoom").onclick=()=>{zoomAcik=!zoomAcik; $("#swZoom").classList.toggle("on",zoomAcik);};
 
-/* ── altyazı: aç/kapat + şablon ── */
-let altyaziAcik=false, altSablon="klasik";
-const ALT_EMOJI={klasik:"⬛",youtube:"🟡",temiz:"⚪",kalin:"🟨",sinema:"🎞️"};
+/* ── ALTYAZI STÜDYOSU: aç/kapat + şablon + ince ayar + canlı önizleme ── */
+let altyaziAcik=false, altSablon="beyaz-kontur", altSablonlar={};
+const ALT_EMOJI={"beyaz-kontur":"⚪","youtube-sari":"🟡",hormozi:"💥","klasik-kutu":"⬛",
+                 "sari-kutu":"🟨",sinematik:"🎞️",podcast:"🎙️",temiz:"✨"};
+const FONT_CSS={montserrat:"Montserrat",anton:"Anton",bebas:"'Bebas Neue'",
+                poppins:"Poppins",oswald:"Oswald"};
+// canlı ayar (şablon seçilince doldurulur, kullanıcı tek tek değiştirebilir)
+let ay={font:"montserrat",boyut:52,agirlik:800,renk:"#ffffff",konturRenk:"#000000",
+        konturKalinlik:5,arka:"yok",konum:"alt",buyukHarf:false,golge:true,harfAralik:0};
+
 $("#swAltyazi").onclick=()=>{
   altyaziAcik=!altyaziAcik;
   $("#swAltyazi").classList.toggle("on",altyaziAcik);
   $("#altyaziWrap").style.display = altyaziAcik ? "" : "none";
 };
+
+function ayarlariFormaYaz(){
+  $("#ayFont").value=ay.font; $("#ayBoyut").value=ay.boyut; $("#ayAgirlik").value=ay.agirlik;
+  $("#ayRenk").value=ay.renk; $("#ayKonturRenk").value=ay.konturRenk;
+  $("#ayKontur").value=ay.konturKalinlik; $("#ayKonum").value=ay.konum;
+  $("#ayArka").value=ay.arka; $("#ayAralik").value=ay.harfAralik;
+  $("#swBuyukHarf").classList.toggle("on",ay.buyukHarf);
+  $("#swGolge").classList.toggle("on",ay.golge);
+  onizlemeCiz();
+}
+function formdanAyarOku(){
+  ay.font=$("#ayFont").value; ay.boyut=+$("#ayBoyut").value; ay.agirlik=+$("#ayAgirlik").value;
+  ay.renk=$("#ayRenk").value; ay.konturRenk=$("#ayKonturRenk").value;
+  ay.konturKalinlik=+$("#ayKontur").value; ay.konum=$("#ayKonum").value;
+  ay.arka=$("#ayArka").value; ay.harfAralik=+$("#ayAralik").value;
+  onizlemeCiz();
+}
+function onizlemeCiz(){
+  $("#ayBoyutV").textContent=ay.boyut; $("#ayAgirlikV").textContent=ay.agirlik;
+  $("#ayKonturV").textContent=ay.konturKalinlik; $("#ayAralikV").textContent=ay.harfAralik;
+  const kutulu = ay.arka!=="yok";
+  const kap=$("#altOnizleme"), e=$("#altOnizYazi");
+  kap.style.alignItems = ay.konum==="ust"?"flex-start":(ay.konum==="orta"?"center":"flex-end");
+  e.style.marginBottom = ay.konum==="alt"?"9%":"0";
+  e.style.marginTop = ay.konum==="ust"?"11%":"0";
+  // önizleme kutusu ~470px genişlik ≈ 1920'nin %24'ü → ölçek
+  const k=0.245;
+  const metin="Bu bir örnek altyazı satırıdır";
+  e.innerHTML=`<span style="
+    display:inline-block;
+    font-family:${FONT_CSS[ay.font]||"Montserrat"},sans-serif;
+    font-size:${Math.max(9,ay.boyut*k)}px;
+    font-weight:${ay.agirlik};
+    letter-spacing:${ay.harfAralik*k}px;
+    line-height:1.22;
+    color:${ay.renk};
+    background:${kutulu?ay.arka:"transparent"};
+    padding:${kutulu?"4px 9px":"0"};
+    border-radius:${kutulu?"5px":"0"};
+    -webkit-text-stroke:${ay.konturKalinlik>0?(ay.konturKalinlik*k).toFixed(2)+"px "+ay.konturRenk:"0"};
+    paint-order:stroke fill;
+    text-shadow:${ay.golge?"0 2px 5px rgba(0,0,0,.75)":"none"};
+  ">${ay.buyukHarf?metin.toLocaleUpperCase("tr-TR"):metin}</span>`;
+}
+["ayFont","ayBoyut","ayAgirlik","ayRenk","ayKonturRenk","ayKontur","ayKonum","ayArka","ayAralik"]
+  .forEach(id=>{const el=$("#"+id); if(el) el.oninput=formdanAyarOku;});
+$("#swBuyukHarf").onclick=()=>{ay.buyukHarf=!ay.buyukHarf; $("#swBuyukHarf").classList.toggle("on",ay.buyukHarf); onizlemeCiz();};
+$("#swGolge").onclick=()=>{ay.golge=!ay.golge; $("#swGolge").classList.toggle("on",ay.golge); onizlemeCiz();};
+$("#btnAltSifirla").onclick=()=>{ if(altSablonlar[altSablon]) { ay={...altSablonlar[altSablon].ayar}; ayarlariFormaYaz(); } };
+
 fetch("api/altyazi-sablonlari").then(r=>r.json()).then(list=>{
   const c=$("#altSablonlar"); c.innerHTML="";
   list.forEach((s,i)=>{
-    if(i===0) altSablon=s.id;
+    altSablonlar[s.id]=s;
+    if(i===0){ altSablon=s.id; ay={...s.ayar}; }
     const d=document.createElement("div");
     d.className="estil"+(i===0?" on":""); d.dataset.id=s.id;
     d.innerHTML=`<span class="pick"></span><span class="en">${ALT_EMOJI[s.id]||"🔤"}</span>
       <b>${s.ad}</b><p>${s.ozet}</p><div class="meta">${s.font}</div>`;
-    d.onclick=()=>{altSablon=s.id; $$("#altSablonlar .estil").forEach(x=>x.classList.toggle("on",x.dataset.id===s.id));};
+    d.onclick=()=>{
+      altSablon=s.id; ay={...s.ayar};
+      $$("#altSablonlar .estil").forEach(x=>x.classList.toggle("on",x.dataset.id===s.id));
+      ayarlariFormaYaz();
+    };
     c.appendChild(d);
   });
+  ayarlariFormaYaz();
 }).catch(()=>{$("#altSablonlar").innerHTML='<span class="durum">şablonlar yüklenemedi</span>';});
 
 /* ── kanal profili ── */
@@ -389,7 +543,8 @@ function pfOzetGuncelle(){
     sat(true, `<b>Video türü:</b> ${({animasyon:"Animasyon",documentary:"Documentary",hikaye:"Hikaye"})[videoTur]||videoTur} · ${stilAd}`),
     sat(!!karFile, `<b>Ana karakter görseli:</b> ${karFile?karFile.name:"yüklenmedi (sistem kendi karakterini üretir)"}`),
     sat(!!stilFile, `<b>Genel görsel stil:</b> ${stilFile?stilFile.name:"yüklenmedi (stilin ilk videoda kilitlenir)"}`),
-    sat(altyaziAcik, `<b>Altyazı:</b> ${altyaziAcik?altSablon:"kapalı"}`),
+    sat(altyaziAcik, `<b>Altyazı:</b> ${altyaziAcik?((altSablonlar[altSablon]||{}).ad||altSablon)+" (özelleştirilmiş)":"kapalı"}`),
+    sat(seciliPalet!=="otomatik", `<b>Renk paleti:</b> ${seciliPalet==="otomatik"?"otomatik (stilin kendi renkleri)":(seciliPalet==="ozel"?("Özel — "+ozelHex.join(" ")):((paletListe.find(x=>x.id===seciliPalet)||{}).ad||seciliPalet))}`),
   ].map(s=>`<div>${s}</div>`).join("");
 }
 function secProfil(pid){
@@ -407,7 +562,8 @@ $("#btnProfil").onclick=async()=>{
   fd.append("pid",pid); fd.append("ad",($("#pfAd").value||pid).trim());
   fd.append("tur",videoTur);
   fd.append("edit", videoTur==="animasyon" ? (animStil||"") : (editStil||""));
-  fd.append("altyazi_sablon", altyaziAcik ? altSablon : "");
+  fd.append("altyazi_sablon", altyaziAcik ? JSON.stringify(ay) : "");
+  fd.append("palet", seciliPalet||""); fd.append("palet_ozel", ozelHex.join(","));
   if(karFile) fd.append("karakter",karFile);
   if(stilFile) fd.append("stil",stilFile);
   $("#btnProfil").disabled=true;
@@ -418,6 +574,54 @@ $("#btnProfil").onclick=async()=>{
   }catch(e){ hata("Profil oluşturulamadı"); }
   $("#btnProfil").disabled=false;
 };
+
+/* ── renk paleti ── */
+function paletSeritHtml(renkler){
+  if(!renkler || !renkler.length) return '<span style="font-size:11px;color:var(--dim2)">stile bağlı</span>';
+  return '<span style="display:inline-flex;border-radius:5px;overflow:hidden;border:1px solid #0006">'
+    + renkler.map(h=>`<i style="width:17px;height:17px;background:${h};display:block"></i>`).join("")
+    + '</span>';
+}
+function ozelRenkleriCiz(){
+  const c=$("#ozelRenkler"); if(!c) return; c.innerHTML="";
+  for(let i=0;i<6;i++){
+    const val = ozelHex[i] || "";
+    const kutu=document.createElement("div");
+    kutu.style.cssText="display:flex;flex-direction:column;align-items:center;gap:5px";
+    kutu.innerHTML=`<input type="color" value="${val||"#888888"}"
+        style="width:44px;height:34px;border:1px solid var(--line);border-radius:8px;
+               background:#0f0f16;cursor:pointer;padding:2px;${val?"":"opacity:.35"}">
+      <span style="font-size:9px;color:var(--dim2);font-family:monospace">${val||"boş"}</span>`;
+    const inp=kutu.querySelector("input");
+    inp.oninput=()=>{ ozelHex[i]=inp.value.toUpperCase(); ozelHex=ozelHex.filter(Boolean);
+                      localStorage.setItem("bedosaho_palet_ozel", ozelHex.join(","));
+                      ozelRenkleriCiz(); paletleriCiz(); };
+    c.appendChild(kutu);
+  }
+}
+function secPalet(pid){
+  seciliPalet=pid; localStorage.setItem("bedosaho_palet",pid);
+  $$("#paletler .estil").forEach(x=>x.classList.toggle("on",(x.dataset.id||"")===pid));
+  const w=$("#ozelPaletWrap"); if(w) w.style.display = pid==="ozel" ? "block" : "none";
+  if(pid==="ozel") ozelRenkleriCiz();
+}
+function paletleriCiz(){
+  const c=$("#paletler"); if(!c) return; c.innerHTML="";
+  const hepsi = paletListe.concat([{id:"ozel", ad:"Özel (kendi renklerim)",
+                                    ozet:"6 renge kadar kendin seç", renkler:ozelHex}]);
+  hepsi.forEach(p=>{
+    const d=document.createElement("div");
+    d.className="estil"+(seciliPalet===p.id?" on":""); d.dataset.id=p.id;
+    d.innerHTML=`<span class="pick"></span><b>${p.ad}</b>
+      <div style="margin:7px 0 5px">${paletSeritHtml(p.renkler)}</div>
+      <span class="durum" style="font-size:11px">${p.ozet||""}</span>`;
+    d.onclick=()=>secPalet(p.id);
+    c.appendChild(d);
+  });
+}
+fetch("api/paletler").then(r=>r.json()).then(list=>{
+  paletListe=list; paletleriCiz(); secPalet(seciliPalet);
+}).catch(()=>{$("#paletler").innerHTML='<span class="durum">paletler yüklenemedi</span>';});
 
 /* edit stilleri */
 const EMOJI={"sinematik-belgesel":"🎬","anlati-video-essay":"📜","hizli-explainer":"⚡"};
@@ -522,8 +726,11 @@ $("#btnUret").onclick=async()=>{
   if(videoTur==="animasyon" && animStil) fd.append("edit",animStil);
   fd.append("sure_dk",sureDk); fd.append("gecis",gecisAcik?"1":"0"); fd.append("zoom",zoomAcik?"1":"0");
   fd.append("altyazi", altyaziAcik?"1":"0");
-  if(altyaziAcik) fd.append("altyazi_sablon", altSablon);
+  if(altyaziAcik) fd.append("altyazi_sablon", JSON.stringify(ay));
   if(seciliProfil) fd.append("profil", seciliProfil);
+  if(seciliPalet && seciliPalet!=="otomatik"){
+    fd.append("palet", seciliPalet); fd.append("palet_ozel", ozelHex.join(","));
+  }
   if(karFile) fd.append("karakter",karFile);
   if(stilFile) fd.append("stil",stilFile);
   let job;

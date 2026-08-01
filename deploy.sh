@@ -11,18 +11,25 @@
 # Ayni anda ikiniz deploy ETMEYIN (tek konteyner — biriniz digerinin isini bozar).
 set -e
 
-IP="${BEDOSAHO_IP:-204.168.136.159}"
+# CANLI SUNUCU: RX-4 (10 vCPU) — 1 Agu 2026'da tasindi. Eski Hetzner (204.168.136.159)
+# artik kullanilmiyor; BEDOSAHO_IP ile gecici olarak baska hedefe deploy edilebilir.
+IP="${BEDOSAHO_IP:-185.23.17.240}"
 KEY="${BEDOSAHO_KEY:-$HOME/.ssh/bedosaho_hetzner}"
 SSH="ssh -i $KEY -o StrictHostKeyChecking=no -o ConnectTimeout=15 root@$IP"
 KOK="$(cd "$(dirname "$0")" && pwd)"
 
 [ -f "$KEY" ] || { echo "HATA: SSH anahtari yok: $KEY (Polat'tan iste)"; exit 1; }
 
-echo "== 1/5 Aktif render var mi (varsa bekle, isi bozma) =="
-N=$($SSH "docker exec bedosaho sh -c 'ps -eo args|grep -iE \"remotion render|chrome-headless\"|grep -v grep|wc -l'" 2>/dev/null || echo 0)
-if [ "$N" -gt 0 ]; then
-  echo "⚠️  Su an bir video render ediliyor. Deploy o isi OLDURUR. Once bitmesini bekle."
-  echo "   (yine de devam icin: FORCE=1 bash deploy.sh)"
+echo "== 1/5 Devam eden is var mi (varsa bekle, isi bozma) =="
+# ONEMLI: sadece render'a bakmak YETMEZ — is once ~10-40 dk GORSEL URETIM asamasinda gecirir
+# ve o sirada hicbir remotion/chrome sureci yoktur. Gercek kontrol: durum dosyalari.
+AKTIF=$($SSH "docker exec bedosaho sh -c 'grep -l \"\\\"durum\\\": \\\"uretiliyor\\\"\" /opt/vidrush/webapp/veri/durumlar/*.json 2>/dev/null | wc -l'" 2>/dev/null || echo 0)
+RENDER=$($SSH "docker exec bedosaho sh -c 'ps -eo args|grep -iE \"remotion render|chrome-headless\"|grep -v grep|wc -l'" 2>/dev/null || echo 0)
+if [ "${AKTIF:-0}" -gt 0 ] || [ "${RENDER:-0}" -gt 0 ]; then
+  echo "⚠️  DEPLOY DURDURULDU — su an bir video uretiliyor (aktif is: $AKTIF, render sureci: $RENDER)."
+  echo "   Deploy konteyneri yeniden baslatir ve o isi OLDURUR (harcanan kredi de bosa gider)."
+  echo "   Isin bitmesini bekle, sonra tekrar dene."
+  echo "   Gercekten zorlamak istersen: FORCE=1 bash deploy.sh"
   [ "${FORCE:-0}" = "1" ] || exit 2
 fi
 

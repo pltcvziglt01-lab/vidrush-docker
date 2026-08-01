@@ -63,6 +63,13 @@ def _durumlari_yukle():
                 if d.get("durum") in ("kuyrukta", "uretiliyor"):
                     d.update({"durum": "hata", "mesaj": "Sunucu yeniden başladı",
                               "hata": "Üretim sırasında sunucu yeniden başladı — lütfen videoyu tekrar başlatın."})
+                    # DISKE DE YAZ: aksi halde dosya sonsuza dek 'uretiliyor' kalir ve
+                    # deploy.sh'in "aktif is var" korumasi kalici olarak deploy'u engeller.
+                    try:
+                        with open(os.path.join(IS_DURUM_DIR, ad), "w", encoding="utf-8") as g:
+                            json.dump(d, g, ensure_ascii=False)
+                    except Exception:
+                        pass
                 isler[ad[:-5]] = d
             except Exception:
                 pass
@@ -139,21 +146,74 @@ def anim_listesi():
             for k, v in pipeline.ANIMASYON_STILLERI.items()]
 
 
+# Altyazi sablonlari — fontlar.ts'teki SABLONLAR ile AYNI olmali (tek dogruluk kaynagi burasi;
+# Video.tsx sablon adini da tam ayar nesnesini de kabul eder).
+ALTYAZI_SABLONLARI = [
+    {"id": "beyaz-kontur", "ad": "Beyaz Kontur", "font": "Montserrat",
+     "ozet": "Faceless kanalların en yaygını — beyaz + kalın siyah kenar",
+     "ayar": {"font": "montserrat", "boyut": 52, "agirlik": 800, "renk": "#ffffff",
+              "konturRenk": "#000000", "konturKalinlik": 5, "arka": "yok", "konum": "alt",
+              "buyukHarf": False, "golge": True, "harfAralik": 0}},
+    {"id": "youtube-sari", "ad": "YouTube Sarı", "font": "Anton",
+     "ozet": "MrBeast tarzı — kalın sarı, ağır siyah kontur, BÜYÜK HARF",
+     "ayar": {"font": "anton", "boyut": 68, "agirlik": 400, "renk": "#ffe000",
+              "konturRenk": "#000000", "konturKalinlik": 7, "arka": "yok", "konum": "alt",
+              "buyukHarf": True, "golge": True, "harfAralik": 1}},
+    {"id": "hormozi", "ad": "Hormozi", "font": "Poppins",
+     "ozet": "Kısa-video tarzı — çok kalın, büyük harf, orta konum",
+     "ayar": {"font": "poppins", "boyut": 64, "agirlik": 900, "renk": "#ffffff",
+              "konturRenk": "#000000", "konturKalinlik": 8, "arka": "yok", "konum": "orta",
+              "buyukHarf": True, "golge": True, "harfAralik": 0}},
+    {"id": "klasik-kutu", "ad": "Klasik Kutu", "font": "Montserrat",
+     "ozet": "Belgesel — koyu yarı saydam kutu, her zeminde okunur",
+     "ayar": {"font": "montserrat", "boyut": 46, "agirlik": 700, "renk": "#ffffff",
+              "konturRenk": "#000000", "konturKalinlik": 0, "arka": "rgba(0,0,0,0.72)",
+              "konum": "alt", "buyukHarf": False, "golge": True, "harfAralik": 0}},
+    {"id": "sari-kutu", "ad": "Sarı Kutu", "font": "Poppins",
+     "ozet": "Vurgulu explainer — sarı dolgu, koyu yazı",
+     "ayar": {"font": "poppins", "boyut": 50, "agirlik": 700, "renk": "#0a0a0a",
+              "konturRenk": "#000000", "konturKalinlik": 0, "arka": "rgba(255,212,0,0.95)",
+              "konum": "alt", "buyukHarf": True, "golge": False, "harfAralik": 0.5}},
+    {"id": "sinematik", "ad": "Sinematik", "font": "Oswald",
+     "ozet": "İnce, geniş harf aralığı — belgesel/film hissi",
+     "ayar": {"font": "oswald", "boyut": 44, "agirlik": 500, "renk": "#f2f2f2",
+              "konturRenk": "#000000", "konturKalinlik": 2, "arka": "yok", "konum": "alt",
+              "buyukHarf": False, "golge": True, "harfAralik": 1.5}},
+    {"id": "podcast", "ad": "Podcast", "font": "Bebas Neue",
+     "ozet": "Uzun, dar, iri harfler — sohbet/podcast klipleri",
+     "ayar": {"font": "bebas", "boyut": 72, "agirlik": 400, "renk": "#ffffff",
+              "konturRenk": "#000000", "konturKalinlik": 5, "arka": "yok", "konum": "alt",
+              "buyukHarf": True, "golge": True, "harfAralik": 2}},
+    {"id": "temiz", "ad": "Temiz Beyaz", "font": "Montserrat",
+     "ozet": "Kontursuz, sadece yumuşak gölge — minimal/modern",
+     "ayar": {"font": "montserrat", "boyut": 50, "agirlik": 700, "renk": "#ffffff",
+              "konturRenk": "#000000", "konturKalinlik": 0, "arka": "yok", "konum": "alt",
+              "buyukHarf": False, "golge": True, "harfAralik": 0}},
+]
+
+
 @app.get("/api/altyazi-sablonlari")
 def altyazi_sablonlari():
-    """Altyazi gorunum sablonlari (Video.tsx fontlar.ts ile ayni liste)."""
-    return [
-        {"id": "klasik", "ad": "Klasik Kutu", "font": "Montserrat",
-         "ozet": "Koyu yarı saydam kutu — her zeminde okunur"},
-        {"id": "youtube", "ad": "YouTube Sarı", "font": "Anton",
-         "ozet": "Kalın sarı, siyah konturlu — faceless/viral tarz"},
-        {"id": "temiz", "ad": "Temiz Beyaz", "font": "Montserrat",
-         "ozet": "Kutusuz beyaz, yumuşak gölge — modern"},
-        {"id": "kalin", "ad": "Kalın Kutu", "font": "Poppins",
-         "ozet": "Sarı dolgu kutu, büyük harf — vurgulu explainer"},
-        {"id": "sinema", "ad": "Sinematik", "font": "Oswald",
-         "ozet": "İnce, geniş harf aralığı — belgesel"},
-    ]
+    return ALTYAZI_SABLONLARI
+
+
+@app.get("/fonts/{dosya}")
+def font_ver(dosya: str):
+    """Gomulu altyazi fontlarini arayuze de sun — canli onizleme gercek fontla cizilsin."""
+    ad = os.path.basename(dosya)
+    if not ad.endswith(".ttf"):
+        raise HTTPException(404, "yok")
+    yol = os.path.join(pipeline.STUDYO, "public", "fonts", ad)
+    if not os.path.exists(yol):
+        raise HTTPException(404, "yok")
+    return FileResponse(yol, media_type="font/ttf",
+                        headers={"Cache-Control": "public, max-age=604800"})
+
+
+@app.get("/api/paletler")
+def paletler():
+    """Kanal renk paletleri — gorsel promptuna KESIN HEX olarak girer (kelimeyle tarif degil)."""
+    return [{"id": k, **v} for k, v in pipeline.PALETLER.items()]
 
 
 @app.get("/api/profiller")
@@ -166,6 +226,7 @@ def profil_listesi():
 async def profil_olustur(pid: str = Form(...), ad: str = Form(""),
                          tur: str = Form("animasyon"), edit: str = Form(""),
                          altyazi_sablon: str = Form(""),
+                         palet: str = Form(""), palet_ozel: str = Form(""),
                          karakter: UploadFile = File(None),
                          stil: UploadFile = File(None)):
     """Kanal profili olustur/guncelle. Karakter+stil gorselleri KALICI saklanir."""
@@ -191,8 +252,11 @@ async def profil_olustur(pid: str = Form(...), ad: str = Form(""),
         raise
     except Exception:
         raise HTTPException(400, "Görsel okunamadı (geçerli bir resim dosyası yükleyin)")
+    pal = palet.strip() if (palet.strip() in pipeline.PALETLER or palet.strip() == "ozel") else ""
     pipeline.profil_yaz(pid, {"ad": ad.strip() or pid, "tur": mod, "edit": eid,
-                              "altyazi_sablon": altyazi_sablon.strip() or None})
+                              "altyazi_sablon": altyazi_sablon.strip() or None,
+                              "palet": pal or None,
+                              "palet_ozel": palet_ozel.strip()[:80] or None})
     return pipeline.profil_oku(pid) and {"ok": True, "id": pid}
 
 
@@ -230,6 +294,8 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
                       profil: str = Form(""),
                       altyazi: str = Form(""),
                       altyazi_sablon: str = Form(""),
+                      palet: str = Form(""),
+                      palet_ozel: str = Form(""),
                       karakter: UploadFile = File(None),
                       stil: UploadFile = File(None)):
     """Karakter/stil gorselleri her video icin DOGRUDAN yuklenir (kalici kayit yok).
@@ -283,8 +349,10 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
     isler[is_id] = {"durum": "kuyrukta", "ilerleme": 0, "mesaj": "Sirada...",
                     "video": None, "kapak": None, "hata": None}
     _durum_kaydet(is_id)
+    pal = palet.strip() if (palet.strip() in pipeline.PALETLER or palet.strip() == "ozel") else ""
     is_kuyrugu.put((is_id, story.strip(), kar, stil_yol, mod, edit_id, sd, gecis_acik, zoom_acik,
-                    profil.strip(), altyazi.strip(), altyazi_sablon.strip()))
+                    profil.strip(), altyazi.strip(), altyazi_sablon.strip(),
+                    pal, palet_ozel.strip()[:80]))
     return {"job_id": is_id, "kuyruk": is_kuyrugu.qsize(), "tur": mod, "edit": edit_id,
             "profil": profil.strip()}
 
@@ -329,7 +397,7 @@ def cikti(dosya: str):
 
 
 def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom_acik,
-            profil_id="", altyazi="", altyazi_sablon=""):
+            profil_id="", altyazi="", altyazi_sablon="", palet="", palet_ozel=""):
     d = isler.get(is_id)
     if not d:
         return
@@ -339,12 +407,14 @@ def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom
     def ilerle(msg, yuzde):
         d["mesaj"] = msg
         d["ilerleme"] = yuzde
+        _durum_kaydet(is_id)   # diske de yaz: restart sonrasi gercek ilerleme gorunsun
 
     try:
         sonuc = asyncio.run(pipeline.uret(is_id, story, kar, stil_yol, mod, edit_id,
                                           sure_dk, gecis_acik, zoom_acik, ilerle,
                                           profil_id=profil_id, altyazi_sablon=altyazi_sablon,
-                                          altyazi_ac=altyazi))
+                                          altyazi_ac=altyazi, palet=palet,
+                                          palet_ozel=palet_ozel))
         d.update({"durum": "bitti", "ilerleme": 100, "mesaj": "Hazir!",
                   "video": "ciktilar/" + sonuc["video"],
                   "kapak": ("ciktilar/" + sonuc["kapak"]) if sonuc.get("kapak") else None,

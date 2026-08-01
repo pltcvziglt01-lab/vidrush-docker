@@ -257,6 +257,22 @@ def gemini_gorsel(prompt: str, ref_yollar: list, hedef: str, deneme: int = 4) ->
     return False
 
 
+
+def altyazi_ayar_coz(girdi):
+    """Altyazi ayari: JSON metni (tam ayar) VEYA sablon adi olabilir. Video.tsx ikisini de anlar.
+    Bozuk JSON gelirse sablon adi gibi davranir; hicbiri yoksa varsayilan sablon."""
+    g = (girdi or "").strip()
+    if not g:
+        return "beyaz-kontur"
+    if g.startswith("{"):
+        try:
+            d = json.loads(g)
+            return d if isinstance(d, dict) else "beyaz-kontur"
+        except Exception:
+            return "beyaz-kontur"
+    return g
+
+
 class BakiyeHatasi(RuntimeError):
     """Bakiye/limit hatasi. Retry ANLAMSIZ: hemen yukari firlar ki 40 sahne boyunca
     bosuna denenmesin ve o ana kadar URETILEN sahneler kurtarilabilsin."""
@@ -376,6 +392,65 @@ HIKAYE_ACILIS_SN = float(os.environ.get("HIKAYE_ACILIS_SN", "150"))
 # ───────── ANIMASYON SANAT YONETIMI (referans video analizinden turetildi) ─────────
 # Hedef: elle cizilmis editorial karikatur — murekkep kontur + gouache dolgu + cel golge,
 # kagit dokusu, soluk vintage palet, DETAYLI ortamlar, karakter kucuk-orta olcek.
+# ═══ DESTEK OGESI KURALI (tum animasyon stillerinde ZORUNLU) ═══
+# Kullanici geri bildirimi: "bir sahne sadece karakterin on planda oldugu duz bir gorsel olarak
+# gorunmemeli; ana karakter bir sey ANLATIYOR, yan destekleyici ogeler de kullanilmali."
+# Yani her kare, o an anlatilan seyi GOSTEREN somut bir gorsel arac icermeli.
+DESTEK_PLANLAYICI = (
+    "SUPPORTING ELEMENT — MANDATORY IN EVERY SCENE. The character is NARRATING something, so each "
+    "frame must SHOW what is being said, not just show the character. Besides the character and the "
+    "setting, every scene_prompt must name at least ONE concrete supporting visual device that "
+    "illustrates the exact point of that line, and must state how the character INTERACTS with it "
+    "(holding, pointing at, leaning over, building, dropping, comparing, reacting to). Choose the "
+    "device from: a real object or tool; a map, chart, timeline, diagram or plan; a document, letter "
+    "or book; secondary figures (a crowd, soldiers, workers, a listener); a visual metaphor made of "
+    "objects (scales, a growing plant, stacked coins, a cracked wall); a before/after or two-object "
+    "comparison; an environmental event (fire, smoke, rain, collapse, dust, explosion). Vary the "
+    "device from scene to scene — never repeat the same one twice in a row. A scene that is only a "
+    "character standing in front of scenery is INVALID and must be rewritten.\n"
+)
+# ═══ KARE CESITLILIGI — KARAKTERSIZ KARELER ZORUNLU ═══
+# Kullanici referansi (arac bakim kanali): 4 karenin 3'unde KARAKTER YOK — patlatilmis
+# teknik sema, yazi karti, makro detay. Ritim: sema -> yazi -> sahne -> makro.
+# Onceki halimiz her kareye karakter koyuyordu -> monoton "karakter + arka plan" akisi.
+KARE_CESITLILIGI = (
+    "FRAME VARIETY — THE CHARACTER IS NOT IN EVERY SCENE. This is a narrated explainer, so the "
+    "pictures must alternate between the narrator and the SUBJECT being explained. Aim for roughly "
+    "half the scenes WITHOUT any character. Choose each scene's frame type from this set and never "
+    "use the same type twice in a row:\n"
+    "  HERO ACTION — the character physically doing/handling something in a real setting.\n"
+    "  OBJECT MACRO — extreme close-up of the object being discussed, filling the frame, NO "
+    "character (write 'no character in frame').\n"
+    "  HANDS ONLY — extreme close-up of two hands performing the exchange or action (handing over "
+    "an envelope, passing a key, gripping a tool), cropped at the wrists, plain background, no "
+    "faces and no bodies.\n"
+    "  MAP ROUTE — a simple outline map of the relevant place with 2-3 labelled dots and a dashed "
+    "route line between them, plus one small vehicle or object travelling along it; NO character "
+    "figure (a tiny driver inside a vehicle is allowed).\n"
+    "  INNER VOICE — the character alone in a wide atmospheric setting with 3-4 short thought "
+    "fragments floating in the air around its head as small hand-written words, showing what it is "
+    "feeling at that moment.\n"
+    "  EXPLODED VIEW — the object taken apart, its parts floating separated and labelled by shape, "
+    "on a clean plain background, NO character.\n"
+    "  CONCEPT CARD — a very short phrase on a clean plain background, NO character.\n"
+    "  COMPARISON — two objects or two states side by side (old vs new, right vs wrong), NO "
+    "character.\n"
+    "  PROCESS STEP — hands (or the character's hands only) performing one step on the object.\n"
+    "  WIDE CONTEXT — the character small inside the full place, showing where this happens.\n"
+    "When the narration is about a THING (how it works, what breaks, what to look for), prefer the "
+    "character-free types; use HERO ACTION when the narration is about a person doing or deciding "
+    "something. Scenes written as 'no character in frame' must not contain any figure at all.\n"
+)
+
+DESTEK_GORSEL = (
+    " STORYTELLING FRAME: this is a narrated explainer picture, so the frame must SHOW the idea, not "
+    "just the character. Besides the character and the background, clearly render the supporting "
+    "element named in the scene text — the object, map, diagram, document, crowd, metaphor or event "
+    "— large enough to read at a glance, and show the character physically engaging with it. A flat "
+    "picture of a character simply standing in front of scenery is not acceptable."
+)
+
+
 ANIM_STIL = (
     "Hand-drawn editorial cartoon on textured paper: confident dark sepia-brown ink outlines with "
     "organic wobble and varying line weight, flat gouache fills, two-tone cel shading with strong "
@@ -490,7 +565,11 @@ EXP_SOZLESME = (
     "The character is referred to ONLY as \"the hero\" — never restate appearance, clothing or "
     "colours. Do NOT mention camera, lens, lighting, style, texture or medium in scene_prompt; all "
     "styling lives in the global block.\n"
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI
 )
+
+
+
 
 ANIM_SOZLESME = (
     "SCENE PROMPT CONTRACT: every scene_prompt is ONE English paragraph of 45-65 words with "
@@ -527,6 +606,7 @@ ANIM_SOZLESME = (
     "style consistency between scenes.\n"
     "TEXT: at most one short natural in-world sign, under four words, written as: sign reads "
     "\"NEW & IMPROVED\". Never captions, subtitles, watermarks or logos.\n"
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI
 )
 
 # ═════════ HIKAYE / WHAT-IF STILI (3. referans: "You Wake Up 100,000 Years Ago") ═════════
@@ -538,9 +618,13 @@ HIK_STIL = (
     "oil painting. THE WORLD (everything except the figures) is fully painted and cinematic — "
     "saturated natural colour, visible brushwork, atmospheric haze, real light and real cast shadows, "
     "layered depth from a dark framing foreground to a hazy far vista; the world carries NO black "
-    "outlines and is never flat or vector. THE FIGURES are the exact opposite: pure flat white shapes "
-    "drawn with one clean uniform-width black ink line — no shading, no gradient, no texture, no rim "
-    "light, no glow, no colour spill, identical at noon, at night, in caves and in firelight. LIGHT "
+    # NOT: burada RENK DAYATILMAZ. Onceden 'pure flat white shapes' yaziyordu ve kullanicinin
+    # turuncu karakteriyle CATISIP sahneler arasi beyaz<->turuncu salinimina yol aciyordu.
+    # Renk daima karakter kunyesinden gelir; stil sadece CIZIM DILINI tanimlar.
+    "outlines and is never flat or vector. THE FIGURES are the exact opposite: flat unshaded shapes "
+    "in their own solid colours, drawn with one clean uniform-width black ink line — no shading, no "
+    "gradient, no texture, no rim light, no glow, no colour spill, keeping exactly the SAME colours "
+    "at noon, at night, in caves and in firelight. LIGHT "
     "SUPREMACY: scene light falls on the world only; figures cast a flat hard-edged single-tone "
     "shadow on the ground but never receive light. All descriptive detail is spent on the "
     "environment, none on the figures. Palette: earth greens, volcanic red, warm gold, dusk blue. "
@@ -574,13 +658,20 @@ HIK_CERCEVE = (
     "hazy receding background). Keep clear negative space around every figure."
 )
 HIK_SOZLESME = (
+    "RULE ZERO — READ FIRST: this is a narrated explainer, not a character showcase. AT LEAST "
+    "40% OF ALL SCENES YOU WRITE MUST CONTAIN NO CHARACTER AT ALL (shot types G, I, J, K below) "
+    "and must literally contain the words 'no character in frame'. Before you finish, COUNT "
+    "your scenes: if fewer than 40% are character-free, rewrite the weakest character scenes as "
+    "object macros, hands-only close-ups, maps or diagrams. A video where every frame shows the "
+    "character standing in a landscape is the FAILURE MODE we are eliminating.\n"
     "SCENE CONTRACT — each scene_prompt is ONE English paragraph of 45-80 words, slots always in this "
     "order: (1) SHOT: the shot-type letter plus the hero's height as a percent of frame height; "
     "(2) WORLD: the painted environment with at least 3 concrete named details, ONE named light "
     "source, time of day and colour mood — spend the entire adjective budget here; (3) FIGURES: only "
-    "what the white stick figure(s) DO — pose, gesture and the emotion read from eyes and stance, "
-    "closing with the fixed clause \"figures stay flat unshaded white with clean black outlines, "
-    "unaffected by the scene light\"; (4) TEXT: either a lettering instruction in double quotes, or "
+    "what the figure(s) DO — pose, gesture and the emotion read from eyes and stance. NEVER state "
+    "the character's colour (it is locked globally); close this slot with the fixed clause "
+    "\"figures stay flat and unshaded with clean black outlines, unaffected by the scene light\"; "
+    "(4) TEXT: either a lettering instruction in double quotes, or "
     "literally \"no text in this image\" — this slot is never empty.\n"
     "Never re-describe the hero's face, hair, clothing, outline, proportions or style — identity is "
     "injected separately and re-describing it causes drift. Prefix the paragraph with ANCIENT or "
@@ -594,13 +685,26 @@ HIK_SOZLESME = (
     "planes, hero nearest and largest (30-50%), middle figures simplified, farthest figures "
     "featureless white silhouettes. F COMPARISON — one painted scene split by a natural divide into "
     "two contrasted situations; both figures identical in build, only posture and surroundings "
-    "differ, never a bulky or muscular body; hero 30-50%. G INFOGRAPHIC — painted landscape overlaid "
-    "with a drawn path or timeline, 2-3 arrows and at most 2 small outlined label boxes; hero 10-18%. "
+    "differ, never a bulky or muscular body; hero 30-50%. "
+    "G INFOGRAPHIC — NO CHARACTER IN FRAME: a drawn path, timeline or diagram over a painted or plain "
+    "ground, 2-3 arrows and at most 2 short outlined label boxes. "
     "H SFX BEAT — one big quoted onomatopoeia plus one simple graphic device (red pulse line, impact "
-    "rays, dust puff); hero 30-50%.\n"
-    "FREQUENCY BUDGET per rolling block of 10 scenes: at least 3 of A/B, at least 1 C, at least 1 D, "
-    "at least 1 E, at most 1 F, at most 1 G, exactly 1 H. Narrative need outranks the rota; the "
-    "budget is a ceiling and a tie-break, not a carousel. Never use the same type twice in a row.\n"
+    "rays, dust puff); hero 30-50%. "
+    "I OBJECT MACRO — NO CHARACTER IN FRAME: extreme close-up of the single object the line is about, "
+    "filling the frame, painted in full detail. "
+    "J HANDS ONLY — NO CHARACTER IN FRAME: extreme close-up of hands doing the action (handing "
+    "something over, gripping a tool, opening a letter), cropped at the wrists. "
+    "K MAP ROUTE — NO CHARACTER IN FRAME: a simple outline map of the relevant place with 2-3 "
+    "labelled dots and a dashed route between them, one small vehicle or object on the route.\n"
+    "FREQUENCY BUDGET per rolling block of 10 scenes — HARD RULE: AT LEAST 4 of the 10 scenes must be "
+    "CHARACTER-FREE (types G, I, J or K). The video must alternate between the narrator and the "
+    "subject being explained; a run of character-only frames is the single worst failure here. "
+    "Also: at least 2 of A/B, at least 1 C, at least 1 D, at most 1 E, at most 1 F, exactly 1 H. "
+    "Never use the same type twice in a row and never place two character-free scenes back to back. "
+    "CHOOSING: when the line is about a THING (how it works, what it costs, where it travels, what it "
+    "looks like, what it is made of) use G/I/J/K; when it is about a PERSON doing, deciding or feeling "
+    "something use A/B/C/D/E. Scenes of types G/I/J/K must literally contain the words "
+    "'no character in frame'.\n"
     "WORLD ROTATION: two consecutive scenes may not share biome AND time of day AND palette; rotate "
     "deliberately (volcanic valley, fern jungle, rock canyon, cave interior, night campfire, dusk "
     "huts and smoke, green oasis, river crossing, overgrown modern ruin) and change the camera angle "
@@ -610,6 +714,7 @@ HIK_SOZLESME = (
     "commas, no punctuation, no plus signs, no chemical symbols, no thousand separators — write "
     "\"100K YEARS\" not \"100,000\". Each infographic label box obeys the same limit. Text never sits "
     "in the top or bottom 9% of the frame.\n"
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI
 )
 
 ANIMASYON_PROFIL = {
@@ -659,6 +764,71 @@ ANIMASYON_STILLERI = {
 }
 VARSAYILAN_ANIM = "anlati-deneme"
 
+# ═══════════════ RENK PALETI (kanal genelinde renk kimligi) ═══════════════
+# Neden: stil promptu "muted ochre/sage" gibi KELIME tarif ediyordu -> model her sahnede
+# baska bir yorum uretiyordu. Cozum: KESIN HEX listesi (palet_olc dersinin aynisi —
+# rengi tarif etme, SAYIYLA ver). Palet DUNYAYI yonetir; karakterin kilitli renkleri
+# her zaman ustundur (yoksa beyaz<->turuncu salinimi geri gelir).
+PALETLER = {
+    "otomatik": {"ad": "Otomatik (stile bırak)", "renkler": [],
+                 "ozet": "Seçili animasyon stilinin kendi renk ailesi kullanılır"},
+    "aussie-kalem": {"ad": "Sıcak Kalem (Aussie)", "ozet": "Kremli kâğıt, adaçayı, altın, kiremit",
+                     "renkler": ["#F0E4CC", "#E0CBA0", "#7B8B5A", "#F2C230", "#B5651D", "#7A97B8"]},
+    "vintage-editorial": {"ad": "Vintage Editorial", "ozet": "Oker, adaçayı, tozlu mavi, soluk tuğla",
+                          "renkler": ["#EFE3CA", "#C8963E", "#8A9A7B", "#6E8399", "#A85A44", "#4A4038"]},
+    "sicak-toprak": {"ad": "Sıcak Toprak", "ozet": "Terrakota, kum, zeytin, pas",
+                     "renkler": ["#E3C99A", "#C1663F", "#7D7A45", "#9B4722", "#D9A574", "#3B2A1E"]},
+    "soguk-mavi": {"ad": "Soğuk Mavi", "ozet": "Lacivert, deniz, buz, arduvaz",
+                   "renkler": ["#EDE7D9", "#1F3A5F", "#2E7D8C", "#BFD9E0", "#5A7184", "#121D2B"]},
+    "canli-explainer": {"ad": "Canlı Explainer", "ozet": "Kırmızı, sarı, mavi, beyaz, siyah",
+                        "renkler": ["#FFFFFF", "#E63946", "#F4C430", "#2A6FDB", "#2BB673", "#111111"]},
+    "gece-neon": {"ad": "Gece Neon", "ozet": "İndigo, magenta, camgöbeği, kömür",
+                  "renkler": ["#1B1035", "#E0409A", "#38D6E0", "#F2A65A", "#221C2E", "#EDE6F5"]},
+    "pastel-yumusak": {"ad": "Pastel Yumuşak", "ozet": "Pudra, nane, tereyağı, leylak",
+                       "renkler": ["#FBF5EC", "#F3C8C2", "#BFE0CE", "#F7E6A8", "#C9BEE3", "#6E6A78"]},
+    "sepya-belgesel": {"ad": "Sepya Belgesel", "ozet": "Koyu sepya, kahve, ten, kemik",
+                       "renkler": ["#E6D8BF", "#C4A177", "#8C6A47", "#4A3520", "#241A10", "#9C8663"]},
+    "orman-yesil": {"ad": "Orman Yeşili", "ozet": "Koyu orman, yosun, eğrelti, kabuk",
+                    "renkler": ["#D7E2CC", "#93B06A", "#5E7F4A", "#234A2E", "#6B4A2E", "#16241A"]},
+    "mono-kontrast": {"ad": "Mono + Tek Vurgu", "ozet": "Siyah-beyaz-gri + tek kırmızı vurgu",
+                      "renkler": ["#FFFFFF", "#D8D4CC", "#8C8880", "#3A3835", "#121110", "#D93025"]},
+}
+VARSAYILAN_PALET = "otomatik"
+_HEX_RE = __import__("re").compile(r"^#[0-9A-Fa-f]{6}$")
+
+
+def palet_renkleri(secim: str, ozel: str = "") -> list:
+    """Palet kimligi -> hex listesi. 'ozel' verilirse (virgulle ayrilmis hexler) o kullanilir.
+    Gecersiz/bos girdi -> [] (palet kilidi uygulanmaz, stilin kendi renk ailesi kalir)."""
+    if (secim or "").strip() == "ozel" or (not secim and ozel):
+        out = []
+        for h in (ozel or "").replace(";", ",").split(","):
+            h = h.strip()
+            if not h.startswith("#"):
+                h = "#" + h
+            if _HEX_RE.match(h) and h.upper() not in out:
+                out.append(h.upper())
+        return out[:8]
+    return list(PALETLER.get((secim or "").strip(), {}).get("renkler", []))
+
+
+def palet_prompt(secim: str, ozel: str = "") -> str:
+    """Gorsel promptuna eklenecek RENK KILIDI. Bos palet -> bos metin (davranis degismez)."""
+    renkler = palet_renkleri(secim, ozel)
+    if len(renkler) < 2:
+        return ""
+    liste = ", ".join(renkler)
+    return (
+        " CHANNEL COLOUR PALETTE (locked, identical in every scene of every video of this channel): "
+        f"build the whole picture from this exact fixed set of hex colours — {liste}. Every surface, "
+        "garment, prop, sky, ground and shadow must be one of these hues, or a lighter tint, darker "
+        "shade or direct mix of two of them; do NOT introduce any hue outside this set. Vary WHICH of "
+        "them dominates from scene to scene (one scene led by the darkest, the next by the warmest) so "
+        "consecutive frames never look identical, but never leave the set. "
+        "PRIORITY: if the locked character's own colours differ from this palette, the CHARACTER'S "
+        "colours always win — this palette governs the world around the character, not their identity."
+    )
+
 
 def profil_coz(tur, edit_id):
     """tur: 'animasyon' -> ANIMASYON_STILLERI; 'hikaye' -> HIKAYE_STILLERI; digeri -> EDIT_STILLERI."""
@@ -699,6 +869,127 @@ def karakter_analiz(kar_yol: str) -> str:
     except Exception as e:
         print(f"  karakter_analiz hata: {str(e)[:160]}", file=sys.stderr)
         return ""
+
+
+def palet_olc(img_yol: str, adet: int = 5) -> list:
+    """Referans gorselden BASKIN RENKLERI piksel duzeyinde olc (median-cut).
+    LLM'e renk TAHMIN ETTIRMEK yerine gercek hex degerleri cikarilir -> 'turuncu karakter
+    pembeye dondu' kaymasi kokten kapanir (renk artik kesin sayi olarak prompta girer)."""
+    try:
+        from PIL import Image
+        im = Image.open(img_yol).convert("RGB")
+        # kenar %12'yi kirp: arka plan yerine OZNENIN rengini olc
+        w, h = im.size
+        k = (int(w * 0.12), int(h * 0.12), int(w * 0.88), int(h * 0.88))
+        im = im.crop(k).resize((160, 160))
+        q = im.quantize(colors=adet, method=Image.MEDIANCUT)
+        pal = q.getpalette()[: adet * 3]
+        sayim = sorted(q.getcolors() or [], reverse=True)   # [(piksel, indeks), ...]
+        out = []
+        for piksel, idx in sayim[:adet]:
+            r, g, b = pal[idx * 3: idx * 3 + 3]
+            out.append({"hex": f"#{r:02X}{g:02X}{b:02X}",
+                        "oran": round(piksel / (160 * 160), 3)})
+        return out
+    except Exception as e:
+        print(f"  palet_olc hata: {str(e)[:120]}", file=sys.stderr)
+        return []
+
+
+KUNYE_ALANLARI = ("tur", "govde_rengi", "ikincil_renk", "kafa", "gozler", "sac",
+                  "kiyafet", "oranlar", "ayirt_edici")
+
+
+def _kunye_tek_okuma(img_yol: str, sicaklik: float, paletler: list) -> dict:
+    """Referansi TEK vision cagrisiyla yapili kimlik kunyesine cevir."""
+    import base64
+    with open(img_yol, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode()
+    pal_txt = ", ".join(f"{p['hex']} (%{int(p['oran']*100)})" for p in paletler[:5]) or "yok"
+    istek = (
+        "You are a character model sheet analyst. Describe ONLY the character in this reference "
+        "image as a reusable identity card. Return STRICT JSON with exactly these keys: "
+        '"tur" (species/type, 3-6 words), "govde_rengi" (main body colour — pick the closest HEX '
+        f"from this measured palette: {pal_txt}), "
+        '"ikincil_renk" (secondary colour, HEX from the same palette or empty), '
+        '"kafa" (head shape, 4-10 words), "gozler" (eyes, 4-10 words), "sac" (hair/fur on head, '
+        '4-10 words or "none"), "kiyafet" (clothing/markings, 4-12 words or "none"), '
+        '"oranlar" (body proportions, 4-10 words), "ayirt_edici" (single most distinctive '
+        'permanent feature, 3-8 words). '
+        "RULES: describe ONLY permanent identity. NEVER describe the pose, the camera angle, the "
+        "background, the lighting, or any object the character is holding — those are temporary. "
+        "If a field is not clearly visible, use an empty string rather than guessing. English only."
+    )
+    body = {
+        "model": "gpt-4.1-mini",
+        "messages": [{"role": "user", "content": [
+            {"type": "text", "text": istek},
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+        ]}],
+        "response_format": {"type": "json_object"},
+        "max_tokens": 500, "temperature": sicaklik,
+    }
+    j = oai_chat(body, timeout=90)
+    ic = (j.get("choices") or [{}])[0].get("message", {}).get("content") or "{}"
+    try:
+        return json.loads(ic)
+    except Exception:
+        return {}
+
+
+def kimlik_kunyesi(img_yol: str) -> dict:
+    """COK ASAMALI KIMLIK ANALIZI (kullanici: '3-4 kere suzgecten gecirsin').
+    1) piksel duzeyinde palet olcumu (kod, $0)
+    2) bagimsiz vision okumasi (dusuk sicaklik)
+    3) IKINCI bagimsiz vision okumasi (yuksek sicaklik, ilkinden habersiz)
+    4) KOD UZLASISI: iki okuma ayni diyorsa alan GECERLI, celisiyorsa alan ATILIR
+       (celisen alan = modelin uydurdugu alandir; 100 karede 100 farkli uydurulur).
+    Donen: {alanlar..., _palet, _guven} — guven dusukse cagiran uyarir."""
+    paletler = palet_olc(img_yol)
+    a = _kunye_tek_okuma(img_yol, 0.15, paletler)
+    b = _kunye_tek_okuma(img_yol, 0.85, paletler)
+    if not a and not b:
+        return {}
+    kunye, onayli, dolu = {}, 0, 0
+    for alan in KUNYE_ALANLARI:
+        va = str(a.get(alan, "") or "").strip()
+        vb = str(b.get(alan, "") or "").strip()
+        if not va and not vb:
+            continue
+        dolu += 1
+        # renk alanlarinda birebir, metin alanlarinda kelime ortusmesi arar
+        if alan.endswith("rengi") or alan == "ikincil_renk":
+            uyum = va.upper() == vb.upper()
+        else:
+            ka, kb = set(va.lower().split()), set(vb.lower().split())
+            uyum = bool(ka & kb) and len(ka & kb) >= max(1, min(len(ka), len(kb)) // 3)
+        if uyum:
+            kunye[alan] = va or vb
+            onayli += 1
+        # celisen alan bilerek ATILIR (uydurma alani promptta tekrarlamak zarardir)
+    kunye["_palet"] = paletler
+    kunye["_guven"] = round(onayli / dolu, 2) if dolu else 0.0
+    return kunye
+
+
+def kunye_metni(k: dict) -> str:
+    """Kunyeyi POZITIF, olculu bir kimlik cumlesine cevir (negatif ifade YOK).
+    Tasarim ilkesi: yasakli seyi ADLANDIRMA — 'pembe olmasin' demek yerine kesin rengi soyle."""
+    if not k:
+        return ""
+    p = []
+    if k.get("tur"):
+        p.append(f"a {k['tur']}")
+    if k.get("govde_rengi"):
+        p.append(f"body colour exactly {k['govde_rengi']}")
+    if k.get("ikincil_renk"):
+        p.append(f"secondary colour {k['ikincil_renk']}")
+    for alan, on in (("kafa", "head"), ("gozler", "eyes"), ("sac", "hair"),
+                     ("kiyafet", "wearing"), ("oranlar", "proportions"),
+                     ("ayirt_edici", "distinctive")):
+        if k.get(alan) and str(k[alan]).lower() not in ("none", "yok"):
+            p.append(f"{on}: {k[alan]}")
+    return "The main character is " + ", ".join(p) + "." if p else ""
 
 
 def stil_analiz(stil_yol: str) -> str:
@@ -753,6 +1044,32 @@ def ses_coz(plan: dict) -> str:
     return ses
 
 
+
+# ── SAHNE TIPI ATAMASI (KODLA ZORLANIR) ──
+# Prompt ile "%40 karaktersiz olsun" demek ISE YARAMADI (LLM 1/7 uretti). Cozum: tipi
+# planlayiciya BIZ soyluyoruz. Tek sahne atlanamaz, oran garanti, ard arda karaktersiz olmaz.
+TIP_KARAKTERLI = ["A WIDE ESTABLISHING", "B MEDIUM ACTION", "C CLOSE-UP",
+                  "D DRAMATIC LIGHT", "E CROWD", "H SFX BEAT"]
+TIP_KARAKTERSIZ = ["I OBJECT MACRO", "J HANDS ONLY", "K MAP ROUTE", "G INFOGRAPHIC"]
+
+
+def sahne_tipi_atamasi(adet: int) -> str:
+    """Sahne basina cekim tipi atar: tek indeksler KARAKTERSIZ -> ~%50 oran, ard arda yok."""
+    satir = []
+    for i in range(adet):
+        if i % 2 == 1:
+            t = TIP_KARAKTERSIZ[(i // 2) % len(TIP_KARAKTERSIZ)]
+            satir.append(f"{i+1}={t} (no character in frame)")
+        else:
+            t = TIP_KARAKTERLI[(i // 2) % len(TIP_KARAKTERLI)]
+            satir.append(f"{i+1}={t}")
+    return ("SHOT TYPE ASSIGNMENT — NON-NEGOTIABLE. The shot type of every scene is decided for you "
+            "below. Write each scene using EXACTLY its assigned type and open the scene_prompt with "
+            "that type's name. Scenes marked '(no character in frame)' must contain no figure at all "
+            "and must literally include the words 'no character in frame'. Do not swap, skip or "
+            "reorder types; fit the narration to the assigned type.\n" + "; ".join(satir) + "\n")
+
+
 def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
     footage = prof["footage_pct"]
     mag_var = bool(prof.get("mag"))
@@ -783,6 +1100,8 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
     # Profilin kendi sahne SOZLESMESI varsa onu kullan (animasyon alt-stilleri), yoksa genel kural.
     if prof.get("sahne_sozlesme"):
         sahne_kural = prof["sahne_sozlesme"]
+        if prof.get("tip_atamasi", True):
+            sahne_kural = sahne_tipi_atamasi(hedef) + sahne_kural
     else:
         sahne_kural = (
             "IMPORTANT: give scene_prompt for EVERY scene = a vivid 16:9 ENGLISH description of the "
@@ -872,9 +1191,18 @@ def plan_uret(story: str, prof: dict, hedef_sahne=40, devam=False, onceki_ozet="
         sp = str(s.get("scene_prompt", "")).strip()
         if kayn == "ai" and not sp:
             continue
-        # Karakter-her-sahnede guvenlik agi: model kahramani unuttuysa promptun basina ekle.
-        if kayn == "ai" and "main character" not in sp.lower():
-            s["scene_prompt"] = "The main character is the large central foreground subject. " + sp
+        # Karakter-her-sahnede guvenlik agi. DIKKAT: eskiden "large central foreground subject"
+        # ekleniyordu; planlayici "the stickman commander" gibi yazdigi icin bu HER sahnede
+        # tetikleniyor ve cekim sistemini (genis plan %15, orta %40) EZIYORDU -> karakter hep
+        # ortada, buyuk ve dimdik cikiyordu. Artik sadece kahramanin VARLIGI garanti edilir,
+        # olcek/kompozisyon cekim sozlesmesine birakilir.
+        # Karaktersiz kareler MESRU (patlatilmis sema, makro detay, yazi karti) — zorlama.
+        karaktersiz = any(x in sp.lower() for x in
+                          ("no character", "object macro", "exploded view", "concept card",
+                           "comparison", "no figure", "hands only", "map route"))
+        if (kayn == "ai" and not karaktersiz and not any(
+                x in sp.lower() for x in ("main character", "the hero", "stickman", "the character"))):
+            s["scene_prompt"] = "The recurring main character appears in this scene. " + sp
         scenes.append(s)
     if not scenes:
         raise RuntimeError("Sahne plani bos")
@@ -936,26 +1264,42 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
     kar_var = bool(kar_yol and os.path.exists(kar_yol))
     stil_gor = bool(stil_yol and os.path.exists(stil_yol))
     capa_var = bool(capa_yol and os.path.exists(capa_yol) and capa_yol != hedef)
+    # PROMPT SIRASI ONEMLI: once SAHNE/AKSIYON, sonra kisa kimlik kilidi.
+    # Referans gorsel notr duruslu oldugu icin modelin PIKSEL egilimi "dimdik dur"a cekiyordu;
+    # bu yuzden aksiyon en basta ve en guclu sekilde tekrarlanir.
     prompt = scene_prompt.rstrip(". ") + "."
-    if kar_var or capa_var:
-        # Karakter kilidi — cok kesin dil (kullanici: "her sahnede AYNI olmali")
-        prompt += (" CHARACTER IDENTITY LOCK: the reference images define ONLY the character's visual "
-                   "IDENTITY — its body and face design, exact colors, proportions and clothing style. "
-                   "Keep that identity EXACTLY the same so it is unmistakably the same character in "
-                   "every scene. CRITICAL: IGNORE the pose, camera angle, background and any object "
-                   "the character happens to be holding in the reference images — those belong to the "
-                   "reference only. RE-DRAW the character FRESH for THIS scene: a new pose, new "
-                   "action, new expression and new surroundings exactly as described above. Do NOT "
-                   "carry over props (for example a cup, a bag or an item in its hand) from the "
-                   "reference unless this scene's description explicitly mentions them. Render exactly "
-                   "ONE main character; do not add other figures. Follow the shot type and character "
-                   "scale stated in the scene description exactly — do not re-frame, do not enlarge "
-                   "or centre the character, and never let it fill the frame; the environment carries "
-                   "the picture.")
+    # KARAKTERSIZ KARE (patlatilmis sema / makro detay / yazi karti / karsilastirma):
+    # kimlik kilidi EKLENMEZ, aksi halde model kareye zorla bir figur sokar.
+    karaktersiz = any(x in (scene_prompt or "").lower() for x in
+                      ("no character", "object macro", "exploded view", "concept card",
+                       "no figure", "hands only", "map route"))
+    if karaktersiz:
+        prompt += (" This frame contains NO character and no people at all — the object, diagram "
+                   "or lettering itself is the entire subject. Do not add any figure.")
+    if (kar_var or capa_var) and not karaktersiz:
+        # 1) POZ SERBESTLIGI — en kritik cumle. Referans SADECE tasarim kaynagi, poz kaynagi DEGIL.
+        prompt += (" THE REFERENCE IMAGE IS A CHARACTER DESIGN SHEET, NOT A POSE REFERENCE. It shows "
+                   "the character standing neutrally only so you can see how it is drawn. In THIS "
+                   "picture the character must be fully ACTING OUT the moment described above — the "
+                   "body language, gesture, posture and facial expression must match that action and "
+                   "emotion. Do NOT draw the character standing upright and facing the camera with "
+                   "arms at its sides unless the scene text explicitly asks for it. Show it leaning, "
+                   "reaching, crouching, running, pointing, carrying, turning, looking — whatever the "
+                   "moment requires, interacting with the objects and surroundings named in the scene.")
+        # 2) KIMLIK — kisa tutulur; uzun kilit metni aksiyonu bogar
+        prompt += (" IDENTITY LOCK: keep the character's design identical to the reference — same "
+                   "body and face design, same exact colours, same proportions, same clothing and "
+                   "markings — but carry over NOTHING else: not its pose, not its camera angle, not "
+                   "its background, and not any object it holds there. Render exactly ONE main "
+                   "character unless the scene describes others. Obey the shot type and character "
+                   "scale given in the scene text; the environment carries the picture.")
+        prompt += DESTEK_GORSEL
         if kar_kilit:
             prompt += f" Character identity to match: {kar_kilit}"
-        prompt += (" Keep the character's EXACT original colors in every scene regardless of lighting "
-                   "or background; do NOT recolor, tint or change its hue.")
+        prompt += (" COLOUR LOCK: the character's colours are fixed and identical in every scene "
+                   "regardless of lighting, time of day or background — the exact same hues at noon, "
+                   "at night, in caves and in firelight. If any style instruction suggests a "
+                   "different figure colour, the character's own locked colours always win.")
     if stil_gor or capa_var:
         prompt += (" ART-STYLE LOCK: match the EXACT art style of the reference images — identical "
                    "rendering technique, line weight, color palette, shading, texture and level of "
@@ -985,17 +1329,21 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
         acik = []
         try:
             files = []
-            if kar_var:
-                fkar = open(kar_yol, "rb"); acik.append(fkar)
-                files.append(("image[]", ("character.png", fkar, "image/png")))
-            if capa_var:   # gorsel capa: ilk sahne -> karakter+stil kilidi
+            # ── TEMIZ CAPA ILKESI (en kritik duzeltme) ──
+            # Capa varsa SADECE capa gonderilir; kullanicinin ham referansi ARTIK GONDERILMEZ.
+            # Sebep: "elindeki kahve her sahneye tasindi" bir PROMPT degil PIKSEL sorunuydu —
+            # her cagriya fincanli goruntu giriyordu. Kopyalanacak fincan olmayinca sorun biter.
+            if capa_var:
                 fcapa = open(capa_yol, "rb"); acik.append(fcapa)
                 files.append(("image[]", ("anchor.png", fcapa, "image/png")))
-            # Stil gorselini SADECE capa yokken (ilk sahne) ekle. Capa varsa stili zaten tasir;
-            # ham stil ref'i sonraki sahnelere basibos renk (or. pembe serit) sokabiliyor.
-            if stil_gor and not capa_var:
-                fstil = open(stil_yol, "rb"); acik.append(fstil)
-                files.append(("image[]", ("style.png", fstil, "image/png")))
+            else:
+                # Capa yoksa (ilk kurulum) ham referans + stil gorseli kullanilir
+                if kar_var:
+                    fkar = open(kar_yol, "rb"); acik.append(fkar)
+                    files.append(("image[]", ("character.png", fkar, "image/png")))
+                if stil_gor:
+                    fstil = open(stil_yol, "rb"); acik.append(fstil)
+                    files.append(("image[]", ("style.png", fstil, "image/png")))
             # quality: OpenAI varsayilani 'auto' (~high, ~$0.28/gorsel). 'medium' (~$0.09)
             # %65-70 ucuz ve 1536x1024'te fark neredeyse gorunmez (ozellikle duz-vektor/
             # stickman animasyonda ayirt edilemez). IMAGE_QUALITY env ile deploysuz degistirilir:
@@ -1038,11 +1386,42 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
     return False
 
 
+CAPA_PROMPT = (
+    # IKI POZLU tasarim sayfasi: tek notr figur, sonraki sahnelerde "dimdik dur" baskisi yapiyordu.
+    # Iki farkli duruş gostermek modele "bu bir tasarim sayfasi, poz degil" sinyali verir.
+    "Character design sheet of the SAME single character shown in the reference image, drawn TWICE "
+    "side by side on one plain flat light-grey studio background: on the LEFT standing upright "
+    "front-facing with arms relaxed at the sides and hands open and empty; on the RIGHT the same "
+    "character in a three-quarter view mid-stride, one arm raised and reaching forward. "
+    "Both figures full body from head to feet, even soft lighting, no scenery, no furniture, no "
+    "props, no shadows on the background. Reproduce the character's identity exactly: same species, "
+    "same colours, same face, same hair, same clothing, same proportions in both drawings. "
+    "No other characters. No text, no watermark, no border."
+)
+
+
+def capa_uret(ref_yol: str, hedef: str, kimlik: str, stil: str, stil_yol: str = "",
+              model: str = "") -> bool:
+    """TEMIZ CAPA (A0) uretir: notr poz, ELLER BOS, sade zemin.
+    Neden: kullanicinin referansi genelde 'kirli'dir (elinde nesne, ozel poz, dolu arka plan) ve
+    her sahneye gonderilince bunlar KOPYALANIR. Bir kez temiz bir kanon uretip onu donduruyoruz;
+    tum sahneler bu temiz kareye kilitlenir. Capa ASLA sahne ciktisiyla guncellenmez (aksi halde
+    sapma bilesiklenip 'son sahnede karakter degisti' hatasini uretir)."""
+    p = CAPA_PROMPT
+    if kimlik:
+        p += " " + kimlik
+    if stil:
+        p += f" Art style: {stil}."
+    return referansli_gorsel(p, ref_yol, hedef, stil_prompt="", kar_kilit="",
+                             stil_yol=stil_yol, capa_yol="", stil_kilit="",
+                             yazi_yasak=True, model=model, cerceve="", deneme=3)
+
+
 async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                mod: str = "documentary", edit_id: str = VARSAYILAN_EDIT,
                sure_dk: float = 2, gecis_acik: bool = True, zoom_acik: bool = True,
                ilerle=None, profil_id: str = "", altyazi_sablon: str = "",
-               altyazi_ac: str = "") -> dict:
+               altyazi_ac: str = "", palet: str = "", palet_ozel: str = "") -> dict:
     """Tam hat. mod: 'animasyon'|'documentary'. stil_yol: referans stil gorseli (opsiyonel).
     sure_dk: hedef sure (hikaye maks 60, digerleri maks 14). gecis_acik/zoom_acik: kullanicinin tercihi.
     profil_id: KANAL PROFILI — verilirse karakter/capa/kilitler profilden gelir ve tum
@@ -1063,6 +1442,14 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # Yuklediyse EKLEME — aksi halde onun karakteriyle (or. tilki) CAKISIR.
     if prof.get("varsayilan_karakter") and not (kar_yol and os.path.exists(kar_yol)):
         gorsel_ek = f"{gorsel_ek}. {prof['varsayilan_karakter']}"
+    # ── RENK PALETI: bu videoda secilmediyse kanal profilininki (kanal genelinde ayni renk) ──
+    if not palet and kanal:
+        palet, palet_ozel = kanal.get("palet", ""), kanal.get("palet_ozel", "")
+    pal_ek = palet_prompt(palet, palet_ozel)
+    if pal_ek:
+        gorsel_ek = gorsel_ek + "." + pal_ek
+        print(f"  palet kilidi: {palet or 'ozel'} -> {palet_renkleri(palet, palet_ozel)}",
+              file=sys.stderr)
     # Kompozisyon/cerceveleme kurali (animasyonda ortam basrol, karakter cerceveyi doldurmaz)
     cerceve_ek = prof.get("cerceve", "")
     motion = prof["motion"] if gecis_acik else "kesme"   # gecis kapali -> sade kesme
@@ -1099,16 +1486,26 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             kar_yol = kanal["karakter_yol"]
         if not (stil_yol and os.path.exists(stil_yol)) and kanal.get("stil_yol"):
             stil_yol = kanal["stil_yol"]
+    kunye_guven = None
     if not kar_kilit and kar_yol and os.path.exists(kar_yol):
-        bildir("Karakter analiz ediliyor...", 3)
-        kar_kilit = karakter_analiz(kar_yol)
+        # COK ASAMALI ANALIZ: palet olcumu + 2 bagimsiz vision okumasi + kod uzlasisi
+        bildir("Karakter derin analiz ediliyor (çok aşamalı)...", 3)
+        k = kimlik_kunyesi(kar_yol)
+        kar_kilit = kunye_metni(k)
+        kunye_guven = k.get("_guven")
+        if kunye_guven is not None and kunye_guven < 0.6:
+            print(f"  UYARI: kunye guveni dusuk ({kunye_guven}) — referans gorsel net degil",
+                  file=sys.stderr)
+        if not kar_kilit:      # analiz hic sonuc vermezse eski tek-gecisli yonteme dus
+            kar_kilit = karakter_analiz(kar_yol)
     if not stil_kilit and stil_yol and os.path.exists(stil_yol):
         stil_kilit = stil_analiz(stil_yol)
     # Kilitleri profile YAZ (bir kez uretilir, sonraki tum videolarda hazir gelir)
     if kanal and (kar_kilit or stil_kilit):
         try:
             profil_yaz(profil_id, {"kar_kilit": kar_kilit or None,
-                                   "stil_kilit": stil_kilit or None})
+                                   "stil_kilit": stil_kilit or None,
+                                   "kunye_guven": kunye_guven})
         except Exception:
             pass
 
@@ -1127,6 +1524,24 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # gorunumune kilitlenir (videolar ARASI tutarlilik). Kanal kimligi budur.
     capa_yol = kanal.get("capa_yol", "") if kanal else ""
     capa_profilden = bool(capa_yol)
+    # TEMIZ CAPA: kullanici karakter verdiyse ve henuz kanon yoksa, sahnelerden ONCE notr/
+    # eller-bos bir kanon karesi uret. Boylece referansin pozu-nesnesi sahnelere BULASMAZ ve
+    # tum sahneler ayni temiz kareye kilitlenir. Sahne 1'i capa yapmak sapmayi bilesikliyordu.
+    if not capa_yol and kar_yol and os.path.exists(kar_yol):
+        bildir("Karakter kanonu (temiz çapa) üretiliyor...", 5)
+        kanon = os.path.join(is_dizini, "_kanon.png")
+        try:
+            if capa_uret(kar_yol, kanon, kar_kilit, stil_kilit, stil_yol, gorsel_model):
+                capa_yol = kanon
+                capa_profilden = True     # DONDURULDU: sahne ciktisiyla guncellenmez
+                if kanal:
+                    profil_capa_kilitle(profil_id, kanon)
+                    print(f"  profil '{profil_id}' TEMIZ capasi kilitlendi", file=sys.stderr)
+        except BakiyeHatasi:
+            raise
+        except Exception as e:
+            print(f"  capa uretilemedi, sahne-1 capasina dusuluyor: {str(e)[:120]}",
+                  file=sys.stderr)
     kumulatif_sn = 0.0   # hikaye modu: acilis bolumu (HIKAYE_ACILIS_SN) takibi icin toplam sure
 
     # ═══ SAHNE URETIMI — 3 FAZ (paralel) ═══
@@ -1315,7 +1730,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # Statik gorsel + Ken Burns'te 24 fps sinematik durur, fark hissedilmez. VIDEO_FPS env ile geri alinir.
     props = {"fps": int(os.environ.get("VIDEO_FPS", "24")), "genislik": 1920, "yukseklik": 1080,
              "gecis": motion, "altyaziStil": altyazi_stil,
-             "altyaziSablon": (altyazi_sablon or "klasik"), "sahneler": props_sahneler}
+             "altyaziAyar": altyazi_ayar_coz(altyazi_sablon), "sahneler": props_sahneler}
     props_yolu = os.path.join(is_dizini, "props.json")
     with open(props_yolu, "w") as f:
         json.dump(props, f, ensure_ascii=False)
