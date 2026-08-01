@@ -344,6 +344,7 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
                       palet: str = Form(""),
                       palet_ozel: str = Form(""),
                       arkaplan: str = Form(""),
+                      ses: str = Form(""),
                       karakter: UploadFile = File(None),
                       stil: UploadFile = File(None)):
     """Karakter/stil gorselleri her video icin DOGRUDAN yuklenir (kalici kayit yok).
