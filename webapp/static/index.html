@@ -220,6 +220,17 @@
           <div class="durum" style="margin-top:10px;font-size:11px">📖 Hazır hikaye metnini yapıştır. İlk ~2,5 dakika <b>yoğun hareketli açılış</b> (izleyiciyi tutmak için), sonrası efektli sinematik kareler + altyazı.<br>🧍 <b>Karakter</b>: yukarıya görsel yüklersen her sahnede birebir o; <b>yüklemesen de</b> karakter baştan sona otomatik aynı tutulur.<br>🎨 <b>Görsel tarzı</b>: yukarıdaki "Stil görseli" alanına örnek bir fotoğraf yüklersen bütün sahneler <b>o fotoğrafın tarzında</b> üretilir (yüklemezsen sinematik film karesi stili).</div>
         </div>
 
+        <!-- ══ ANLATICI SESİ ══ -->
+        <div style="margin-top:22px;border-top:1px solid var(--line);padding-top:18px">
+          <div class="lbl2">🎙️ Anlatıcı sesi <span style="font-weight:400;color:var(--dim2)">— dinleyip seç</span></div>
+          <div class="estiller" id="sesler"><span class="durum">Yükleniyor...</span></div>
+          <div class="durum" style="margin-top:10px;font-size:11px">
+            <b>Ücretsiz</b> sesler edge-tts — yaş tarif edilemez, sadece ton farkı.
+            <b>Yaşlı/olgun</b> sesler OpenAI motoru kullanır: sesin yaşı ve tınısı tarif edilebilir,
+            video başına ~$0.03. Kanal profiline kaydedilir.
+          </div>
+        </div>
+
         <!-- ══ ARKA PLAN: mekân dünyası + yoğunluk ══ -->
         <div style="margin-top:22px;border-top:1px solid var(--line);padding-top:18px">
           <div class="lbl2">🏠 Arka plan <span style="font-weight:400;color:var(--dim2)">— sahnelerin geçtiği mekân dünyası</span></div>
@@ -404,6 +415,9 @@ let sureDk=2, gecisAcik=true, zoomAcik=true;
    okuyor — tanim daha asagida kalirsa TDZ ReferenceError ile TUM script olur (hicbir sey secilemez) */
 let animStil=null, animListe=[];
 /* renk paleti — pfOzetGuncelle bunlari da okuyor, TDZ olmasin diye BURADA */
+let seciliSes = localStorage.getItem("bedosaho_ses") || "otomatik";
+let sesListe = [];
+let calan = null;
 let seciliArkaplan = localStorage.getItem("bedosaho_arkaplan") || "otomatik";
 let arkaplanListe = [];
 let seciliPalet = localStorage.getItem("bedosaho_palet") || "otomatik";
@@ -556,6 +570,7 @@ function pfOzetGuncelle(){
     sat(!!karFile, `<b>Ana karakter görseli:</b> ${karFile?karFile.name:"yüklenmedi (sistem kendi karakterini üretir)"}`),
     sat(!!stilFile, `<b>Genel görsel stil:</b> ${stilFile?stilFile.name:"yüklenmedi (stilin ilk videoda kilitlenir)"}`),
     sat(altyaziAcik, `<b>Altyazı:</b> ${altyaziAcik?((altSablonlar[altSablon]||{}).ad||altSablon)+" (özelleştirilmiş)":"kapalı"}`),
+    sat(seciliSes!=="otomatik", `<b>Anlatıcı sesi:</b> ${seciliSes==="otomatik"?"otomatik (dile göre, ücretsiz)":((sesListe.find(x=>x.id===seciliSes)||{}).ad||seciliSes)}`),
     sat(seciliArkaplan!=="otomatik", `<b>Arka plan:</b> ${seciliArkaplan==="otomatik"?"otomatik (stilin kendi mekân kuralı)":((arkaplanListe.find(x=>x.id===seciliArkaplan)||{}).ad||seciliArkaplan)}`),
     sat(seciliPalet!=="otomatik", `<b>Renk paleti:</b> ${seciliPalet==="otomatik"?"otomatik (stilin kendi renkleri)":(seciliPalet==="ozel"?("Özel — "+ozelHex.join(" ")):((paletListe.find(x=>x.id===seciliPalet)||{}).ad||seciliPalet))}`),
   ].map(s=>`<div>${s}</div>`).join("");
@@ -578,6 +593,7 @@ $("#btnProfil").onclick=async()=>{
   fd.append("altyazi_sablon", altyaziAcik ? JSON.stringify(ay) : "");
   fd.append("palet", seciliPalet||""); fd.append("palet_ozel", ozelHex.join(","));
   fd.append("arkaplan", seciliArkaplan||"");
+  fd.append("ses", seciliSes||"");
   if(karFile) fd.append("karakter",karFile);
   if(stilFile) fd.append("stil",stilFile);
   $("#btnProfil").disabled=true;
@@ -603,6 +619,42 @@ function buyut(src, ad){
     if(e.key==="Escape"){o.remove();document.removeEventListener("keydown",esc);}});
   document.body.appendChild(o);
 }
+
+/* ── anlatici sesi ── */
+function sesCal(url, btn){
+  if(calan){ calan.pause(); calan = null; }
+  document.querySelectorAll("#sesler .oynat").forEach(x=>x.textContent="▶ dinle");
+  const a = new Audio(url);
+  calan = a; btn.textContent = "⏸ durdur";
+  a.onended = ()=>{ btn.textContent="▶ dinle"; calan=null; };
+  a.play().catch(()=>{ btn.textContent="çalınamadı"; });
+}
+function secSes(id){
+  seciliSes=id; localStorage.setItem("bedosaho_ses",id);
+  $$("#sesler .estil").forEach(x=>x.classList.toggle("on",(x.dataset.id||"")===id));
+}
+fetch("api/sesler").then(r=>r.json()).then(list=>{
+  sesListe=list; const c=$("#sesler"); if(!c) return; c.innerHTML="";
+  list.forEach(v=>{
+    const d=document.createElement("div");
+    d.className="estil"+(seciliSes===v.id?" on":""); d.dataset.id=v.id;
+    const rozet = v.motor==="openai"
+      ? `<span style="font-size:10px;color:var(--warn)">${v.ucret}</span>`
+      : `<span style="font-size:10px;color:var(--ok)">ücretsiz</span>`;
+    d.innerHTML=`<span class="pick"></span><b>${v.ad}</b>
+      <p>${v.ozet||""}</p>
+      <div class="meta" style="display:flex;align-items:center;gap:10px;margin-top:9px">
+        ${rozet}
+        ${v.ornek?`<button class="oynat" style="background:#0e1117;border:1px solid var(--line);
+           color:var(--txt);border-radius:8px;padding:4px 10px;font:inherit;font-size:11px;
+           cursor:pointer">▶ dinle</button>`:""}
+      </div>`;
+    const b2=d.querySelector(".oynat");
+    if(b2) b2.onclick=(e)=>{ e.stopPropagation(); sesCal(v.ornek, b2); };
+    d.onclick=()=>secSes(v.id);
+    c.appendChild(d);
+  });
+}).catch(()=>{$("#sesler").innerHTML='<span class="durum">sesler yüklenemedi</span>';});
 
 /* ── arka plan ── */
 const AP_ROZET={sade:"◻️ sade", orta:"◧ orta", zengin:"▦ zengin"};
@@ -790,6 +842,7 @@ $("#btnUret").onclick=async()=>{
     fd.append("palet", seciliPalet); fd.append("palet_ozel", ozelHex.join(","));
   }
   if(seciliArkaplan && seciliArkaplan!=="otomatik") fd.append("arkaplan", seciliArkaplan);
+  if(seciliSes && seciliSes!=="otomatik") fd.append("ses", seciliSes);
   if(karFile) fd.append("karakter",karFile);
   if(stilFile) fd.append("stil",stilFile);
   let job;

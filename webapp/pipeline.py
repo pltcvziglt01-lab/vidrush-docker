@@ -1499,6 +1499,68 @@ import re as _re
 _SES_KALIP = _re.compile(r"^[a-z]{2,3}-[A-Z]{2}-\w+Neural$")
 
 
+# ═══════════════ SES SECENEKLERI ═══════════════
+# edge-tts (bedava) + OpenAI gpt-4o-mini-tts (talimatli — GERCEK yasli ses).
+# Neden OpenAI: edge-tts'in 322 sesinin hicbiri yasli degil; perde dusurmek genc sesi
+# kalinlastirir, yaslandirmaz. gpt-4o-mini-tts sesin YASINI tarif etmeye izin veriyor.
+# Maliyet: ~$0.02-0.03 / 11 dk video (+ whisper hizalama ~$0.07). edge-tts $0.
+YASLI_KADIN_TALIMAT = (
+    "An elderly woman, roughly seventy five. Frail, papery timbre with a gentle tremor, quiet "
+    "and slow, full of lived experience. Speak softly, as if sitting in a kitchen chair.")
+
+SESLER = {
+    "otomatik": {"ad": "Otomatik (dile göre)", "motor": "edge", "ses": "",
+                 "ozet": "Metnin diline uygun ücretsiz ses", "ucret": "ücretsiz", "dil": ""},
+    # ── Kullanicinin 1 Agu 2026'da ORNEK DINLEYIP ONAYLADIGI ses ──
+    "yasli-kadin": {"ad": "Yaşlı Kadın (75)", "motor": "openai", "ses": "shimmer",
+                    "talimat": YASLI_KADIN_TALIMAT, "hiz": 0.92, "dil": "en",
+                    "ozet": "Kırılgan, hafif titrek, sakin — tasarruf/anı kanalları için",
+                    "ucret": "~$0.03/video"},
+    "olgun-kadin": {"ad": "Olgun Kadın (68)", "motor": "openai", "ses": "coral",
+                    "talimat": ("Speak as a warm woman in her late sixties. Unhurried and gentle, "
+                                "with the soft dryness and slight breathiness of an older voice. "
+                                "Lower and thinner than a young voice, with small natural pauses, "
+                                "as if remembering while she speaks. Kind, grandmotherly, never perky."),
+                    "hiz": 0.94, "dil": "en", "ozet": "Anneanne tonu, hatırlarken duraklayan",
+                    "ucret": "~$0.03/video"},
+    "buyukanne-abd": {"ad": "Büyükanne (Orta Batı)", "motor": "openai", "ses": "ballad",
+                      "talimat": ("A grandmother in her late sixties from the American midwest. "
+                                  "Low, calm, plain-spoken, a touch of gravel. No enthusiasm, just "
+                                  "quiet certainty from years of doing it herself."),
+                      "hiz": 0.93, "dil": "en", "ozet": "Alçak, düz konuşan, çakıllı",
+                      "ucret": "~$0.03/video"},
+    "yasli-erkek": {"ad": "Yaşlı Erkek (70)", "motor": "openai", "ses": "onyx",
+                    "talimat": ("A man of about seventy telling a story he has told before. Deep, "
+                                "slow and weathered, with a dry rasp. Calm authority, no drama."),
+                    "hiz": 0.92, "dil": "en", "ozet": "Derin, yavaş, yıpranmış",
+                    "ucret": "~$0.03/video"},
+    # ── Ucretsiz edge-tts secenekleri (yas TARIF EDILEMEZ, sadece ton farki) ──
+    "en-kadin-sicak": {"ad": "Kadın · Sıcak (İng)", "motor": "edge", "ses": "en-US-JennyNeural",
+                       "ozet": "Şefkatli, sakin anlatıcı", "ucret": "ücretsiz", "dil": "en"},
+    "en-kadin-ingiliz": {"ad": "Kadın · İngiliz", "motor": "edge", "ses": "en-GB-SoniaNeural",
+                         "ozet": "Ölçülü İngiliz aksanı", "ucret": "ücretsiz", "dil": "en"},
+    "en-kadin-avustralya": {"ad": "Kadın · Avustralya", "motor": "edge", "ses": "en-AU-NatashaNeural",
+                            "ozet": "Aussie kanalları için", "ucret": "ücretsiz", "dil": "en"},
+    "en-erkek": {"ad": "Erkek · Anlatıcı (İng)", "motor": "edge",
+                 "ses": "en-US-AndrewMultilingualNeural",
+                 "ozet": "Belgesel tonu", "ucret": "ücretsiz", "dil": "en"},
+    "tr-kadin": {"ad": "Kadın · Türkçe", "motor": "edge", "ses": "tr-TR-EmelNeural",
+                 "ozet": "Türkçe anlatıcı", "ucret": "ücretsiz", "dil": "tr"},
+    "tr-erkek": {"ad": "Erkek · Türkçe", "motor": "edge", "ses": "tr-TR-AhmetNeural",
+                 "ozet": "Türkçe anlatıcı", "ucret": "ücretsiz", "dil": "tr"},
+}
+VARSAYILAN_SES = "otomatik"
+
+
+def ses_ayari(secim: str, plan_sesi: str = "") -> dict:
+    """Ses secimini motor+parametre sozlugune cevir. Bilinmeyen/otomatik -> edge, dile gore."""
+    s = SESLER.get((secim or "").strip())
+    if not s or s.get("motor") != "openai":
+        return {"motor": "edge", "ses": (s or {}).get("ses") or plan_sesi}
+    return {"motor": "openai", "ses": s["ses"], "talimat": s.get("talimat", ""),
+            "hiz": s.get("hiz", 0.92)}
+
+
 def ses_coz(plan: dict) -> str:
     """plan['voice']'i dogrula; bos/bozuk/dil-uyumsuzsa plan['language']'a gore yerel sesi sec.
     Boylece Turkce metin en-US sesle okunmaz ve halusinasyon voice tum isi oldurmez."""
@@ -1891,7 +1953,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                sure_dk: float = 2, gecis_acik: bool = True, zoom_acik: bool = True,
                ilerle=None, profil_id: str = "", altyazi_sablon: str = "",
                altyazi_ac: str = "", palet: str = "", palet_ozel: str = "",
-               arkaplan: str = "") -> dict:
+               arkaplan: str = "", ses_secim: str = "") -> dict:
     """Tam hat. mod: 'animasyon'|'documentary'. stil_yol: referans stil gorseli (opsiyonel).
     sure_dk: hedef sure (hikaye maks 60, digerleri maks 14). gecis_acik/zoom_acik: kullanicinin tercihi.
     profil_id: KANAL PROFILI — verilirse karakter/capa/kilitler profilden gelir ve tum
@@ -2029,6 +2091,14 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     plan = uzun_plan(story, prof, sure_dk)
     scenes = plan["scenes"]
     ses = ses_coz(plan)   # dogrulanmis, dile uygun ses (en-US-on-Turkce ve halusinasyon fix)
+    # SES SECIMI: bu videoda secilmediyse kanal profilininki (kanal genelinde ayni anlatici)
+    if not ses_secim and kanal:
+        ses_secim = kanal.get("ses", "")
+    ses_ayar = ses_ayari(ses_secim, ses)
+    if ses_ayar.get("motor") == "openai":
+        print(f"  ses: OpenAI {ses_ayar['ses']} ({ses_secim})", file=sys.stderr)
+    elif ses_ayar.get("ses"):
+        ses = ses_ayar["ses"]
 
     is_dizini = os.path.join(PUBLIC, "isler", is_adi)
     os.makedirs(is_dizini, exist_ok=True)
@@ -2176,7 +2246,8 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     async def _tts(n, metin):
         async with tts_sem:
             syol = f"isler/{is_adi}/ses_{n}.mp3"
-            kelimeler, sure = await uret_seslendir(metin, ses, os.path.join(PUBLIC, syol))
+            kelimeler, sure = await uret_seslendir(metin, ses, os.path.join(PUBLIC, syol),
+                                                  ayar=ses_ayar)
             return n, syol, kelimeler, sure
 
     tts_sonuc = {}
@@ -2341,7 +2412,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     return sonuc
 
 
-async def uret_seslendir(metin, ses, yol, deneme=3):
+async def uret_seslendir(metin, ses, yol, deneme=3, ayar=None):
     """DAYANIKLI TTS. edge-tts agdan cekilir; gecici hata/bos metin olursa TEKRAR dener.
     Basarisiz ya da bos/bozuk ses dosyasi -> (None, None) doner ki cagiran o sahneyi
     ATLASIN (tek TTS hicgirigi tum 30dk isi oldurmesin). Basarida (kelimeler, sure)."""
@@ -2355,7 +2426,7 @@ async def uret_seslendir(metin, ses, yol, deneme=3):
             # bekletebilir (retry sadece exception'da calisir). 120s tavan -> hata firlar ->
             # retry devreye girer -> tum kuyruk sonsuza kilitlenmez.
             kelimeler, sure = await asyncio.wait_for(
-                uretmod.seslendir(metin, ses, yol), timeout=120)
+                uretmod.seslendir(metin, ses, yol, ayar), timeout=240)
             # Remotion'un <Audio> cozebilmesi icin dosya gercekten yazilmis olmali
             if os.path.exists(yol) and os.path.getsize(yol) > 1024:
                 return kelimeler, sure

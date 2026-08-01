@@ -231,6 +231,28 @@ def onizleme(dosya: str):
     return FileResponse(yol, headers={"Cache-Control": "public, max-age=86400"})
 
 
+@app.get("/api/sesler")
+def sesler():
+    """Anlatici sesleri. motor=openai olanlar sesin YASINI tarif edebiliyor (edge-tts edemez)."""
+    return [{"id": k, "ad": v["ad"], "ozet": v.get("ozet", ""), "motor": v["motor"],
+             "ucret": v.get("ucret", ""), "dil": v.get("dil", ""),
+             "ornek": (f"ses-ornek/{k}.mp3"
+                       if os.path.exists(os.path.join(STATIC, "ses-ornek", f"{k}.mp3")) else "")}
+            for k, v in pipeline.SESLER.items()]
+
+
+@app.get("/ses-ornek/{dosya}")
+def ses_ornek(dosya: str):
+    ad = os.path.basename(dosya)
+    if not ad.endswith(".mp3"):
+        raise HTTPException(404, "yok")
+    yol = os.path.join(STATIC, "ses-ornek", ad)
+    if not os.path.exists(yol):
+        raise HTTPException(404, "yok")
+    return FileResponse(yol, media_type="audio/mpeg",
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
 @app.get("/api/arkaplanlar")
 def arkaplanlar():
     """Mekan/arka plan secenekleri — cerceve blogunun sonuna eklenir, yogunlugu ezebilir."""
@@ -248,7 +270,7 @@ async def profil_olustur(pid: str = Form(...), ad: str = Form(""),
                          tur: str = Form("animasyon"), edit: str = Form(""),
                          altyazi_sablon: str = Form(""),
                          palet: str = Form(""), palet_ozel: str = Form(""),
-                         arkaplan: str = Form(""),
+                         arkaplan: str = Form(""), ses: str = Form(""),
                          karakter: UploadFile = File(None),
                          stil: UploadFile = File(None)):
     """Kanal profili olustur/guncelle. Karakter+stil gorselleri KALICI saklanir."""
@@ -280,7 +302,8 @@ async def profil_olustur(pid: str = Form(...), ad: str = Form(""),
                               "palet": pal or None,
                               "palet_ozel": palet_ozel.strip()[:80] or None,
                               "arkaplan": (arkaplan.strip()
-                                           if arkaplan.strip() in pipeline.ARKA_PLANLAR else "") or None})
+                                           if arkaplan.strip() in pipeline.ARKA_PLANLAR else "") or None,
+                              "ses": (ses.strip() if ses.strip() in pipeline.SESLER else "") or None})
     return pipeline.profil_oku(pid) and {"ok": True, "id": pid}
 
 
@@ -378,7 +401,8 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
     is_kuyrugu.put((is_id, story.strip(), kar, stil_yol, mod, edit_id, sd, gecis_acik, zoom_acik,
                     profil.strip(), altyazi.strip(), altyazi_sablon.strip(),
                     pal, palet_ozel.strip()[:80],
-                    arkaplan.strip() if arkaplan.strip() in pipeline.ARKA_PLANLAR else ""))
+                    arkaplan.strip() if arkaplan.strip() in pipeline.ARKA_PLANLAR else "",
+                    ses.strip() if ses.strip() in pipeline.SESLER else ""))
     return {"job_id": is_id, "kuyruk": is_kuyrugu.qsize(), "tur": mod, "edit": edit_id,
             "profil": profil.strip()}
 
@@ -424,7 +448,7 @@ def cikti(dosya: str):
 
 def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom_acik,
             profil_id="", altyazi="", altyazi_sablon="", palet="", palet_ozel="",
-            arkaplan=""):
+            arkaplan="", ses_secim=""):
     d = isler.get(is_id)
     if not d:
         return
@@ -441,7 +465,8 @@ def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom
                                           sure_dk, gecis_acik, zoom_acik, ilerle,
                                           profil_id=profil_id, altyazi_sablon=altyazi_sablon,
                                           altyazi_ac=altyazi, palet=palet,
-                                          palet_ozel=palet_ozel, arkaplan=arkaplan))
+                                          palet_ozel=palet_ozel, arkaplan=arkaplan,
+                                          ses_secim=ses_secim))
         d.update({"durum": "bitti", "ilerleme": 100, "mesaj": "Hazir!",
                   "video": "ciktilar/" + sonuc["video"],
                   "kapak": ("ciktilar/" + sonuc["kapak"]) if sonuc.get("kapak") else None,

@@ -43,10 +43,19 @@ for c in python3 python py; do
 done
 [ -n "$PYBIN" ] || { echo "HATA: calisan python bulunamadi"; exit 3; }
 KOKPY="$(cygpath -m "$KOK" 2>/dev/null || echo "$KOK")"
-PYTHONUTF8=1 "$PYBIN" -c "import ast,glob,sys
-yollar = glob.glob('$KOKPY/webapp/*.py')+['$KOKPY/app/uret.py']
-[ast.parse(open(f, encoding='utf-8').read()) for f in yollar]
-print('  ✓ syntax OK (%d dosya)' % len(yollar))" || { echo 'SYNTAX HATASI — deploy iptal'; exit 3; }
+# compile() KULLAN, ast.parse DEGIL. ast.parse "duplicate argument 'ses'" gibi hatalari
+# YAKALAMAZ (bunlar ayristirmada degil bytecode uretiminde bulunur) — 1 Agu 2026'da tam
+# boyle bir hata syntax kontrolunden gecti ve siteyi dusurdu.
+PYTHONUTF8=1 "$PYBIN" -c "import glob,sys
+yollar = sorted(glob.glob('$KOKPY/webapp/*.py'))+['$KOKPY/app/uret.py']
+hata = 0
+for f in yollar:
+    try:
+        compile(open(f, encoding='utf-8').read(), f, 'exec')
+    except SyntaxError as e:
+        print('  ✗ %s satir %s: %s' % (f, e.lineno, e.msg)); hata = 1
+sys.exit(hata) if hata else print('  ✓ derleme OK (%d dosya)' % len(yollar))" \
+  || { echo 'SYNTAX HATASI — deploy iptal'; exit 3; }
 
 echo "== 3/5 Dosyalari konteynere kopyala =="
 # webapp (pipeline/server/kaynak/static)

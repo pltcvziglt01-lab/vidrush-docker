@@ -122,7 +122,102 @@ def _ses_suresi(mp3_yolu: str) -> float:
         return 0.0
 
 
-async def seslendir(metin: str, ses: str, mp3_yolu: str):
+# ═══════════ OpenAI TTS (GERCEK YASLI SES) ═══════════
+# Neden gerekli: edge-tts'in 322 sesinin HICBIRI yasli degil (hepsi Friendly/Positive/
+# Cheerful etiketli). Perde dusurmek genc sesi KALINLASTIRIR, yaslandirmaz.
+# gpt-4o-mini-tts ise "instructions" aliyor -> sesin yasini/tinisini TARIF edebiliyoruz.
+# BEDEL: edge-tts kelime zamanlarini (WordBoundary) bedava veriyordu, OpenAI vermiyor.
+# Cozum: uretilen mp3'u whisper-1 ile kelime bazli hizala. Whisper de patlarsa
+# kelime uzunluguna gore ORANTILI tahmin uret — altyazi kabaca dogru kalir, is olmez.
+def _oai_anahtar():
+    return os.environ.get("OPENAI_KEY") or os.environ.get("OPENAI_API_KEY") or ""
+
+
+def _orantili_zaman(metin: str, toplam: float):
+    """Whisper yoksa: kelime uzunluguna gore sureyi bol. Kusursuz degil ama altyazi
+    tamamen kaymaz ve is olmez."""
+    kel = [k for k in (metin or "").split() if k]
+    if not kel or toplam <= 0:
+        return []
+    agirlik = [max(1, len(k)) for k in kel]
+    top = sum(agirlik)
+    out, t = [], 0.0
+    for k, a in zip(kel, agirlik):
+        d = toplam * a / top
+        out.append({"t0": t, "t1": t + d, "kelime": k})
+        t += d
+    return out
+
+
+def _whisper_zamanlari(mp3_yolu: str):
+    """whisper-1 ile KELIME bazli zaman damgasi. Hata olursa [] doner (cagiran tahmine duser)."""
+    key = _oai_anahtar()
+    if not key:
+        return []
+    try:
+        import urllib.request, uuid, json as _json
+        sinir = "----bedosaho" + uuid.uuid4().hex
+        with open(mp3_yolu, "rb") as f:
+            ses_veri = f.read()
+        parcalar = []
+        for ad, deger in (("model", "whisper-1"), ("response_format", "verbose_json"),
+                          ("timestamp_granularities[]", "word")):
+            parcalar.append(f"--{sinir}\r\nContent-Disposition: form-data; name=\"{ad}\"\r\n\r\n{deger}\r\n".encode())
+        parcalar.append(
+            f"--{sinir}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"a.mp3\"\r\n"
+            f"Content-Type: audio/mpeg\r\n\r\n".encode() + ses_veri + b"\r\n")
+        parcalar.append(f"--{sinir}--\r\n".encode())
+        govde = b"".join(parcalar)
+        r = urllib.request.Request(
+            "https://api.openai.com/v1/audio/transcriptions", data=govde,
+            headers={"Authorization": f"Bearer {key}",
+                     "Content-Type": f"multipart/form-data; boundary={sinir}"})
+        with urllib.request.urlopen(r, timeout=180) as y:
+            j = _json.loads(y.read().decode())
+        return [{"t0": float(w["start"]), "t1": float(w["end"]), "kelime": w["word"]}
+                for w in (j.get("words") or []) if w.get("word")]
+    except Exception as e:
+        print(f"  whisper hizalama basarisiz (orantili tahmine dusuluyor): {str(e)[:140]}",
+              file=sys.stderr)
+        return []
+
+
+async def seslendir_openai(metin: str, mp3_yolu: str, ses: str = "shimmer",
+                           talimat: str = "", hiz: float = 0.92):
+    key = _oai_anahtar()
+    if not key:
+        raise RuntimeError("OPENAI_KEY yok — OpenAI sesi kullanilamaz")
+    import urllib.request, json as _json
+    govde = {"model": "gpt-4o-mini-tts", "voice": ses, "input": metin,
+             "response_format": "mp3", "speed": max(0.5, min(1.5, float(hiz)))}
+    if talimat:
+        govde["instructions"] = talimat
+    r = urllib.request.Request(
+        "https://api.openai.com/v1/audio/speech", data=_json.dumps(govde).encode(),
+        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
+    veri = await asyncio.to_thread(lambda: urllib.request.urlopen(r, timeout=180).read())
+    with open(mp3_yolu, "wb") as f:
+        f.write(veri)
+    olculen = _ses_suresi(mp3_yolu)
+    kelimeler = await asyncio.to_thread(_whisper_zamanlari, mp3_yolu)
+    if not kelimeler:
+        kelimeler = _orantili_zaman(metin, olculen)
+    kuyruk = float(os.environ.get("TTS_KUYRUK", "0.30"))
+    sure = max((kelimeler[-1]["t1"] + kuyruk) if kelimeler else 0,
+               (olculen + 0.12) if olculen else 0,
+               max(2.5, len(metin.split()) * 0.40))
+    return kelimeler, sure
+
+
+async def seslendir(metin: str, ses: str, mp3_yolu: str, ayar: dict = None):
+    """ayar verilirse ve ayar['motor']=='openai' ise OpenAI TTS'e yonlendirilir."""
+    if ayar and ayar.get("motor") == "openai":
+        return await seslendir_openai(metin, mp3_yolu, ayar.get("ses") or "shimmer",
+                                      ayar.get("talimat") or "", ayar.get("hiz") or 0.92)
+    return await _seslendir_edge(metin, ses, mp3_yolu)
+
+
+async def _seslendir_edge(metin: str, ses: str, mp3_yolu: str):
     # HIZ: edge-tts varsayilani ~100-110 kelime/dk cikiyordu (yavas, sahneler hedeften uzun).
     # Referans videolarin temposu icin +%15 hiz. TTS_RATE env'i ile ayarlanir ("+0%" = kapali).
     hiz = os.environ.get("TTS_RATE", "+15%")
