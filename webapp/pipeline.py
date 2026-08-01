@@ -494,8 +494,8 @@ ANIM_STIL = (
     "Hand-drawn editorial cartoon on textured paper: confident dark sepia-brown ink outlines with "
     "organic wobble and varying line weight, flat gouache fills, two-tone cel shading with strong "
     "directional light and deep cast shadows, subtle paper grain and soft offset-print texture. "
-    "Muted sun-faded palette drawn from warm ochre, sage green, dusty slate blue, faded brick and "
-    "warm cream; desaturated, never neon, glossy or flat digital vector. IMPORTANT — vary which of "
+    "Sun-faded palette drawn from warm ochre, sage green, dusty slate blue, faded brick and "
+    "warm cream, kept LIGHT and airy rather than dark; never neon, glossy or flat digital vector. IMPORTANT — vary which of "
     "these colours DOMINATES this particular scene (one scene ochre-dominant, the next sage-green or "
     "dusty slate-blue or cool grey dominant) so consecutive scenes do not all share the same colour "
     "temperature, while the palette family and drawing style stay identical. Small natural in-world "
@@ -518,7 +518,7 @@ ANIM_CERCEVE = (
     "and receding depth. Objects, furniture and signage must run to all four edges of the image, and "
     "at least one piece of furniture or foreground object must pass in front of the character and "
     "partly overlap it — nothing floats in open space, no blank areas. Keep ONE dominant light source "
-    "with a clearly visible direction, casting deep directional shadows that shape the composition."
+    "with a clearly visible direction, casting soft readable shadows that shape the composition."
 )
 
 # ═════════ EXPLAINER STILI (2. referans: "Salt" videosu analizinden) ═════════
@@ -656,7 +656,7 @@ HIK_STIL = (
     "ultra-simple flat sticker-like figures placed on top of it, like paper cutouts pasted onto an "
     "oil painting. THE WORLD (everything except the figures) is fully painted and cinematic — "
     "saturated natural colour, visible brushwork, atmospheric haze, real light and real cast shadows, "
-    "layered depth from a dark framing foreground to a hazy far vista; the world carries NO black "
+    "layered depth from a framing foreground to a hazy far vista; the world carries NO black "
     # NOT: burada RENK DAYATILMAZ. Onceden 'pure flat white shapes' yaziyordu ve kullanicinin
     # turuncu karakteriyle CATISIP sahneler arasi beyaz<->turuncu salinimina yol aciyordu.
     # Renk daima karakter kunyesinden gelir; stil sadece CIZIM DILINI tanimlar.
@@ -689,7 +689,7 @@ HIK_CERCEVE = (
     " FRAMING for a 16:9 centre crop of this 1536x1024 image: the top 9% and bottom 9% get cut away, "
     "so every face, letter, label box and key silhouette stays inside 10%-90% of frame height and 8% "
     "clear of the left and right edges. VALUE LAW (non-negotiable): the painted area directly behind "
-    "and around a figure is mid-to-dark and visually calm so the flat white figure reads instantly as "
+    "and around a figure is mid-toned and visually calm so the flat white figure reads instantly as "
     "the lightest shape — never place a figure against bright sky, open fire, snow or busy painted "
     "texture. GROUNDING: every figure sits on the ground with a flat hard-edged single-tone shadow "
     "ellipse, never a soft or painted shadow. One focal point per frame placed on a third; horizon on "
@@ -846,8 +846,10 @@ KALEM_SOZLESME = (
 ANI_STIL = (
     "Warm hand-drawn storybook illustration: fine confident ink linework filled with soft coloured "
     "pencil and light watercolour washes, gentle paper grain, no hard cel shading and no digital "
-    "vector flatness. Cosy nostalgic domestic mood, everything lit by one warm source — a table "
-    "lamp, a kitchen window, late afternoon sun. Interiors are richly furnished and clearly lived "
+    "vector flatness. Cosy nostalgic domestic mood in BRIGHT, AIRY DAYLIGHT: rooms are filled "
+    "with broad soft window light, walls and large surfaces stay light and cheerful, shadows are "
+    "pale and short, and there are no gloomy corners or deep blacks anywhere. Colours are light "
+    "and gently desaturated like a children's picture book. Interiors are richly furnished and lived "
     "in: patterned wallpaper, floral curtains, potted plants, tea things, wall clocks, framed "
     "photographs, worn timber. People are drawn as REAL people in a friendly illustrated style — "
     "proper faces with age, expression and warmth — never as stick figures, never photorealistic, "
@@ -1044,8 +1046,11 @@ PALETLER = {
                        "renkler": ["#E6D8BF", "#C4A177", "#8C6A47", "#4A3520", "#241A10", "#9C8663"]},
     "orman-yesil": {"ad": "Orman Yeşili", "ozet": "Koyu orman, yosun, eğrelti, kabuk",
                     "renkler": ["#D7E2CC", "#93B06A", "#5E7F4A", "#234A2E", "#6B4A2E", "#16241A"]},
-    "ani-defteri": {"ad": "Anı Defteri", "ozet": "Adaçayı, krem, meşe, lamba sarısı, gül kurusu",
-                    "renkler": ["#F5EDDC", "#8FA68E", "#A9743F", "#E8B65A", "#C98B7E", "#4A3728"]},
+    # ThriftyHazel'in 100 karesinden OLCULDU. Eski palette #4A3728 (parlaklik 57) vardi,
+    # model surekli ona yasleniyordu -> cikti kapkaranlik. Olculen baskin renklerin 8'i
+    # 145+ parlaklikta; palet ona gore acildi.
+    "ani-defteri": {"ad": "Anı Defteri", "ozet": "Açık krem, nane, kum, mercan — aydınlık",
+                    "renkler": ["#F5F0DC", "#E8DCC0", "#D4D4CC", "#A8C8B8", "#E0956F", "#B08050"]},
     "mono-kontrast": {"ad": "Mono + Tek Vurgu", "ozet": "Siyah-beyaz-gri + tek kırmızı vurgu",
                       "renkler": ["#FFFFFF", "#D8D4CC", "#8C8880", "#3A3835", "#121110", "#D93025"]},
 }
@@ -1157,6 +1162,40 @@ ARKA_PLANLAR = {
                    "darkness do the work.")},
 }
 VARSAYILAN_ARKAPLAN = "otomatik"
+
+# ═══════════════ ISIK DUZEYI ═══════════════
+# 1 Agu 2026 OLCUMU: hedef kanal (ThriftyHazel, 120 kare) ortalama parlaklik 162/255,
+# doygunluk 57. Bizim ciktimiz 114 / 95 -> %30 daha KARANLIK, %67 daha DOYGUN (camurlu).
+# Sebep: stil ve arka plan promptlari "tek isik kaynagi / derin golge / lamba isigi"
+# vurguluyordu. Cozum: isik AYRI eksen olsun ve stilin karanlik egilimini EZEBILSIN.
+ISIK_DUZEYLERI = {
+    "parlak-gunduz": {
+        "ad": "Parlak Gündüz", "ozet": "Aydınlık, yumuşak, gölgesiz — YouTube'da en okunaklısı",
+        "prompt": (" LIGHTING — HIGH KEY (this OVERRIDES any earlier instruction about a single "
+                   "light source, deep shadow, dim rooms or dramatic lighting): the whole picture is "
+                   "brightly and EVENLY lit by broad soft daylight. Walls, floors and large surfaces "
+                   "sit in the LIGHT half of the value range, never in gloom. Shadows are soft, pale "
+                   "and short; no deep blacks, no heavy vignette anywhere. Colours are light and "
+                   "slightly desaturated like a children's picture book — clean pastels rather than "
+                   "heavy saturated pigment. The image must read as CHEERFUL and AIRY at a glance, "
+                   "even on a small phone screen.")},
+    "dengeli": {
+        "ad": "Dengeli", "ozet": "Orta aydınlık, yumuşak gölge",
+        "prompt": (" LIGHTING: soft natural daylight with gentle, readable shadows. Keep the overall "
+                   "value in the middle-to-light range; avoid both washed-out flatness and deep "
+                   "murky shadow. Colours natural, never oversaturated.")},
+    "karanlik-sinematik": {
+        "ad": "Karanlık Sinematik", "ozet": "Tek ışık kaynağı, derin gölge — dram için",
+        "prompt": (" LIGHTING: low-key and dramatic, one visible light source, deep directional "
+                   "shadows and rich darks shaping the composition.")},
+}
+VARSAYILAN_ISIK = "parlak-gunduz"
+
+
+def isik_prompt(secim: str) -> str:
+    v = ISIK_DUZEYLERI.get((secim or "").strip())
+    return v["prompt"] if v else ""
+
 
 
 def arkaplan_prompt(secim: str) -> str:
@@ -1788,7 +1827,8 @@ def uzun_plan(story: str, prof: dict, sure_dk: float) -> dict:
 def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
                       stil_prompt: str = "", kar_kilit: str = "", stil_yol: str = "",
                       capa_yol: str = "", stil_kilit: str = "", yazi_yasak: bool = True,
-                      model: str = "", cerceve: str = "", deneme=5) -> bool:
+                      model: str = "", cerceve: str = "", deneme=5,
+                      kanon_modu: bool = False) -> bool:
     """OpenAI images/edits: karakter + stil + GORSEL CAPA referanslariyla sahne uretir.
     capa_yol: ilk uretilen sahnenin gorseli -> sonraki sahnelere ek referans olarak verilir,
     boylece karakter VE stil ilk kareye kilitlenir (her sahnede birebir ayni). kar_kilit:
@@ -1826,7 +1866,14 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
                    "its background, and not any object it holds there. Render exactly ONE main "
                    "character unless the scene describes others. Obey the shot type and character "
                    "scale given in the scene text; the environment carries the picture.")
-        prompt += DESTEK_GORSEL + VERI_KARTI_GORSEL + MARKA_YASAK
+        # ⚠ 1 Agu 2026: KANON'a destek/veri-karti EKLENMEZ. Kanon notr bir tasarim
+        # sayfasidir; ona "anlatilan sayiyi bir yuzeye yaz" denince model UYDURUYOR
+        # ("SALES GROWTH" grafigi) ve o kirli kanon 24 sahnenin HEPSINE kopyalaniyor.
+        # Bu, cozdugumuz "kirli referans" hatasinin kendi elimizle geri getirilmis hali.
+        if not kanon_modu:
+            prompt += DESTEK_GORSEL + VERI_KARTI_GORSEL + MARKA_YASAK
+        else:
+            prompt += MARKA_YASAK
         if kar_kilit:
             prompt += f" Character identity to match: {kar_kilit}"
         prompt += (" COLOUR LOCK: the character's colours are fixed and identical in every scene "
@@ -1947,7 +1994,8 @@ def capa_uret(ref_yol: str, hedef: str, kimlik: str, stil: str, stil_yol: str = 
         p += f" Art style: {stil}."
     return referansli_gorsel(p, ref_yol, hedef, stil_prompt="", kar_kilit="",
                              stil_yol=stil_yol, capa_yol="", stil_kilit="",
-                             yazi_yasak=True, model=model, cerceve="", deneme=3)
+                             yazi_yasak=True, model=model, cerceve="", deneme=3,
+                             kanon_modu=True)
 
 
 async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
@@ -1955,7 +2003,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                sure_dk: float = 2, gecis_acik: bool = True, zoom_acik: bool = True,
                ilerle=None, profil_id: str = "", altyazi_sablon: str = "",
                altyazi_ac: str = "", palet: str = "", palet_ozel: str = "",
-               arkaplan: str = "", ses_secim: str = "") -> dict:
+               arkaplan: str = "", ses_secim: str = "", isik: str = "") -> dict:
     """Tam hat. mod: 'animasyon'|'documentary'. stil_yol: referans stil gorseli (opsiyonel).
     sure_dk: hedef sure (hikaye maks 60, digerleri maks 14). gecis_acik/zoom_acik: kullanicinin tercihi.
     profil_id: KANAL PROFILI — verilirse karakter/capa/kilitler profilden gelir ve tum
@@ -2009,6 +2057,15 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     if ap_ek:
         cerceve_ek = cerceve_ek + ap_ek
         print(f"  arka plan: {arkaplan}", file=sys.stderr)
+    # ISIK EN SONA: hem stilin hem arka planin karanlik egilimini ezmesi gerekiyor.
+    if not isik and kanal:
+        isik = kanal.get("isik", "")
+    if not isik:
+        isik = VARSAYILAN_ISIK          # varsayilan PARLAK (olculen hedef 162/255)
+    is_ek = isik_prompt(isik)
+    if is_ek:
+        cerceve_ek = cerceve_ek + is_ek
+        print(f"  isik duzeyi: {isik}", file=sys.stderr)
     motion = prof["motion"] if gecis_acik else "kesme"   # gecis kapali -> sade kesme
     overlay_stil = prof["overlay"]
     # Altyazi: profil varsayilani, ama kullanici acikca ac/kapat diyebilir (animasyonda da).

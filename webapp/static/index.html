@@ -220,6 +220,17 @@
           <div class="durum" style="margin-top:10px;font-size:11px">📖 Hazır hikaye metnini yapıştır. İlk ~2,5 dakika <b>yoğun hareketli açılış</b> (izleyiciyi tutmak için), sonrası efektli sinematik kareler + altyazı.<br>🧍 <b>Karakter</b>: yukarıya görsel yüklersen her sahnede birebir o; <b>yüklemesen de</b> karakter baştan sona otomatik aynı tutulur.<br>🎨 <b>Görsel tarzı</b>: yukarıdaki "Stil görseli" alanına örnek bir fotoğraf yüklersen bütün sahneler <b>o fotoğrafın tarzında</b> üretilir (yüklemezsen sinematik film karesi stili).</div>
         </div>
 
+        <!-- ══ IŞIK DÜZEYİ ══ -->
+        <div style="margin-top:22px;border-top:1px solid var(--line);padding-top:18px">
+          <div class="lbl2">💡 Işık düzeyi <span style="font-weight:400;color:var(--dim2)">— karelerin aydınlığı</span></div>
+          <div class="estiller" id="isiklar"><span class="durum">Yükleniyor...</span></div>
+          <div class="durum" style="margin-top:10px;font-size:11px">
+            Ölçüm: hedef kanalların ortalama parlaklığı <b>162/255</b>, bizim eski çıktımız <b>114</b> —
+            %30 daha karanlıktı. <b>Parlak Gündüz</b> artık varsayılan ve stilin/arka planın
+            karanlık eğilimini <b>ezer</b>.
+          </div>
+        </div>
+
         <!-- ══ ANLATICI SESİ ══ -->
         <div style="margin-top:22px;border-top:1px solid var(--line);padding-top:18px">
           <div class="lbl2">🎙️ Anlatıcı sesi <span style="font-weight:400;color:var(--dim2)">— dinleyip seç</span></div>
@@ -415,6 +426,8 @@ let sureDk=2, gecisAcik=true, zoomAcik=true;
    okuyor — tanim daha asagida kalirsa TDZ ReferenceError ile TUM script olur (hicbir sey secilemez) */
 let animStil=null, animListe=[];
 /* renk paleti — pfOzetGuncelle bunlari da okuyor, TDZ olmasin diye BURADA */
+let seciliIsik = localStorage.getItem("bedosaho_isik") || "parlak-gunduz";
+let isikListe = [];
 let seciliSes = localStorage.getItem("bedosaho_ses") || "otomatik";
 let sesListe = [];
 let calan = null;
@@ -584,6 +597,7 @@ function pfOzetGuncelle(){
     sat(!!karFile, `<b>Ana karakter görseli:</b> ${karFile?karFile.name:"yüklenmedi (sistem kendi karakterini üretir)"}`),
     sat(!!stilFile, `<b>Genel görsel stil:</b> ${stilFile?stilFile.name:"yüklenmedi (stilin ilk videoda kilitlenir)"}`),
     sat(altyaziAcik, `<b>Altyazı:</b> ${altyaziAcik?((altSablonlar[altSablon]||{}).ad||altSablon)+" (özelleştirilmiş)":"kapalı"}`),
+    sat(true, `<b>Işık düzeyi:</b> ${((isikListe.find(x=>x.id===seciliIsik)||{}).ad||seciliIsik)}`),
     sat(seciliSes!=="otomatik", `<b>Anlatıcı sesi:</b> ${seciliSes==="otomatik"?"otomatik (dile göre, ücretsiz)":((sesListe.find(x=>x.id===seciliSes)||{}).ad||seciliSes)}`),
     sat(seciliArkaplan!=="otomatik", `<b>Arka plan:</b> ${seciliArkaplan==="otomatik"?"otomatik (stilin kendi mekân kuralı)":((arkaplanListe.find(x=>x.id===seciliArkaplan)||{}).ad||seciliArkaplan)}`),
     sat(seciliPalet!=="otomatik", `<b>Renk paleti:</b> ${seciliPalet==="otomatik"?"otomatik (stilin kendi renkleri)":(seciliPalet==="ozel"?("Özel — "+ozelHex.join(" ")):((paletListe.find(x=>x.id===seciliPalet)||{}).ad||seciliPalet))}`),
@@ -608,6 +622,7 @@ $("#btnProfil").onclick=async()=>{
   fd.append("palet", seciliPalet||""); fd.append("palet_ozel", ozelHex.join(","));
   fd.append("arkaplan", seciliArkaplan||"");
   fd.append("ses", seciliSes||"");
+  fd.append("isik", seciliIsik||"");
   if(karFile) fd.append("karakter",karFile);
   if(stilFile) fd.append("stil",stilFile);
   $("#btnProfil").disabled=true;
@@ -633,6 +648,23 @@ function buyut(src, ad){
     if(e.key==="Escape"){o.remove();document.removeEventListener("keydown",esc);}});
   document.body.appendChild(o);
 }
+
+/* ── isik duzeyi ── */
+function secIsik(id){
+  seciliIsik=id; localStorage.setItem("bedosaho_isik",id);
+  $$("#isiklar .estil").forEach(x=>x.classList.toggle("on",(x.dataset.id||"")===id));
+}
+fetch("api/isik-duzeyleri").then(r=>r.json()).then(list=>{
+  isikListe=list; const c=$("#isiklar"); if(!c) return; c.innerHTML="";
+  list.forEach(v=>{
+    const d=document.createElement("div");
+    d.className="estil"+(seciliIsik===v.id?" on":""); d.dataset.id=v.id;
+    d.innerHTML=`<span class="pick"></span><b>${v.ad}</b>
+      <span class="durum" style="font-size:11px;display:block;margin-top:5px">${v.ozet||""}</span>`;
+    d.onclick=()=>secIsik(v.id);
+    c.appendChild(d);
+  });
+}).catch(()=>{$("#isiklar").innerHTML='<span class="durum">ışık düzeyleri yüklenemedi</span>';});
 
 /* ── anlatici sesi ── */
 function sesCal(url, btn){
@@ -857,6 +889,7 @@ $("#btnUret").onclick=async()=>{
   }
   if(seciliArkaplan && seciliArkaplan!=="otomatik") fd.append("arkaplan", seciliArkaplan);
   if(seciliSes && seciliSes!=="otomatik") fd.append("ses", seciliSes);
+  if(seciliIsik) fd.append("isik", seciliIsik);
   if(karFile) fd.append("karakter",karFile);
   if(stilFile) fd.append("stil",stilFile);
   let job;

@@ -46,10 +46,13 @@ def uret(stil_id: str, prof: dict) -> bool:
     if pal:
         stil_metni += "." + pal
     print(f"  {stil_id}: uretiliyor ({model})...", flush=True)
+    # ISIK: uret() bunu cerceve'nin SONUNA ekliyor; onizleme de AYNI kosullari kullanmali,
+    # yoksa kartta gordugun parlaklik gercek ciktiyla uyusmaz.
+    cerceve = prof.get("cerceve", "") + P.isik_prompt(P.VARSAYILAN_ISIK)
     return P.referansli_gorsel(
         ORTAK_SAHNE, "", hedef,
         stil_prompt=stil_metni,
-        cerceve=prof.get("cerceve", ""),
+        cerceve=cerceve,
         yazi_yasak=False,          # kartta "SAVE 40" yazisi GORUNSUN
         model=model, deneme=3,
     )
