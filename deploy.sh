@@ -11,7 +11,9 @@
 # Ayni anda ikiniz deploy ETMEYIN (tek konteyner — biriniz digerinin isini bozar).
 set -e
 
-IP="${BEDOSAHO_IP:-204.168.136.159}"
+# CANLI SUNUCU: RX-4 (10 vCPU) — 1 Agu 2026'da tasindi. Eski Hetzner (204.168.136.159)
+# artik kullanilmiyor; BEDOSAHO_IP ile gecici olarak baska hedefe deploy edilebilir.
+IP="${BEDOSAHO_IP:-185.23.17.240}"
 KEY="${BEDOSAHO_KEY:-$HOME/.ssh/bedosaho_hetzner}"
 SSH="ssh -i $KEY -o StrictHostKeyChecking=no -o ConnectTimeout=15 root@$IP"
 KOK="$(cd "$(dirname "$0")" && pwd)"

@@ -59,6 +59,23 @@ K MAP ROUTE, G INFOGRAPHIC** (hepsi karaktersiz).
 **Kod karşılığı:** `HANDS ONLY`, `MAP ROUTE`, `INNER VOICE` tipleri + `DESTEK_PLANLAYICI`
 (her kare anlatılanı GÖSTEREN somut bir araç içermeli, karakter onunla etkileşmeli).
 
+## 6. "Aussie Money With Bruce" — $12 Million Win (7 kare)
+**Ne öğretti:** Renkli **kurşun kalem** medyumu + **imza aksesuar** kimliği + sıkı renk paleti.
+- Medyum: renkli kalem tarama dokusu, kâğıt grenli, yumuşak; vektör/dijital DEĞİL
+- Karakter: beyaz stickman ama **yeşil-altın çizgili kravat** = kimlik çapası.
+  Yüz hatları neredeyse yok; ayırt edici olan **aksesuar**
+- Yan karakterler aynı stickman ama **kıyafet/saç** ile ayrılıyor (mavi gömlek, at kuyruğu, topuz)
+- Duygu tamamen **kaşlarda**: endişeli eğik kaş, öfkeli çatık kaş, üzgün düşük ağız — her karede net
+- Ortamlar çok spesifik ve "yaşanmış": vardiya panolu mola odası, hi-vis montlar, limon ağaçlı mutfak
+  penceresi, tüplü TV + çiçekli kanepe, kırmızı ipli mantar pano
+- Mesaj taşıyan objeler: tutulan tabela ("WON $12,000,000"), kupa üstünde "FOCUS PLAN FREEDOM"
+- **Renkler bütün karelerde aynı dar aile**: krem kâğıt, adaçayı, altın, kiremit, tozlu mavi
+
+**Kod karşılığı:** `PALETLER["aussie-kalem"]` + `palet_prompt()` — renk artık **kelimeyle tarif
+edilmiyor, kesin HEX olarak** prompta giriyor (`palet_olc` dersinin genele yayılmışı).
+⚠️ Palet **dünyayı** yönetir; karakterin kilitli renkleri her zaman önceliklidir — yoksa
+3. referanstaki beyaz↔turuncu salınımı geri gelir.
+
 ---
 
 ## Sistemin kendi kendine öğrendiği kurallar (referanslardan bağımsız)
