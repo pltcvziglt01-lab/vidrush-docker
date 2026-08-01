@@ -216,6 +216,12 @@ def paletler():
     return [{"id": k, **v} for k, v in pipeline.PALETLER.items()]
 
 
+@app.get("/api/arkaplanlar")
+def arkaplanlar():
+    """Mekan/arka plan secenekleri — cerceve blogunun sonuna eklenir, yogunlugu ezebilir."""
+    return [{"id": k, **v} for k, v in pipeline.ARKA_PLANLAR.items()]
+
+
 @app.get("/api/profiller")
 def profil_listesi():
     """Kanal profilleri — videolar ARASI stil/karakter tutarliligi icin."""
@@ -227,6 +233,7 @@ async def profil_olustur(pid: str = Form(...), ad: str = Form(""),
                          tur: str = Form("animasyon"), edit: str = Form(""),
                          altyazi_sablon: str = Form(""),
                          palet: str = Form(""), palet_ozel: str = Form(""),
+                         arkaplan: str = Form(""),
                          karakter: UploadFile = File(None),
                          stil: UploadFile = File(None)):
     """Kanal profili olustur/guncelle. Karakter+stil gorselleri KALICI saklanir."""
@@ -256,7 +263,9 @@ async def profil_olustur(pid: str = Form(...), ad: str = Form(""),
     pipeline.profil_yaz(pid, {"ad": ad.strip() or pid, "tur": mod, "edit": eid,
                               "altyazi_sablon": altyazi_sablon.strip() or None,
                               "palet": pal or None,
-                              "palet_ozel": palet_ozel.strip()[:80] or None})
+                              "palet_ozel": palet_ozel.strip()[:80] or None,
+                              "arkaplan": (arkaplan.strip()
+                                           if arkaplan.strip() in pipeline.ARKA_PLANLAR else "") or None})
     return pipeline.profil_oku(pid) and {"ok": True, "id": pid}
 
 
@@ -296,6 +305,7 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
                       altyazi_sablon: str = Form(""),
                       palet: str = Form(""),
                       palet_ozel: str = Form(""),
+                      arkaplan: str = Form(""),
                       karakter: UploadFile = File(None),
                       stil: UploadFile = File(None)):
     """Karakter/stil gorselleri her video icin DOGRUDAN yuklenir (kalici kayit yok).
@@ -352,7 +362,8 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
     pal = palet.strip() if (palet.strip() in pipeline.PALETLER or palet.strip() == "ozel") else ""
     is_kuyrugu.put((is_id, story.strip(), kar, stil_yol, mod, edit_id, sd, gecis_acik, zoom_acik,
                     profil.strip(), altyazi.strip(), altyazi_sablon.strip(),
-                    pal, palet_ozel.strip()[:80]))
+                    pal, palet_ozel.strip()[:80],
+                    arkaplan.strip() if arkaplan.strip() in pipeline.ARKA_PLANLAR else ""))
     return {"job_id": is_id, "kuyruk": is_kuyrugu.qsize(), "tur": mod, "edit": edit_id,
             "profil": profil.strip()}
 
@@ -397,7 +408,8 @@ def cikti(dosya: str):
 
 
 def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom_acik,
-            profil_id="", altyazi="", altyazi_sablon="", palet="", palet_ozel=""):
+            profil_id="", altyazi="", altyazi_sablon="", palet="", palet_ozel="",
+            arkaplan=""):
     d = isler.get(is_id)
     if not d:
         return
@@ -414,7 +426,7 @@ def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom
                                           sure_dk, gecis_acik, zoom_acik, ilerle,
                                           profil_id=profil_id, altyazi_sablon=altyazi_sablon,
                                           altyazi_ac=altyazi, palet=palet,
-                                          palet_ozel=palet_ozel))
+                                          palet_ozel=palet_ozel, arkaplan=arkaplan))
         d.update({"durum": "bitti", "ilerleme": 100, "mesaj": "Hazir!",
                   "video": "ciktilar/" + sonuc["video"],
                   "kapak": ("ciktilar/" + sonuc["kapak"]) if sonuc.get("kapak") else None,

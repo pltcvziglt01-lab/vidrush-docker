@@ -928,6 +928,93 @@ def palet_prompt(secim: str, ozel: str = "") -> str:
     )
 
 
+# ═══════════════ ARKA PLAN (mekan dunyasi + yogunluk) ═══════════════
+# Neden ayri bir eksen: 567 referans karesinin analizi iki ZIT dogru gosterdi —
+# Paint Explainer (1.96M) karelerinin cogu BOMBOS beyaz zeminde tek oge; Bruce ve
+# Serious History ise tikabasa dolu mekanlar kuruyor. Ikisi de calisiyor. Yani
+# "her yer dolu olsun" evrensel bir kural DEGIL, kanal karari. Burasi o karar.
+#
+# DIKKAT: stil promptlari (*_CERCEVE) yogunluk dayatiyor ("objects must run to all
+# four edges"). Arka plan secimi bununla CELISEBILIR. Renk paletindeki dersin aynisi:
+# celiskiyi cozmeden birakma -> arka plan blogu en SONA eklenir ve oncelikli oldugunu
+# acikca soyler.
+ARKA_PLANLAR = {
+    "otomatik": {"ad": "Otomatik (stile bırak)", "yogunluk": "-",
+                 "ozet": "Seçili animasyon stilinin kendi mekân kuralı geçerli", "prompt": ""},
+    "sade-beyaz": {
+        "ad": "Sade Beyaz", "yogunluk": "sade",
+        "ozet": "Bomboş beyaz zemin, tek öğe — Paint Explainer düzeni",
+        "prompt": ("BACKGROUND: a plain empty white field. Draw ONLY the subject the scene names "
+                   "and nothing else — no room, no furniture, no scenery, no horizon, no texture. "
+                   "Generous empty space around the subject is the point, not a flaw. A thin ground "
+                   "shadow is the only extra mark allowed.")},
+    "sade-renkli": {
+        "ad": "Sade Renk Alanı", "yogunluk": "sade",
+        "ozet": "Tek düz renk zemin, dikkat dağıtan detay yok",
+        "prompt": ("BACKGROUND: one single flat colour field filling the whole frame, chosen from the "
+                   "locked palette. No scenery, no objects, no gradient, no texture. Only the subject "
+                   "the scene names sits on it, with a simple flat ground shadow.")},
+    "gundelik-ev": {
+        "ad": "Gündelik Ev/Mahalle", "yogunluk": "zengin",
+        "ozet": "Mutfak, salon, bahçe, iş yeri — yaşanmış detaylı mekânlar",
+        "prompt": ("BACKGROUND: a specific, lived-in everyday place — a kitchen, living room, front "
+                   "yard, workplace lunch room, home office, shed or suburban street. Fill it with at "
+                   "least 5 small true-to-life details (appliances, notices, jars, plants, tools, "
+                   "framed photos, worn floors) running to all four edges, with real perspective and "
+                   "one named light source.")},
+    "tarihi-donem": {
+        "ad": "Tarihi Dönem", "yogunluk": "zengin",
+        "ozet": "Kale, ordugâh, eski sokak, saray — dönem detaylı",
+        "prompt": ("BACKGROUND: a period-accurate historical place — castle wall, war camp, throne "
+                   "hall, cobbled old street, harbour, marketplace. Include at least 4 concrete "
+                   "period props (banners, barrels, torches, weapons racks, carts) and build three "
+                   "depth layers with atmospheric haze on the far one.")},
+    "doga-manzara": {
+        "ad": "Doğa / Manzara", "yogunluk": "zengin",
+        "ozet": "Orman, dağ, okyanus, çöl — geniş sinematik doğa",
+        "prompt": ("BACKGROUND: a wide natural landscape — forest, mountain range, ocean, desert, "
+                   "river valley, cave. Build a dark framing foreground, a midground where the action "
+                   "happens and a hazy receding far vista, with weather and time of day clearly "
+                   "readable and one dominant light source.")},
+    "sehir-modern": {
+        "ad": "Modern Şehir", "yogunluk": "zengin",
+        "ozet": "Cadde, ofis, dükkân, metro — çağdaş kent dokusu",
+        "prompt": ("BACKGROUND: a contemporary urban place — a street with shopfronts, an open-plan "
+                   "office, a supermarket aisle, a subway platform, an apartment interior. Include "
+                   "signage, glazing, vehicles or crowds as depth layers, with believable perspective "
+                   "running to all four edges.")},
+    "calisma-panosu": {
+        "ad": "Pano / Masa Üstü", "yogunluk": "orta",
+        "ozet": "Mantar pano, beyaz tahta, masa — açıklayıcı kurulum",
+        "prompt": ("BACKGROUND: an explainer setup — a corkboard with pinned cards and string, a "
+                   "whiteboard with a diagram, or a desk seen from above with papers, pens and notes. "
+                   "The board or desktop fills most of the frame and IS the environment; keep the "
+                   "surrounding room minimal and out of focus.")},
+    "karanlik-sinematik": {
+        "ad": "Karanlık Sinematik", "yogunluk": "orta",
+        "ozet": "Tek ışık kaynağı, koyu zemin, dramatik",
+        "prompt": ("BACKGROUND: a dark, low-key environment lit by exactly ONE visible source — a "
+                   "lamp, fire, screen, doorway or beam. Most of the frame falls into deep shadow "
+                   "with only the essential shapes catching light; keep detail sparse and let the "
+                   "darkness do the work.")},
+}
+VARSAYILAN_ARKAPLAN = "otomatik"
+
+
+def arkaplan_prompt(secim: str) -> str:
+    """Cerceve blogunun SONUNA eklenecek mekan yonergesi. 'otomatik'/bilinmeyen -> bos."""
+    a = ARKA_PLANLAR.get((secim or "").strip())
+    if not a or not a.get("prompt"):
+        return ""
+    ek = " " + a["prompt"]
+    if a.get("yogunluk") == "sade":
+        # Stil bloklari "hicbir yer bos kalmasin" diyor; sade arka plan bunu ezmeli.
+        ek += (" PRIORITY: this background instruction OVERRIDES any earlier instruction to fill the "
+               "frame with objects, furniture, clutter or scenery running to the edges. Emptiness "
+               "here is deliberate.")
+    return ek
+
+
 def profil_coz(tur, edit_id):
     """tur: 'animasyon' -> ANIMASYON_STILLERI; 'hikaye' -> HIKAYE_STILLERI; digeri -> EDIT_STILLERI."""
     if tur == "animasyon":
@@ -1530,7 +1617,8 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                mod: str = "documentary", edit_id: str = VARSAYILAN_EDIT,
                sure_dk: float = 2, gecis_acik: bool = True, zoom_acik: bool = True,
                ilerle=None, profil_id: str = "", altyazi_sablon: str = "",
-               altyazi_ac: str = "", palet: str = "", palet_ozel: str = "") -> dict:
+               altyazi_ac: str = "", palet: str = "", palet_ozel: str = "",
+               arkaplan: str = "") -> dict:
     """Tam hat. mod: 'animasyon'|'documentary'. stil_yol: referans stil gorseli (opsiyonel).
     sure_dk: hedef sure (hikaye maks 60, digerleri maks 14). gecis_acik/zoom_acik: kullanicinin tercihi.
     profil_id: KANAL PROFILI — verilirse karakter/capa/kilitler profilden gelir ve tum
@@ -1564,6 +1652,14 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
               file=sys.stderr)
     # Kompozisyon/cerceveleme kurali (animasyonda ortam basrol, karakter cerceveyi doldurmaz)
     cerceve_ek = prof.get("cerceve", "")
+    # ── ARKA PLAN: bu videoda secilmediyse kanal profilininki. EN SONA eklenir ki
+    #    stilin yogunluk dayatmasini ezebilsin (sade-beyaz secilirse "her yer dolsun" susar).
+    if not arkaplan and kanal:
+        arkaplan = kanal.get("arkaplan", "")
+    ap_ek = arkaplan_prompt(arkaplan)
+    if ap_ek:
+        cerceve_ek = cerceve_ek + ap_ek
+        print(f"  arka plan: {arkaplan}", file=sys.stderr)
     motion = prof["motion"] if gecis_acik else "kesme"   # gecis kapali -> sade kesme
     overlay_stil = prof["overlay"]
     # Altyazi: profil varsayilani, ama kullanici acikca ac/kapat diyebilir (animasyonda da).

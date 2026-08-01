@@ -220,6 +220,16 @@
           <div class="durum" style="margin-top:10px;font-size:11px">📖 Hazır hikaye metnini yapıştır. İlk ~2,5 dakika <b>yoğun hareketli açılış</b> (izleyiciyi tutmak için), sonrası efektli sinematik kareler + altyazı.<br>🧍 <b>Karakter</b>: yukarıya görsel yüklersen her sahnede birebir o; <b>yüklemesen de</b> karakter baştan sona otomatik aynı tutulur.<br>🎨 <b>Görsel tarzı</b>: yukarıdaki "Stil görseli" alanına örnek bir fotoğraf yüklersen bütün sahneler <b>o fotoğrafın tarzında</b> üretilir (yüklemezsen sinematik film karesi stili).</div>
         </div>
 
+        <!-- ══ ARKA PLAN: mekân dünyası + yoğunluk ══ -->
+        <div style="margin-top:22px;border-top:1px solid var(--line);padding-top:18px">
+          <div class="lbl2">🏠 Arka plan <span style="font-weight:400;color:var(--dim2)">— sahnelerin geçtiği mekân dünyası</span></div>
+          <div class="estiller" id="arkaplanlar"><span class="durum">Yükleniyor...</span></div>
+          <div class="durum" style="margin-top:10px;font-size:11px">
+            <b>Sade</b> seçersen "her yer dolu olsun" kuralı susturulur (Paint Explainer düzeni).
+            <b>Zengin</b> seçersen detaylı, yaşanmış mekânlar kurulur. Kanal profiline kaydedilir.
+          </div>
+        </div>
+
         <!-- ══ RENK PALETİ: kanal genelinde sabit renk kimliği ══ -->
         <div style="margin-top:22px;border-top:1px solid var(--line);padding-top:18px">
           <div class="lbl2">🎨 Renk paleti <span style="font-weight:400;color:var(--dim2)">— kanalın renk kimliği, her videoda aynı</span></div>
@@ -394,6 +404,8 @@ let sureDk=2, gecisAcik=true, zoomAcik=true;
    okuyor — tanim daha asagida kalirsa TDZ ReferenceError ile TUM script olur (hicbir sey secilemez) */
 let animStil=null, animListe=[];
 /* renk paleti — pfOzetGuncelle bunlari da okuyor, TDZ olmasin diye BURADA */
+let seciliArkaplan = localStorage.getItem("bedosaho_arkaplan") || "otomatik";
+let arkaplanListe = [];
 let seciliPalet = localStorage.getItem("bedosaho_palet") || "otomatik";
 let paletListe = [];
 let ozelHex = (localStorage.getItem("bedosaho_palet_ozel") || "#F0E4CC,#7B8B5A,#B5651D,#7A97B8")
@@ -544,6 +556,7 @@ function pfOzetGuncelle(){
     sat(!!karFile, `<b>Ana karakter görseli:</b> ${karFile?karFile.name:"yüklenmedi (sistem kendi karakterini üretir)"}`),
     sat(!!stilFile, `<b>Genel görsel stil:</b> ${stilFile?stilFile.name:"yüklenmedi (stilin ilk videoda kilitlenir)"}`),
     sat(altyaziAcik, `<b>Altyazı:</b> ${altyaziAcik?((altSablonlar[altSablon]||{}).ad||altSablon)+" (özelleştirilmiş)":"kapalı"}`),
+    sat(seciliArkaplan!=="otomatik", `<b>Arka plan:</b> ${seciliArkaplan==="otomatik"?"otomatik (stilin kendi mekân kuralı)":((arkaplanListe.find(x=>x.id===seciliArkaplan)||{}).ad||seciliArkaplan)}`),
     sat(seciliPalet!=="otomatik", `<b>Renk paleti:</b> ${seciliPalet==="otomatik"?"otomatik (stilin kendi renkleri)":(seciliPalet==="ozel"?("Özel — "+ozelHex.join(" ")):((paletListe.find(x=>x.id===seciliPalet)||{}).ad||seciliPalet))}`),
   ].map(s=>`<div>${s}</div>`).join("");
 }
@@ -564,6 +577,7 @@ $("#btnProfil").onclick=async()=>{
   fd.append("edit", videoTur==="animasyon" ? (animStil||"") : (editStil||""));
   fd.append("altyazi_sablon", altyaziAcik ? JSON.stringify(ay) : "");
   fd.append("palet", seciliPalet||""); fd.append("palet_ozel", ozelHex.join(","));
+  fd.append("arkaplan", seciliArkaplan||"");
   if(karFile) fd.append("karakter",karFile);
   if(stilFile) fd.append("stil",stilFile);
   $("#btnProfil").disabled=true;
@@ -574,6 +588,25 @@ $("#btnProfil").onclick=async()=>{
   }catch(e){ hata("Profil oluşturulamadı"); }
   $("#btnProfil").disabled=false;
 };
+
+/* ── arka plan ── */
+const AP_ROZET={sade:"◻️ sade", orta:"◧ orta", zengin:"▦ zengin"};
+function secArkaplan(id){
+  seciliArkaplan=id; localStorage.setItem("bedosaho_arkaplan",id);
+  $$("#arkaplanlar .estil").forEach(x=>x.classList.toggle("on",(x.dataset.id||"")===id));
+}
+fetch("api/arkaplanlar").then(r=>r.json()).then(list=>{
+  arkaplanListe=list; const c=$("#arkaplanlar"); if(!c) return; c.innerHTML="";
+  list.forEach(a=>{
+    const d=document.createElement("div");
+    d.className="estil"+(seciliArkaplan===a.id?" on":""); d.dataset.id=a.id;
+    d.innerHTML=`<span class="pick"></span><b>${a.ad}</b>
+      <span class="durum" style="font-size:11px;display:block;margin-top:5px">${a.ozet||""}</span>
+      <span style="font-size:10px;color:var(--dim2)">${AP_ROZET[a.yogunluk]||""}</span>`;
+    d.onclick=()=>secArkaplan(a.id);
+    c.appendChild(d);
+  });
+}).catch(()=>{$("#arkaplanlar").innerHTML='<span class="durum">arka planlar yüklenemedi</span>';});
 
 /* ── renk paleti ── */
 function paletSeritHtml(renkler){
@@ -731,6 +764,7 @@ $("#btnUret").onclick=async()=>{
   if(seciliPalet && seciliPalet!=="otomatik"){
     fd.append("palet", seciliPalet); fd.append("palet_ozel", ozelHex.join(","));
   }
+  if(seciliArkaplan && seciliArkaplan!=="otomatik") fd.append("arkaplan", seciliArkaplan);
   if(karFile) fd.append("karakter",karFile);
   if(stilFile) fd.append("stil",stilFile);
   let job;
