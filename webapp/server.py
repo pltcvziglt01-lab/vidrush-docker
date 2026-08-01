@@ -63,6 +63,13 @@ def _durumlari_yukle():
                 if d.get("durum") in ("kuyrukta", "uretiliyor"):
                     d.update({"durum": "hata", "mesaj": "Sunucu yeniden başladı",
                               "hata": "Üretim sırasında sunucu yeniden başladı — lütfen videoyu tekrar başlatın."})
+                    # DISKE DE YAZ: aksi halde dosya sonsuza dek 'uretiliyor' kalir ve
+                    # deploy.sh'in "aktif is var" korumasi kalici olarak deploy'u engeller.
+                    try:
+                        with open(os.path.join(IS_DURUM_DIR, ad), "w", encoding="utf-8") as g:
+                            json.dump(d, g, ensure_ascii=False)
+                    except Exception:
+                        pass
                 isler[ad[:-5]] = d
             except Exception:
                 pass
@@ -386,6 +393,7 @@ def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom
     def ilerle(msg, yuzde):
         d["mesaj"] = msg
         d["ilerleme"] = yuzde
+        _durum_kaydet(is_id)   # diske de yaz: restart sonrasi gercek ilerleme gorunsun
 
     try:
         sonuc = asyncio.run(pipeline.uret(is_id, story, kar, stil_yol, mod, edit_id,
