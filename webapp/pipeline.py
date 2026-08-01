@@ -838,6 +838,102 @@ KALEM_SOZLESME = (
     + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI
 )
 
+# ═════════ ANI DEFTERI STILI (11. referans: "ThriftyHazel" — 216 kare) ═════════
+# Digerlerinden temel farki: karakter COP ADAM DEGIL, gercekci-karikatur bir insan.
+# Kanal ~11 dk'lik "N sey" listeleri yapiyor; kimlik anlaticinin YASI ve kiyafeti.
+ANI_STIL = (
+    "Warm hand-drawn storybook illustration: fine confident ink linework filled with soft coloured "
+    "pencil and light watercolour washes, gentle paper grain, no hard cel shading and no digital "
+    "vector flatness. Cosy nostalgic domestic mood, everything lit by one warm source — a table "
+    "lamp, a kitchen window, late afternoon sun. Interiors are richly furnished and clearly lived "
+    "in: patterned wallpaper, floral curtains, potted plants, tea things, wall clocks, framed "
+    "photographs, worn timber. People are drawn as REAL people in a friendly illustrated style — "
+    "proper faces with age, expression and warmth — never as stick figures, never photorealistic, "
+    "never anime. "
+    "TIME CODING: anything set in the past is drawn in muted sepia-brown, desaturated tones; "
+    "anything set in the present keeps the full warm palette. This contrast is how the viewer knows "
+    "which era they are looking at. "
+    "Avoid: 3D render, glossy digital art, neon colours, harsh outlines, stick figures"
+)
+ANI_VARSAYILAN_KARAKTER = (
+    "The narrator is a warm, friendly woman in her early fifties: shoulder-length dark wavy hair, "
+    "round thin-rimmed glasses, gentle laugh lines, kind expression. She wears exactly one signature "
+    "outfit in every frame — a soft sage-green cardigan over a plain white collared blouse with dark "
+    "trousers. Her build, face, hair and outfit never change from scene to scene"
+)
+ANI_CERCEVE = (
+    " FRAMING for a 16:9 centre crop of this 1536x1024 image: the top 9% and bottom 9% get cut away, "
+    "so every face, sign and key element stays inside 10%-90% of frame height and 8% clear of the "
+    "left and right edges. TWO REGISTERS, alternating: a PRESENTER frame places the narrator alone "
+    "against a plain pale backdrop with no environment at all, filling 55-75% of frame height, "
+    "speaking directly to camera; a WORLD frame places her (or the objects) inside a fully furnished "
+    "room or street with a foreground object cutting into the frame, a midground where the action "
+    "happens and a background with real perspective. Never blend the two — a backdrop frame has NO "
+    "scenery, a world frame is completely furnished to all four edges. Keep ONE warm dominant light "
+    "source with a visible direction and soft shadows."
+)
+ANI_SOZLESME = (
+    "RULE ZERO — READ FIRST: this is a narrated first-person memoir explainer, not a character "
+    "showcase. AT LEAST 40% OF ALL SCENES YOU WRITE MUST CONTAIN NO PERSON AT ALL (shot types G, I, "
+    "J, K, N, O below) and must literally contain the words 'no character in frame'. Before you "
+    "finish, COUNT your scenes; if fewer than 40% are person-free, rewrite the weakest ones as "
+    "object still lifes, hands-only close-ups, ledgers or screens.\n"
+    "SCENE CONTRACT — each scene_prompt is ONE English paragraph of 45-80 words, slots always in "
+    "this order: (1) SHOT: the shot-type letter plus the narrator's height as a percent of frame "
+    "height, and the word PRESENTER or WORLD for the register; (2) PLACE: for WORLD frames, a "
+    "specific domestic or neighbourhood setting with at least 4 concrete named objects, ONE named "
+    "warm light source and the era (PAST or PRESENT) — for PRESENTER frames write 'plain pale "
+    "backdrop, no scenery'; (3) ACTION: only what the person DOES — the gesture, what she is "
+    "holding or touching, the emotion read from eyes and posture. NEVER restate her face, hair, "
+    "age or clothing (identity is injected separately). (4) TEXT: either a lettering instruction in "
+    "double quotes, or literally \"no text in this image\".\n"
+    "ERA CONTRAST: mark every scene PAST or PRESENT. PAST scenes are drawn in muted sepia-brown "
+    "desaturated tones with period-correct objects; PRESENT scenes keep full warm colour. Put at "
+    "least one PAST scene in every rolling block of 6.\n"
+    "SHOT TYPES AND SCALE BANDS (two consecutive scenes must use different bands): "
+    "A WIDE ESTABLISHING — person 12-20%, the whole room or street. "
+    "B MEDIUM ACTION — person 30-50%, mid-gesture, handling a named object. "
+    "C PRESENTER CARD — person 55-75% on a plain pale backdrop, no scenery, speaking to camera. "
+    "D LAMPLIT MOMENT — person 30-50%, dim room lit by one lamp or window. "
+    "E TWO PEOPLE — the narrator and one other person sharing a task or a table. "
+    "F POV HANDS — the narrator's own hands entering the frame from the near edge, doing the action "
+    "(opening a tin, cutting cloth, writing on a bill), seen from her eyes. "
+    "G LEDGER OR LIST — NO CHARACTER IN FRAME: a handwritten notebook, ledger, receipt or list with "
+    "legible dated rows and amounts. "
+    "I OBJECT STILL LIFE — NO CHARACTER IN FRAME: one nostalgic object filling the frame in full "
+    "detail (a tin, a rotary telephone, a mending basket, a pantry jar). "
+    "J HANDS ONLY — NO CHARACTER IN FRAME: close-up of hands doing one step, cropped at the wrists. "
+    "K THEN AND NOW — NO CHARACTER IN FRAME: one frame split between a sepia PAST object or scene "
+    "and its full-colour PRESENT equivalent, each with a short label. "
+    "N SCREEN READOUT — NO CHARACTER IN FRAME: a phone or app screen showing plans, prices or a "
+    "balance, using an INVENTED generic brand name, never a real one. "
+    "O OVERHEAD FLATLAY — NO CHARACTER IN FRAME: a table seen from directly above with the objects "
+    "of the scene arranged on it.\n"
+    "FREQUENCY BUDGET per rolling block of 10 scenes — HARD RULE: AT LEAST 4 must be PERSON-FREE "
+    "(G, I, J, K, N, O). Also: at least 2 of A/B, at least 2 C presenter cards, at least 1 D, at "
+    "least 1 F, at most 1 E. Never use the same type twice in a row and never place two person-free "
+    "scenes back to back.\n"
+    "PLACE ROTATION: rotate deliberately (kitchen, pantry, sitting room, hallway, porch, garden, "
+    "corner shop, bedroom, garage) and change the camera angle every scene.\n"
+    "TEXT BUDGET: at most 1 scene in 3 carries lettering. When it does: max 2 lines, each max 3 "
+    "words and 14 characters, letters A-Z digits 0-9 spaces and the $ sign only, inside double "
+    "quotes. No commas and no thousand separators — write \"1200 A MONTH\" not \"$1,200\". "
+    "Handwritten ledger rows are exempt from the word limit but must stay short and legible. "
+    "Text never sits in the top or bottom 9% of the frame.\n"
+    # ThriftyHazel'in iki imza cihazi (216 karede tutarli):
+    "COUNTDOWN BADGE — apply ONLY if the narration is a numbered list that counts down or up "
+    "(\"rule 11\", \"number 9\", \"the third thing\"). In the FIRST scene of each numbered item, and "
+    "only there, add to the TEXT slot: a single large plain numeral placed in a top corner of the "
+    "frame, written as e.g. corner numeral \"11\". Never put a numeral on a scene that is not the "
+    "opening of an item, and never on more than one scene per item. If the script is not a numbered "
+    "list, no numerals at all.\n"
+    "CHAPTER CARD — if the script clearly breaks into 2-4 thematic sections, insert ONE full-frame "
+    "card at the start of each section: a deep warm-brown panel with an ornate decorative border and "
+    "the section name in elegant serif capitals across two lines, no character, no scenery. Max 4 "
+    "words total. Write it as its own scene of shot type C with 'no character in frame'.\n"
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI
+)
+
 ANIMASYON_PROFIL = {
     "ad": "Animasyon (Anlatı)",
     "ozet": "Elle çizilmiş editorial-karikatür anlatı animasyonu; detaylı ortamlar, sinematik çekimler",
@@ -890,12 +986,27 @@ KALEM_PROFIL = {
     "palet": "aussie-kalem",     # bu stilin dogal paleti (kullanici degistirebilir)
 }
 
+ANI_PROFIL = {
+    "ad": "Animasyon (Anı Defteri)",
+    "ozet": "Sıcak nostaljik illüstrasyon; gerçekçi anlatıcı, geçmiş/bugün karşıtlığı, ev içi",
+    "sahne_sn": float(os.environ.get("ANIM_SAHNE_SN", "5")), "kelime": 14,
+    "footage_pct": 0, "overlay": "yok",
+    "altyazi": "orta", "motion": "sinematik", "mag": None,   # referans kanal altyazi KULLANIYOR
+    "gorsel_ek": ANI_STIL,
+    "varsayilan_karakter": ANI_VARSAYILAN_KARAKTER,
+    "cerceve": ANI_CERCEVE,
+    "sahne_sozlesme": ANI_SOZLESME,
+    "palet": "ani-defteri",
+    "gerisayim": True,   # "N sey" listelerinde kose rozeti
+}
+
 # Animasyon ALT-STILLERI (documentary'deki 3 edit stili gibi)
 ANIMASYON_STILLERI = {
     "anlati-deneme": ANIMASYON_PROFIL,
     "egitici-explainer": EXPLAINER_PROFIL,
     "hikaye-whatif": HIKAYE_PROFIL,
     "renkli-kalem": KALEM_PROFIL,
+    "ani-defteri": ANI_PROFIL,
 }
 VARSAYILAN_ANIM = "anlati-deneme"
 
@@ -925,6 +1036,8 @@ PALETLER = {
                        "renkler": ["#E6D8BF", "#C4A177", "#8C6A47", "#4A3520", "#241A10", "#9C8663"]},
     "orman-yesil": {"ad": "Orman Yeşili", "ozet": "Koyu orman, yosun, eğrelti, kabuk",
                     "renkler": ["#D7E2CC", "#93B06A", "#5E7F4A", "#234A2E", "#6B4A2E", "#16241A"]},
+    "ani-defteri": {"ad": "Anı Defteri", "ozet": "Adaçayı, krem, meşe, lamba sarısı, gül kurusu",
+                    "renkler": ["#F5EDDC", "#8FA68E", "#A9743F", "#E8B65A", "#C98B7E", "#4A3728"]},
     "mono-kontrast": {"ad": "Mono + Tek Vurgu", "ozet": "Siyah-beyaz-gri + tek kırmızı vurgu",
                       "renkler": ["#FFFFFF", "#D8D4CC", "#8C8880", "#3A3835", "#121110", "#D93025"]},
 }

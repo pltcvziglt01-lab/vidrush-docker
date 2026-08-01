@@ -133,6 +133,51 @@ Serious History **gerçek kare-kare animasyon** yapıyor (hareket bulanıklığ�
 Durağan görselle taklit edilemez. Oradan alınan ders animasyon değil, TASARIM
 (ayrıntılı kafa + sade gövde, boş nefes karesi, vuruş başına renk sıçraması).
 
+## 11. ThriftyHazel (6.4K abone, 2 aylık) — 10 video, 216 kare
+
+`@thriftyhazel` · 24 video · 379K izlenme · **2 Haz 2026'da açılmış**. Tasarruf/frugal yaşam,
+ABD yaşlı kitlesi. Formül: **"N Şey" + yaş işareti ("at 52") + birinci tekil + büyükanne nostaljisi.**
+
+### Diğer 10 referanstan TEMEL farkı: karakter çöp adam DEĞİL
+Gerçekçi-karikatür bir insan — 50'li yaşlarda kadın, yuvarlak gözlük, adaçayı hırka.
+Sıcak hikâye kitabı illüstrasyonu: ince mürekkep çizgi + kuru boya + suluboya yıkama.
+
+### Bulgular
+
+**A. İKİ REGISTER, DÖNÜŞÜMLÜ**
+- **Sunucu karesi**: anlatıcı bomboş soluk zeminde, mekân YOK, kameraya konuşuyor
+- **Dünya karesi**: tıka basa döşenmiş oda — duvar kâğıdı, çiçekli perde, saksı, duvar saati
+İkisi asla karışmıyor. Bizim tek-modlu çerçevemizden farklı.
+
+**B. GERİ SAYIM ROZETİ**
+Köşede kocaman `11` `10` `9` `8` `7`. Liste videolarının omurgası, 10 videoda da var.
+
+**C. BÖLÜM KARTI**
+Koyu kahve zeminde süslü çerçeve + zarif serif başlık: `THE RULES IN YOUR HEAD`,
+`THE RULES FOR YOUR WALLET`. Paint Explainer'ın üst bandının tam ekran versiyonu.
+
+**D. GEÇMİŞ/BUGÜN RENK KODLAMASI**
+Geçmiş sahneler **soluk sepya-kahve**, bugün sahneleri **tam sıcak renk**.
+İzleyici hangi döneme baktığını renkten anlıyor. Çok ucuz, çok etkili.
+
+**E. BİRİNCİ TEKİL ELLER (POV)**
+Anlatıcının kendi elleri karenin yakın kenarından giriyor — teneke açıyor, fatura yazıyor.
+`J HANDS ONLY`den farklı: bu "benim gözümden".
+
+**F. ✅ MARKA YASAĞIMIZI DOĞRULUYOR**
+Klarna/Afterpay yerine **uydurma** `FLEXIPAY: MANAGE YOUR PLANS` markası çizilmiş.
+Bir gün önce eklediğim `MARKA_YASAK` kuralının bağımsız doğrulaması.
+
+**G. ✅ VERİ KARTINI DOĞRULUYOR**
+El yazısı defter: `Oct 1956 $5.00 / Nov 1956 $10.00 / Dec 1956 $20.00` — modern telefonun yanında.
+Eski-yeni karşılaştırması TEK karede.
+
+**Kod karşılığı:** yeni 5. stil `ani-defteri` (`ANI_STIL/CERCEVE/SOZLESME`) + `ani-defteri` paleti
+(#F5EDDC krem, #8FA68E adaçayı, #A9743F meşe, #E8B65A lamba, #C98B7E gül kurusu, #4A3728 kahve)
++ `COUNTDOWN BADGE` ve `CHAPTER CARD` cihazları (ikisi de **koşullu** — liste değilse rakam yok).
+
+---
+
 ---
 
 ## Sistemin kendi kendine öğrendiği kurallar (referanslardan bağımsız)
