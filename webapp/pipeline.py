@@ -714,6 +714,90 @@ HIK_SOZLESME = (
     + KARE_CESITLILIGI + DESTEK_PLANLAYICI
 )
 
+# ═════════ RENKLI KALEM STILI (6. referans: "Aussie Money With Bruce") ═════════
+# Fark: HIK_STIL "boyanmis dunya + duz figur" kontrastina dayanir. Burada TEK medyum var —
+# her sey ayni renkli kalemle cizilmis. Kimlik yuzden degil IMZA AKSESUARDAN okunur.
+KALEM_STIL = (
+    "Hand-drawn coloured-pencil illustration on cream textured paper, one single medium for the "
+    "whole image. Visible directional pencil hatching and crayon grain on every surface; soft "
+    "slightly uneven contours drawn in dark pencil, thicker on the outer silhouette and lighter "
+    "inside; colour built up in layered strokes so flat areas still show the tooth of the paper. "
+    "Gentle natural daylight with soft pencil-shaded shadows — no hard cel shading, no gradients, "
+    "no glow, no digital vector flatness. Warm, homely, everyday-life mood; ordinary places drawn "
+    "with affection and a lot of small true-to-life clutter. Figures are ultra-simple: plain white "
+    "rounded head, thin dark limbs, small oval hands and feet, no nose, no neck; all the drawing "
+    "detail is spent on the ENVIRONMENT and the props, never on the body. "
+    "Avoid: photorealism, 3D render, anime, glossy digital vector art, neon colours, airbrush"
+)
+KALEM_VARSAYILAN_KARAKTER = (
+    "The narrator is one simple stick figure: plain white rounded head with two black dot eyes, two "
+    "short black eyebrows that carry all the emotion, and one small mouth line; no nose, no ears, no "
+    "hair, no neck. White body, thin dark limbs, small oval white hands and feet. He wears exactly "
+    "one signature item — a green and gold diagonally striped necktie — and it is present, identical, "
+    "in every single frame he appears in. Nothing else is ever added to him"
+)
+KALEM_CERCEVE = (
+    " FRAMING for a 16:9 centre crop of this 1536x1024 image: the top 9% and bottom 9% get cut away, "
+    "so every face, sign and key silhouette stays inside 10%-90% of frame height and 8% clear of the "
+    "left and right edges. Obey the shot type and character-scale band written in the scene text "
+    "exactly; do not pull the camera closer or enlarge the figure. THE PLACE IS THE SUBJECT: build a "
+    "complete believable room or exterior with a foreground object cutting into the frame, a "
+    "midground where the action happens and a background with true perspective, and let furniture, "
+    "shelves, signage and clutter run to all four edges — nothing floats on blank paper. At least one "
+    "object must pass in front of the figure and partly overlap it. Keep ONE dominant light source "
+    "with a clear direction and soft pencil-shaded shadows. Keep the figure's white head clearly "
+    "readable against whatever sits behind it."
+)
+KALEM_SOZLESME = (
+    "RULE ZERO — READ FIRST: this is a narrated explainer, not a character showcase. AT LEAST "
+    "40% OF ALL SCENES YOU WRITE MUST CONTAIN NO CHARACTER AT ALL (shot types G, I, J, K below) "
+    "and must literally contain the words 'no character in frame'. Before you finish, COUNT your "
+    "scenes: if fewer than 40% are character-free, rewrite the weakest character scenes as object "
+    "macros, hands-only close-ups, maps or diagrams.\n"
+    "SCENE CONTRACT — each scene_prompt is ONE English paragraph of 45-80 words, slots always in this "
+    "order: (1) SHOT: the shot-type letter plus the narrator's height as a percent of frame height; "
+    "(2) PLACE: a specific ordinary real-world setting with at least 4 concrete named objects in it "
+    "(appliances, shelves, notices, plants, tools, furniture), ONE named light source and the time of "
+    "day — spend the entire adjective budget here; (3) ACTION: only what the figure(s) DO — the "
+    "gesture, what they are touching or holding, and the emotion read from eyebrow angle and posture. "
+    "NEVER state the character's colours or clothing (identity is injected separately). "
+    "(4) TEXT: either a lettering instruction in double quotes, or literally \"no text in this "
+    "image\" — this slot is never empty.\n"
+    "SUPPORTING CAST: when a scene needs other people, they are the same simple stick figures but "
+    "are told apart ONLY by a plain garment, hair shape or hat — never by a different body style, "
+    "and never by wearing the narrator's signature item.\n"
+    "SHOT TYPES AND SCALE BANDS (bands never overlap; two consecutive scenes must use different "
+    "bands): A WIDE ESTABLISHING — figure 12-20%, the whole room or street visible. B MEDIUM ACTION "
+    "— figure 30-50%, mid-gesture, physically interacting with a named object. C CLOSE-UP — figure "
+    "55-75%, head and shoulders, eyebrows carrying the emotional beat. D DRAMATIC LIGHT — figure "
+    "30-50%, dim room lit by one lamp, window or screen. E CROWD — 3-6 figures on two depth planes, "
+    "narrator nearest at 30-50%, the others differentiated by garment or hair. "
+    "F HELD SIGN — figure 30-50% holding a large drawn placard, board or newspaper whose short text "
+    "is the point of the scene. "
+    "G INFOGRAPHIC — NO CHARACTER IN FRAME: a pinboard, whiteboard or drawn chart with 2-3 arrows or "
+    "pinned cards and at most 2 short labels. "
+    "H SFX BEAT — one big quoted onomatopoeia plus one simple pencil graphic device (impact rays, "
+    "motion lines, dust puff); figure 30-50%. "
+    "I OBJECT MACRO — NO CHARACTER IN FRAME: extreme close-up of the single object the line is about, "
+    "filling the frame, drawn in full pencil detail. "
+    "J HANDS ONLY — NO CHARACTER IN FRAME: extreme close-up of hands doing the action (passing an "
+    "envelope, signing a form, counting notes), cropped at the wrists. "
+    "K MAP ROUTE — NO CHARACTER IN FRAME: a simple hand-drawn map with 2-3 labelled dots and a dashed "
+    "route between them.\n"
+    "FREQUENCY BUDGET per rolling block of 10 scenes — HARD RULE: AT LEAST 4 of the 10 must be "
+    "CHARACTER-FREE (G, I, J, K). Also: at least 2 of A/B, at least 1 C, at least 1 D, at most 1 E, "
+    "at most 1 F, exactly 1 H. Never use the same type twice in a row and never place two "
+    "character-free scenes back to back.\n"
+    "PLACE ROTATION: two consecutive scenes may not share the same room or location; rotate "
+    "deliberately (kitchen, living room, front yard, workplace lunch room, home office, hallway, "
+    "street, shed) and change the camera angle every scene.\n"
+    "TEXT BUDGET: at most 1 scene in 3 carries lettering. When it does: max 2 lines, each max 3 words "
+    "and 14 characters, ALL CAPS, letters A-Z digits 0-9 spaces and the $ sign only, inside double "
+    "quotes. No commas, no thousand separators — write \"12 MILLION\" not \"12,000,000\". Text never "
+    "sits in the top or bottom 9% of the frame.\n"
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI
+)
+
 ANIMASYON_PROFIL = {
     "ad": "Animasyon (Anlatı)",
     "ozet": "Elle çizilmiş editorial-karikatür anlatı animasyonu; detaylı ortamlar, sinematik çekimler",
@@ -753,11 +837,25 @@ HIKAYE_PROFIL = {
     "sahne_sozlesme": HIK_SOZLESME,
 }
 
+KALEM_PROFIL = {
+    "ad": "Animasyon (Renkli Kalem)",
+    "ozet": "Kremli kâğıda renkli kurşun kalem; sıcak gündelik mekânlar, imza aksesuarlı stickman",
+    "sahne_sn": float(os.environ.get("ANIM_SAHNE_SN", "5")), "kelime": 14,
+    "footage_pct": 0, "overlay": "yok",
+    "altyazi": "yok", "motion": "sinematik", "mag": None,
+    "gorsel_ek": KALEM_STIL,
+    "varsayilan_karakter": KALEM_VARSAYILAN_KARAKTER,
+    "cerceve": KALEM_CERCEVE,
+    "sahne_sozlesme": KALEM_SOZLESME,
+    "palet": "aussie-kalem",     # bu stilin dogal paleti (kullanici degistirebilir)
+}
+
 # Animasyon ALT-STILLERI (documentary'deki 3 edit stili gibi)
 ANIMASYON_STILLERI = {
     "anlati-deneme": ANIMASYON_PROFIL,
     "egitici-explainer": EXPLAINER_PROFIL,
     "hikaye-whatif": HIKAYE_PROFIL,
+    "renkli-kalem": KALEM_PROFIL,
 }
 VARSAYILAN_ANIM = "anlati-deneme"
 
@@ -986,7 +1084,18 @@ def kunye_metni(k: dict) -> str:
                      ("ayirt_edici", "distinctive")):
         if k.get(alan) and str(k[alan]).lower() not in ("none", "yok"):
             p.append(f"{on}: {k[alan]}")
-    return "The main character is " + ", ".join(p) + "." if p else ""
+    if not p:
+        return ""
+    metin = "The main character is " + ", ".join(p) + "."
+    # IMZA AKSESUAR (6. referans dersi): minimal stickman'de kimlik yuzden degil TEK bir
+    # ayirt edici parcadan okunur. Onu ayrica ve emir kipiyle tekrarla — yoksa model
+    # sahneler arasinda "unutup" birakiyor ve karakter baskasina donuyor.
+    imza = k.get("ayirt_edici") or k.get("kiyafet")
+    if imza and str(imza).lower() not in ("none", "yok"):
+        metin += (f" SIGNATURE (never omitted): {imza} — this must be clearly visible and identical "
+                  "in EVERY frame the character appears in; it is how the viewer recognises them. "
+                  "No other figure in any scene may wear or carry it.")
+    return metin
 
 
 def stil_analiz(stil_yol: str) -> str:
@@ -1440,8 +1549,11 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     if prof.get("varsayilan_karakter") and not (kar_yol and os.path.exists(kar_yol)):
         gorsel_ek = f"{gorsel_ek}. {prof['varsayilan_karakter']}"
     # ── RENK PALETI: bu videoda secilmediyse kanal profilininki (kanal genelinde ayni renk) ──
+    # Oncelik: bu videodaki secim > kanal profili > stilin kendi dogal paleti ("Otomatik").
     if not palet and kanal:
         palet, palet_ozel = kanal.get("palet", ""), kanal.get("palet_ozel", "")
+    if not palet:
+        palet = prof.get("palet", "")
     pal_ek = palet_prompt(palet, palet_ozel)
     if pal_ek:
         gorsel_ek = gorsel_ek + "." + pal_ek
