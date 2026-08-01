@@ -382,6 +382,7 @@ function pfOzetGuncelle(){
   const e=$("#pfOzet"); if(!e) return;
   const stilAd = videoTur==="animasyon"
     ? ((animListe.find(x=>x.id===animStil)||{}).ad || "—")
+    : videoTur==="hikaye" ? "Sinematik Hikaye"
     : (($$("#estiller .estil.on")[0]?.querySelector("b")?.textContent) || "—");
   const sat = (ok,txt)=>`${ok?"✅":"⬜"} ${txt}`;
   e.innerHTML = [
@@ -480,7 +481,7 @@ $$("#turler .estil").forEach(c=>c.onclick=()=>{
   sureDk=+s.value; $("#sureLbl").textContent=sureDk+" dk";
   const h=$("#sureHint");
   if(h) h.textContent = (videoTur==="hikaye")
-    ? "1–60 dk. DİKKAT: uzun hikayede render SAATLER sürer (60 dk ≈ 10-12 saat) ve görsel maliyeti artar."
+    ? "1–60 dk. Uzun hikayede üretim saatler alabilir (30 dk ≈ ~1,5 sa · 60 dk ≈ ~2,5 sa) ve görsel maliyeti artar (60 dk ≈ ~$40)."
     : "1–14 dk. Uzun sürede render dakikalarca sürebilir.";
 });
 

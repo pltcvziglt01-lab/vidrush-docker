@@ -11,7 +11,9 @@ import json
 import time
 import shutil
 import asyncio
+import threading
 import subprocess
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 
@@ -357,7 +359,8 @@ HKANAL_CERCEVE = (
 HIKAYE_KANALI_PROFIL = {
     "ad": "Sinematik Hikaye",
     "ozet": "Hikaye kanalı formatı — film karesi görseller, hareketli açılış, altyazı, tutarlı karakter",
-    "sahne_sn": float(os.environ.get("HIKAYE_SAHNE_SN", "6")), "kelime": 15,
+    # 6->8 sn: hikaye kanallarinda sakin tempo normal; %25 daha az gorsel = daha hizli + ucuz
+    "sahne_sn": float(os.environ.get("HIKAYE_SAHNE_SN", "8")), "kelime": 19,
     "footage_pct": 0, "overlay": "yok",
     "altyazi": "orta", "motion": "hikaye", "mag": "films_n_photography",
     "gorsel_ek": HKANAL_STIL,
@@ -1081,7 +1084,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     gorsel_model = GORSEL_MODEL_ANIM if mod == "animasyon" else GORSEL_MODEL_DOC
     yt_once = True
     # Sure tavani: hikaye kanali 60 dk (uzun hikaye formati), diger turler 14 dk.
-    # DIKKAT: 60 dk hikaye = ~600 sahne gorseli + 2 vCPU'da ~10-12 saat render.
+    # 60 dk hikaye (8sn sahne, paralel gorsel, 10 cekirdek render) ~2-2.5 saat, ~$40 gorsel.
     tavan_dk = 60.0 if mod == "hikaye" else 14.0
     sure_dk = max(0.3, min(tavan_dk, float(sure_dk or 2)))
 
@@ -1126,84 +1129,145 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     capa_profilden = bool(capa_yol)
     kumulatif_sn = 0.0   # hikaye modu: acilis bolumu (HIKAYE_ACILIS_SN) takibi icin toplam sure
 
+    # ═══ SAHNE URETIMI — 3 FAZ (paralel) ═══
+    # Eski hat sahneleri TEKER TEKER uretiyordu (gorsel + bekleme + TTS ust uste eklenirdi;
+    # 300 sahne ~2 saat). Yeni hat: (A) capa sahnesi sirali, (B) kalan gorseller PARALEL
+    # (GORSEL_PARALEL isci), (C) TTS paralel + montaj SIRALI. 429 gelirse referansli_gorsel
+    # zaten Retry-After'a uyuyor -> paralellik hiz limitine karsi kendi kendini frenler.
     bakiye_bitti = False   # bakiye/limit doldu mu (elde olanla kurtarma icin)
-    ard_arda = 0           # ust uste basarisiz sahne sayaci
+    uretim_durdu = False   # toplu basarisizlikta yeni istek acilmasin (para yanmasin)
+    gorsel_bekle = float(os.environ.get("GORSEL_BEKLE", "5"))
+    paralel = max(1, int(os.environ.get("GORSEL_PARALEL", "4")))
+
+    islenecek = []   # (i, n, sahne, metin, overlay) — bos voiceover'lar elenmis, sira sabit
     for i, s in enumerate(scenes):
-        n = i + 1   # kanonik indeks (modelin 'n'i cakisirsa dosya uzerine yazilmasin)
         metin = str(s.get("voiceover", "")).strip()   # model sayi/null verirse .strip() patlamasin
         if not metin:
             continue
-        overlay = str(s.get("overlay", "")).strip() if overlay_stil != "yok" else ""
-        yuzde = 8 + int(58 * i / max(1, toplam))
-        tur = "image"
-        medya = None
+        islenecek.append((i, i + 1, s, metin,
+                          str(s.get("overlay", "")).strip() if overlay_stil != "yok" else ""))
 
+    sonuc_medya = {}          # n -> (tur, medya). Basarisiz sahne burada olmaz.
+    sayac_kilit = threading.Lock()
+    tamamlanan = [0]
+
+    def _sahne_medya(n, s):
+        """Tek sahnenin medyasini (footage veya AI gorsel) uretir. Thread icinde calisir."""
+        nonlocal bakiye_bitti, uretim_durdu
+        if bakiye_bitti or uretim_durdu:
+            return None
         # 1) Footage sahnesi mi?
         if footage_acik and str(s.get("kaynak")) == "footage" and str(s.get("footage_sorgu", "")).strip():
-            bildir(f"Sahne {i+1}/{toplam}: footage indiriliyor...", yuzde)
             vyol_full = os.path.join(PUBLIC, "isler", is_adi, f"sahne_{n}.mp4")
             if kaynak.footage_getir(s["footage_sorgu"].strip(), vyol_full, yt_once=yt_once):
-                tur = "video"
-                medya = f"isler/{is_adi}/sahne_{n}.mp4"
-
+                return ("video", f"isler/{is_adi}/sahne_{n}.mp4")
         # 2) AI gorsel (footage yoksa/basarisizsa)
-        if medya is None:
-            bildir(f"Sahne {i+1}/{toplam}: görsel üretiliyor...", yuzde)
-            sp = str(s.get("scene_prompt", "")).strip() or str(s.get("footage_sorgu", "")).strip()
-            gyol_full = os.path.join(PUBLIC, "isler", is_adi, f"sahne_{n}.png")
-            try:
-                uretildi = referansli_gorsel(sp, kar_yol, gyol_full, stil_prompt=gorsel_ek,
-                                             kar_kilit=kar_kilit, stil_yol=stil_yol,
-                                             capa_yol=capa_yol, stil_kilit=stil_kilit,
-                                             model=gorsel_model, cerceve=cerceve_ek)
-            except BakiyeHatasi:
-                # Bakiye/limit doldu: DAHA FAZLA PARA HARCAMA. Elde uretilmis sahneler varsa
-                # onlarla videoyu tamamla (odenen para bosa gitmesin), yoksa net hata ver.
-                bakiye_bitti = True
-                print(f"  BAKIYE bitti — {len(props_sahneler)} uretilmis sahneyle devam",
-                      file=sys.stderr)
-                break
-            if not uretildi:
-                ard_arda += 1
-                print(f"sahne {n} atlandi", file=sys.stderr)
-                # Ust uste basarisizlik: sistem bozuk demektir, para yakmadan elde olanla bitir
-                if ard_arda >= 4 and len(props_sahneler) >= 3:
-                    print("  ust uste hata -> uretimi durdurup elde olanla tamamla",
-                          file=sys.stderr)
-                    break
-                continue
-            ard_arda = 0
-            # CAPA yalnizca ANIMASYON + HIKAYE'de: documentary'de ilk sahnenin ICERIGI (or. hayvan,
-            # obje) sonraki tum sahnelere kopyalaniyordu (referans gorseldeki icerik bulasmasi).
-            # Animasyon/hikayede AYNI KARAKTER her sahnede sart -> capa istenen davranis;
-            # documentary'de stil_yol + stil_kilit yeter.
-            if not capa_yol and mod in ("animasyon", "hikaye"):   # ilk basarili AI sahne = capa. Magnific ONCESI kucuk kopya al
-                capa_yol = os.path.join(is_dizini, "_capa.png")   # (dev upscale'i her sahnede yuklemesin)
+        sp = str(s.get("scene_prompt", "")).strip() or str(s.get("footage_sorgu", "")).strip()
+        gyol_full = os.path.join(PUBLIC, "isler", is_adi, f"sahne_{n}.png")
+        try:
+            uretildi = referansli_gorsel(sp, kar_yol, gyol_full, stil_prompt=gorsel_ek,
+                                         kar_kilit=kar_kilit, stil_yol=stil_yol,
+                                         capa_yol=capa_yol, stil_kilit=stil_kilit,
+                                         model=gorsel_model, cerceve=cerceve_ek)
+        except BakiyeHatasi:
+            # Bakiye/limit doldu: DAHA FAZLA PARA HARCAMA; diger isciler de yeni istek acmaz.
+            bakiye_bitti = True
+            return None
+        if not uretildi:
+            return None
+        if mag_profil and s.get("hd"):   # OTOMATIK: sadece plan HD isaretlediyse
+            kaynak.magnific_upscale(gyol_full, optimized_for=mag_profil, scale="2x")
+        # Hiz limiti: her ISCI kendi isteginden sonra bekler (toplam hiz = paralel/(uretim+bekleme))
+        time.sleep(gorsel_bekle)
+        return ("image", f"isler/{is_adi}/sahne_{n}.png")
+
+    # ── FAZ A: CAPA (yalniz animasyon/hikaye ve profil capasi yoksa) ──
+    # Ilk basarili sahne sonraki TUM sahnelere referans olacagi icin sirali uretilmek zorunda.
+    basla = 0
+    if mod in ("animasyon", "hikaye") and not capa_yol:
+        while basla < len(islenecek) and not bakiye_bitti:
+            i, n, s, _, _ = islenecek[basla]
+            bildir(f"Sahne {n}/{toplam}: çapa görseli üretiliyor...", 8)
+            r = _sahne_medya(n, s)
+            basla += 1
+            if r:
+                sonuc_medya[n] = r
+                gyol_full = os.path.join(PUBLIC, "isler", is_adi, f"sahne_{n}.png")
+                capa_yol = os.path.join(is_dizini, "_capa.png")   # Magnific ONCESI kucuk kopya
                 try:
                     shutil.copy(gyol_full, capa_yol)
                 except Exception:
                     capa_yol = gyol_full
                 # PROFIL VAR ama henuz kilitli degil -> ilk sahneyi kanalin KALICI capasi yap.
-                # Bundan sonraki tum videolar bu goruntuye kilitlenir (kanal kimligi sabitlenir).
                 if kanal and not capa_profilden:
                     if profil_capa_kilitle(profil_id, capa_yol):
                         capa_profilden = True
                         print(f"  profil '{profil_id}' capasi KILITLENDI", file=sys.stderr)
-            if mag_profil and s.get("hd"):   # OTOMATIK: sadece plan HD isaretlediyse
-                bildir(f"Sahne {i+1}/{toplam}: Magnific HD...", yuzde)
-                kaynak.magnific_upscale(gyol_full, optimized_for=mag_profil, scale="2x")
-            # OpenAI hiz limiti beklemesi. 11 sn cok muhafazakardi (96 sahne = 18 dk BOS bekleme).
-            # 429 artik Retry-After'a uyup otomatik tekrar deniyor, bu yuzden guvenle dusuruldu.
-            time.sleep(float(os.environ.get("GORSEL_BEKLE", "5")))
-            tur = "image"
-            medya = f"isler/{is_adi}/sahne_{n}.png"
+                break
+            print(f"sahne {n} atlandi (capa denemesi)", file=sys.stderr)
+            if basla >= 6:   # 6 denemede capa cikmadiysa sistemsel sorun var, para yakma
+                uretim_durdu = True
+                print("  capa uretilemedi -> uretim durduruldu", file=sys.stderr)
 
-        # 3) Seslendirme + sahne props
-        syol = f"isler/{is_adi}/ses_{n}.mp3"
-        kelimeler, sure = await uret_seslendir(metin, ses, os.path.join(PUBLIC, syol))
+    # ── FAZ B: KALAN GORSELLER PARALEL ──
+    kalan = islenecek[basla:]
+    if kalan and not bakiye_bitti and not uretim_durdu:
+        bildir(f"Görseller üretiliyor ({paralel} paralel)...", 9)
+        basarisiz = 0
+        with ThreadPoolExecutor(max_workers=paralel) as havuz:
+            gelecek = {havuz.submit(_sahne_medya, n, s): n for i, n, s, _, _ in kalan}
+            for g in as_completed(gelecek):
+                n = gelecek[g]
+                try:
+                    r = g.result()
+                except Exception as e:   # beklenmedik istisna tek sahneyi yaksin, isi degil
+                    r = None
+                    print(f"  sahne {n} gorsel istisna: {str(e)[:140]}", file=sys.stderr)
+                if r:
+                    sonuc_medya[n] = r
+                else:
+                    basarisiz += 1
+                    print(f"sahne {n} atlandi", file=sys.stderr)
+                    # Cok basarisizlik + neredeyse hic basari yok: sistem bozuk, kalanini durdur
+                    if basarisiz >= 8 and len(sonuc_medya) < 3:
+                        uretim_durdu = True
+                with sayac_kilit:
+                    tamamlanan[0] += 1
+                    yuzde = 8 + int(50 * tamamlanan[0] / max(1, len(islenecek)))
+                bildir(f"Görsel {tamamlanan[0]}/{len(islenecek)} hazır", yuzde)
+    if bakiye_bitti:
+        print(f"  BAKIYE bitti — {len(sonuc_medya)} uretilmis sahneyle devam", file=sys.stderr)
+
+    # ── FAZ C: SESLENDIRME PARALEL (TTS_PARALEL isci) + MONTAJ SIRALI ──
+    bildir("Seslendirme üretiliyor...", 60)
+    tts_sem = asyncio.Semaphore(max(1, int(os.environ.get("TTS_PARALEL", "3"))))
+
+    async def _tts(n, metin):
+        async with tts_sem:
+            syol = f"isler/{is_adi}/ses_{n}.mp3"
+            kelimeler, sure = await uret_seslendir(metin, ses, os.path.join(PUBLIC, syol))
+            return n, syol, kelimeler, sure
+
+    tts_sonuc = {}
+    tts_cikti = await asyncio.gather(
+        *[_tts(n, metin) for i, n, s, metin, _ in islenecek if n in sonuc_medya],
+        return_exceptions=True)
+    for t in tts_cikti:
+        if isinstance(t, BaseException):
+            print(f"  tts istisna: {str(t)[:120]}", file=sys.stderr)
+            continue
+        n, syol, kelimeler, sure = t
         if kelimeler is None:   # TTS retry'lar tukendi -> bu sahneyi atla, is olmesin
             print(f"sahne {n} sesi uretilemedi, atlandi", file=sys.stderr)
             continue
+        tts_sonuc[n] = (syol, kelimeler, sure)
+
+    # Montaj: orijinal sahne sirasi korunur (paralellik sirayi bozamaz)
+    for i, n, s, metin, overlay in islenecek:
+        if n not in sonuc_medya or n not in tts_sonuc:
+            continue
+        tur, medya = sonuc_medya[n]
+        syol, kelimeler, sure = tts_sonuc[n]
         props_sahneler.append({
             "tur": tur, "medya": medya, "ses": syol, "sure": round(sure, 3),
             "zoom": ("in" if i % 2 == 0 else "out") if zoom_acik else "yok",
