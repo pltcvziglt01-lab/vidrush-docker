@@ -210,6 +210,12 @@ def font_ver(dosya: str):
                         headers={"Cache-Control": "public, max-age=604800"})
 
 
+@app.get("/api/paletler")
+def paletler():
+    """Kanal renk paletleri — gorsel promptuna KESIN HEX olarak girer (kelimeyle tarif degil)."""
+    return [{"id": k, **v} for k, v in pipeline.PALETLER.items()]
+
+
 @app.get("/api/profiller")
 def profil_listesi():
     """Kanal profilleri — videolar ARASI stil/karakter tutarliligi icin."""
@@ -220,6 +226,7 @@ def profil_listesi():
 async def profil_olustur(pid: str = Form(...), ad: str = Form(""),
                          tur: str = Form("animasyon"), edit: str = Form(""),
                          altyazi_sablon: str = Form(""),
+                         palet: str = Form(""), palet_ozel: str = Form(""),
                          karakter: UploadFile = File(None),
                          stil: UploadFile = File(None)):
     """Kanal profili olustur/guncelle. Karakter+stil gorselleri KALICI saklanir."""
@@ -245,8 +252,11 @@ async def profil_olustur(pid: str = Form(...), ad: str = Form(""),
         raise
     except Exception:
         raise HTTPException(400, "Görsel okunamadı (geçerli bir resim dosyası yükleyin)")
+    pal = palet.strip() if (palet.strip() in pipeline.PALETLER or palet.strip() == "ozel") else ""
     pipeline.profil_yaz(pid, {"ad": ad.strip() or pid, "tur": mod, "edit": eid,
-                              "altyazi_sablon": altyazi_sablon.strip() or None})
+                              "altyazi_sablon": altyazi_sablon.strip() or None,
+                              "palet": pal or None,
+                              "palet_ozel": palet_ozel.strip()[:80] or None})
     return pipeline.profil_oku(pid) and {"ok": True, "id": pid}
 
 
@@ -284,6 +294,8 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
                       profil: str = Form(""),
                       altyazi: str = Form(""),
                       altyazi_sablon: str = Form(""),
+                      palet: str = Form(""),
+                      palet_ozel: str = Form(""),
                       karakter: UploadFile = File(None),
                       stil: UploadFile = File(None)):
     """Karakter/stil gorselleri her video icin DOGRUDAN yuklenir (kalici kayit yok).
@@ -337,8 +349,10 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
     isler[is_id] = {"durum": "kuyrukta", "ilerleme": 0, "mesaj": "Sirada...",
                     "video": None, "kapak": None, "hata": None}
     _durum_kaydet(is_id)
+    pal = palet.strip() if (palet.strip() in pipeline.PALETLER or palet.strip() == "ozel") else ""
     is_kuyrugu.put((is_id, story.strip(), kar, stil_yol, mod, edit_id, sd, gecis_acik, zoom_acik,
-                    profil.strip(), altyazi.strip(), altyazi_sablon.strip()))
+                    profil.strip(), altyazi.strip(), altyazi_sablon.strip(),
+                    pal, palet_ozel.strip()[:80]))
     return {"job_id": is_id, "kuyruk": is_kuyrugu.qsize(), "tur": mod, "edit": edit_id,
             "profil": profil.strip()}
 
@@ -383,7 +397,7 @@ def cikti(dosya: str):
 
 
 def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom_acik,
-            profil_id="", altyazi="", altyazi_sablon=""):
+            profil_id="", altyazi="", altyazi_sablon="", palet="", palet_ozel=""):
     d = isler.get(is_id)
     if not d:
         return
@@ -399,7 +413,8 @@ def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom
         sonuc = asyncio.run(pipeline.uret(is_id, story, kar, stil_yol, mod, edit_id,
                                           sure_dk, gecis_acik, zoom_acik, ilerle,
                                           profil_id=profil_id, altyazi_sablon=altyazi_sablon,
-                                          altyazi_ac=altyazi))
+                                          altyazi_ac=altyazi, palet=palet,
+                                          palet_ozel=palet_ozel))
         d.update({"durum": "bitti", "ilerleme": 100, "mesaj": "Hazir!",
                   "video": "ciktilar/" + sonuc["video"],
                   "kapak": ("ciktilar/" + sonuc["kapak"]) if sonuc.get("kapak") else None,

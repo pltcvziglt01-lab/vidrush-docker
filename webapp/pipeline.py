@@ -761,6 +761,71 @@ ANIMASYON_STILLERI = {
 }
 VARSAYILAN_ANIM = "anlati-deneme"
 
+# ═══════════════ RENK PALETI (kanal genelinde renk kimligi) ═══════════════
+# Neden: stil promptu "muted ochre/sage" gibi KELIME tarif ediyordu -> model her sahnede
+# baska bir yorum uretiyordu. Cozum: KESIN HEX listesi (palet_olc dersinin aynisi —
+# rengi tarif etme, SAYIYLA ver). Palet DUNYAYI yonetir; karakterin kilitli renkleri
+# her zaman ustundur (yoksa beyaz<->turuncu salinimi geri gelir).
+PALETLER = {
+    "otomatik": {"ad": "Otomatik (stile bırak)", "renkler": [],
+                 "ozet": "Seçili animasyon stilinin kendi renk ailesi kullanılır"},
+    "aussie-kalem": {"ad": "Sıcak Kalem (Aussie)", "ozet": "Kremli kâğıt, adaçayı, altın, kiremit",
+                     "renkler": ["#F0E4CC", "#E0CBA0", "#7B8B5A", "#F2C230", "#B5651D", "#7A97B8"]},
+    "vintage-editorial": {"ad": "Vintage Editorial", "ozet": "Oker, adaçayı, tozlu mavi, soluk tuğla",
+                          "renkler": ["#EFE3CA", "#C8963E", "#8A9A7B", "#6E8399", "#A85A44", "#4A4038"]},
+    "sicak-toprak": {"ad": "Sıcak Toprak", "ozet": "Terrakota, kum, zeytin, pas",
+                     "renkler": ["#E3C99A", "#C1663F", "#7D7A45", "#9B4722", "#D9A574", "#3B2A1E"]},
+    "soguk-mavi": {"ad": "Soğuk Mavi", "ozet": "Lacivert, deniz, buz, arduvaz",
+                   "renkler": ["#EDE7D9", "#1F3A5F", "#2E7D8C", "#BFD9E0", "#5A7184", "#121D2B"]},
+    "canli-explainer": {"ad": "Canlı Explainer", "ozet": "Kırmızı, sarı, mavi, beyaz, siyah",
+                        "renkler": ["#FFFFFF", "#E63946", "#F4C430", "#2A6FDB", "#2BB673", "#111111"]},
+    "gece-neon": {"ad": "Gece Neon", "ozet": "İndigo, magenta, camgöbeği, kömür",
+                  "renkler": ["#1B1035", "#E0409A", "#38D6E0", "#F2A65A", "#221C2E", "#EDE6F5"]},
+    "pastel-yumusak": {"ad": "Pastel Yumuşak", "ozet": "Pudra, nane, tereyağı, leylak",
+                       "renkler": ["#FBF5EC", "#F3C8C2", "#BFE0CE", "#F7E6A8", "#C9BEE3", "#6E6A78"]},
+    "sepya-belgesel": {"ad": "Sepya Belgesel", "ozet": "Koyu sepya, kahve, ten, kemik",
+                       "renkler": ["#E6D8BF", "#C4A177", "#8C6A47", "#4A3520", "#241A10", "#9C8663"]},
+    "orman-yesil": {"ad": "Orman Yeşili", "ozet": "Koyu orman, yosun, eğrelti, kabuk",
+                    "renkler": ["#D7E2CC", "#93B06A", "#5E7F4A", "#234A2E", "#6B4A2E", "#16241A"]},
+    "mono-kontrast": {"ad": "Mono + Tek Vurgu", "ozet": "Siyah-beyaz-gri + tek kırmızı vurgu",
+                      "renkler": ["#FFFFFF", "#D8D4CC", "#8C8880", "#3A3835", "#121110", "#D93025"]},
+}
+VARSAYILAN_PALET = "otomatik"
+_HEX_RE = __import__("re").compile(r"^#[0-9A-Fa-f]{6}$")
+
+
+def palet_renkleri(secim: str, ozel: str = "") -> list:
+    """Palet kimligi -> hex listesi. 'ozel' verilirse (virgulle ayrilmis hexler) o kullanilir.
+    Gecersiz/bos girdi -> [] (palet kilidi uygulanmaz, stilin kendi renk ailesi kalir)."""
+    if (secim or "").strip() == "ozel" or (not secim and ozel):
+        out = []
+        for h in (ozel or "").replace(";", ",").split(","):
+            h = h.strip()
+            if not h.startswith("#"):
+                h = "#" + h
+            if _HEX_RE.match(h) and h.upper() not in out:
+                out.append(h.upper())
+        return out[:8]
+    return list(PALETLER.get((secim or "").strip(), {}).get("renkler", []))
+
+
+def palet_prompt(secim: str, ozel: str = "") -> str:
+    """Gorsel promptuna eklenecek RENK KILIDI. Bos palet -> bos metin (davranis degismez)."""
+    renkler = palet_renkleri(secim, ozel)
+    if len(renkler) < 2:
+        return ""
+    liste = ", ".join(renkler)
+    return (
+        " CHANNEL COLOUR PALETTE (locked, identical in every scene of every video of this channel): "
+        f"build the whole picture from this exact fixed set of hex colours — {liste}. Every surface, "
+        "garment, prop, sky, ground and shadow must be one of these hues, or a lighter tint, darker "
+        "shade or direct mix of two of them; do NOT introduce any hue outside this set. Vary WHICH of "
+        "them dominates from scene to scene (one scene led by the darkest, the next by the warmest) so "
+        "consecutive frames never look identical, but never leave the set. "
+        "PRIORITY: if the locked character's own colours differ from this palette, the CHARACTER'S "
+        "colours always win — this palette governs the world around the character, not their identity."
+    )
+
 
 def profil_coz(tur, edit_id):
     """tur: 'animasyon' -> ANIMASYON_STILLERI; 'hikaye' -> HIKAYE_STILLERI; digeri -> EDIT_STILLERI."""
@@ -1353,7 +1418,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                mod: str = "documentary", edit_id: str = VARSAYILAN_EDIT,
                sure_dk: float = 2, gecis_acik: bool = True, zoom_acik: bool = True,
                ilerle=None, profil_id: str = "", altyazi_sablon: str = "",
-               altyazi_ac: str = "") -> dict:
+               altyazi_ac: str = "", palet: str = "", palet_ozel: str = "") -> dict:
     """Tam hat. mod: 'animasyon'|'documentary'. stil_yol: referans stil gorseli (opsiyonel).
     sure_dk: hedef sure (hikaye maks 60, digerleri maks 14). gecis_acik/zoom_acik: kullanicinin tercihi.
     profil_id: KANAL PROFILI — verilirse karakter/capa/kilitler profilden gelir ve tum
@@ -1374,6 +1439,14 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # Yuklediyse EKLEME — aksi halde onun karakteriyle (or. tilki) CAKISIR.
     if prof.get("varsayilan_karakter") and not (kar_yol and os.path.exists(kar_yol)):
         gorsel_ek = f"{gorsel_ek}. {prof['varsayilan_karakter']}"
+    # ── RENK PALETI: bu videoda secilmediyse kanal profilininki (kanal genelinde ayni renk) ──
+    if not palet and kanal:
+        palet, palet_ozel = kanal.get("palet", ""), kanal.get("palet_ozel", "")
+    pal_ek = palet_prompt(palet, palet_ozel)
+    if pal_ek:
+        gorsel_ek = gorsel_ek + "." + pal_ek
+        print(f"  palet kilidi: {palet or 'ozel'} -> {palet_renkleri(palet, palet_ozel)}",
+              file=sys.stderr)
     # Kompozisyon/cerceveleme kurali (animasyonda ortam basrol, karakter cerceveyi doldurmaz)
     cerceve_ek = prof.get("cerceve", "")
     motion = prof["motion"] if gecis_acik else "kesme"   # gecis kapali -> sade kesme
