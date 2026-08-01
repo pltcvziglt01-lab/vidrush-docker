@@ -27,6 +27,81 @@ PUBLIC = os.path.join(STUDYO, "public")
 CIKTI_DIR = "/opt/vidrush/webapp/ciktilar"
 os.makedirs(CIKTI_DIR, exist_ok=True)
 
+# ═══════════════ KANAL PROFILI (videolar ARASI tutarlilik) ═══════════════
+# Sorun: capa (stil kilidi) is dizininde tutuluyordu ve is bitince SILINIYORDU
+# -> her video kendi capasini sifirdan uretiyor -> 50 videoluk kanalda stil kayiyor.
+# Cozum: profil = KALICI karakter + capa + kilit metinleri. Her videoda ayni referanslar
+# enjekte edilir -> tum kanal ayni gorunur. Bu dizin ASLA is temizliginde silinmez.
+PROFIL_DIR = "/opt/vidrush/webapp/veri/profiller"
+os.makedirs(PROFIL_DIR, exist_ok=True)
+_PROFIL_RE = __import__("re").compile(r"^[A-Za-z0-9_-]{1,48}$")
+
+
+def profil_yolu(pid: str) -> str:
+    if not _PROFIL_RE.match(pid or ""):
+        raise ValueError("gecersiz profil kimligi")
+    return os.path.join(PROFIL_DIR, pid)
+
+
+def profil_oku(pid: str) -> dict:
+    """Profili diskten oku. Yoksa bos dict. Donen: ad, tur, edit, kar_kilit, stil_kilit,
+    karakter/capa/stil dosya yollari (varsa)."""
+    try:
+        d = profil_yolu(pid)
+        with open(os.path.join(d, "profil.json"), encoding="utf-8") as f:
+            p = json.load(f)
+    except Exception:
+        return {}
+    p["id"] = pid
+    for ad, anahtar in (("karakter.png", "karakter_yol"), ("capa.png", "capa_yol"),
+                        ("stil.png", "stil_yol")):
+        y = os.path.join(profil_yolu(pid), ad)
+        p[anahtar] = y if os.path.exists(y) else ""
+    return p
+
+
+def profil_yaz(pid: str, veri: dict):
+    d = profil_yolu(pid)
+    os.makedirs(d, exist_ok=True)
+    mevcut = {}
+    try:
+        with open(os.path.join(d, "profil.json"), encoding="utf-8") as f:
+            mevcut = json.load(f)
+    except Exception:
+        pass
+    mevcut.update({k: v for k, v in veri.items() if v is not None})
+    with open(os.path.join(d, "profil.json"), "w", encoding="utf-8") as f:
+        json.dump(mevcut, f, ensure_ascii=False, indent=1)
+
+
+def profil_listele() -> list:
+    out = []
+    try:
+        for pid in sorted(os.listdir(PROFIL_DIR)):
+            p = profil_oku(pid)
+            if p:
+                out.append({"id": pid, "ad": p.get("ad", pid), "tur": p.get("tur", ""),
+                            "edit": p.get("edit", ""), "video_sayisi": p.get("video_sayisi", 0),
+                            "kilitli": bool(p.get("capa_yol")),
+                            "karakter_var": bool(p.get("karakter_yol"))})
+    except Exception:
+        pass
+    return out
+
+
+def profil_capa_kilitle(pid: str, kaynak_png: str) -> bool:
+    """Profilin GORSEL CAPASI'ni sabitle. Bundan sonraki TUM videolar bu kareye kilitlenir
+    -> kanal genelinde ayni stil/karakter. Bir kez kilitlenir, elle degistirilene kadar kalir."""
+    try:
+        if not (kaynak_png and os.path.exists(kaynak_png)):
+            return False
+        shutil.copy(kaynak_png, os.path.join(profil_yolu(pid), "capa.png"))
+        return True
+    except Exception as e:
+        print(f"  profil capa kilitleme hata: {str(e)[:120]}", file=sys.stderr)
+        return False
+
+
 OAI_H = {"Authorization": f"Bearer {OPENAI_KEY}"}
 
 # ─────────────── GORSEL MODELI (maliyet/kalite dengesi) ───────────────
@@ -963,13 +1038,21 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
 async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                mod: str = "documentary", edit_id: str = VARSAYILAN_EDIT,
                sure_dk: float = 2, gecis_acik: bool = True, zoom_acik: bool = True,
-               ilerle=None) -> dict:
+               ilerle=None, profil_id: str = "", altyazi_sablon: str = "",
+               altyazi_ac: str = "") -> dict:
     """Tam hat. mod: 'animasyon'|'documentary'. stil_yol: referans stil gorseli (opsiyonel).
-    sure_dk: hedef sure (maks 30). gecis_acik/zoom_acik: kullanicinin gecis/zoom tercihi.
-    Footage (documentary) ve Magnific HD PLANA GORE OTOMATIK."""
+    sure_dk: hedef sure (maks 14). gecis_acik/zoom_acik: kullanicinin gecis/zoom tercihi.
+    profil_id: KANAL PROFILI — verilirse karakter/capa/kilitler profilden gelir ve tum
+    videolar ayni gorunur (evergreen kanal tutarliligi). Footage/Magnific plana gore OTOMATIK."""
     def bildir(mesaj, yuzde):
         if ilerle:
             ilerle(mesaj, yuzde)
+
+    # ── KANAL PROFILI: kalici karakter + capa + kilitler (videolar ARASI tutarlilik) ──
+    kanal = profil_oku(profil_id) if profil_id else {}
+    if kanal:
+        mod = kanal.get("tur") or mod
+        edit_id = kanal.get("edit") or edit_id
 
     prof = profil_coz(mod, edit_id)
     gorsel_ek = prof["gorsel_ek"]
@@ -981,7 +1064,17 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     cerceve_ek = prof.get("cerceve", "")
     motion = prof["motion"] if gecis_acik else "kesme"   # gecis kapali -> sade kesme
     overlay_stil = prof["overlay"]
+    # Altyazi: profil varsayilani, ama kullanici acikca ac/kapat diyebilir (animasyonda da).
+    # altyazi_ac: "" = profil karari, "1"/"orta"/"yogun" = ac, "0"/"yok" = kapat
     altyazi_stil = prof.get("altyazi", "orta")
+    if altyazi_ac in ("0", "yok", "kapali"):
+        altyazi_stil = "yok"
+    elif altyazi_ac in ("1", "acik", "orta"):
+        altyazi_stil = "orta"
+    elif altyazi_ac == "yogun":
+        altyazi_stil = "yogun"
+    if kanal and not altyazi_sablon:
+        altyazi_sablon = kanal.get("altyazi_sablon", "")   # kanal profili sablonu hatirlar
     mag_profil = prof.get("mag")
     footage_acik = prof.get("footage_pct", 0) > 0
     # Maliyet/kalite: animasyon (duz vektor) ucuz mini, documentary (foto-gercekci) gpt-image-2
@@ -989,12 +1082,29 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     yt_once = True
     sure_dk = max(0.3, min(14.0, float(sure_dk or 2)))   # 14 dk tavan
 
-    # Karakter + STIL DETAY analizi (her sahnede birebir ayni karakter VE stil icin)
-    kar_kilit = ""
-    if kar_yol and os.path.exists(kar_yol):
+    # ── Karakter + STIL kilitleri ──
+    # PROFIL VARSA: kayitli referans/kilitler kullanilir -> hem videolar arasi TUTARLILIK,
+    # hem her videoda 2 vision cagrisi tasarrufu (daha hizli + daha ucuz).
+    kar_kilit = kanal.get("kar_kilit", "") if kanal else ""
+    stil_kilit = kanal.get("stil_kilit", "") if kanal else ""
+    if kanal:
+        # kullanici bu videoda ozel gorsel yuklemediyse profilinkini kullan
+        if not (kar_yol and os.path.exists(kar_yol)) and kanal.get("karakter_yol"):
+            kar_yol = kanal["karakter_yol"]
+        if not (stil_yol and os.path.exists(stil_yol)) and kanal.get("stil_yol"):
+            stil_yol = kanal["stil_yol"]
+    if not kar_kilit and kar_yol and os.path.exists(kar_yol):
         bildir("Karakter analiz ediliyor...", 3)
         kar_kilit = karakter_analiz(kar_yol)
-    stil_kilit = stil_analiz(stil_yol) if (stil_yol and os.path.exists(stil_yol)) else ""
+    if not stil_kilit and stil_yol and os.path.exists(stil_yol):
+        stil_kilit = stil_analiz(stil_yol)
+    # Kilitleri profile YAZ (bir kez uretilir, sonraki tum videolarda hazir gelir)
+    if kanal and (kar_kilit or stil_kilit):
+        try:
+            profil_yaz(profil_id, {"kar_kilit": kar_kilit or None,
+                                   "stil_kilit": stil_kilit or None})
+        except Exception:
+            pass
 
     bildir("Hikaye sahnelere bölünüyor...", 5)
     plan = uzun_plan(story, prof, sure_dk)
@@ -1006,7 +1116,11 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     panlar = ["right", "left", "top", "bottom"]
     props_sahneler = []
     toplam = len(scenes)
-    capa_yol = ""   # gorsel capa: ilk uretilen sahne -> sonrakilere karakter+stil kilidi
+    # Gorsel capa: normalde ilk uretilen sahne sonrakilere kilit olur (video ICI tutarlilik).
+    # PROFIL KILITLIYSE capa ta bastan gelir -> ILK SAHNE DAHIL her kare kanalin sabit
+    # gorunumune kilitlenir (videolar ARASI tutarlilik). Kanal kimligi budur.
+    capa_yol = kanal.get("capa_yol", "") if kanal else ""
+    capa_profilden = bool(capa_yol)
     kumulatif_sn = 0.0   # hikaye modu: acilis bolumu (HIKAYE_ACILIS_SN) takibi icin toplam sure
 
     bakiye_bitti = False   # bakiye/limit doldu mu (elde olanla kurtarma icin)
@@ -1066,10 +1180,18 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                     shutil.copy(gyol_full, capa_yol)
                 except Exception:
                     capa_yol = gyol_full
+                # PROFIL VAR ama henuz kilitli degil -> ilk sahneyi kanalin KALICI capasi yap.
+                # Bundan sonraki tum videolar bu goruntuye kilitlenir (kanal kimligi sabitlenir).
+                if kanal and not capa_profilden:
+                    if profil_capa_kilitle(profil_id, capa_yol):
+                        capa_profilden = True
+                        print(f"  profil '{profil_id}' capasi KILITLENDI", file=sys.stderr)
             if mag_profil and s.get("hd"):   # OTOMATIK: sadece plan HD isaretlediyse
                 bildir(f"Sahne {i+1}/{toplam}: Magnific HD...", yuzde)
                 kaynak.magnific_upscale(gyol_full, optimized_for=mag_profil, scale="2x")
-            time.sleep(11)  # OpenAI Tier1 hiz limiti
+            # OpenAI hiz limiti beklemesi. 11 sn cok muhafazakardi (96 sahne = 18 dk BOS bekleme).
+            # 429 artik Retry-After'a uyup otomatik tekrar deniyor, bu yuzden guvenle dusuruldu.
+            time.sleep(float(os.environ.get("GORSEL_BEKLE", "5")))
             tur = "image"
             medya = f"isler/{is_adi}/sahne_{n}.png"
 
@@ -1125,7 +1247,8 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # fps 30->24: %20 daha az kare = %20 hizli render (darbogaz Chromium kare uretimi).
     # Statik gorsel + Ken Burns'te 24 fps sinematik durur, fark hissedilmez. VIDEO_FPS env ile geri alinir.
     props = {"fps": int(os.environ.get("VIDEO_FPS", "24")), "genislik": 1920, "yukseklik": 1080,
-             "gecis": motion, "altyaziStil": altyazi_stil, "sahneler": props_sahneler}
+             "gecis": motion, "altyaziStil": altyazi_stil,
+             "altyaziSablon": (altyazi_sablon or "klasik"), "sahneler": props_sahneler}
     props_yolu = os.path.join(is_dizini, "props.json")
     with open(props_yolu, "w") as f:
         json.dump(props, f, ensure_ascii=False)

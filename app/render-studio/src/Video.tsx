@@ -12,6 +12,7 @@ import {
 } from 'remotion';
 import {TransitionSeries, linearTiming} from '@remotion/transitions';
 import {fade} from '@remotion/transitions/fade';
+import {fontlariYukle, fontAilesi, sablonCoz, FontAdi} from './fontlar';
 
 export type AltyaziParcasi = {t0: number; t1: number; metin: string};
 
@@ -36,6 +37,8 @@ export type VideoProps = {
   yukseklik: number;
   gecis?: Motion;
   altyaziStil?: AltyaziStil;
+  altyaziSablon?: string;   // 'klasik' | 'youtube' | 'temiz' | 'kalin' | 'sinema'
+  altyaziFont?: FontAdi;    // sablonun fontunu ezmek icin (opsiyonel)
   sahneler: Sahne[];
 };
 
@@ -151,9 +154,9 @@ const OverlayBaslik: React.FC<{metin: string; motion: string; kareSayisi: number
           textAlign: 'center',
           overflowWrap: 'anywhere',
           wordBreak: 'break-word',
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-          fontWeight: 800,
+          // Kinetik baslik da gomulu fontu kullansin (sistem fontu yerine) — tutarli marka
+          fontFamily: fontAilesi(hizli ? 'anton' : 'montserrat'),
+          fontWeight: hizli ? 400 : 800,
           fontSize: hizli ? 96 : 68,
           lineHeight: 1.05,
           letterSpacing: hizli ? 0 : -1,
@@ -170,37 +173,47 @@ const OverlayBaslik: React.FC<{metin: string; motion: string; kareSayisi: number
   );
 };
 
-const Altyazi: React.FC<{parcalar: AltyaziParcasi[]; fps: number; stil: AltyaziStil}> = ({
-  parcalar,
-  fps,
-  stil,
-}) => {
+const Altyazi: React.FC<{
+  parcalar: AltyaziParcasi[];
+  fps: number;
+  stil: AltyaziStil;
+  sablonAdi?: string;
+  fontEz?: FontAdi;
+}> = ({parcalar, fps, stil, sablonAdi, fontEz}) => {
   const frame = useCurrentFrame();
   const saniye = frame / fps;
   const aktif = parcalar.find((p) => saniye >= p.t0 && saniye < p.t1);
   if (!aktif || stil === 'yok') return null;
-  const yogun = stil === 'yogun';
+
+  const s = sablonCoz(sablonAdi);
+  const kutulu = s.arka !== 'transparent';
+  // 'yogun' stil sablonu biraz buyutur (Vox tarzi vurgulu akis)
+  const olcek = stil === 'yogun' ? 1.12 : 1;
+  const metin = s.buyukHarf ? aktif.metin.toLocaleUpperCase('tr-TR') : aktif.metin;
+
   return (
-    <AbsoluteFill style={{justifyContent: 'flex-end', alignItems: 'center', paddingBottom: 64}}>
+    <AbsoluteFill
+      style={{justifyContent: 'flex-end', alignItems: 'center', paddingBottom: s.altBosluk}}
+    >
       <div
         style={{
-          maxWidth: '80%',
-          backgroundColor: 'rgba(0, 0, 0, 0.72)',
-          color: 'white',
+          maxWidth: '82%',
+          backgroundColor: s.arka,
+          color: s.renk,
           overflowWrap: 'anywhere',
           wordBreak: 'break-word',
-          fontFamily:
-            '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
-          fontSize: yogun ? 52 : 44,
-          fontWeight: yogun ? 800 : 700,
-          lineHeight: 1.25,
+          fontFamily: fontAilesi(fontEz || s.font),
+          fontSize: Math.round(s.boyut * olcek),
+          fontWeight: s.agirlik,
+          letterSpacing: s.harfAralik,
+          lineHeight: 1.22,
           textAlign: 'center',
-          padding: '13px 28px',
-          borderRadius: 14,
-          textShadow: '0 2px 6px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.9)',
+          padding: kutulu ? '13px 30px' : 0,
+          borderRadius: kutulu ? 14 : 0,
+          textShadow: s.kontur,
         }}
       >
-        {aktif.metin}
+        {metin}
       </div>
     </AbsoluteFill>
   );
@@ -287,7 +300,9 @@ const SahneGorunumu: React.FC<{
   motion: NormMotion;
   altyaziStil: AltyaziStil;
   kareSayisi: number;
-}> = ({sahne, indeks, motion, altyaziStil, kareSayisi}) => {
+  altyaziSablon?: string;
+  altyaziFont?: FontAdi;
+}> = ({sahne, indeks, motion, altyaziStil, kareSayisi, altyaziSablon, altyaziFont}) => {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
   const K = kareSayisi;
@@ -324,13 +339,22 @@ const SahneGorunumu: React.FC<{
         />
       ) : null}
       <OverlayBaslik metin={sahne.overlay || ''} motion={motion} kareSayisi={K} />
-      <Altyazi parcalar={sahne.altyazi} fps={fps} stil={altyaziStil} />
+      <Altyazi
+        parcalar={sahne.altyazi}
+        fps={fps}
+        stil={altyaziStil}
+        sablonAdi={altyaziSablon}
+        fontEz={altyaziFont}
+      />
       <Audio src={kaynakCoz(sahne.ses)} />
     </AbsoluteFill>
   );
 };
 
-export const VidrushVideo: React.FC<VideoProps> = ({fps, gecis, altyaziStil, sahneler}) => {
+export const VidrushVideo: React.FC<VideoProps> = ({
+  fps, gecis, altyaziStil, altyaziSablon, altyaziFont, sahneler,
+}) => {
+  fontlariYukle();   // gomulu altyazi fontlarini enjekte et + yuklenene kadar render'i beklet
   const motion = normMotion(gecis);
   const alt: AltyaziStil = altyaziStil ?? 'orta';   // yalnizca undefined/null -> 'orta' ('yok' korunur)
   const {Ks, gecisler} = hesaplaKareler(sahneler, fps, motion);
@@ -345,6 +369,8 @@ export const VidrushVideo: React.FC<VideoProps> = ({fps, gecis, altyaziStil, sah
           motion={motion}
           altyaziStil={alt}
           kareSayisi={Ks[i]}
+          altyaziSablon={altyaziSablon}
+          altyaziFont={altyaziFont}
         />
       </TransitionSeries.Sequence>,
     );

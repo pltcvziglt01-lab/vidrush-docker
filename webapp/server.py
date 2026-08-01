@@ -139,6 +139,87 @@ def anim_listesi():
             for k, v in pipeline.ANIMASYON_STILLERI.items()]
 
 
+@app.get("/api/altyazi-sablonlari")
+def altyazi_sablonlari():
+    """Altyazi gorunum sablonlari (Video.tsx fontlar.ts ile ayni liste)."""
+    return [
+        {"id": "klasik", "ad": "Klasik Kutu", "font": "Montserrat",
+         "ozet": "Koyu yarı saydam kutu — her zeminde okunur"},
+        {"id": "youtube", "ad": "YouTube Sarı", "font": "Anton",
+         "ozet": "Kalın sarı, siyah konturlu — faceless/viral tarz"},
+        {"id": "temiz", "ad": "Temiz Beyaz", "font": "Montserrat",
+         "ozet": "Kutusuz beyaz, yumuşak gölge — modern"},
+        {"id": "kalin", "ad": "Kalın Kutu", "font": "Poppins",
+         "ozet": "Sarı dolgu kutu, büyük harf — vurgulu explainer"},
+        {"id": "sinema", "ad": "Sinematik", "font": "Oswald",
+         "ozet": "İnce, geniş harf aralığı — belgesel"},
+    ]
+
+
+@app.get("/api/profiller")
+def profil_listesi():
+    """Kanal profilleri — videolar ARASI stil/karakter tutarliligi icin."""
+    return pipeline.profil_listele()
+
+
+@app.post("/api/profil")
+async def profil_olustur(pid: str = Form(...), ad: str = Form(""),
+                         tur: str = Form("animasyon"), edit: str = Form(""),
+                         altyazi_sablon: str = Form(""),
+                         karakter: UploadFile = File(None),
+                         stil: UploadFile = File(None)):
+    """Kanal profili olustur/guncelle. Karakter+stil gorselleri KALICI saklanir."""
+    try:
+        d = pipeline.profil_yolu(pid)
+    except ValueError:
+        raise HTTPException(400, "Geçersiz profil kimliği (harf/rakam/-/_ , maks 48)")
+    os.makedirs(d, exist_ok=True)
+    mod = tur if tur in ("animasyon", "documentary") else "animasyon"
+    if mod == "animasyon":
+        eid = edit if edit in pipeline.ANIMASYON_STILLERI else pipeline.VARSAYILAN_ANIM
+    else:
+        eid = edit if edit in pipeline.EDIT_STILLERI else pipeline.VARSAYILAN_EDIT
+    try:
+        for dosya, hedef_ad in ((karakter, "karakter.png"), (stil, "stil.png")):
+            if dosya is not None:
+                veri = await dosya.read()
+                if veri:
+                    if len(veri) > MAKS_UPLOAD:
+                        raise HTTPException(413, "Görsel çok büyük (maks 20 MB)")
+                    await asyncio.to_thread(_kucult, veri, os.path.join(d, hedef_ad))
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(400, "Görsel okunamadı (geçerli bir resim dosyası yükleyin)")
+    pipeline.profil_yaz(pid, {"ad": ad.strip() or pid, "tur": mod, "edit": eid,
+                              "altyazi_sablon": altyazi_sablon.strip() or None})
+    return pipeline.profil_oku(pid) and {"ok": True, "id": pid}
+
+
+@app.delete("/api/profil/{pid}")
+def profil_sil(pid: str):
+    try:
+        d = pipeline.profil_yolu(pid)
+    except ValueError:
+        raise HTTPException(400, "gecersiz profil")
+    if not os.path.isdir(d):
+        raise HTTPException(404, "profil yok")
+    shutil.rmtree(d, ignore_errors=True)
+    return {"ok": True}
+
+
+@app.post("/api/profil/{pid}/capa-sifirla")
+def profil_capa_sifirla(pid: str):
+    """Kanalin gorsel kilidini kaldir — bir sonraki video yeni gorunumu belirler."""
+    try:
+        y = os.path.join(pipeline.profil_yolu(pid), "capa.png")
+    except ValueError:
+        raise HTTPException(400, "gecersiz profil")
+    if os.path.exists(y):
+        os.remove(y)
+    return {"ok": True, "kilitli": False}
+
+
 @app.post("/api/generate")
 async def uret_baslat(session: str = Form(...), story: str = Form(...),
                       tur: str = Form("documentary"),
@@ -146,6 +227,9 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
                       sure_dk: str = Form("2"),
                       gecis: str = Form("1"),
                       zoom: str = Form("1"),
+                      profil: str = Form(""),
+                      altyazi: str = Form(""),
+                      altyazi_sablon: str = Form(""),
                       karakter: UploadFile = File(None),
                       stil: UploadFile = File(None)):
     """Karakter/stil gorselleri her video icin DOGRUDAN yuklenir (kalici kayit yok).
@@ -198,8 +282,10 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
     isler[is_id] = {"durum": "kuyrukta", "ilerleme": 0, "mesaj": "Sirada...",
                     "video": None, "kapak": None, "hata": None}
     _durum_kaydet(is_id)
-    is_kuyrugu.put((is_id, story.strip(), kar, stil_yol, mod, edit_id, sd, gecis_acik, zoom_acik))
-    return {"job_id": is_id, "kuyruk": is_kuyrugu.qsize(), "tur": mod, "edit": edit_id}
+    is_kuyrugu.put((is_id, story.strip(), kar, stil_yol, mod, edit_id, sd, gecis_acik, zoom_acik,
+                    profil.strip(), altyazi.strip(), altyazi_sablon.strip()))
+    return {"job_id": is_id, "kuyruk": is_kuyrugu.qsize(), "tur": mod, "edit": edit_id,
+            "profil": profil.strip()}
 
 
 @app.get("/api/job/{is_id}")
@@ -241,7 +327,8 @@ def cikti(dosya: str):
     return FileResponse(yol)
 
 
-def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom_acik):
+def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom_acik,
+            profil_id="", altyazi="", altyazi_sablon=""):
     d = isler.get(is_id)
     if not d:
         return
@@ -254,7 +341,9 @@ def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom
 
     try:
         sonuc = asyncio.run(pipeline.uret(is_id, story, kar, stil_yol, mod, edit_id,
-                                          sure_dk, gecis_acik, zoom_acik, ilerle))
+                                          sure_dk, gecis_acik, zoom_acik, ilerle,
+                                          profil_id=profil_id, altyazi_sablon=altyazi_sablon,
+                                          altyazi_ac=altyazi))
         d.update({"durum": "bitti", "ilerleme": 100, "mesaj": "Hazir!",
                   "video": "ciktilar/" + sonuc["video"],
                   "kapak": ("ciktilar/" + sonuc["kapak"]) if sonuc.get("kapak") else None,

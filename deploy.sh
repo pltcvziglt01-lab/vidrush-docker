@@ -43,14 +43,22 @@ print('  ✓ syntax OK (%d dosya)' % len(yollar))" || { echo 'SYNTAX HATASI — 
 
 echo "== 3/5 Dosyalari konteynere kopyala =="
 # webapp (pipeline/server/kaynak/static)
-$SSH "mkdir -p /tmp/dep/webapp/static /tmp/dep/rs/src"
+$SSH "mkdir -p /tmp/dep/webapp/static /tmp/dep/rs/src /tmp/dep/rs/fonts"
 scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/webapp/*.py root@$IP:/tmp/dep/webapp/ >/dev/null
 scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/webapp/static/index.html root@$IP:/tmp/dep/webapp/static/ >/dev/null
 scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/app/uret.py root@$IP:/tmp/dep/ >/dev/null
-scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/app/render-studio/src/*.tsx root@$IP:/tmp/dep/rs/src/ >/dev/null
+# Remotion kaynaklari: .tsx + .ts (fontlar.ts gibi yardimcilar da)
+scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/app/render-studio/src/*.tsx "$KOK"/app/render-studio/src/*.ts root@$IP:/tmp/dep/rs/src/ >/dev/null
+# Gomulu altyazi fontlari (varsa)
+if ls "$KOK"/app/render-studio/public/fonts/*.ttf >/dev/null 2>&1; then
+  scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/app/render-studio/public/fonts/*.ttf root@$IP:/tmp/dep/rs/fonts/ >/dev/null
+fi
 $SSH "docker cp /tmp/dep/webapp/. bedosaho:/opt/vidrush/webapp/ && \
       docker cp /tmp/dep/uret.py bedosaho:/opt/vidrush/uret.py && \
-      docker cp /tmp/dep/rs/src/. bedosaho:/opt/vidrush/render-studio/src/ && rm -rf /tmp/dep"
+      docker cp /tmp/dep/rs/src/. bedosaho:/opt/vidrush/render-studio/src/ && \
+      docker exec bedosaho mkdir -p /opt/vidrush/render-studio/public/fonts && \
+      (ls /tmp/dep/rs/fonts/*.ttf >/dev/null 2>&1 && docker cp /tmp/dep/rs/fonts/. bedosaho:/opt/vidrush/render-studio/public/fonts/ || true) && \
+      rm -rf /tmp/dep"
 echo "  ✓ kopyalandi"
 
 echo "== 4/5 Yeniden baslat + saglik =="

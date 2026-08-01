@@ -220,6 +220,30 @@
           <div class="switch on" id="swZoom" style="margin-top:4px">
             <span class="tr"></span><span>Zoom (Ken Burns)<small>görselde yakınlaşma/kaydırma</small></span>
           </div>
+          <div class="switch" id="swAltyazi" style="margin-top:4px">
+            <span class="tr"></span><span>Altyazı<small>konuşmayı ekrana yaz</small></span>
+          </div>
+        </div>
+        <div id="altyaziWrap" style="display:none;margin-top:16px">
+          <div class="lbl2">🔤 Altyazı şablonu</div>
+          <div class="estiller" id="altSablonlar"><span class="durum">Yükleniyor...</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2><span class="num">5</span> Kanal Profili <span class="durum" style="font-weight:400">— her videoda aynı stil</span></h2>
+        <div class="durum" style="font-size:12px;margin-bottom:12px">
+          Profil seçersen karakter ve görsel stili <b>kaydedilir</b>; sonraki tüm videolar aynı görünür.
+          İlk video görünümü <b>kilitler</b>, sonrakiler ona uyar — evergreen kanal için şart.
+        </div>
+        <div class="estiller" id="profiller"><span class="durum">Yükleniyor...</span></div>
+        <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <input id="pfId" placeholder="profil-kimligi (or. bahce-kanali)" style="flex:1;min-width:200px;padding:10px 12px;border-radius:10px;border:1px solid #2a2a35;background:#14141c;color:#eee">
+          <input id="pfAd" placeholder="Görünen ad" style="flex:1;min-width:160px;padding:10px 12px;border-radius:10px;border:1px solid #2a2a35;background:#14141c;color:#eee">
+          <button class="btn" id="btnProfil" style="padding:10px 18px">+ Profil Oluştur</button>
+        </div>
+        <div class="durum" style="font-size:11px;margin-top:8px">
+          Profil, şu an seçili <b>video türü + stil + altyazı şablonunu</b> ve yüklediğin karakter/stil görselini kaydeder.
         </div>
       </div>
 
@@ -303,6 +327,76 @@ gorselSec("#fStil","#stilView","#dropStil",f=>stilFile=f);
 $("#sure").addEventListener("input",e=>{sureDk=+e.target.value; $("#sureLbl").textContent=sureDk+" dk";});
 $("#swGecis").onclick=()=>{gecisAcik=!gecisAcik; $("#swGecis").classList.toggle("on",gecisAcik);};
 $("#swZoom").onclick=()=>{zoomAcik=!zoomAcik; $("#swZoom").classList.toggle("on",zoomAcik);};
+
+/* ── altyazı: aç/kapat + şablon ── */
+let altyaziAcik=false, altSablon="klasik";
+const ALT_EMOJI={klasik:"⬛",youtube:"🟡",temiz:"⚪",kalin:"🟨",sinema:"🎞️"};
+$("#swAltyazi").onclick=()=>{
+  altyaziAcik=!altyaziAcik;
+  $("#swAltyazi").classList.toggle("on",altyaziAcik);
+  $("#altyaziWrap").style.display = altyaziAcik ? "" : "none";
+};
+fetch("api/altyazi-sablonlari").then(r=>r.json()).then(list=>{
+  const c=$("#altSablonlar"); c.innerHTML="";
+  list.forEach((s,i)=>{
+    if(i===0) altSablon=s.id;
+    const d=document.createElement("div");
+    d.className="estil"+(i===0?" on":""); d.dataset.id=s.id;
+    d.innerHTML=`<span class="pick"></span><span class="en">${ALT_EMOJI[s.id]||"🔤"}</span>
+      <b>${s.ad}</b><p>${s.ozet}</p><div class="meta">${s.font}</div>`;
+    d.onclick=()=>{altSablon=s.id; $$("#altSablonlar .estil").forEach(x=>x.classList.toggle("on",x.dataset.id===s.id));};
+    c.appendChild(d);
+  });
+}).catch(()=>{$("#altSablonlar").innerHTML='<span class="durum">şablonlar yüklenemedi</span>';});
+
+/* ── kanal profili ── */
+let seciliProfil = localStorage.getItem("bedosaho_profil") || "";
+function profilleriYukle(){
+  fetch("api/profiller").then(r=>r.json()).then(list=>{
+    const c=$("#profiller"); c.innerHTML="";
+    // "profilsiz" seçeneği
+    const yok=document.createElement("div");
+    yok.className="estil"+(seciliProfil?"":" on"); yok.dataset.id="";
+    yok.innerHTML=`<span class="pick"></span><span class="en">🚫</span><b>Profilsiz</b>
+      <p>Tek seferlik video — stil kaydedilmez.</p><div class="meta">tutarlılık yok</div>`;
+    yok.onclick=()=>secProfil("");
+    c.appendChild(yok);
+    list.forEach(p=>{
+      const d=document.createElement("div");
+      d.className="estil"+(seciliProfil===p.id?" on":""); d.dataset.id=p.id;
+      d.innerHTML=`<span class="pick"></span><span class="en">${p.kilitli?"🔒":"🔓"}</span>
+        <b>${p.ad}</b><p>${p.tur==="animasyon"?"Animasyon":"Documentary"} · ${p.edit||""}</p>
+        <div class="meta">${p.kilitli?"stil kilitli":"ilk video kilitleyecek"}${p.karakter_var?" · karakter var":""}</div>`;
+      d.onclick=()=>secProfil(p.id);
+      c.appendChild(d);
+    });
+    if(seciliProfil && !list.some(p=>p.id===seciliProfil)) secProfil("");
+  }).catch(()=>{$("#profiller").innerHTML='<span class="durum">profiller yüklenemedi</span>';});
+}
+function secProfil(pid){
+  seciliProfil=pid; localStorage.setItem("bedosaho_profil",pid);
+  $$("#profiller .estil").forEach(x=>x.classList.toggle("on",(x.dataset.id||"")===pid));
+}
+profilleriYukle();
+
+$("#btnProfil").onclick=async()=>{
+  const pid=($("#pfId").value||"").trim();
+  if(!/^[A-Za-z0-9_-]{1,48}$/.test(pid)){ hata("Profil kimliği: harf/rakam/-/_ , maks 48"); return; }
+  const fd=new FormData();
+  fd.append("pid",pid); fd.append("ad",($("#pfAd").value||pid).trim());
+  fd.append("tur",videoTur);
+  fd.append("edit", videoTur==="animasyon" ? (animStil||"") : (editStil||""));
+  fd.append("altyazi_sablon", altyaziAcik ? altSablon : "");
+  if(karFile) fd.append("karakter",karFile);
+  if(stilFile) fd.append("stil",stilFile);
+  $("#btnProfil").disabled=true;
+  try{
+    const r=await fetch("api/profil",{method:"POST",body:fd});
+    if(!r.ok){ hata("Profil oluşturulamadı ("+r.status+")"); }
+    else { $("#pfId").value=""; $("#pfAd").value=""; profilleriYukle(); secProfil(pid); }
+  }catch(e){ hata("Profil oluşturulamadı"); }
+  $("#btnProfil").disabled=false;
+};
 
 /* edit stilleri */
 const EMOJI={"sinematik-belgesel":"🎬","anlati-video-essay":"📜","hizli-explainer":"⚡"};
@@ -397,6 +491,9 @@ $("#btnUret").onclick=async()=>{
   if(videoTur==="documentary" && editStil) fd.append("edit",editStil);
   if(videoTur==="animasyon" && animStil) fd.append("edit",animStil);
   fd.append("sure_dk",sureDk); fd.append("gecis",gecisAcik?"1":"0"); fd.append("zoom",zoomAcik?"1":"0");
+  fd.append("altyazi", altyaziAcik?"1":"0");
+  if(altyaziAcik) fd.append("altyazi_sablon", altSablon);
+  if(seciliProfil) fd.append("profil", seciliProfil);
   if(karFile) fd.append("karakter",karFile);
   if(stilFile) fd.append("stil",stilFile);
   let job;
