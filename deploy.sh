@@ -18,11 +18,16 @@ KOK="$(cd "$(dirname "$0")" && pwd)"
 
 [ -f "$KEY" ] || { echo "HATA: SSH anahtari yok: $KEY (Polat'tan iste)"; exit 1; }
 
-echo "== 1/5 Aktif render var mi (varsa bekle, isi bozma) =="
-N=$($SSH "docker exec bedosaho sh -c 'ps -eo args|grep -iE \"remotion render|chrome-headless\"|grep -v grep|wc -l'" 2>/dev/null || echo 0)
-if [ "$N" -gt 0 ]; then
-  echo "⚠️  Su an bir video render ediliyor. Deploy o isi OLDURUR. Once bitmesini bekle."
-  echo "   (yine de devam icin: FORCE=1 bash deploy.sh)"
+echo "== 1/5 Devam eden is var mi (varsa bekle, isi bozma) =="
+# ONEMLI: sadece render'a bakmak YETMEZ — is once ~10-40 dk GORSEL URETIM asamasinda gecirir
+# ve o sirada hicbir remotion/chrome sureci yoktur. Gercek kontrol: durum dosyalari.
+AKTIF=$($SSH "docker exec bedosaho sh -c 'grep -l \"\\\"durum\\\": \\\"uretiliyor\\\"\" /opt/vidrush/webapp/veri/durumlar/*.json 2>/dev/null | wc -l'" 2>/dev/null || echo 0)
+RENDER=$($SSH "docker exec bedosaho sh -c 'ps -eo args|grep -iE \"remotion render|chrome-headless\"|grep -v grep|wc -l'" 2>/dev/null || echo 0)
+if [ "${AKTIF:-0}" -gt 0 ] || [ "${RENDER:-0}" -gt 0 ]; then
+  echo "⚠️  DEPLOY DURDURULDU — su an bir video uretiliyor (aktif is: $AKTIF, render sureci: $RENDER)."
+  echo "   Deploy konteyneri yeniden baslatir ve o isi OLDURUR (harcanan kredi de bosa gider)."
+  echo "   Isin bitmesini bekle, sonra tekrar dene."
+  echo "   Gercekten zorlamak istersen: FORCE=1 bash deploy.sh"
   [ "${FORCE:-0}" = "1" ] || exit 2
 fi
 

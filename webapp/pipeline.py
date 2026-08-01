@@ -255,6 +255,22 @@ def gemini_gorsel(prompt: str, ref_yollar: list, hedef: str, deneme: int = 4) ->
     return False
 
 
+
+def altyazi_ayar_coz(girdi):
+    """Altyazi ayari: JSON metni (tam ayar) VEYA sablon adi olabilir. Video.tsx ikisini de anlar.
+    Bozuk JSON gelirse sablon adi gibi davranir; hicbiri yoksa varsayilan sablon."""
+    g = (girdi or "").strip()
+    if not g:
+        return "beyaz-kontur"
+    if g.startswith("{"):
+        try:
+            d = json.loads(g)
+            return d if isinstance(d, dict) else "beyaz-kontur"
+        except Exception:
+            return "beyaz-kontur"
+    return g
+
+
 class BakiyeHatasi(RuntimeError):
     """Bakiye/limit hatasi. Retry ANLAMSIZ: hemen yukari firlar ki 40 sahne boyunca
     bosuna denenmesin ve o ana kadar URETILEN sahneler kurtarilabilsin."""
@@ -535,9 +551,13 @@ HIK_STIL = (
     "oil painting. THE WORLD (everything except the figures) is fully painted and cinematic — "
     "saturated natural colour, visible brushwork, atmospheric haze, real light and real cast shadows, "
     "layered depth from a dark framing foreground to a hazy far vista; the world carries NO black "
-    "outlines and is never flat or vector. THE FIGURES are the exact opposite: pure flat white shapes "
-    "drawn with one clean uniform-width black ink line — no shading, no gradient, no texture, no rim "
-    "light, no glow, no colour spill, identical at noon, at night, in caves and in firelight. LIGHT "
+    # NOT: burada RENK DAYATILMAZ. Onceden 'pure flat white shapes' yaziyordu ve kullanicinin
+    # turuncu karakteriyle CATISIP sahneler arasi beyaz<->turuncu salinimina yol aciyordu.
+    # Renk daima karakter kunyesinden gelir; stil sadece CIZIM DILINI tanimlar.
+    "outlines and is never flat or vector. THE FIGURES are the exact opposite: flat unshaded shapes "
+    "in their own solid colours, drawn with one clean uniform-width black ink line — no shading, no "
+    "gradient, no texture, no rim light, no glow, no colour spill, keeping exactly the SAME colours "
+    "at noon, at night, in caves and in firelight. LIGHT "
     "SUPREMACY: scene light falls on the world only; figures cast a flat hard-edged single-tone "
     "shadow on the ground but never receive light. All descriptive detail is spent on the "
     "environment, none on the figures. Palette: earth greens, volcanic red, warm gold, dusk blue. "
@@ -575,9 +595,10 @@ HIK_SOZLESME = (
     "order: (1) SHOT: the shot-type letter plus the hero's height as a percent of frame height; "
     "(2) WORLD: the painted environment with at least 3 concrete named details, ONE named light "
     "source, time of day and colour mood — spend the entire adjective budget here; (3) FIGURES: only "
-    "what the white stick figure(s) DO — pose, gesture and the emotion read from eyes and stance, "
-    "closing with the fixed clause \"figures stay flat unshaded white with clean black outlines, "
-    "unaffected by the scene light\"; (4) TEXT: either a lettering instruction in double quotes, or "
+    "what the figure(s) DO — pose, gesture and the emotion read from eyes and stance. NEVER state "
+    "the character's colour (it is locked globally); close this slot with the fixed clause "
+    "\"figures stay flat and unshaded with clean black outlines, unaffected by the scene light\"; "
+    "(4) TEXT: either a lettering instruction in double quotes, or "
     "literally \"no text in this image\" — this slot is never empty.\n"
     "Never re-describe the hero's face, hair, clothing, outline, proportions or style — identity is "
     "injected separately and re-describing it causes drift. Prefix the paragraph with ANCIENT or "
@@ -696,6 +717,127 @@ def karakter_analiz(kar_yol: str) -> str:
     except Exception as e:
         print(f"  karakter_analiz hata: {str(e)[:160]}", file=sys.stderr)
         return ""
+
+
+def palet_olc(img_yol: str, adet: int = 5) -> list:
+    """Referans gorselden BASKIN RENKLERI piksel duzeyinde olc (median-cut).
+    LLM'e renk TAHMIN ETTIRMEK yerine gercek hex degerleri cikarilir -> 'turuncu karakter
+    pembeye dondu' kaymasi kokten kapanir (renk artik kesin sayi olarak prompta girer)."""
+    try:
+        from PIL import Image
+        im = Image.open(img_yol).convert("RGB")
+        # kenar %12'yi kirp: arka plan yerine OZNENIN rengini olc
+        w, h = im.size
+        k = (int(w * 0.12), int(h * 0.12), int(w * 0.88), int(h * 0.88))
+        im = im.crop(k).resize((160, 160))
+        q = im.quantize(colors=adet, method=Image.MEDIANCUT)
+        pal = q.getpalette()[: adet * 3]
+        sayim = sorted(q.getcolors() or [], reverse=True)   # [(piksel, indeks), ...]
+        out = []
+        for piksel, idx in sayim[:adet]:
+            r, g, b = pal[idx * 3: idx * 3 + 3]
+            out.append({"hex": f"#{r:02X}{g:02X}{b:02X}",
+                        "oran": round(piksel / (160 * 160), 3)})
+        return out
+    except Exception as e:
+        print(f"  palet_olc hata: {str(e)[:120]}", file=sys.stderr)
+        return []
+
+
+KUNYE_ALANLARI = ("tur", "govde_rengi", "ikincil_renk", "kafa", "gozler", "sac",
+                  "kiyafet", "oranlar", "ayirt_edici")
+
+
+def _kunye_tek_okuma(img_yol: str, sicaklik: float, paletler: list) -> dict:
+    """Referansi TEK vision cagrisiyla yapili kimlik kunyesine cevir."""
+    import base64
+    with open(img_yol, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode()
+    pal_txt = ", ".join(f"{p['hex']} (%{int(p['oran']*100)})" for p in paletler[:5]) or "yok"
+    istek = (
+        "You are a character model sheet analyst. Describe ONLY the character in this reference "
+        "image as a reusable identity card. Return STRICT JSON with exactly these keys: "
+        '"tur" (species/type, 3-6 words), "govde_rengi" (main body colour — pick the closest HEX '
+        f"from this measured palette: {pal_txt}), "
+        '"ikincil_renk" (secondary colour, HEX from the same palette or empty), '
+        '"kafa" (head shape, 4-10 words), "gozler" (eyes, 4-10 words), "sac" (hair/fur on head, '
+        '4-10 words or "none"), "kiyafet" (clothing/markings, 4-12 words or "none"), '
+        '"oranlar" (body proportions, 4-10 words), "ayirt_edici" (single most distinctive '
+        'permanent feature, 3-8 words). '
+        "RULES: describe ONLY permanent identity. NEVER describe the pose, the camera angle, the "
+        "background, the lighting, or any object the character is holding — those are temporary. "
+        "If a field is not clearly visible, use an empty string rather than guessing. English only."
+    )
+    body = {
+        "model": "gpt-4.1-mini",
+        "messages": [{"role": "user", "content": [
+            {"type": "text", "text": istek},
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+        ]}],
+        "response_format": {"type": "json_object"},
+        "max_tokens": 500, "temperature": sicaklik,
+    }
+    j = oai_chat(body, timeout=90)
+    ic = (j.get("choices") or [{}])[0].get("message", {}).get("content") or "{}"
+    try:
+        return json.loads(ic)
+    except Exception:
+        return {}
+
+
+def kimlik_kunyesi(img_yol: str) -> dict:
+    """COK ASAMALI KIMLIK ANALIZI (kullanici: '3-4 kere suzgecten gecirsin').
+    1) piksel duzeyinde palet olcumu (kod, $0)
+    2) bagimsiz vision okumasi (dusuk sicaklik)
+    3) IKINCI bagimsiz vision okumasi (yuksek sicaklik, ilkinden habersiz)
+    4) KOD UZLASISI: iki okuma ayni diyorsa alan GECERLI, celisiyorsa alan ATILIR
+       (celisen alan = modelin uydurdugu alandir; 100 karede 100 farkli uydurulur).
+    Donen: {alanlar..., _palet, _guven} — guven dusukse cagiran uyarir."""
+    paletler = palet_olc(img_yol)
+    a = _kunye_tek_okuma(img_yol, 0.15, paletler)
+    b = _kunye_tek_okuma(img_yol, 0.85, paletler)
+    if not a and not b:
+        return {}
+    kunye, onayli, dolu = {}, 0, 0
+    for alan in KUNYE_ALANLARI:
+        va = str(a.get(alan, "") or "").strip()
+        vb = str(b.get(alan, "") or "").strip()
+        if not va and not vb:
+            continue
+        dolu += 1
+        # renk alanlarinda birebir, metin alanlarinda kelime ortusmesi arar
+        if alan.endswith("rengi") or alan == "ikincil_renk":
+            uyum = va.upper() == vb.upper()
+        else:
+            ka, kb = set(va.lower().split()), set(vb.lower().split())
+            uyum = bool(ka & kb) and len(ka & kb) >= max(1, min(len(ka), len(kb)) // 3)
+        if uyum:
+            kunye[alan] = va or vb
+            onayli += 1
+        # celisen alan bilerek ATILIR (uydurma alani promptta tekrarlamak zarardir)
+    kunye["_palet"] = paletler
+    kunye["_guven"] = round(onayli / dolu, 2) if dolu else 0.0
+    return kunye
+
+
+def kunye_metni(k: dict) -> str:
+    """Kunyeyi POZITIF, olculu bir kimlik cumlesine cevir (negatif ifade YOK).
+    Tasarim ilkesi: yasakli seyi ADLANDIRMA — 'pembe olmasin' demek yerine kesin rengi soyle."""
+    if not k:
+        return ""
+    p = []
+    if k.get("tur"):
+        p.append(f"a {k['tur']}")
+    if k.get("govde_rengi"):
+        p.append(f"body colour exactly {k['govde_rengi']}")
+    if k.get("ikincil_renk"):
+        p.append(f"secondary colour {k['ikincil_renk']}")
+    for alan, on in (("kafa", "head"), ("gozler", "eyes"), ("sac", "hair"),
+                     ("kiyafet", "wearing"), ("oranlar", "proportions"),
+                     ("ayirt_edici", "distinctive")):
+        if k.get(alan) and str(k[alan]).lower() not in ("none", "yok"):
+            p.append(f"{on}: {k[alan]}")
+    return "The main character is " + ", ".join(p) + "." if p else ""
 
 
 def stil_analiz(stil_yol: str) -> str:
@@ -951,8 +1093,10 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
                    "the picture.")
         if kar_kilit:
             prompt += f" Character identity to match: {kar_kilit}"
-        prompt += (" Keep the character's EXACT original colors in every scene regardless of lighting "
-                   "or background; do NOT recolor, tint or change its hue.")
+        prompt += (" COLOUR LOCK: the character's colours are fixed and identical in every scene "
+                   "regardless of lighting, time of day or background — the exact same hues at noon, "
+                   "at night, in caves and in firelight. If any style instruction suggests a "
+                   "different figure colour, the character's own locked colours always win.")
     if stil_gor or capa_var:
         prompt += (" ART-STYLE LOCK: match the EXACT art style of the reference images — identical "
                    "rendering technique, line weight, color palette, shading, texture and level of "
@@ -982,17 +1126,21 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
         acik = []
         try:
             files = []
-            if kar_var:
-                fkar = open(kar_yol, "rb"); acik.append(fkar)
-                files.append(("image[]", ("character.png", fkar, "image/png")))
-            if capa_var:   # gorsel capa: ilk sahne -> karakter+stil kilidi
+            # ── TEMIZ CAPA ILKESI (en kritik duzeltme) ──
+            # Capa varsa SADECE capa gonderilir; kullanicinin ham referansi ARTIK GONDERILMEZ.
+            # Sebep: "elindeki kahve her sahneye tasindi" bir PROMPT degil PIKSEL sorunuydu —
+            # her cagriya fincanli goruntu giriyordu. Kopyalanacak fincan olmayinca sorun biter.
+            if capa_var:
                 fcapa = open(capa_yol, "rb"); acik.append(fcapa)
                 files.append(("image[]", ("anchor.png", fcapa, "image/png")))
-            # Stil gorselini SADECE capa yokken (ilk sahne) ekle. Capa varsa stili zaten tasir;
-            # ham stil ref'i sonraki sahnelere basibos renk (or. pembe serit) sokabiliyor.
-            if stil_gor and not capa_var:
-                fstil = open(stil_yol, "rb"); acik.append(fstil)
-                files.append(("image[]", ("style.png", fstil, "image/png")))
+            else:
+                # Capa yoksa (ilk kurulum) ham referans + stil gorseli kullanilir
+                if kar_var:
+                    fkar = open(kar_yol, "rb"); acik.append(fkar)
+                    files.append(("image[]", ("character.png", fkar, "image/png")))
+                if stil_gor:
+                    fstil = open(stil_yol, "rb"); acik.append(fstil)
+                    files.append(("image[]", ("style.png", fstil, "image/png")))
             # quality: OpenAI varsayilani 'auto' (~high, ~$0.28/gorsel). 'medium' (~$0.09)
             # %65-70 ucuz ve 1536x1024'te fark neredeyse gorunmez (ozellikle duz-vektor/
             # stickman animasyonda ayirt edilemez). IMAGE_QUALITY env ile deploysuz degistirilir:
@@ -1033,6 +1181,34 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
                 try: f.close()
                 except Exception: pass
     return False
+
+
+CAPA_PROMPT = (
+    "Full-body character model sheet of the SAME single character shown in the reference image. "
+    "Front-facing, standing upright in a relaxed neutral pose, arms down at the sides, "
+    "HANDS COMPLETELY OPEN AND EMPTY, entire body visible from head to feet, centred in frame. "
+    "Plain flat neutral light-grey studio background, even soft lighting, no scenery, no furniture, "
+    "no props, no shadows on the background. Reproduce the character's identity exactly: same "
+    "species, same colours, same face, same hair, same clothing, same proportions. "
+    "Single character only. No text, no watermark, no border."
+)
+
+
+def capa_uret(ref_yol: str, hedef: str, kimlik: str, stil: str, stil_yol: str = "",
+              model: str = "") -> bool:
+    """TEMIZ CAPA (A0) uretir: notr poz, ELLER BOS, sade zemin.
+    Neden: kullanicinin referansi genelde 'kirli'dir (elinde nesne, ozel poz, dolu arka plan) ve
+    her sahneye gonderilince bunlar KOPYALANIR. Bir kez temiz bir kanon uretip onu donduruyoruz;
+    tum sahneler bu temiz kareye kilitlenir. Capa ASLA sahne ciktisiyla guncellenmez (aksi halde
+    sapma bilesiklenip 'son sahnede karakter degisti' hatasini uretir)."""
+    p = CAPA_PROMPT
+    if kimlik:
+        p += " " + kimlik
+    if stil:
+        p += f" Art style: {stil}."
+    return referansli_gorsel(p, ref_yol, hedef, stil_prompt="", kar_kilit="",
+                             stil_yol=stil_yol, capa_yol="", stil_kilit="",
+                             yazi_yasak=True, model=model, cerceve="", deneme=3)
 
 
 async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
@@ -1096,16 +1272,26 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             kar_yol = kanal["karakter_yol"]
         if not (stil_yol and os.path.exists(stil_yol)) and kanal.get("stil_yol"):
             stil_yol = kanal["stil_yol"]
+    kunye_guven = None
     if not kar_kilit and kar_yol and os.path.exists(kar_yol):
-        bildir("Karakter analiz ediliyor...", 3)
-        kar_kilit = karakter_analiz(kar_yol)
+        # COK ASAMALI ANALIZ: palet olcumu + 2 bagimsiz vision okumasi + kod uzlasisi
+        bildir("Karakter derin analiz ediliyor (çok aşamalı)...", 3)
+        k = kimlik_kunyesi(kar_yol)
+        kar_kilit = kunye_metni(k)
+        kunye_guven = k.get("_guven")
+        if kunye_guven is not None and kunye_guven < 0.6:
+            print(f"  UYARI: kunye guveni dusuk ({kunye_guven}) — referans gorsel net degil",
+                  file=sys.stderr)
+        if not kar_kilit:      # analiz hic sonuc vermezse eski tek-gecisli yonteme dus
+            kar_kilit = karakter_analiz(kar_yol)
     if not stil_kilit and stil_yol and os.path.exists(stil_yol):
         stil_kilit = stil_analiz(stil_yol)
     # Kilitleri profile YAZ (bir kez uretilir, sonraki tum videolarda hazir gelir)
     if kanal and (kar_kilit or stil_kilit):
         try:
             profil_yaz(profil_id, {"kar_kilit": kar_kilit or None,
-                                   "stil_kilit": stil_kilit or None})
+                                   "stil_kilit": stil_kilit or None,
+                                   "kunye_guven": kunye_guven})
         except Exception:
             pass
 
@@ -1124,6 +1310,24 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # gorunumune kilitlenir (videolar ARASI tutarlilik). Kanal kimligi budur.
     capa_yol = kanal.get("capa_yol", "") if kanal else ""
     capa_profilden = bool(capa_yol)
+    # TEMIZ CAPA: kullanici karakter verdiyse ve henuz kanon yoksa, sahnelerden ONCE notr/
+    # eller-bos bir kanon karesi uret. Boylece referansin pozu-nesnesi sahnelere BULASMAZ ve
+    # tum sahneler ayni temiz kareye kilitlenir. Sahne 1'i capa yapmak sapmayi bilesikliyordu.
+    if not capa_yol and kar_yol and os.path.exists(kar_yol):
+        bildir("Karakter kanonu (temiz çapa) üretiliyor...", 5)
+        kanon = os.path.join(is_dizini, "_kanon.png")
+        try:
+            if capa_uret(kar_yol, kanon, kar_kilit, stil_kilit, stil_yol, gorsel_model):
+                capa_yol = kanon
+                capa_profilden = True     # DONDURULDU: sahne ciktisiyla guncellenmez
+                if kanal:
+                    profil_capa_kilitle(profil_id, kanon)
+                    print(f"  profil '{profil_id}' TEMIZ capasi kilitlendi", file=sys.stderr)
+        except BakiyeHatasi:
+            raise
+        except Exception as e:
+            print(f"  capa uretilemedi, sahne-1 capasina dusuluyor: {str(e)[:120]}",
+                  file=sys.stderr)
     kumulatif_sn = 0.0   # hikaye modu: acilis bolumu (HIKAYE_ACILIS_SN) takibi icin toplam sure
 
     bakiye_bitti = False   # bakiye/limit doldu mu (elde olanla kurtarma icin)
@@ -1251,7 +1455,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # Statik gorsel + Ken Burns'te 24 fps sinematik durur, fark hissedilmez. VIDEO_FPS env ile geri alinir.
     props = {"fps": int(os.environ.get("VIDEO_FPS", "24")), "genislik": 1920, "yukseklik": 1080,
              "gecis": motion, "altyaziStil": altyazi_stil,
-             "altyaziSablon": (altyazi_sablon or "klasik"), "sahneler": props_sahneler}
+             "altyaziAyar": altyazi_ayar_coz(altyazi_sablon), "sahneler": props_sahneler}
     props_yolu = os.path.join(is_dizini, "props.json")
     with open(props_yolu, "w") as f:
         json.dump(props, f, ensure_ascii=False)
