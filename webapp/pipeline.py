@@ -503,7 +503,34 @@ EXP_SOZLESME = (
     "The character is referred to ONLY as \"the hero\" — never restate appearance, clothing or "
     "colours. Do NOT mention camera, lens, lighting, style, texture or medium in scene_prompt; all "
     "styling lives in the global block.\n"
+    + DESTEK_PLANLAYICI
 )
+
+# ═══ DESTEK OGESI KURALI (tum animasyon stillerinde ZORUNLU) ═══
+# Kullanici geri bildirimi: "bir sahne sadece karakterin on planda oldugu duz bir gorsel olarak
+# gorunmemeli; ana karakter bir sey ANLATIYOR, yan destekleyici ogeler de kullanilmali."
+# Yani her kare, o an anlatilan seyi GOSTEREN somut bir gorsel arac icermeli.
+DESTEK_PLANLAYICI = (
+    "SUPPORTING ELEMENT — MANDATORY IN EVERY SCENE. The character is NARRATING something, so each "
+    "frame must SHOW what is being said, not just show the character. Besides the character and the "
+    "setting, every scene_prompt must name at least ONE concrete supporting visual device that "
+    "illustrates the exact point of that line, and must state how the character INTERACTS with it "
+    "(holding, pointing at, leaning over, building, dropping, comparing, reacting to). Choose the "
+    "device from: a real object or tool; a map, chart, timeline, diagram or plan; a document, letter "
+    "or book; secondary figures (a crowd, soldiers, workers, a listener); a visual metaphor made of "
+    "objects (scales, a growing plant, stacked coins, a cracked wall); a before/after or two-object "
+    "comparison; an environmental event (fire, smoke, rain, collapse, dust, explosion). Vary the "
+    "device from scene to scene — never repeat the same one twice in a row. A scene that is only a "
+    "character standing in front of scenery is INVALID and must be rewritten.\n"
+)
+DESTEK_GORSEL = (
+    " STORYTELLING FRAME: this is a narrated explainer picture, so the frame must SHOW the idea, not "
+    "just the character. Besides the character and the background, clearly render the supporting "
+    "element named in the scene text — the object, map, diagram, document, crowd, metaphor or event "
+    "— large enough to read at a glance, and show the character physically engaging with it. A flat "
+    "picture of a character simply standing in front of scenery is not acceptable."
+)
+
 
 ANIM_SOZLESME = (
     "SCENE PROMPT CONTRACT: every scene_prompt is ONE English paragraph of 45-65 words with "
@@ -540,6 +567,7 @@ ANIM_SOZLESME = (
     "style consistency between scenes.\n"
     "TEXT: at most one short natural in-world sign, under four words, written as: sign reads "
     "\"NEW & IMPROVED\". Never captions, subtitles, watermarks or logos.\n"
+    + DESTEK_PLANLAYICI
 )
 
 # ═════════ HIKAYE / WHAT-IF STILI (3. referans: "You Wake Up 100,000 Years Ago") ═════════
@@ -628,6 +656,7 @@ HIK_SOZLESME = (
     "commas, no punctuation, no plus signs, no chemical symbols, no thousand separators — write "
     "\"100K YEARS\" not \"100,000\". Each infographic label box obeys the same limit. Text never sits "
     "in the top or bottom 9% of the frame.\n"
+    + DESTEK_PLANLAYICI
 )
 
 ANIMASYON_PROFIL = {
@@ -1011,9 +1040,14 @@ def plan_uret(story: str, prof: dict, hedef_sahne=40, devam=False, onceki_ozet="
         sp = str(s.get("scene_prompt", "")).strip()
         if kayn == "ai" and not sp:
             continue
-        # Karakter-her-sahnede guvenlik agi: model kahramani unuttuysa promptun basina ekle.
-        if kayn == "ai" and "main character" not in sp.lower():
-            s["scene_prompt"] = "The main character is the large central foreground subject. " + sp
+        # Karakter-her-sahnede guvenlik agi. DIKKAT: eskiden "large central foreground subject"
+        # ekleniyordu; planlayici "the stickman commander" gibi yazdigi icin bu HER sahnede
+        # tetikleniyor ve cekim sistemini (genis plan %15, orta %40) EZIYORDU -> karakter hep
+        # ortada, buyuk ve dimdik cikiyordu. Artik sadece kahramanin VARLIGI garanti edilir,
+        # olcek/kompozisyon cekim sozlesmesine birakilir.
+        if kayn == "ai" and not any(x in sp.lower() for x in
+                                    ("main character", "the hero", "stickman", "the character")):
+            s["scene_prompt"] = "The recurring main character appears in this scene. " + sp
         scenes.append(s)
     if not scenes:
         raise RuntimeError("Sahne plani bos")
@@ -1075,22 +1109,28 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
     kar_var = bool(kar_yol and os.path.exists(kar_yol))
     stil_gor = bool(stil_yol and os.path.exists(stil_yol))
     capa_var = bool(capa_yol and os.path.exists(capa_yol) and capa_yol != hedef)
+    # PROMPT SIRASI ONEMLI: once SAHNE/AKSIYON, sonra kisa kimlik kilidi.
+    # Referans gorsel notr duruslu oldugu icin modelin PIKSEL egilimi "dimdik dur"a cekiyordu;
+    # bu yuzden aksiyon en basta ve en guclu sekilde tekrarlanir.
     prompt = scene_prompt.rstrip(". ") + "."
     if kar_var or capa_var:
-        # Karakter kilidi — cok kesin dil (kullanici: "her sahnede AYNI olmali")
-        prompt += (" CHARACTER IDENTITY LOCK: the reference images define ONLY the character's visual "
-                   "IDENTITY — its body and face design, exact colors, proportions and clothing style. "
-                   "Keep that identity EXACTLY the same so it is unmistakably the same character in "
-                   "every scene. CRITICAL: IGNORE the pose, camera angle, background and any object "
-                   "the character happens to be holding in the reference images — those belong to the "
-                   "reference only. RE-DRAW the character FRESH for THIS scene: a new pose, new "
-                   "action, new expression and new surroundings exactly as described above. Do NOT "
-                   "carry over props (for example a cup, a bag or an item in its hand) from the "
-                   "reference unless this scene's description explicitly mentions them. Render exactly "
-                   "ONE main character; do not add other figures. Follow the shot type and character "
-                   "scale stated in the scene description exactly — do not re-frame, do not enlarge "
-                   "or centre the character, and never let it fill the frame; the environment carries "
-                   "the picture.")
+        # 1) POZ SERBESTLIGI — en kritik cumle. Referans SADECE tasarim kaynagi, poz kaynagi DEGIL.
+        prompt += (" THE REFERENCE IMAGE IS A CHARACTER DESIGN SHEET, NOT A POSE REFERENCE. It shows "
+                   "the character standing neutrally only so you can see how it is drawn. In THIS "
+                   "picture the character must be fully ACTING OUT the moment described above — the "
+                   "body language, gesture, posture and facial expression must match that action and "
+                   "emotion. Do NOT draw the character standing upright and facing the camera with "
+                   "arms at its sides unless the scene text explicitly asks for it. Show it leaning, "
+                   "reaching, crouching, running, pointing, carrying, turning, looking — whatever the "
+                   "moment requires, interacting with the objects and surroundings named in the scene.")
+        # 2) KIMLIK — kisa tutulur; uzun kilit metni aksiyonu bogar
+        prompt += (" IDENTITY LOCK: keep the character's design identical to the reference — same "
+                   "body and face design, same exact colours, same proportions, same clothing and "
+                   "markings — but carry over NOTHING else: not its pose, not its camera angle, not "
+                   "its background, and not any object it holds there. Render exactly ONE main "
+                   "character unless the scene describes others. Obey the shot type and character "
+                   "scale given in the scene text; the environment carries the picture.")
+        prompt += DESTEK_GORSEL
         if kar_kilit:
             prompt += f" Character identity to match: {kar_kilit}"
         prompt += (" COLOUR LOCK: the character's colours are fixed and identical in every scene "
@@ -1184,13 +1224,16 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
 
 
 CAPA_PROMPT = (
-    "Full-body character model sheet of the SAME single character shown in the reference image. "
-    "Front-facing, standing upright in a relaxed neutral pose, arms down at the sides, "
-    "HANDS COMPLETELY OPEN AND EMPTY, entire body visible from head to feet, centred in frame. "
-    "Plain flat neutral light-grey studio background, even soft lighting, no scenery, no furniture, "
-    "no props, no shadows on the background. Reproduce the character's identity exactly: same "
-    "species, same colours, same face, same hair, same clothing, same proportions. "
-    "Single character only. No text, no watermark, no border."
+    # IKI POZLU tasarim sayfasi: tek notr figur, sonraki sahnelerde "dimdik dur" baskisi yapiyordu.
+    # Iki farkli duruş gostermek modele "bu bir tasarim sayfasi, poz degil" sinyali verir.
+    "Character design sheet of the SAME single character shown in the reference image, drawn TWICE "
+    "side by side on one plain flat light-grey studio background: on the LEFT standing upright "
+    "front-facing with arms relaxed at the sides and hands open and empty; on the RIGHT the same "
+    "character in a three-quarter view mid-stride, one arm raised and reaching forward. "
+    "Both figures full body from head to feet, even soft lighting, no scenery, no furniture, no "
+    "props, no shadows on the background. Reproduce the character's identity exactly: same species, "
+    "same colours, same face, same hair, same clothing, same proportions in both drawings. "
+    "No other characters. No text, no watermark, no border."
 )
 
 
