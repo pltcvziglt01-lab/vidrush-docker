@@ -389,6 +389,65 @@ HIKAYE_ACILIS_SN = float(os.environ.get("HIKAYE_ACILIS_SN", "150"))
 # ───────── ANIMASYON SANAT YONETIMI (referans video analizinden turetildi) ─────────
 # Hedef: elle cizilmis editorial karikatur — murekkep kontur + gouache dolgu + cel golge,
 # kagit dokusu, soluk vintage palet, DETAYLI ortamlar, karakter kucuk-orta olcek.
+# ═══ DESTEK OGESI KURALI (tum animasyon stillerinde ZORUNLU) ═══
+# Kullanici geri bildirimi: "bir sahne sadece karakterin on planda oldugu duz bir gorsel olarak
+# gorunmemeli; ana karakter bir sey ANLATIYOR, yan destekleyici ogeler de kullanilmali."
+# Yani her kare, o an anlatilan seyi GOSTEREN somut bir gorsel arac icermeli.
+DESTEK_PLANLAYICI = (
+    "SUPPORTING ELEMENT — MANDATORY IN EVERY SCENE. The character is NARRATING something, so each "
+    "frame must SHOW what is being said, not just show the character. Besides the character and the "
+    "setting, every scene_prompt must name at least ONE concrete supporting visual device that "
+    "illustrates the exact point of that line, and must state how the character INTERACTS with it "
+    "(holding, pointing at, leaning over, building, dropping, comparing, reacting to). Choose the "
+    "device from: a real object or tool; a map, chart, timeline, diagram or plan; a document, letter "
+    "or book; secondary figures (a crowd, soldiers, workers, a listener); a visual metaphor made of "
+    "objects (scales, a growing plant, stacked coins, a cracked wall); a before/after or two-object "
+    "comparison; an environmental event (fire, smoke, rain, collapse, dust, explosion). Vary the "
+    "device from scene to scene — never repeat the same one twice in a row. A scene that is only a "
+    "character standing in front of scenery is INVALID and must be rewritten.\n"
+)
+# ═══ KARE CESITLILIGI — KARAKTERSIZ KARELER ZORUNLU ═══
+# Kullanici referansi (arac bakim kanali): 4 karenin 3'unde KARAKTER YOK — patlatilmis
+# teknik sema, yazi karti, makro detay. Ritim: sema -> yazi -> sahne -> makro.
+# Onceki halimiz her kareye karakter koyuyordu -> monoton "karakter + arka plan" akisi.
+KARE_CESITLILIGI = (
+    "FRAME VARIETY — THE CHARACTER IS NOT IN EVERY SCENE. This is a narrated explainer, so the "
+    "pictures must alternate between the narrator and the SUBJECT being explained. Aim for roughly "
+    "half the scenes WITHOUT any character. Choose each scene's frame type from this set and never "
+    "use the same type twice in a row:\n"
+    "  HERO ACTION — the character physically doing/handling something in a real setting.\n"
+    "  OBJECT MACRO — extreme close-up of the object being discussed, filling the frame, NO "
+    "character (write 'no character in frame').\n"
+    "  HANDS ONLY — extreme close-up of two hands performing the exchange or action (handing over "
+    "an envelope, passing a key, gripping a tool), cropped at the wrists, plain background, no "
+    "faces and no bodies.\n"
+    "  MAP ROUTE — a simple outline map of the relevant place with 2-3 labelled dots and a dashed "
+    "route line between them, plus one small vehicle or object travelling along it; NO character "
+    "figure (a tiny driver inside a vehicle is allowed).\n"
+    "  INNER VOICE — the character alone in a wide atmospheric setting with 3-4 short thought "
+    "fragments floating in the air around its head as small hand-written words, showing what it is "
+    "feeling at that moment.\n"
+    "  EXPLODED VIEW — the object taken apart, its parts floating separated and labelled by shape, "
+    "on a clean plain background, NO character.\n"
+    "  CONCEPT CARD — a very short phrase on a clean plain background, NO character.\n"
+    "  COMPARISON — two objects or two states side by side (old vs new, right vs wrong), NO "
+    "character.\n"
+    "  PROCESS STEP — hands (or the character's hands only) performing one step on the object.\n"
+    "  WIDE CONTEXT — the character small inside the full place, showing where this happens.\n"
+    "When the narration is about a THING (how it works, what breaks, what to look for), prefer the "
+    "character-free types; use HERO ACTION when the narration is about a person doing or deciding "
+    "something. Scenes written as 'no character in frame' must not contain any figure at all.\n"
+)
+
+DESTEK_GORSEL = (
+    " STORYTELLING FRAME: this is a narrated explainer picture, so the frame must SHOW the idea, not "
+    "just the character. Besides the character and the background, clearly render the supporting "
+    "element named in the scene text — the object, map, diagram, document, crowd, metaphor or event "
+    "— large enough to read at a glance, and show the character physically engaging with it. A flat "
+    "picture of a character simply standing in front of scenery is not acceptable."
+)
+
+
 ANIM_STIL = (
     "Hand-drawn editorial cartoon on textured paper: confident dark sepia-brown ink outlines with "
     "organic wobble and varying line weight, flat gouache fills, two-tone cel shading with strong "
@@ -503,33 +562,10 @@ EXP_SOZLESME = (
     "The character is referred to ONLY as \"the hero\" — never restate appearance, clothing or "
     "colours. Do NOT mention camera, lens, lighting, style, texture or medium in scene_prompt; all "
     "styling lives in the global block.\n"
-    + DESTEK_PLANLAYICI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI
 )
 
-# ═══ DESTEK OGESI KURALI (tum animasyon stillerinde ZORUNLU) ═══
-# Kullanici geri bildirimi: "bir sahne sadece karakterin on planda oldugu duz bir gorsel olarak
-# gorunmemeli; ana karakter bir sey ANLATIYOR, yan destekleyici ogeler de kullanilmali."
-# Yani her kare, o an anlatilan seyi GOSTEREN somut bir gorsel arac icermeli.
-DESTEK_PLANLAYICI = (
-    "SUPPORTING ELEMENT — MANDATORY IN EVERY SCENE. The character is NARRATING something, so each "
-    "frame must SHOW what is being said, not just show the character. Besides the character and the "
-    "setting, every scene_prompt must name at least ONE concrete supporting visual device that "
-    "illustrates the exact point of that line, and must state how the character INTERACTS with it "
-    "(holding, pointing at, leaning over, building, dropping, comparing, reacting to). Choose the "
-    "device from: a real object or tool; a map, chart, timeline, diagram or plan; a document, letter "
-    "or book; secondary figures (a crowd, soldiers, workers, a listener); a visual metaphor made of "
-    "objects (scales, a growing plant, stacked coins, a cracked wall); a before/after or two-object "
-    "comparison; an environmental event (fire, smoke, rain, collapse, dust, explosion). Vary the "
-    "device from scene to scene — never repeat the same one twice in a row. A scene that is only a "
-    "character standing in front of scenery is INVALID and must be rewritten.\n"
-)
-DESTEK_GORSEL = (
-    " STORYTELLING FRAME: this is a narrated explainer picture, so the frame must SHOW the idea, not "
-    "just the character. Besides the character and the background, clearly render the supporting "
-    "element named in the scene text — the object, map, diagram, document, crowd, metaphor or event "
-    "— large enough to read at a glance, and show the character physically engaging with it. A flat "
-    "picture of a character simply standing in front of scenery is not acceptable."
-)
+
 
 
 ANIM_SOZLESME = (
@@ -567,7 +603,7 @@ ANIM_SOZLESME = (
     "style consistency between scenes.\n"
     "TEXT: at most one short natural in-world sign, under four words, written as: sign reads "
     "\"NEW & IMPROVED\". Never captions, subtitles, watermarks or logos.\n"
-    + DESTEK_PLANLAYICI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI
 )
 
 # ═════════ HIKAYE / WHAT-IF STILI (3. referans: "You Wake Up 100,000 Years Ago") ═════════
@@ -619,6 +655,12 @@ HIK_CERCEVE = (
     "hazy receding background). Keep clear negative space around every figure."
 )
 HIK_SOZLESME = (
+    "RULE ZERO — READ FIRST: this is a narrated explainer, not a character showcase. AT LEAST "
+    "40% OF ALL SCENES YOU WRITE MUST CONTAIN NO CHARACTER AT ALL (shot types G, I, J, K below) "
+    "and must literally contain the words 'no character in frame'. Before you finish, COUNT "
+    "your scenes: if fewer than 40% are character-free, rewrite the weakest character scenes as "
+    "object macros, hands-only close-ups, maps or diagrams. A video where every frame shows the "
+    "character standing in a landscape is the FAILURE MODE we are eliminating.\n"
     "SCENE CONTRACT — each scene_prompt is ONE English paragraph of 45-80 words, slots always in this "
     "order: (1) SHOT: the shot-type letter plus the hero's height as a percent of frame height; "
     "(2) WORLD: the painted environment with at least 3 concrete named details, ONE named light "
@@ -640,13 +682,26 @@ HIK_SOZLESME = (
     "planes, hero nearest and largest (30-50%), middle figures simplified, farthest figures "
     "featureless white silhouettes. F COMPARISON — one painted scene split by a natural divide into "
     "two contrasted situations; both figures identical in build, only posture and surroundings "
-    "differ, never a bulky or muscular body; hero 30-50%. G INFOGRAPHIC — painted landscape overlaid "
-    "with a drawn path or timeline, 2-3 arrows and at most 2 small outlined label boxes; hero 10-18%. "
+    "differ, never a bulky or muscular body; hero 30-50%. "
+    "G INFOGRAPHIC — NO CHARACTER IN FRAME: a drawn path, timeline or diagram over a painted or plain "
+    "ground, 2-3 arrows and at most 2 short outlined label boxes. "
     "H SFX BEAT — one big quoted onomatopoeia plus one simple graphic device (red pulse line, impact "
-    "rays, dust puff); hero 30-50%.\n"
-    "FREQUENCY BUDGET per rolling block of 10 scenes: at least 3 of A/B, at least 1 C, at least 1 D, "
-    "at least 1 E, at most 1 F, at most 1 G, exactly 1 H. Narrative need outranks the rota; the "
-    "budget is a ceiling and a tie-break, not a carousel. Never use the same type twice in a row.\n"
+    "rays, dust puff); hero 30-50%. "
+    "I OBJECT MACRO — NO CHARACTER IN FRAME: extreme close-up of the single object the line is about, "
+    "filling the frame, painted in full detail. "
+    "J HANDS ONLY — NO CHARACTER IN FRAME: extreme close-up of hands doing the action (handing "
+    "something over, gripping a tool, opening a letter), cropped at the wrists. "
+    "K MAP ROUTE — NO CHARACTER IN FRAME: a simple outline map of the relevant place with 2-3 "
+    "labelled dots and a dashed route between them, one small vehicle or object on the route.\n"
+    "FREQUENCY BUDGET per rolling block of 10 scenes — HARD RULE: AT LEAST 4 of the 10 scenes must be "
+    "CHARACTER-FREE (types G, I, J or K). The video must alternate between the narrator and the "
+    "subject being explained; a run of character-only frames is the single worst failure here. "
+    "Also: at least 2 of A/B, at least 1 C, at least 1 D, at most 1 E, at most 1 F, exactly 1 H. "
+    "Never use the same type twice in a row and never place two character-free scenes back to back. "
+    "CHOOSING: when the line is about a THING (how it works, what it costs, where it travels, what it "
+    "looks like, what it is made of) use G/I/J/K; when it is about a PERSON doing, deciding or feeling "
+    "something use A/B/C/D/E. Scenes of types G/I/J/K must literally contain the words "
+    "'no character in frame'.\n"
     "WORLD ROTATION: two consecutive scenes may not share biome AND time of day AND palette; rotate "
     "deliberately (volcanic valley, fern jungle, rock canyon, cave interior, night campfire, dusk "
     "huts and smoke, green oasis, river crossing, overgrown modern ruin) and change the camera angle "
@@ -656,7 +711,7 @@ HIK_SOZLESME = (
     "commas, no punctuation, no plus signs, no chemical symbols, no thousand separators — write "
     "\"100K YEARS\" not \"100,000\". Each infographic label box obeys the same limit. Text never sits "
     "in the top or bottom 9% of the frame.\n"
-    + DESTEK_PLANLAYICI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI
 )
 
 ANIMASYON_PROFIL = {
@@ -921,6 +976,32 @@ def ses_coz(plan: dict) -> str:
     return ses
 
 
+
+# ── SAHNE TIPI ATAMASI (KODLA ZORLANIR) ──
+# Prompt ile "%40 karaktersiz olsun" demek ISE YARAMADI (LLM 1/7 uretti). Cozum: tipi
+# planlayiciya BIZ soyluyoruz. Tek sahne atlanamaz, oran garanti, ard arda karaktersiz olmaz.
+TIP_KARAKTERLI = ["A WIDE ESTABLISHING", "B MEDIUM ACTION", "C CLOSE-UP",
+                  "D DRAMATIC LIGHT", "E CROWD", "H SFX BEAT"]
+TIP_KARAKTERSIZ = ["I OBJECT MACRO", "J HANDS ONLY", "K MAP ROUTE", "G INFOGRAPHIC"]
+
+
+def sahne_tipi_atamasi(adet: int) -> str:
+    """Sahne basina cekim tipi atar: tek indeksler KARAKTERSIZ -> ~%50 oran, ard arda yok."""
+    satir = []
+    for i in range(adet):
+        if i % 2 == 1:
+            t = TIP_KARAKTERSIZ[(i // 2) % len(TIP_KARAKTERSIZ)]
+            satir.append(f"{i+1}={t} (no character in frame)")
+        else:
+            t = TIP_KARAKTERLI[(i // 2) % len(TIP_KARAKTERLI)]
+            satir.append(f"{i+1}={t}")
+    return ("SHOT TYPE ASSIGNMENT — NON-NEGOTIABLE. The shot type of every scene is decided for you "
+            "below. Write each scene using EXACTLY its assigned type and open the scene_prompt with "
+            "that type's name. Scenes marked '(no character in frame)' must contain no figure at all "
+            "and must literally include the words 'no character in frame'. Do not swap, skip or "
+            "reorder types; fit the narration to the assigned type.\n" + "; ".join(satir) + "\n")
+
+
 def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
     footage = prof["footage_pct"]
     mag_var = bool(prof.get("mag"))
@@ -951,6 +1032,8 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
     # Profilin kendi sahne SOZLESMESI varsa onu kullan (animasyon alt-stilleri), yoksa genel kural.
     if prof.get("sahne_sozlesme"):
         sahne_kural = prof["sahne_sozlesme"]
+        if prof.get("tip_atamasi", True):
+            sahne_kural = sahne_tipi_atamasi(hedef) + sahne_kural
     else:
         sahne_kural = (
             "IMPORTANT: give scene_prompt for EVERY scene = a vivid 16:9 ENGLISH description of the "
@@ -1045,8 +1128,12 @@ def plan_uret(story: str, prof: dict, hedef_sahne=40, devam=False, onceki_ozet="
         # tetikleniyor ve cekim sistemini (genis plan %15, orta %40) EZIYORDU -> karakter hep
         # ortada, buyuk ve dimdik cikiyordu. Artik sadece kahramanin VARLIGI garanti edilir,
         # olcek/kompozisyon cekim sozlesmesine birakilir.
-        if kayn == "ai" and not any(x in sp.lower() for x in
-                                    ("main character", "the hero", "stickman", "the character")):
+        # Karaktersiz kareler MESRU (patlatilmis sema, makro detay, yazi karti) — zorlama.
+        karaktersiz = any(x in sp.lower() for x in
+                          ("no character", "object macro", "exploded view", "concept card",
+                           "comparison", "no figure", "hands only", "map route"))
+        if (kayn == "ai" and not karaktersiz and not any(
+                x in sp.lower() for x in ("main character", "the hero", "stickman", "the character"))):
             s["scene_prompt"] = "The recurring main character appears in this scene. " + sp
         scenes.append(s)
     if not scenes:
@@ -1113,7 +1200,15 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
     # Referans gorsel notr duruslu oldugu icin modelin PIKSEL egilimi "dimdik dur"a cekiyordu;
     # bu yuzden aksiyon en basta ve en guclu sekilde tekrarlanir.
     prompt = scene_prompt.rstrip(". ") + "."
-    if kar_var or capa_var:
+    # KARAKTERSIZ KARE (patlatilmis sema / makro detay / yazi karti / karsilastirma):
+    # kimlik kilidi EKLENMEZ, aksi halde model kareye zorla bir figur sokar.
+    karaktersiz = any(x in (scene_prompt or "").lower() for x in
+                      ("no character", "object macro", "exploded view", "concept card",
+                       "no figure", "hands only", "map route"))
+    if karaktersiz:
+        prompt += (" This frame contains NO character and no people at all — the object, diagram "
+                   "or lettering itself is the entire subject. Do not add any figure.")
+    if (kar_var or capa_var) and not karaktersiz:
         # 1) POZ SERBESTLIGI — en kritik cumle. Referans SADECE tasarim kaynagi, poz kaynagi DEGIL.
         prompt += (" THE REFERENCE IMAGE IS A CHARACTER DESIGN SHEET, NOT A POSE REFERENCE. It shows "
                    "the character standing neutrally only so you can see how it is drawn. In THIS "
