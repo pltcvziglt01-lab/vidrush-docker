@@ -142,7 +142,10 @@ def edit_listesi():
 @app.get("/api/animasyon-stilleri")
 def anim_listesi():
     """Animasyon alt-stilleri (anlati-deneme / egitici-explainer)."""
-    return [{"id": k, "ad": v["ad"], "ozet": v["ozet"], "sahne_sn": v["sahne_sn"]}
+    ond = os.path.join(STATIC, "onizleme")
+    return [{"id": k, "ad": v["ad"], "ozet": v["ozet"], "sahne_sn": v["sahne_sn"],
+             "onizleme": (f"onizleme/{k}.jpg"
+                          if os.path.exists(os.path.join(ond, f"{k}.jpg")) else "")}
             for k, v in pipeline.ANIMASYON_STILLERI.items()]
 
 
@@ -214,6 +217,18 @@ def font_ver(dosya: str):
 def paletler():
     """Kanal renk paletleri — gorsel promptuna KESIN HEX olarak girer (kelimeyle tarif degil)."""
     return [{"id": k, **v} for k, v in pipeline.PALETLER.items()]
+
+
+@app.get("/onizleme/{dosya}")
+def onizleme(dosya: str):
+    """Stil onizleme gorselleri — arayuzde stil kartinin yaninda gorunur."""
+    ad = os.path.basename(dosya)
+    if not ad.endswith((".jpg", ".png")):
+        raise HTTPException(404, "yok")
+    yol = os.path.join(STATIC, "onizleme", ad)
+    if not os.path.exists(yol):
+        raise HTTPException(404, "yok")
+    return FileResponse(yol, headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.get("/api/arkaplanlar")

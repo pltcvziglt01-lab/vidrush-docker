@@ -589,6 +589,21 @@ $("#btnProfil").onclick=async()=>{
   $("#btnProfil").disabled=false;
 };
 
+/* Onizleme buyutec: karti secmeden gorseli tam boy incele */
+function buyut(src, ad){
+  const o=document.createElement("div");
+  o.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;display:flex;"+
+    "align-items:center;justify-content:center;flex-direction:column;gap:14px;cursor:zoom-out;padding:24px";
+  o.innerHTML=`<img src="${src}" alt="${ad}" style="max-width:94vw;max-height:82vh;border-radius:14px;
+      box-shadow:0 20px 60px rgba(0,0,0,.6)">
+    <div style="color:#fff;font-size:14px;font-weight:600">${ad}
+      <span style="color:#9aa;font-weight:400"> — kapatmak için tıkla</span></div>`;
+  o.onclick=()=>o.remove();
+  document.addEventListener("keydown",function esc(e){
+    if(e.key==="Escape"){o.remove();document.removeEventListener("keydown",esc);}});
+  document.body.appendChild(o);
+}
+
 /* ── arka plan ── */
 const AP_ROZET={sade:"◻️ sade", orta:"◧ orta", zengin:"▦ zengin"};
 function secArkaplan(id){
@@ -694,7 +709,17 @@ function animYukle(){
     list.forEach((s,i)=>{
       const d=document.createElement("div");
       d.className="estil"+(i===0?" on":""); d.dataset.id=s.id;
-      d.innerHTML=`<span class="pick"></span><span class="en">${ANIM_EMOJI[s.id]||"🎨"}</span>
+      /* Onizleme gorseli: stil YAZIYLA secilemez — TUM stiller AYNI sahneyi cizer,
+         yani karttaki fark sadece stilden gelir. Gorsel yoksa kart eskisi gibi calisir. */
+      const gor = s.onizleme
+        ? `<img src="${s.onizleme}" alt="${s.ad} örnek kare" decoding="async"
+             onclick="event.stopPropagation();buyut('${s.onizleme}','${s.ad}')"
+             style="width:100%;aspect-ratio:3/2;object-fit:cover;border-radius:10px;
+                    margin-bottom:10px;border:1px solid var(--line);display:block;cursor:zoom-in">`
+        : `<div style="width:100%;aspect-ratio:3/2;border-radius:10px;margin-bottom:10px;
+             border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;
+             color:var(--dim2);font-size:11px">örnek görsel yok</div>`;
+      d.innerHTML=`<span class="pick"></span>${gor}<span class="en">${ANIM_EMOJI[s.id]||"🎨"}</span>
         <b>${s.ad}</b><p>${s.ozet}</p>
         <div class="meta">~${s.sahne_sn}sn/sahne</div>`;
       d.onclick=()=>{animStil=s.id; $$("#animStiller .estil").forEach(x=>x.classList.toggle("on",x.dataset.id===s.id));};
