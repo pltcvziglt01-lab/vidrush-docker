@@ -85,7 +85,9 @@ def profil_listele() -> list:
                 out.append({"id": pid, "ad": p.get("ad", pid), "tur": p.get("tur", ""),
                             "edit": p.get("edit", ""), "video_sayisi": p.get("video_sayisi", 0),
                             "kilitli": bool(p.get("capa_yol")),
-                            "karakter_var": bool(p.get("karakter_yol"))})
+                            "karakter_var": bool(p.get("karakter_yol")),
+                            "palet": p.get("palet", ""), "arkaplan": p.get("arkaplan", ""),
+                            "ses": p.get("ses", "")})
     except Exception:
         pass
     return out
@@ -1964,9 +1966,21 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
 
     # ── KANAL PROFILI: kalici karakter + capa + kilitler (videolar ARASI tutarlilik) ──
     kanal = profil_oku(profil_id) if profil_id else {}
+    # ⚠ 1 Agu 2026 DUZELTMESI — profil ARTIK kullanicinin secimini EZMEZ.
+    # Onceki hali: `mod = kanal.get("tur") or mod` -> kullanici "Ani Defteri" seciyor ama
+    # profilde kayitli "hikaye-whatif" sessizce devreye giriyordu. Ustune profilin DONMUS
+    # capasi her sahneye ESKI karakteri dayatiyordu; yeni yuklenen referans hic kullanilmiyordu.
+    # Kural: BU VIDEODAKI SECIM HER ZAMAN KAZANIR. Profil sadece BOS birakilani doldurur.
+    yeni_karakter = bool(kar_yol and os.path.exists(kar_yol))
+    yeni_stil_gorseli = bool(stil_yol and os.path.exists(stil_yol))
     if kanal:
-        mod = kanal.get("tur") or mod
-        edit_id = kanal.get("edit") or edit_id
+        if not mod:
+            mod = kanal.get("tur") or mod
+        if not edit_id:
+            edit_id = kanal.get("edit") or edit_id
+        if kanal.get("edit") and edit_id and kanal["edit"] != edit_id:
+            print(f"  NOT: profil '{profil_id}' stili '{kanal['edit']}' ama bu videoda "
+                  f"'{edit_id}' secilmis -> SECIM kazanir", file=sys.stderr)
 
     prof = profil_coz(mod, edit_id)
     gorsel_ek = prof["gorsel_ek"]
@@ -2021,8 +2035,11 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # ── Karakter + STIL kilitleri ──
     # PROFIL VARSA: kayitli referans/kilitler kullanilir -> hem videolar arasi TUTARLILIK,
     # hem her videoda 2 vision cagrisi tasarrufu (daha hizli + daha ucuz).
-    kar_kilit = kanal.get("kar_kilit", "") if kanal else ""
-    stil_kilit = kanal.get("stil_kilit", "") if kanal else ""
+    # ⚠ Profilin kayitli kunyesi ESKI referansi tarif eder. Bu videoda YENI bir gorsel
+    # yuklendiyse onu kullanma — yoksa yeni referans analiz bile edilmez ve cikti eski
+    # karaktere benzemeye devam eder (kullanicinin 1 Agu 2026'da bildirdigi hata).
+    kar_kilit = kanal.get("kar_kilit", "") if (kanal and not yeni_karakter) else ""
+    stil_kilit = kanal.get("stil_kilit", "") if (kanal and not yeni_stil_gorseli) else ""
     if kanal:
         # kullanici bu videoda ozel gorsel yuklemediyse profilinkini kullan
         if not (kar_yol and os.path.exists(kar_yol)) and kanal.get("karakter_yol"):
@@ -2046,7 +2063,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # stil kilidi yaninda erirdi -> kullanici stil yukluyor ama cikti dahili stile benziyordu.
     # Iki rakip sanat yonergesi = sahneler arasi salinim (renk kilidi dersinin aynisi).
     # Kompozisyon (cerceve + sahne sozlesmesi) DEGISMEZ: stil GORUNUSU, sozlesme YAPIYI belirler.
-    stil_kunye_txt = kanal.get("stil_kunye", "") if kanal else ""
+    stil_kunye_txt = kanal.get("stil_kunye", "") if (kanal and not yeni_stil_gorseli) else ""
     stil_guven = None
     if stil_yol and os.path.exists(stil_yol) and not stil_kunye_txt:
         bildir("Stil görseli derin analiz ediliyor (çok aşamalı)...", 4)
@@ -2109,6 +2126,16 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # PROFIL KILITLIYSE capa ta bastan gelir -> ILK SAHNE DAHIL her kare kanalin sabit
     # gorunumune kilitlenir (videolar ARASI tutarlilik). Kanal kimligi budur.
     capa_yol = kanal.get("capa_yol", "") if kanal else ""
+    # ⚠ 1 Agu 2026 DUZELTMESI — YENI REFERANS YUKLENDIYSE DONMUS CAPA YOK SAYILIR.
+    # Onceki hali: profilin capasi kosulsuz kullaniliyordu. Kullanici yeni bir karakter
+    # (ya da stil gorseli) yukleyip yeni bir stil secse bile ESKI donmus kare her sahneye
+    # referans olarak gidiyordu -> cikti hep eski karaktere benziyordu ve yeni referans
+    # HIC kullanilmiyordu. Yeni referans = yeni kanon niyeti demektir; eskiyi birak.
+    if capa_yol and (yeni_karakter or yeni_stil_gorseli):
+        print(f"  DONMUS CAPA YOK SAYILDI: bu videoda yeni referans yuklendi "
+              f"(karakter={yeni_karakter}, stil={yeni_stil_gorseli}) -> yeni kanon uretilecek",
+              file=sys.stderr)
+        capa_yol = ""
     capa_profilden = bool(capa_yol)
     # TEMIZ CAPA: kullanici karakter verdiyse ve henuz kanon yoksa, sahnelerden ONCE notr/
     # eller-bos bir kanon karesi uret. Boylece referansin pozu-nesnesi sahnelere BULASMAZ ve
