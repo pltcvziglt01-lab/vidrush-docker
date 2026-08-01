@@ -450,6 +450,43 @@ DESTEK_GORSEL = (
     "picture of a character simply standing in front of scenery is not acceptable."
 )
 
+# ── VERI KARTI (567 referans karesinin EN GUCLU bulgusu) ──
+# Aussie Money With Bruce'un 28 karesinin ~24'unde tutulan tabela / laptop ekrani / fiyat
+# etiketi var ve ustunde anlatilan cumlenin TAM SAYISI yazili. Karakter hicbir zaman
+# "sadece anlatmiyor", sayiyi GOSTERIYOR. Bizim eski kuralimiz "destekleyici oge olsun"
+# diyordu ama "anlatilan sayiyi gorunur bir yuzeye yaz" DEMIYORDU.
+VERI_KARTI_PLAN = (
+    "DATA CARD — apply to every scene whose narration contains a concrete fact: a number, price, "
+    "percentage, year, count, duration or a two-way comparison. In that scene you MUST name a "
+    "physical surface inside the world that displays that exact fact — a held placard, a shop price "
+    "tag, a laptop or phone screen, a TV, a noticeboard, a billboard, a printed letter, a menu or a "
+    "hand-drawn chart — and write the words to be shown in double quotes. Do not paraphrase the "
+    "number; use the same figure the narration says. If the narration compares two things, show "
+    "both values on the same surface. If a scene's line carries no concrete fact, no data card is "
+    "needed and you must not invent one.\n"
+)
+VERI_KARTI_GORSEL = (
+    " DATA CARD: if the scene text puts words or figures on a surface (placard, screen, tag, board, "
+    "chart), render that surface large, front-facing and fully legible, and place it on the opposite "
+    "side of the frame from the character so the two do not overlap — character on one side, the "
+    "information on the other. Draw the surface and any chart in the SAME medium and style as the "
+    "rest of the picture. Spell the words exactly as written, ALL CAPS, no extra text invented."
+)
+# Marka guvenligi: Bruce gercek logolar kullaniyor (Netflix/Disney+). Biz KULLANMAYACAGIZ.
+MARKA_YASAK = (
+    " Never draw real company logos, brand marks, product names or recognisable trade dress; "
+    "invent neutral generic equivalents instead."
+)
+# Iki BAGIMSIZ kanal (Paint Explainer + Simple Explainer) ayni seyi yapiyor: bir bolum boyunca
+# AYNI mekan tekrar kullaniliyor, sadece aci/aksiyon degisiyor. Tesadufi degil, kural.
+MEKAN_SUREKLILIGI = (
+    "SETTING CONTINUITY: group your scenes into short runs of 2-4 consecutive scenes that share the "
+    "SAME named location, and describe that location with the same concrete details each time, "
+    "changing only the camera angle, the distance and what happens. Move to a new location only when "
+    "the narration genuinely moves on. A video that teleports to a brand-new place every single "
+    "scene feels incoherent; repeating a place makes it feel like a real world.\n"
+)
+
 
 ANIM_STIL = (
     "Hand-drawn editorial cartoon on textured paper: confident dark sepia-brown ink outlines with "
@@ -565,7 +602,7 @@ EXP_SOZLESME = (
     "The character is referred to ONLY as \"the hero\" — never restate appearance, clothing or "
     "colours. Do NOT mention camera, lens, lighting, style, texture or medium in scene_prompt; all "
     "styling lives in the global block.\n"
-    + KARE_CESITLILIGI + DESTEK_PLANLAYICI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI
 )
 
 
@@ -606,7 +643,7 @@ ANIM_SOZLESME = (
     "style consistency between scenes.\n"
     "TEXT: at most one short natural in-world sign, under four words, written as: sign reads "
     "\"NEW & IMPROVED\". Never captions, subtitles, watermarks or logos.\n"
-    + KARE_CESITLILIGI + DESTEK_PLANLAYICI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI
 )
 
 # ═════════ HIKAYE / WHAT-IF STILI (3. referans: "You Wake Up 100,000 Years Ago") ═════════
@@ -714,7 +751,7 @@ HIK_SOZLESME = (
     "commas, no punctuation, no plus signs, no chemical symbols, no thousand separators — write "
     "\"100K YEARS\" not \"100,000\". Each infographic label box obeys the same limit. Text never sits "
     "in the top or bottom 9% of the frame.\n"
-    + KARE_CESITLILIGI + DESTEK_PLANLAYICI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI
 )
 
 # ═════════ RENKLI KALEM STILI (6. referans: "Aussie Money With Bruce") ═════════
@@ -798,7 +835,7 @@ KALEM_SOZLESME = (
     "and 14 characters, ALL CAPS, letters A-Z digits 0-9 spaces and the $ sign only, inside double "
     "quotes. No commas, no thousand separators — write \"12 MILLION\" not \"12,000,000\". Text never "
     "sits in the top or bottom 9% of the frame.\n"
-    + KARE_CESITLILIGI + DESTEK_PLANLAYICI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI
 )
 
 ANIMASYON_PROFIL = {
@@ -1246,7 +1283,9 @@ def ses_coz(plan: dict) -> str:
 # planlayiciya BIZ soyluyoruz. Tek sahne atlanamaz, oran garanti, ard arda karaktersiz olmaz.
 TIP_KARAKTERLI = ["A WIDE ESTABLISHING", "B MEDIUM ACTION", "C CLOSE-UP",
                   "D DRAMATIC LIGHT", "E CROWD", "H SFX BEAT"]
-TIP_KARAKTERSIZ = ["I OBJECT MACRO", "J HANDS ONLY", "K MAP ROUTE", "G INFOGRAPHIC"]
+# N/O: Simple Explainer + Bruce karelerinde dogrulandi (ekran arayuzu, tepeden cekim).
+TIP_KARAKTERSIZ = ["I OBJECT MACRO", "J HANDS ONLY", "K MAP ROUTE", "G INFOGRAPHIC",
+                   "N SCREEN READOUT", "O OVERHEAD FLATLAY"]
 
 
 def sahne_tipi_atamasi(adet: int) -> str:
@@ -1489,7 +1528,7 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
                    "its background, and not any object it holds there. Render exactly ONE main "
                    "character unless the scene describes others. Obey the shot type and character "
                    "scale given in the scene text; the environment carries the picture.")
-        prompt += DESTEK_GORSEL
+        prompt += DESTEK_GORSEL + VERI_KARTI_GORSEL + MARKA_YASAK
         if kar_kilit:
             prompt += f" Character identity to match: {kar_kilit}"
         prompt += (" COLOUR LOCK: the character's colours are fixed and identical in every scene "
