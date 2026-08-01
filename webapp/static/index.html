@@ -242,8 +242,9 @@
           <input id="pfAd" placeholder="Görünen ad" style="flex:1;min-width:160px;padding:10px 12px;border-radius:10px;border:1px solid #2a2a35;background:#14141c;color:#eee">
           <button class="btn" id="btnProfil" style="padding:10px 18px">+ Profil Oluştur</button>
         </div>
-        <div class="durum" style="font-size:11px;margin-top:8px">
-          Profil, şu an seçili <b>video türü + stil + altyazı şablonunu</b> ve yüklediğin karakter/stil görselini kaydeder.
+        <div class="durum" style="font-size:11.5px;margin-top:10px;background:#0e1117;border:1px solid var(--line);border-radius:10px;padding:11px 13px">
+          <b style="color:var(--txt)">Kaydedilecekler</b> — yukarıdaki seçimlerin kullanılır, ayrıca bir şey sorulmaz:
+          <div id="pfOzet" style="margin-top:7px;line-height:1.75"></div>
         </div>
       </div>
 
@@ -373,11 +374,27 @@ function profilleriYukle(){
     if(seciliProfil && !list.some(p=>p.id===seciliProfil)) secProfil("");
   }).catch(()=>{$("#profiller").innerHTML='<span class="durum">profiller yüklenemedi</span>';});
 }
+/* profil kartinda "ne kaydedilecek" canli ozeti */
+function pfOzetGuncelle(){
+  const e=$("#pfOzet"); if(!e) return;
+  const stilAd = videoTur==="animasyon"
+    ? ((animListe.find(x=>x.id===animStil)||{}).ad || "—")
+    : (animStil, ($$("#estiller .estil.on")[0]?.querySelector("b")?.textContent) || "—");
+  const sat = (ok,txt)=>`${ok?"✅":"⬜"} ${txt}`;
+  e.innerHTML = [
+    sat(true, `<b>Video türü:</b> ${videoTur==="animasyon"?"Animasyon":"Documentary"} · ${stilAd}`),
+    sat(!!karFile, `<b>Ana karakter görseli:</b> ${karFile?karFile.name:"yüklenmedi (sistem kendi karakterini üretir)"}`),
+    sat(!!stilFile, `<b>Genel görsel stil:</b> ${stilFile?stilFile.name:"yüklenmedi (stilin ilk videoda kilitlenir)"}`),
+    sat(altyaziAcik, `<b>Altyazı:</b> ${altyaziAcik?altSablon:"kapalı"}`),
+  ].map(s=>`<div>${s}</div>`).join("");
+}
 function secProfil(pid){
   seciliProfil=pid; localStorage.setItem("bedosaho_profil",pid);
   $$("#profiller .estil").forEach(x=>x.classList.toggle("on",(x.dataset.id||"")===pid));
 }
 profilleriYukle();
+pfOzetGuncelle();
+setInterval(pfOzetGuncelle, 700);   // secimler degistikce ozeti taze tut (ucuz DOM guncellemesi)
 
 $("#btnProfil").onclick=async()=>{
   const pid=($("#pfId").value||"").trim();
