@@ -304,6 +304,9 @@ let SID=localStorage.getItem("vidrush_sid");
 if(!SID){SID="u"+Math.random().toString(36).slice(2,10);localStorage.setItem("vidrush_sid",SID);}
 let karFile=null, stilFile=null, editStil=null, videoTur="documentary";
 let sureDk=2, gecisAcik=true, zoomAcik=true;
+/* animStil/animListe BURADA tanimlanmali: pfOzetGuncelle() asagida hemen cagriliyor ve bunlari
+   okuyor — tanim daha asagida kalirsa TDZ ReferenceError ile TUM script olur (hicbir sey secilemez) */
+let animStil=null, animListe=[];
 
 /* nav */
 $$(".nav").forEach(n=>n.onclick=()=>{
@@ -379,10 +382,10 @@ function pfOzetGuncelle(){
   const e=$("#pfOzet"); if(!e) return;
   const stilAd = videoTur==="animasyon"
     ? ((animListe.find(x=>x.id===animStil)||{}).ad || "—")
-    : (animStil, ($$("#estiller .estil.on")[0]?.querySelector("b")?.textContent) || "—");
+    : (($$("#estiller .estil.on")[0]?.querySelector("b")?.textContent) || "—");
   const sat = (ok,txt)=>`${ok?"✅":"⬜"} ${txt}`;
   e.innerHTML = [
-    sat(true, `<b>Video türü:</b> ${videoTur==="animasyon"?"Animasyon":"Documentary"} · ${stilAd}`),
+    sat(true, `<b>Video türü:</b> ${({animasyon:"Animasyon",documentary:"Documentary",hikaye:"Hikaye"})[videoTur]||videoTur} · ${stilAd}`),
     sat(!!karFile, `<b>Ana karakter görseli:</b> ${karFile?karFile.name:"yüklenmedi (sistem kendi karakterini üretir)"}`),
     sat(!!stilFile, `<b>Genel görsel stil:</b> ${stilFile?stilFile.name:"yüklenmedi (stilin ilk videoda kilitlenir)"}`),
     sat(altyaziAcik, `<b>Altyazı:</b> ${altyaziAcik?altSablon:"kapalı"}`),
@@ -445,7 +448,7 @@ editYukle();
 
 /* animasyon alt-stilleri */
 const ANIM_EMOJI={"anlati-deneme":"🖋️","egitici-explainer":"📊","hikaye-whatif":"🏞️"};
-let animStil=null, animListe=[];
+/* NOT: animStil/animListe EN USTTEKI let blokta tanimli (pfOzetGuncelle onlari erken okuyor) */
 function animYukle(){
   fetch("api/animasyon-stilleri").then(r=>r.json()).then(list=>{
     animListe=list; if(list.length) animStil=list[0].id;
