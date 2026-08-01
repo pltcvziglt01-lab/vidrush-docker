@@ -922,15 +922,21 @@ ANI_SOZLESME = (
     "Text never sits in the top or bottom 9% of the frame.\n"
     # ThriftyHazel'in iki imza cihazi (216 karede tutarli):
     "COUNTDOWN BADGE — apply ONLY if the narration is a numbered list that counts down or up "
-    "(\"rule 11\", \"number 9\", \"the third thing\"). In the FIRST scene of each numbered item, and "
-    "only there, add to the TEXT slot: a single large plain numeral placed in a top corner of the "
-    "frame, written as e.g. corner numeral \"11\". Never put a numeral on a scene that is not the "
-    "opening of an item, and never on more than one scene per item. If the script is not a numbered "
-    "list, no numerals at all.\n"
+    "(\"rule 11\", \"number 9\", \"the third thing\"). On the OPENING scene of each numbered item add "
+    "to the TEXT slot exactly: watermark numeral \"11\" (using that item's number). It is rendered "
+    "very large in the TOP-RIGHT corner as a soft, low-contrast, semi-transparent numeral in a muted "
+    "tone of the scene's own palette — a quiet watermark behind the action, NOT a bright badge, "
+    "sticker, circle or outlined graphic, and never overlapping a face or the data card. Put it on "
+    "the opening scene of an item only. If the script is not a numbered list, no numerals at all.\n"
     "CHAPTER CARD — if the script clearly breaks into 2-4 thematic sections, insert ONE full-frame "
-    "card at the start of each section: a deep warm-brown panel with an ornate decorative border and "
-    "the section name in elegant serif capitals across two lines, no character, no scenery. Max 4 "
-    "words total. Write it as its own scene of shot type C with 'no character in frame'.\n"
+    "card at the start of each section: a deep warm-brown panel with an ornate decorative border, "
+    "the section name in elegant cream serif capitals across two lines (max 4 words), AND four to "
+    "six small simple illustrations of objects from that section scattered around the title (for a "
+    "cleaning section: a spray bottle, a mop, a pipe, a cloth). No character, no scenery. Write it "
+    "as its own scene of shot type C with 'no character in frame'.\n"
+    "REJECTION MARK — when the narration says something is wasteful, wrong or should be dropped, "
+    "draw a single bold hand-drawn red cross over that one object. Only one crossed object per "
+    "scene, and never over a person.\n"
     + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI
 )
 
@@ -1336,6 +1342,121 @@ def kunye_metni(k: dict) -> str:
                   "in EVERY frame the character appears in; it is how the viewer recognises them. "
                   "No other figure in any scene may wear or carry it.")
     return metin
+
+
+# ═══════════ STIL KUNYESI — yuklenen stil gorselinin COK ASAMALI analizi ═══════════
+# SORUN: stil_analiz() TEK cumle (20-40 kelime) uretiyordu, ama secili stilin kendi
+# sanat yonergesi (ANIM_STIL vb.) 150-250 kelime. Iki blok yarisinca UZUN olan kazaniyor
+# -> kullanici stil gorseli yukluyor ama cikti hala dahili stile benziyor.
+# COZUM: karakter kunyesinin aynisi (palet olcumu + 2 bagimsiz okuma + kod uzlasisi),
+# ve uretilen kunye dahili sanat yonergesinin YERINE gecer (yanina degil).
+STIL_ALANLARI = ("medyum", "cizgi", "golgeleme", "doku", "isik", "detay", "ruh", "arka_plan")
+
+
+def _stil_tek_okuma(img_yol: str, sicaklik: float, paletler: list) -> dict:
+    import base64
+    with open(img_yol, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode()
+    pal_txt = ", ".join(f"{p['hex']} (%{int(p['oran']*100)})" for p in paletler[:6]) or "yok"
+    istek = (
+        "You are an art-direction analyst. Describe ONLY the ART STYLE of this image so another "
+        "artist could redraw ANY subject in exactly this style. Return STRICT JSON with exactly "
+        'these keys: "medyum" (medium and rendering technique, 6-14 words, e.g. "coloured pencil '
+        'and watercolour wash on textured paper"), "cizgi" (line quality and weight, 5-12 words, '
+        'or "none" if there are no outlines), "golgeleme" (shading model, 5-12 words), '
+        '"doku" (surface texture and grain, 4-10 words, or "none"), '
+        '"isik" (lighting character and direction, 5-12 words), '
+        '"detay" (level of detail, one of: minimal, moderate, high, very high), '
+        '"ruh" (overall mood in 3-6 words), '
+        '"arka_plan" (background density, one of: empty, sparse, moderate, dense). '
+        f"The measured dominant colours are: {pal_txt}. "
+        "RULES: describe ONLY the style. NEVER describe the subject, the character, the objects, "
+        "the scene or what is happening — those change every frame. If a field is not clearly "
+        "readable, use an empty string rather than guessing. English only."
+    )
+    body = {
+        "model": "gpt-4.1-mini",
+        "messages": [{"role": "user", "content": [
+            {"type": "text", "text": istek},
+            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
+        ]}],
+        "response_format": {"type": "json_object"},
+        "max_tokens": 500, "temperature": sicaklik,
+    }
+    j = oai_chat(body, timeout=90)
+    ic = (j.get("choices") or [{}])[0].get("message", {}).get("content") or "{}"
+    try:
+        return json.loads(ic)
+    except Exception:
+        return {}
+
+
+def stil_kunyesi(img_yol: str) -> dict:
+    """Yuklenen stil gorselini 4 asamadan gecirir (kimlik_kunyesi ile ayni desen):
+    1) piksel duzeyinde palet olcumu ($0, tahmin yok)
+    2) dusuk sicaklikta bagimsiz vision okumasi
+    3) yuksek sicaklikta IKINCI bagimsiz okuma
+    4) kod uzlasisi — celisen alan ATILIR (uydurma alani tekrarlamak zarardir)"""
+    if not (img_yol and os.path.exists(img_yol)):
+        return {}
+    try:
+        paletler = palet_olc(img_yol, adet=6)
+        a = _stil_tek_okuma(img_yol, 0.15, paletler)
+        b = _stil_tek_okuma(img_yol, 0.85, paletler)
+    except BakiyeHatasi:
+        raise
+    except Exception as e:
+        print(f"  stil_kunyesi hata: {str(e)[:160]}", file=sys.stderr)
+        return {}
+    if not a and not b:
+        return {}
+    kunye, onayli, dolu = {}, 0, 0
+    for alan in STIL_ALANLARI:
+        va = str(a.get(alan, "") or "").strip()
+        vb = str(b.get(alan, "") or "").strip()
+        if not va and not vb:
+            continue
+        dolu += 1
+        if alan in ("detay", "arka_plan"):
+            uyum = va.lower() == vb.lower()
+        else:
+            ka, kb = set(va.lower().split()), set(vb.lower().split())
+            uyum = bool(ka & kb) and len(ka & kb) >= max(1, min(len(ka), len(kb)) // 3)
+        if uyum:
+            kunye[alan] = va or vb
+            onayli += 1
+    kunye["_palet"] = paletler
+    kunye["_guven"] = round(onayli / dolu, 2) if dolu else 0.0
+    return kunye
+
+
+def stil_kunye_metni(k: dict) -> str:
+    """Stil kunyesini gorsel promptu icin sanat yonergesine cevir.
+    Renkler KESIN HEX olarak girer (kelimeyle tarif etme dersi)."""
+    if not k:
+        return ""
+    p = []
+    for alan, on in (("medyum", "Medium and rendering"), ("cizgi", "Line work"),
+                     ("golgeleme", "Shading"), ("doku", "Surface texture"),
+                     ("isik", "Lighting"), ("ruh", "Mood")):
+        v = k.get(alan)
+        if v and str(v).lower() not in ("none", "yok", ""):
+            p.append(f"{on}: {v}")
+    # GUVENLIK: renk ya da "detay: high" TEK BASINA stil DEGILDIR. Gercek bir sanat alani
+    # (medyum/cizgi/golgeleme/doku/isik/ruh) cikmadiysa bos don -> dahili sanat yonergesi
+    # yerinde kalir. Aksi halde 250 kelimelik yonergeyi bir hex listesiyle degistirip
+    # gorunusu tamamen kaybederdik. Bu kontrol detay/renk EKLENMEDEN once yapilmali.
+    if not p:
+        return ""
+    if k.get("detay"):
+        p.append(f"Level of detail: {k['detay']}")
+    hexler = [c["hex"] for c in (k.get("_palet") or [])][:6]
+    if hexler:
+        p.append("Colours are drawn from this measured set: " + ", ".join(hexler))
+    return ("REFERENCE ART STYLE (this is the definitive look — the user supplied a style image and "
+            "every frame must match it): " + ". ".join(p) +
+            ". Reproduce this exact medium, line quality, shading and colour family in every single "
+            "frame; do not substitute a different illustration style.")
 
 
 def stil_analiz(stil_yol: str) -> str:
@@ -1858,13 +1979,48 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                   file=sys.stderr)
         if not kar_kilit:      # analiz hic sonuc vermezse eski tek-gecisli yonteme dus
             kar_kilit = karakter_analiz(kar_yol)
-    if not stil_kilit and stil_yol and os.path.exists(stil_yol):
-        stil_kilit = stil_analiz(stil_yol)
+    # ── STIL GORSELI: cok asamali analiz + DAHILI SANAT YONERGESININ YERINE GECER ──
+    # Neden yerine gecer, yanina degil: secili stilin blogu 150-250 kelime, tek cumlelik
+    # stil kilidi yaninda erirdi -> kullanici stil yukluyor ama cikti dahili stile benziyordu.
+    # Iki rakip sanat yonergesi = sahneler arasi salinim (renk kilidi dersinin aynisi).
+    # Kompozisyon (cerceve + sahne sozlesmesi) DEGISMEZ: stil GORUNUSU, sozlesme YAPIYI belirler.
+    stil_kunye_txt = kanal.get("stil_kunye", "") if kanal else ""
+    stil_guven = None
+    if stil_yol and os.path.exists(stil_yol) and not stil_kunye_txt:
+        bildir("Stil görseli derin analiz ediliyor (çok aşamalı)...", 4)
+        sk = stil_kunyesi(stil_yol)
+        stil_guven = sk.get("_guven")
+        stil_kunye_txt = stil_kunye_metni(sk)
+        # Palet secilmemisse referansin OLCULEN renkleri paleti olsun
+        if stil_kunye_txt and not palet_renkleri(palet, palet_ozel):
+            olculen = [c["hex"] for c in (sk.get("_palet") or [])][:6]
+            if len(olculen) >= 2:
+                palet, palet_ozel = "ozel", ",".join(olculen)
+                print(f"  stil gorselinden olculen palet: {olculen}", file=sys.stderr)
+        if stil_guven is not None and stil_guven < 0.5:
+            print(f"  UYARI: stil kunyesi guveni dusuk ({stil_guven}) — gorsel net degil",
+                  file=sys.stderr)
+    if stil_kunye_txt:
+        # Dahili sanat yonergesini SOK, geri kalanini (varsayilan karakter + palet) koru
+        taban = prof["gorsel_ek"]
+        gorsel_ek = (stil_kunye_txt + gorsel_ek[len(taban):]) if gorsel_ek.startswith(taban) \
+            else stil_kunye_txt
+        # Palet stil gorselinden geldiyse simdi ekle (yukarida hesaplanmisti)
+        yeni_pal = palet_prompt(palet, palet_ozel)
+        if yeni_pal and yeni_pal not in gorsel_ek:
+            gorsel_ek += "." + yeni_pal
+        stil_kilit = stil_kunye_txt          # capa ve sahneler ayni zengin tarifi kullansin
+        print(f"  STIL GORSELI devrede (guven={stil_guven}) — dahili sanat yonergesi devre disi",
+              file=sys.stderr)
+    elif not stil_kilit and stil_yol and os.path.exists(stil_yol):
+        stil_kilit = stil_analiz(stil_yol)   # kunye cikmadiysa eski tek-cumlelik yonteme dus
     # Kilitleri profile YAZ (bir kez uretilir, sonraki tum videolarda hazir gelir)
-    if kanal and (kar_kilit or stil_kilit):
+    if kanal and (kar_kilit or stil_kilit or stil_kunye_txt):
         try:
             profil_yaz(profil_id, {"kar_kilit": kar_kilit or None,
                                    "stil_kilit": stil_kilit or None,
+                                   "stil_kunye": stil_kunye_txt or None,
+                                   "stil_guven": stil_guven,
                                    "kunye_guven": kunye_guven})
         except Exception:
             pass
