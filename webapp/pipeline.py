@@ -488,8 +488,12 @@ DESTEK_GORSEL = (
 # "sadece anlatmiyor", sayiyi GOSTERIYOR. Bizim eski kuralimiz "destekleyici oge olsun"
 # diyordu ama "anlatilan sayiyi gorunur bir yuzeye yaz" DEMIYORDU.
 VERI_KARTI_PLAN = (
-    "DATA CARD — apply to every scene whose narration contains a concrete fact: a number, price, "
-    "percentage, year, count, duration or a two-way comparison. In that scene you MUST name a "
+    "DATA CARD — apply ONLY to a scene whose narration literally contains a NUMERAL: a price, "
+    "percentage, year, count, quantity or duration written as digits. If the line has no numeral, "
+    "the scene gets NO card, NO sign and NO lettered board — write \"no text in this image\" and "
+    "move on. NEVER invent an abstract label card (\"EMOTIONAL EXPRESSION\", \"SALES GROWTH\", "
+    "\"MINDSET\") — a card that does not carry a number from the narration is a FAILURE. "
+    "When the line does contain a numeral you MUST name a "
     "physical surface inside the world that displays that exact fact — a held placard, a shop price "
     "tag, a laptop or phone screen, a TV, a noticeboard, a billboard, a printed letter, a menu or a "
     "hand-drawn chart — and write the words to be shown in double quotes. Do not paraphrase the "
@@ -1205,10 +1209,14 @@ ISIK_DUZEYLERI = {
                    "light source, deep shadow, dim rooms or dramatic lighting): the whole picture is "
                    "brightly and EVENLY lit by broad soft daylight. Walls, floors and large surfaces "
                    "sit in the LIGHT half of the value range, never in gloom. Shadows are soft, pale "
-                   "and short; no deep blacks, no heavy vignette anywhere. Colours are light and "
-                   "slightly desaturated like a children's picture book — clean pastels rather than "
-                   "heavy saturated pigment. The image must read as CHEERFUL and AIRY at a glance, "
-                   "even on a small phone screen.")},
+                   "and short; no deep blacks, no heavy vignette anywhere. "
+                   "BRIGHT IS NOT WASHED OUT — this is the most common failure: keep STRONG local "
+                   "contrast and clearly distinct colours. Give the main objects and furniture their "
+                   "own definite hues (a mint-green cupboard, a coral apron, a red tin) that stand "
+                   "apart from the pale wall behind them, and keep crisp dark linework and clear "
+                   "mid-tone accents so shapes separate instantly. A picture where everything is the "
+                   "same pale beige is WRONG. Light and airy overall, but never flat, milky or "
+                   "faded — it must read clearly at a glance on a small phone screen.")},
     "dengeli": {
         "ad": "Dengeli", "ozet": "Orta aydınlık, yumuşak gölge",
         "prompt": (" LIGHTING: soft natural daylight with gentle, readable shadows. Keep the overall "
@@ -1528,6 +1536,125 @@ def stil_kunye_metni(k: dict) -> str:
             "every frame must match it): " + ". ".join(p) +
             ". Reproduce this exact medium, line quality, shading and colour family in every single "
             "frame; do not substitute a different illustration style.")
+
+
+# ═══════════ SAHNE REFERANSI — tek gorselden HER SEYI cikar ═══════════
+# Kullanicinin 2 Agu 2026 onerisi: "karakter + stil ayri ayri degil; karakterin ICINDE
+# oldugu bir kare vereyim, motor tum video stilini oradan anlasin."
+# Dogru fikir: gercek bir kare hem karakteri, hem cizim dilini, hem paleti, hem de
+# ISIK SEVIYESINI ayni anda tasir. Ustelik isigi TAHMIN etmek yerine OLCEBILIYORUZ —
+# 1 Agu'de temalarin karanlik cikmasinin sebebi tahmindi.
+def gorsel_olcum(yol: str) -> dict:
+    """Referans karenin parlaklik / doygunluk / kontrastini PIKSELDEN olcer ($0, tahmin yok)."""
+    try:
+        from PIL import Image
+        import statistics as _st
+        im = Image.open(yol).convert("RGB")
+        im.thumbnail((180, 180))
+        px = list(im.getdata())
+        lum = [0.2126 * r + 0.7152 * g + 0.0722 * b for r, g, b in px]
+        return {"parlaklik": round(sum(lum) / len(lum), 1),
+                "doygunluk": round(sum(max(q) - min(q) for q in px) / len(px), 1),
+                "kontrast": round(_st.pstdev(lum), 1)}
+    except Exception as e:
+        print(f"  gorsel_olcum hata: {str(e)[:120]}", file=sys.stderr)
+        return {}
+
+
+def olcum_isik_prompt(o: dict) -> str:
+    """Olculen degerleri HEDEF olarak prompta yaz. Kelimeyle 'aydinlik olsun' demek yerine
+    sayi vermek, palet dersinin isiga uygulanmis hali."""
+    if not o or not o.get("parlaklik"):
+        return ""
+    p, d, k = o["parlaklik"], o.get("doygunluk", 0), o.get("kontrast", 0)
+    if p >= 175:   ton = "very light and airy"
+    elif p >= 150: ton = "light and bright"
+    elif p >= 120: ton = "medium-toned"
+    else:          ton = "deliberately dark and moody"
+    dg = ("muted and gently desaturated" if d < 65 else
+          "moderately saturated" if d < 100 else "richly saturated")
+    kn = ("soft and low-contrast" if k < 35 else
+          "clearly contrasted" if k < 55 else "high-contrast and punchy")
+    return (f" LIGHT AND COLOUR MATCH (measured from the reference frames the user supplied — hit "
+            f"these targets): the overall image should be {ton} (mean brightness about "
+            f"{int(p)} out of 255), {dg} (mean saturation about {int(d)}), and {kn} "
+            f"(tonal spread about {int(k)}). BRIGHT MUST NOT MEAN WASHED OUT: main objects keep "
+            f"their own definite hues so they separate from the wall behind them, and linework "
+            f"stays crisp. Match this light and colour feel in EVERY frame.")
+
+
+def sahne_referansi(yollar: list, bildir=None) -> dict:
+    """1-4 referans karesinden TEK SEFERDE: karakter kimligi + cizim stili + palet + isik.
+    Birden fazla kare verilirse alanlar UZLASIYLA secilir (celisen alan atilir) — tek karede
+    tesadufi olan sey, iki karede tekrar ediyorsa gercektir."""
+    yollar = [y for y in (yollar or []) if y and os.path.exists(y)][:4]
+    if not yollar:
+        return {}
+    kimlikler, stiller, olcumler, paletler = [], [], [], []
+    for i, y in enumerate(yollar):
+        if bildir:
+            bildir(f"Referans {i+1}/{len(yollar)} analiz ediliyor...", 3)
+        olcumler.append(gorsel_olcum(y))
+        paletler += palet_olc(y, adet=6)
+        try:
+            kimlikler.append(kimlik_kunyesi(y))
+        except BakiyeHatasi:
+            raise
+        except Exception as e:
+            print(f"  ref{i+1} kimlik hata: {str(e)[:120]}", file=sys.stderr)
+        try:
+            stiller.append(stil_kunyesi(y))
+        except BakiyeHatasi:
+            raise
+        except Exception as e:
+            print(f"  ref{i+1} stil hata: {str(e)[:120]}", file=sys.stderr)
+
+    def uzlas(sozlukler, alanlar):
+        """Tek gorsel: oldugu gibi. Coklu: en az iki gorselde AYNI cikan alan gecerli."""
+        sozlukler = [d for d in sozlukler if d]
+        if not sozlukler:
+            return {}
+        if len(sozlukler) == 1:
+            return dict(sozlukler[0])
+        out = {}
+        for alan in alanlar:
+            degerler = [str(d.get(alan, "") or "").strip() for d in sozlukler]
+            degerler = [v for v in degerler if v and v.lower() not in ("none", "yok")]
+            if not degerler:
+                continue
+            for i, a in enumerate(degerler):
+                esles = False
+                for b2 in degerler[i + 1:]:
+                    ka, kb = set(a.lower().split()), set(b2.lower().split())
+                    if ka & kb and len(ka & kb) >= max(1, min(len(ka), len(kb)) // 3):
+                        esles = True
+                        break
+                if esles:
+                    out[alan] = a
+                    break
+        return out
+
+    kimlik = uzlas(kimlikler, KUNYE_ALANLARI)
+    stil = uzlas(stiller, STIL_ALANLARI)
+    # Palet: TUM karelerin olculen renkleri, en baskin 6'si
+    paletler.sort(key=lambda c: -c.get("oran", 0))
+    gorulen, birlesik = set(), []
+    for c in paletler:
+        h = c["hex"].upper()
+        if h not in gorulen:
+            gorulen.add(h)
+            birlesik.append(c)
+        if len(birlesik) >= 6:
+            break
+    stil["_palet"] = birlesik
+    olc = {}
+    gecerli = [o for o in olcumler if o.get("parlaklik")]
+    if gecerli:
+        for k in ("parlaklik", "doygunluk", "kontrast"):
+            olc[k] = round(sum(o.get(k, 0) for o in gecerli) / len(gecerli), 1)
+    return {"kimlik": kimlik, "stil": stil, "olcum": olc,
+            "palet_hex": [c["hex"] for c in birlesik],
+            "kare_sayisi": len(yollar)}
 
 
 def stil_analiz(stil_yol: str) -> str:
@@ -2147,7 +2274,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                ilerle=None, profil_id: str = "", altyazi_sablon: str = "",
                altyazi_ac: str = "", palet: str = "", palet_ozel: str = "",
                arkaplan: str = "", ses_secim: str = "", isik: str = "",
-               acilis_dk=None) -> dict:
+               acilis_dk=None, sahne_ref: list = None) -> dict:
     """Tam hat. mod: 'animasyon'|'documentary'. stil_yol: referans stil gorseli (opsiyonel).
     sure_dk: hedef sure (hikaye maks 60, digerleri maks 14). gecis_acik/zoom_acik: kullanicinin tercihi.
     profil_id: KANAL PROFILI — verilirse karakter/capa/kilitler profilden gelir ve tum
@@ -2163,8 +2290,16 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # profilde kayitli "hikaye-whatif" sessizce devreye giriyordu. Ustune profilin DONMUS
     # capasi her sahneye ESKI karakteri dayatiyordu; yeni yuklenen referans hic kullanilmiyordu.
     # Kural: BU VIDEODAKI SECIM HER ZAMAN KAZANIR. Profil sadece BOS birakilani doldurur.
-    yeni_karakter = bool(kar_yol and os.path.exists(kar_yol))
-    yeni_stil_gorseli = bool(stil_yol and os.path.exists(stil_yol))
+    # SAHNE REFERANSI: karakter+stil+palet+isik hepsi ayni karelerden gelir.
+    sahne_ref = [y for y in (sahne_ref or []) if y and os.path.exists(y)][:4]
+    if sahne_ref:
+        # Gorsel referans olarak ILK kareyi kullan (kanon ondan uretilir)
+        kar_yol = kar_yol if (kar_yol and os.path.exists(kar_yol)) else sahne_ref[0]
+        stil_yol = stil_yol if (stil_yol and os.path.exists(stil_yol)) else sahne_ref[0]
+    sr = {}                     # sahne referansi analizi (asagida doldurulur)
+    stil_kunye_txt_on = ""
+    yeni_karakter = bool(kar_yol and os.path.exists(kar_yol)) or bool(sahne_ref)
+    yeni_stil_gorseli = bool(stil_yol and os.path.exists(stil_yol)) or bool(sahne_ref)
     if kanal:
         if not mod:
             mod = kanal.get("tur") or mod
@@ -2248,6 +2383,23 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         if not (stil_yol and os.path.exists(stil_yol)) and kanal.get("stil_yol"):
             stil_yol = kanal["stil_yol"]
     kunye_guven = None
+    sr = {}
+    if sahne_ref:
+        bildir(f"{len(sahne_ref)} referans karesi analiz ediliyor (karakter+stil+palet+ışık)...", 3)
+        sr = sahne_referansi(sahne_ref, bildir)
+        if sr:
+            kar_kilit = kunye_metni(sr.get("kimlik") or {}) or kar_kilit
+            kunye_guven = (sr.get("kimlik") or {}).get("_guven")
+            sk_txt = stil_kunye_metni(sr.get("stil") or {})
+            if sk_txt:
+                stil_kunye_txt_on = sk_txt
+            else:
+                stil_kunye_txt_on = ""
+            # Palet: referansin OLCULEN renkleri (kullanici ayrica secmediyse)
+            if sr.get("palet_hex") and not palet_renkleri(palet, palet_ozel):
+                palet, palet_ozel = "ozel", ",".join(sr["palet_hex"])
+            print(f"  SAHNE REFERANSI: {sr.get('kare_sayisi')} kare | olcum={sr.get('olcum')} "
+                  f"| palet={sr.get('palet_hex')}", file=sys.stderr)
     if not kar_kilit and kar_yol and os.path.exists(kar_yol):
         # COK ASAMALI ANALIZ: palet olcumu + 2 bagimsiz vision okumasi + kod uzlasisi
         bildir("Karakter derin analiz ediliyor (çok aşamalı)...", 3)
@@ -2265,6 +2417,18 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # Iki rakip sanat yonergesi = sahneler arasi salinim (renk kilidi dersinin aynisi).
     # Kompozisyon (cerceve + sahne sozlesmesi) DEGISMEZ: stil GORUNUSU, sozlesme YAPIYI belirler.
     stil_kunye_txt = kanal.get("stil_kunye", "") if (kanal and not yeni_stil_gorseli) else ""
+    if sr and stil_kunye_txt_on:
+        stil_kunye_txt = stil_kunye_txt_on      # sahne referansindan gelen zengin stil tarifi
+    # OLCULEN ISIK: hazir kademeden daha kesin -> onun YERINE gecer. (sr burada hazir;
+    # yukaridaki cerceve blogunda henuz bos oldugu icin burada uygulaniyor.)
+    if sr and sr.get("olcum"):
+        olculen_ek = olcum_isik_prompt(sr["olcum"])
+        if olculen_ek:
+            if is_ek and is_ek in cerceve_ek:
+                cerceve_ek = cerceve_ek.replace(is_ek, olculen_ek)
+            else:
+                cerceve_ek += olculen_ek
+            print(f"  isik REFERANSTAN OLCULDU: {sr['olcum']}", file=sys.stderr)
     stil_guven = None
     if stil_yol and os.path.exists(stil_yol) and not stil_kunye_txt:
         bildir("Stil görseli derin analiz ediliyor (çok aşamalı)...", 4)
