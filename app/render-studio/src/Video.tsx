@@ -284,8 +284,9 @@ const hikayeHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
       extrapolateRight: 'clamp',
       easing: Easing.out(Easing.cubic),
     });
-    const girisOlcek = 1.14 - 0.14 * girisP; // hizli push-in giris
-    const {olcek, tx, ty} = kbHesap(sahne, frame, K, 1.16, 48); // derin zoom + genis pan
+    const girisOlcek = 1.2 - 0.2 * girisP; // sert push-in giris
+    // 1.16/48 yetersizdi ("videolasmis" hissi vermiyordu) -> 1.30/110: kamera geziyor hissi
+    const {olcek, tx, ty} = kbHesap(sahne, frame, K, 1.3, 110); // derin zoom + genis pan
     return {transform: `translate(${tx}px, ${ty}px) scale(${olcek * girisOlcek})`};
   }
   const {olcek, tx, ty} = kbHesap(sahne, frame, K, 1.07, 26); // sakin bolum: standart Ken Burns

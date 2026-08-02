@@ -130,7 +130,9 @@ def _motion_param(gecis, vurgu):
     giris_*: sahne basindaki push-in (1+giris_buyume'den 1'e iner, ilk giris_pay karede)."""
     if gecis == "hikaye":
         if vurgu:
-            return 1.16, 48, 0.14, 4   # acilis: derin zoom + genis pan + push-in giris
+            # ACILIS: "videolasmis" his icin sert degerler (1.16/48 yetersizdi — olcumde fark
+            # gorunuyor ama izleyici hissetmiyordu). 1.30 zoom + genis pan = kamera geziyor hissi.
+            return 1.30, 110, 0.20, 4
         return 1.07, 26, 0.0, 4
     if gecis == "anlati":
         return 1.12, 40, 0.12, 4
