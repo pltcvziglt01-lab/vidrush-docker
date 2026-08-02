@@ -1650,8 +1650,12 @@ VARSAYILAN_SES = "otomatik"
 
 
 def ses_ayari(secim: str, plan_sesi: str = "") -> dict:
-    """Ses secimini motor+parametre sozlugune cevir. Bilinmeyen/otomatik -> edge, dile gore."""
-    s = SESLER.get((secim or "").strip())
+    """Ses secimini motor+parametre sozlugune cevir. Bilinmeyen/otomatik -> edge, dile gore.
+    'ozel:<voice_id>' = kullanicinin Ai33 KUTUPHANESINDEN sectigi herhangi bir ses."""
+    secim = (secim or "").strip()
+    if secim.startswith("ozel:"):
+        return {"motor": "ai33", "ses": secim[5:], "hiz": 1.0}
+    s = SESLER.get(secim)
     if s and s.get("motor") == "openai":
         return {"motor": "openai", "ses": s["ses"], "talimat": s.get("talimat", ""),
                 "hiz": s.get("hiz", 0.92)}

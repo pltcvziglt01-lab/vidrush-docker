@@ -90,6 +90,9 @@
   .estil .pick{position:absolute;top:12px;right:12px;width:18px;height:18px;border-radius:50%;
     border:1.5px solid var(--line)}
   .estil.on .pick{background:var(--grad);border-color:transparent}
+  /* ses kutuphanesi: secili satir vurgusu */
+  .krow.sec{border-color:var(--acc2)!important;box-shadow:0 0 0 1px var(--acc2)}
+  .krow:hover{border-color:var(--acc)}
   /* seçenekler */
   .opt{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:4px}
   .seg{display:inline-flex;background:#0e1117;border:1px solid var(--line);border-radius:11px;padding:3px}
@@ -617,7 +620,7 @@ function pfOzetGuncelle(){
     sat(!!stilFile, `<b>Genel görsel stil:</b> ${stilFile?stilFile.name:"yüklenmedi (stilin ilk videoda kilitlenir)"}`),
     sat(altyaziAcik, `<b>Altyazı:</b> ${altyaziAcik?((altSablonlar[altSablon]||{}).ad||altSablon)+" (özelleştirilmiş)":"kapalı"}`),
     sat(true, `<b>Işık düzeyi:</b> ${((isikListe.find(x=>x.id===seciliIsik)||{}).ad||seciliIsik)}`),
-    sat(seciliSes!=="otomatik", `<b>Anlatıcı sesi:</b> ${seciliSes==="otomatik"?"otomatik (dile göre, ücretsiz)":((sesListe.find(x=>x.id===seciliSes)||{}).ad||seciliSes)}`),
+    sat(seciliSes!=="otomatik", `<b>Anlatıcı sesi:</b> ${seciliSes==="otomatik"?"otomatik (dile göre, ücretsiz)":(seciliSes.startsWith("ozel:")?((localStorage.getItem("bedosaho_ses_ad")||"kütüphane sesi")+" (kütüphane)"):((sesListe.find(x=>x.id===seciliSes)||{}).ad||seciliSes))}`),
     sat(seciliArkaplan!=="otomatik", `<b>Arka plan:</b> ${seciliArkaplan==="otomatik"?"otomatik (stilin kendi mekân kuralı)":((arkaplanListe.find(x=>x.id===seciliArkaplan)||{}).ad||seciliArkaplan)}`),
     sat(seciliPalet!=="otomatik", `<b>Renk paleti:</b> ${seciliPalet==="otomatik"?"otomatik (stilin kendi renkleri)":(seciliPalet==="ozel"?("Özel — "+ozelHex.join(" ")):((paletListe.find(x=>x.id===seciliPalet)||{}).ad||seciliPalet))}`),
   ].map(s=>`<div>${s}</div>`).join("");
@@ -698,10 +701,27 @@ function secSes(id){
   seciliSes=id; localStorage.setItem("bedosaho_ses",id);
   $$("#sesler .estil").forEach(x=>x.classList.toggle("on",(x.dataset.id||"")===id));
 }
-/* Ses saglayici SEKMELERI: once program sec (Ücretsiz / OpenAI / ElevenLabs), sonra ses.
-   Yeni saglayici (MiniMax, FishAudio...) eklemek = SESLER'e grup'lu girdi + bu listeye satir. */
-const SES_GRUPLARI=[["ucretsiz","🆓 Ücretsiz"],["karakterli","🎭 Karakterli (OpenAI)"],["elevenlabs","⭐ ElevenLabs"]];
+/* Ses SAGLAYICI SEKMELERI: once programi sec, sonra o programin sesleri.
+   kutuphane: dolu olanlarda Ai33'ten TUM katalog cekilir (arama + dinle + sec). */
+const SES_GRUPLARI=[
+  {id:"ucretsiz",   ad:"🆓 Ücretsiz",            kutuphane:""},
+  {id:"karakterli", ad:"🎭 Karakterli (OpenAI)", kutuphane:""},
+  {id:"elevenlabs", ad:"⭐ ElevenLabs",          kutuphane:"elevenlabs"},
+  {id:"minimax",    ad:"🎵 MiniMax",             kutuphane:"minimax"},
+  {id:"fishaudio",  ad:"🐟 FishAudio",           kutuphane:"fishaudio"},
+  {id:"kokoro",     ad:"🌸 Kokoro",              kutuphane:"kokoro"},
+];
 let sesGrubu = "ucretsiz";
+const kutupCache = {};   // saglayici -> liste
+function secOzelSes(voiceId, ad){
+  seciliSes = "ozel:"+voiceId;
+  localStorage.setItem("bedosaho_ses", seciliSes);
+  localStorage.setItem("bedosaho_ses_ad", ad);
+  $$("#sesKartlari .estil").forEach(x=>x.classList.remove("on"));
+  $$("#sesKutup .krow").forEach(x=>x.classList.toggle("sec", x.dataset.vid===voiceId));
+  const chip=$("#sesSecimChip");
+  if(chip){ chip.style.display=""; chip.querySelector("b").textContent=ad; }
+}
 function sesKartlariCiz(){
   const c=$("#sesKartlari"); if(!c) return; c.innerHTML="";
   sesListe.filter(v=>(v.grup||"ucretsiz")===sesGrubu).forEach(v=>{
@@ -719,32 +739,83 @@ function sesKartlariCiz(){
       </div>`;
     const b2=d.querySelector(".oynat");
     if(b2) b2.onclick=(e)=>{ e.stopPropagation(); sesCal(v.ornek, b2); };
-    d.onclick=()=>secSes(v.id);
+    d.onclick=()=>{ const chip=$("#sesSecimChip"); if(chip) chip.style.display="none"; secSes(v.id); };
     c.appendChild(d);
   });
+}
+function kutupSatirlariCiz(liste, filtre){
+  const kc=$("#sesKutupListe"); if(!kc) return; kc.innerHTML="";
+  const f=(filtre||"").toLowerCase();
+  const secilenVid = seciliSes.startsWith("ozel:") ? seciliSes.slice(5) : "";
+  liste.filter(v=>!f || (v.ad+" "+v.ozet+" "+v.cinsiyet+" "+v.dil).toLowerCase().includes(f))
+       .forEach(v=>{
+    const r=document.createElement("div"); r.className="krow"+(v.voice_id===secilenVid?" sec":"");
+    r.dataset.vid=v.voice_id;
+    r.style.cssText="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:7px;background:var(--card2)";
+    const rozetler=[v.cinsiyet==="female"?"♀":v.cinsiyet==="male"?"♂":"", v.yas?v.yas.replace("_"," "):"", v.dil?v.dil.toUpperCase():""].filter(Boolean).join(" · ");
+    r.innerHTML=`<div style="flex:1;min-width:0"><b style="font-size:13px">${v.ad}</b>
+        <div style="font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${v.ozet||""}</div>
+        <div style="font-size:10px;color:var(--dim2);margin-top:2px">${rozetler}</div></div>
+      ${v.onizleme?`<button class="oynat" style="background:#0e1117;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:5px 10px;font:inherit;font-size:11px;cursor:pointer;flex:0 0 auto">▶</button>`:""}
+      <button class="btn" style="padding:6px 14px;font-size:12px;flex:0 0 auto">Seç</button>`;
+    const oy=r.querySelector(".oynat");
+    if(oy) oy.onclick=()=>sesCal(v.onizleme, oy);
+    r.querySelector(".btn").onclick=()=>secOzelSes(v.voice_id, v.ad);
+    kc.appendChild(r);
+  });
+  if(!kc.children.length) kc.innerHTML='<span class="durum">Eşleşen ses yok.</span>';
+}
+function kutupYukle(saglayici){
+  const kc=$("#sesKutupListe"); if(!kc) return;
+  if(kutupCache[saglayici]){ kutupSatirlariCiz(kutupCache[saglayici], $("#sesAra")?.value); return; }
+  kc.innerHTML='<span class="durum">Kütüphane yükleniyor...</span>';
+  fetch("api/ses-kutuphane?saglayici="+saglayici).then(r=>r.json()).then(list=>{
+    kutupCache[saglayici]=list; kutupSatirlariCiz(list, $("#sesAra")?.value);
+  }).catch(()=>{ kc.innerHTML='<span class="durum">Kütüphane alınamadı.</span>'; });
 }
 function sesGruplariCiz(){
   const c=$("#sesler"); if(!c) return;
   c.className=""; c.innerHTML="";
-  const bar=document.createElement("div"); bar.className="seg"; bar.style.marginBottom="12px";
-  SES_GRUPLARI.forEach(([id,ad])=>{
-    const sayi = sesListe.filter(v=>(v.grup||"ucretsiz")===id).length;
-    if(!sayi) return;
+  // secili ozel ses varsa ust bilgi cipi
+  const ozelAd = seciliSes.startsWith("ozel:") ? (localStorage.getItem("bedosaho_ses_ad")||"kütüphane sesi") : "";
+  const chip=document.createElement("div"); chip.id="sesSecimChip";
+  chip.style.cssText="display:"+(ozelAd?"":"none")+";margin-bottom:10px;padding:9px 14px;border:1.5px solid var(--acc2);border-radius:10px;background:#12211d;font-size:12.5px";
+  chip.innerHTML=`🎙️ Seçili anlatıcı: <b>${ozelAd}</b> <span style="color:var(--dim2)">(kütüphaneden)</span>`;
+  c.appendChild(chip);
+  const bar=document.createElement("div"); bar.className="seg"; bar.style.cssText="margin-bottom:12px;flex-wrap:wrap";
+  SES_GRUPLARI.forEach(g=>{
+    const sayi = sesListe.filter(v=>(v.grup||"ucretsiz")===g.id).length;
+    if(!sayi && !g.kutuphane) return;
     const b=document.createElement("button");
-    b.textContent=`${ad} (${sayi})`;
-    b.className=(sesGrubu===id)?"on":"";
-    b.onclick=()=>{ sesGrubu=id; bar.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); sesKartlariCiz(); };
+    b.textContent=g.ad+(sayi?` (${sayi})`:"");
+    b.className=(sesGrubu===g.id)?"on":"";
+    b.onclick=()=>{ sesGrubu=g.id; bar.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); icerikCiz(); };
     bar.appendChild(b);
   });
   c.appendChild(bar);
   const grid=document.createElement("div"); grid.className="estiller"; grid.id="sesKartlari";
   c.appendChild(grid);
-  sesKartlariCiz();
+  const kut=document.createElement("div"); kut.id="sesKutup"; kut.style.marginTop="12px";
+  kut.innerHTML=`<div class="lbl2" style="margin-bottom:8px">📚 Tüm kütüphane — dinle, beğendiğini seç</div>
+    <input id="sesAra" placeholder="Ara: isim, tarz, dil (örn. deep, energetic, calm...)"
+      style="width:100%;background:#0e1117;border:1px solid var(--line);border-radius:10px;color:var(--txt);padding:10px 13px;font:inherit;font-size:13px;margin-bottom:9px">
+    <div id="sesKutupListe" style="max-height:340px;overflow-y:auto"></div>`;
+  c.appendChild(kut);
+  $("#sesAra").oninput=()=>{ const g=SES_GRUPLARI.find(x=>x.id===sesGrubu); if(g&&g.kutuphane) kutupSatirlariCiz(kutupCache[g.kutuphane]||[], $("#sesAra").value); };
+  function icerikCiz(){
+    const g=SES_GRUPLARI.find(x=>x.id===sesGrubu)||{};
+    sesKartlariCiz();
+    kut.style.display = g.kutuphane ? "" : "none";
+    if(g.kutuphane) kutupYukle(g.kutuphane);
+  }
+  icerikCiz();
 }
 fetch("api/sesler").then(r=>r.json()).then(list=>{
   sesListe=list;
-  // secili ses hangi gruptaysa o sekme acik gelsin
-  const sec=list.find(v=>v.id===seciliSes); if(sec) sesGrubu=sec.grup||"ucretsiz";
+  // secili ses hangi gruptaysa o sekme acik gelsin (ozel secim -> elevenlabs varsay)
+  const sec=list.find(v=>v.id===seciliSes);
+  if(sec) sesGrubu=sec.grup||"ucretsiz";
+  else if(seciliSes.startsWith("ozel:")) sesGrubu=(seciliSes.slice(5).split("_")[0])||"elevenlabs";
   sesGruplariCiz();
 }).catch(()=>{$("#sesler").innerHTML='<span class="durum">sesler yüklenemedi</span>';});
 

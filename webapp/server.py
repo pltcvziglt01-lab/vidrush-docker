@@ -112,6 +112,17 @@ def _kucult(data: bytes, hedef: str, boyut=1024):
     im.save(hedef, "PNG")
 
 
+_OZEL_SES_RE = re.compile(r"^ozel:(elevenlabs|minimax|fishaudio|kokoro)_[A-Za-z0-9_-]{1,64}$")
+
+
+def _ses_secimi(ses: str) -> str:
+    """Ses form alanini dogrula: SESLER anahtari VEYA kutuphaneden 'ozel:<voice_id>' secimi."""
+    s = (ses or "").strip()
+    if s in pipeline.SESLER or _OZEL_SES_RE.match(s):
+        return s
+    return ""
+
+
 def _bayrak(v) -> bool:
     return str(v).lower() in ("1", "true", "on", "evet", "yes")
 
@@ -242,6 +253,48 @@ def sesler():
             for k, v in pipeline.SESLER.items()]
 
 
+_SES_KUTUPHANE_ONBELLEK = {}   # saglayici -> (zaman, liste); Ai33'e her seferinde gitmeyelim
+
+
+def _ai33_key():
+    k = os.environ.get("AI33_KEY", "").strip()
+    if not k:
+        try:
+            with open("/opt/vidrush/AI33_KEY") as f:
+                k = f.read().strip()
+        except Exception:
+            k = ""
+    return k
+
+
+@app.get("/api/ses-kutuphane")
+def ses_kutuphane(saglayici: str = "elevenlabs"):
+    """Ai33 ses KUTUPHANESI — saglayicinin TUM katalogu (isim, tarif, onizleme).
+    Kullanici istedigi sesi secer; secim 'ozel:<voice_id>' olarak generate'e gider."""
+    if saglayici not in ("elevenlabs", "minimax", "fishaudio", "kokoro"):
+        raise HTTPException(400, "gecersiz saglayici")
+    zaman, liste = _SES_KUTUPHANE_ONBELLEK.get(saglayici, (0, None))
+    if liste is not None and time.time() - zaman < 600:
+        return liste
+    key = _ai33_key()
+    if not key:
+        raise HTTPException(503, "AI33 anahtari kurulu degil")
+    import requests
+    try:
+        r = requests.get(f"https://api.ai33.pro/v3/voices?provider={saglayici}",
+                         headers={"xi-api-key": key}, timeout=30)
+        veri = r.json().get("data", [])
+    except Exception:
+        raise HTTPException(502, "Ses kütüphanesi alınamadı")
+    liste = [{"voice_id": v.get("voice_id"), "ad": v.get("name") or v.get("voice_id"),
+              "ozet": (v.get("description") or "")[:220],
+              "cinsiyet": v.get("gender", ""), "yas": v.get("age", ""),
+              "dil": v.get("language", ""), "onizleme": v.get("preview_url", "")}
+             for v in veri if v.get("voice_id")]
+    _SES_KUTUPHANE_ONBELLEK[saglayici] = (time.time(), liste)
+    return liste
+
+
 @app.get("/ses-ornek/{dosya}")
 def ses_ornek(dosya: str):
     ad = os.path.basename(dosya)
@@ -311,7 +364,7 @@ async def profil_olustur(pid: str = Form(...), ad: str = Form(""),
                               "palet_ozel": palet_ozel.strip()[:80] or None,
                               "arkaplan": (arkaplan.strip()
                                            if arkaplan.strip() in pipeline.ARKA_PLANLAR else "") or None,
-                              "ses": (ses.strip() if ses.strip() in pipeline.SESLER else "") or None,
+                              "ses": (_ses_secimi(ses)) or None,
                               "isik": (isik.strip()
                                        if isik.strip() in pipeline.ISIK_DUZEYLERI else "") or None})
     return pipeline.profil_oku(pid) and {"ok": True, "id": pid}
@@ -420,7 +473,7 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
                     profil.strip(), altyazi.strip(), altyazi_sablon.strip(),
                     pal, palet_ozel.strip()[:80],
                     arkaplan.strip() if arkaplan.strip() in pipeline.ARKA_PLANLAR else "",
-                    ses.strip() if ses.strip() in pipeline.SESLER else "",
+                    _ses_secimi(ses),
                     isik.strip() if isik.strip() in pipeline.ISIK_DUZEYLERI else "",
                     acilis_dk))
     return {"job_id": is_id, "kuyruk": is_kuyrugu.qsize(), "tur": mod, "edit": edit_id,
