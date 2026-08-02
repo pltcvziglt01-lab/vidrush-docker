@@ -1619,6 +1619,16 @@ SESLER = {
                  "ozet": "Türkçe anlatıcı", "ucret": "ücretsiz", "dil": "tr"},
     "tr-erkek": {"ad": "Erkek · Türkçe", "motor": "edge", "ses": "tr-TR-AhmetNeural",
                  "ozet": "Türkçe anlatıcı", "ucret": "ücretsiz", "dil": "tr"},
+    # ── PREMIUM (Ai33.Pro — ElevenLabs kalitesi, her dilde; anahtar sunucuda AI33_KEY) ──
+    # eleven_multilingual_v2 otomatik: ayni ses Turkce dahil her dili dogal okur.
+    "premium-kadin": {"ad": "⭐ Premium Kadın", "motor": "ai33",
+                      "ses": "elevenlabs_21m00Tcm4TlvDq8ikWAM", "hiz": 1.0, "dil": "",
+                      "ozet": "ElevenLabs (Rachel) — en doğal kadın anlatıcı, her dil",
+                      "ucret": "kredi"},
+    "premium-erkek": {"ad": "⭐ Premium Erkek", "motor": "ai33",
+                      "ses": "elevenlabs_pNInz6obpgDQGcFmaJgB", "hiz": 1.0, "dil": "",
+                      "ozet": "ElevenLabs (Adam) — derin, doğal erkek anlatıcı, her dil",
+                      "ucret": "kredi"},
 }
 VARSAYILAN_SES = "otomatik"
 
@@ -1626,10 +1636,12 @@ VARSAYILAN_SES = "otomatik"
 def ses_ayari(secim: str, plan_sesi: str = "") -> dict:
     """Ses secimini motor+parametre sozlugune cevir. Bilinmeyen/otomatik -> edge, dile gore."""
     s = SESLER.get((secim or "").strip())
-    if not s or s.get("motor") != "openai":
-        return {"motor": "edge", "ses": (s or {}).get("ses") or plan_sesi}
-    return {"motor": "openai", "ses": s["ses"], "talimat": s.get("talimat", ""),
-            "hiz": s.get("hiz", 0.92)}
+    if s and s.get("motor") == "openai":
+        return {"motor": "openai", "ses": s["ses"], "talimat": s.get("talimat", ""),
+                "hiz": s.get("hiz", 0.92)}
+    if s and s.get("motor") == "ai33":
+        return {"motor": "ai33", "ses": s["ses"], "hiz": s.get("hiz", 1.0)}
+    return {"motor": "edge", "ses": (s or {}).get("ses") or plan_sesi}
 
 
 def ses_coz(plan: dict) -> str:

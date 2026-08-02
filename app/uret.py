@@ -209,11 +209,101 @@ async def seslendir_openai(metin: str, mp3_yolu: str, ses: str = "shimmer",
     return kelimeler, sure
 
 
+def _ai33_anahtar():
+    """Ai33.Pro anahtari: env AI33_KEY veya /opt/vidrush/AI33_KEY dosyasi.
+    Anahtar GIT'E GIRMEZ — sadece sunucuda durur (docker commit ile kalici)."""
+    k = os.environ.get("AI33_KEY", "").strip()
+    if not k:
+        try:
+            with open("/opt/vidrush/AI33_KEY") as f:
+                k = f.read().strip()
+        except Exception:
+            k = ""
+    return k
+
+
+async def seslendir_ai33(metin: str, mp3_yolu: str,
+                         voice_id: str = "elevenlabs_21m00Tcm4TlvDq8ikWAM", hiz: float = 1.0):
+    """Ai33.Pro — tek anahtarla premium TTS (ElevenLabs/MiniMax/FishAudio...). Asenkron API:
+    POST -> task_id -> poll -> mp3 + KELIME BAZLI transkript (altyazi senkronu buradan gelir).
+    Kisa cumle ~35 kredi. voice_id saglayici onekli: elevenlabs_XXX, minimax_XXX..."""
+    key = _ai33_anahtar()
+    if not key:
+        raise RuntimeError("AI33_KEY yok — premium ses kullanilamaz")
+    import requests
+
+    def _basla():
+        r = requests.post("https://api.ai33.pro/v3/text-to-speech",
+                          headers={"xi-api-key": key},
+                          data={"text": metin, "voice_id": voice_id,
+                                "speed": str(max(0.5, min(1.5, float(hiz)))),
+                                "with_transcript": "true"},
+                          timeout=60)
+        r.raise_for_status()
+        j = r.json()
+        if not j.get("success") or not j.get("task_id"):
+            raise RuntimeError(f"ai33 baslatilamadi: {str(j)[:150]}")
+        return j["task_id"]
+
+    def _bekle(tid):
+        bas = time.time()
+        while time.time() - bas < 240:
+            time.sleep(3)
+            try:
+                j = requests.get(f"https://api.ai33.pro/v3/task/{tid}",
+                                 headers={"xi-api-key": key}, timeout=30).json()
+            except Exception:
+                continue
+            if not j.get("success"):
+                continue   # server_busy vb. gecici durumlar -> tekrar dene
+            d = j.get("data", {})
+            if d.get("status") == "done":
+                return d.get("metadata", {})
+            if d.get("status") in ("failed", "error", "cancelled"):
+                raise RuntimeError(f"ai33 task basarisiz: {str(d)[:150]}")
+        raise RuntimeError("ai33 zaman asimi (240s)")
+
+    def _indir(meta):
+        au = meta.get("audio_url")
+        if not au:
+            raise RuntimeError("ai33 audio_url donmedi")
+        with open(mp3_yolu, "wb") as f:
+            f.write(requests.get(au, timeout=120).content)
+        kel = []
+        ju = meta.get("json_url")
+        if ju:
+            try:
+                for blok in requests.get(ju, timeout=60).json():
+                    for w in blok.get("words", []):
+                        if w.get("type") == "word" and str(w.get("text", "")).strip():
+                            kel.append({"t0": float(w["start"]), "t1": float(w["end"]),
+                                        "kelime": str(w["text"]).strip()})
+            except Exception:
+                kel = []   # transkript alinamazsa orantili zamana duseriz
+        return kel
+
+    tid = await asyncio.to_thread(_basla)
+    meta = await asyncio.to_thread(_bekle, tid)
+    kelimeler = await asyncio.to_thread(_indir, meta)
+    olculen = _ses_suresi(mp3_yolu)
+    if not kelimeler:
+        kelimeler = _orantili_zaman(metin, olculen)
+    kuyruk = float(os.environ.get("TTS_KUYRUK", "0.30"))
+    sure = max((kelimeler[-1]["t1"] + kuyruk) if kelimeler else 0,
+               (olculen + 0.12) if olculen else 0,
+               max(1.6, len(metin.split()) * 0.40))
+    return kelimeler, sure
+
+
 async def seslendir(metin: str, ses: str, mp3_yolu: str, ayar: dict = None):
-    """ayar verilirse ve ayar['motor']=='openai' ise OpenAI TTS'e yonlendirilir."""
+    """ayar['motor']: 'openai' -> gpt-4o-mini-tts, 'ai33' -> Ai33.Pro premium, yoksa edge-tts."""
     if ayar and ayar.get("motor") == "openai":
         return await seslendir_openai(metin, mp3_yolu, ayar.get("ses") or "shimmer",
                                       ayar.get("talimat") or "", ayar.get("hiz") or 0.92)
+    if ayar and ayar.get("motor") == "ai33":
+        return await seslendir_ai33(metin, mp3_yolu,
+                                    ayar.get("ses") or "elevenlabs_21m00Tcm4TlvDq8ikWAM",
+                                    ayar.get("hiz") or 1.0)
     return await _seslendir_edge(metin, ses, mp3_yolu)
 
 
