@@ -317,8 +317,9 @@ def ses_kutuphane(saglayici: str = "elevenlabs"):
             out.insert(0, ana)
         return out
 
-    def _yas(v):   # "Middle Age" / "middle-aged" / "middle_aged" -> tek bicim
-        return str(v.get("age", "")).strip().lower().replace("-", "_").replace(" ", "_")
+    def _yas(v):   # "Middle Age" / "middle-aged" / "middle_aged" -> tek bicim; cop degerler elenir
+        y = str(v.get("age", "")).strip().lower().replace("-", "_").replace(" ", "_")
+        return "" if y in ("none", "null", "unknown", "n/a") else y
 
     liste = [{"voice_id": v.get("voice_id"), "ad": v.get("name") or v.get("voice_id"),
               "ozet": (v.get("description") or "")[:220],
