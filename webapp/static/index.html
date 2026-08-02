@@ -217,7 +217,17 @@
         </div>
 
         <div id="hikayeWrap" style="display:none">
-          <div class="durum" style="margin-top:10px;font-size:11px">📖 Hazır hikaye metnini yapıştır. İlk ~2,5 dakika <b>yoğun hareketli açılış</b> (izleyiciyi tutmak için), sonrası efektli sinematik kareler + altyazı.<br>🧍 <b>Karakter</b>: yukarıya görsel yüklersen her sahnede birebir o; <b>yüklemesen de</b> karakter baştan sona otomatik aynı tutulur.<br>🎨 <b>Görsel tarzı</b>: yukarıdaki "Stil görseli" alanına örnek bir fotoğraf yüklersen bütün sahneler <b>o fotoğrafın tarzında</b> üretilir (yüklemezsen sinematik film karesi stili).</div>
+          <div class="ay" style="margin-top:12px;max-width:340px">
+            <span>🎬 Hareketli açılış süresi <b id="acilisLbl">İlk 2,5 dk</b></span>
+            <select id="acilisSec">
+              <option value="0">Kapalı — baştan sona sakin</option>
+              <option value="1">İlk 1 dakika</option>
+              <option value="2.5" selected>İlk 2,5 dakika (önerilen)</option>
+              <option value="5">İlk 5 dakika</option>
+              <option value="60">Tüm video hareketli</option>
+            </select>
+          </div>
+          <div class="durum" style="margin-top:10px;font-size:11px">📖 Hazır hikaye metnini yapıştır. Seçtiğin açılış süresi boyunca <b>yoğun hareket</b> (derin zoom + kayma — izleyiciyi tutmak için), sonrası sakin sinematik kareler.<br>🧍 <b>Karakter</b>: yukarıya görsel yüklersen her sahnede birebir o; <b>yüklemesen de</b> karakter baştan sona otomatik aynı tutulur.<br>🎨 <b>Görsel tarzı</b>: yukarıdaki "Stil görseli" alanına örnek bir fotoğraf yüklersen bütün sahneler <b>o fotoğrafın tarzında</b> üretilir (yüklemezsen sinematik film karesi stili).</div>
         </div>
 
         <!-- ══ RENK PALETİ: kanal genelinde sabit renk kimliği ══ -->
@@ -689,6 +699,12 @@ $$("#turler .estil").forEach(c=>c.onclick=()=>{
     : "1–14 dk. Uzun sürede render dakikalarca sürebilir.";
 });
 
+/* hikaye: hareketli acilis suresi etiketi */
+$("#acilisSec") && ($("#acilisSec").onchange=()=>{
+  const m={"0":"Kapalı","1":"İlk 1 dk","2.5":"İlk 2,5 dk","5":"İlk 5 dk","60":"Tümü"};
+  const l=$("#acilisLbl"); if(l) l.textContent=m[$("#acilisSec").value]||($("#acilisSec").value+" dk");
+});
+
 /* krediler */
 function krediYukle(){
   fetch("api/saglik").then(r=>r.json()).then(h=>{
@@ -727,6 +743,7 @@ $("#btnUret").onclick=async()=>{
   fd.append("sure_dk",sureDk); fd.append("gecis",gecisAcik?"1":"0"); fd.append("zoom",zoomAcik?"1":"0");
   fd.append("altyazi", altyaziAcik?"1":"0");
   if(altyaziAcik) fd.append("altyazi_sablon", JSON.stringify(ay));
+  if(videoTur==="hikaye"){ const a=$("#acilisSec"); if(a) fd.append("acilis", a.value); }
   if(seciliProfil) fd.append("profil", seciliProfil);
   if(seciliPalet && seciliPalet!=="otomatik"){
     fd.append("palet", seciliPalet); fd.append("palet_ozel", ozelHex.join(","));

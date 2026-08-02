@@ -296,6 +296,7 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
                       altyazi_sablon: str = Form(""),
                       palet: str = Form(""),
                       palet_ozel: str = Form(""),
+                      acilis: str = Form(""),
                       karakter: UploadFile = File(None),
                       stil: UploadFile = File(None)):
     """Karakter/stil gorselleri her video icin DOGRUDAN yuklenir (kalici kayit yok).
@@ -350,9 +351,14 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
                     "video": None, "kapak": None, "hata": None}
     _durum_kaydet(is_id)
     pal = palet.strip() if (palet.strip() in pipeline.PALETLER or palet.strip() == "ozel") else ""
+    # Hikaye: hareketli acilis suresi (dk). "" = varsayilan (HIKAYE_ACILIS_SN); 0 = kapali.
+    try:
+        acilis_dk = max(0.0, min(60.0, float(acilis))) if acilis.strip() != "" else None
+    except Exception:
+        acilis_dk = None
     is_kuyrugu.put((is_id, story.strip(), kar, stil_yol, mod, edit_id, sd, gecis_acik, zoom_acik,
                     profil.strip(), altyazi.strip(), altyazi_sablon.strip(),
-                    pal, palet_ozel.strip()[:80]))
+                    pal, palet_ozel.strip()[:80], acilis_dk))
     return {"job_id": is_id, "kuyruk": is_kuyrugu.qsize(), "tur": mod, "edit": edit_id,
             "profil": profil.strip()}
 
@@ -397,7 +403,8 @@ def cikti(dosya: str):
 
 
 def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom_acik,
-            profil_id="", altyazi="", altyazi_sablon="", palet="", palet_ozel=""):
+            profil_id="", altyazi="", altyazi_sablon="", palet="", palet_ozel="",
+            acilis_dk=None):
     d = isler.get(is_id)
     if not d:
         return
@@ -414,7 +421,7 @@ def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom
                                           sure_dk, gecis_acik, zoom_acik, ilerle,
                                           profil_id=profil_id, altyazi_sablon=altyazi_sablon,
                                           altyazi_ac=altyazi, palet=palet,
-                                          palet_ozel=palet_ozel))
+                                          palet_ozel=palet_ozel, acilis_dk=acilis_dk))
         d.update({"durum": "bitti", "ilerleme": 100, "mesaj": "Hazir!",
                   "video": "ciktilar/" + sonuc["video"],
                   "kapak": ("ciktilar/" + sonuc["kapak"]) if sonuc.get("kapak") else None,

@@ -1530,7 +1530,8 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                mod: str = "documentary", edit_id: str = VARSAYILAN_EDIT,
                sure_dk: float = 2, gecis_acik: bool = True, zoom_acik: bool = True,
                ilerle=None, profil_id: str = "", altyazi_sablon: str = "",
-               altyazi_ac: str = "", palet: str = "", palet_ozel: str = "") -> dict:
+               altyazi_ac: str = "", palet: str = "", palet_ozel: str = "",
+               acilis_dk=None) -> dict:
     """Tam hat. mod: 'animasyon'|'documentary'. stil_yol: referans stil gorseli (opsiyonel).
     sure_dk: hedef sure (hikaye maks 60, digerleri maks 14). gecis_acik/zoom_acik: kullanicinin tercihi.
     profil_id: KANAL PROFILI — verilirse karakter/capa/kilitler profilden gelir ve tum
@@ -1654,7 +1655,9 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         except Exception as e:
             print(f"  capa uretilemedi, sahne-1 capasina dusuluyor: {str(e)[:120]}",
                   file=sys.stderr)
-    kumulatif_sn = 0.0   # hikaye modu: acilis bolumu (HIKAYE_ACILIS_SN) takibi icin toplam sure
+    kumulatif_sn = 0.0   # hikaye modu: acilis bolumu takibi icin toplam sure
+    # Hareketli acilis suresi: kullanici secimi (acilis_dk, 0=kapali) > varsayilan env
+    acilis_sn = float(acilis_dk) * 60 if acilis_dk is not None else HIKAYE_ACILIS_SN
 
     # ═══ SAHNE URETIMI — 3 FAZ (paralel) ═══
     # Eski hat sahneleri TEKER TEKER uretiyordu (gorsel + bekleme + TTS ust uste eklenirdi;
@@ -1802,7 +1805,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             "overlay": overlay,
             "altyazi": uretmod.altyazi_parcala(kelimeler, sure),
             # Hikaye kanali: acilis dakikalarindaki sahneler yogun hareket alir (Video.tsx "vurgu")
-            "vurgu": mod == "hikaye" and kumulatif_sn < HIKAYE_ACILIS_SN,
+            "vurgu": mod == "hikaye" and kumulatif_sn < acilis_sn,
         })
         kumulatif_sn += sure
 
