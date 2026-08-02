@@ -451,7 +451,7 @@ let seciliIsik = localStorage.getItem("bedosaho_isik") || "parlak-gunduz";
 let isikListe = [];
 let seciliSes = localStorage.getItem("bedosaho_ses") || "otomatik";
 let sesListe = [];
-let calan = null;
+let calan = null, calanBtn = null;
 let seciliArkaplan = localStorage.getItem("bedosaho_arkaplan") || "otomatik";
 let arkaplanListe = [];
 let seciliPalet = localStorage.getItem("bedosaho_palet") || "otomatik";
@@ -690,11 +690,13 @@ fetch("api/isik-duzeyleri").then(r=>r.json()).then(list=>{
 
 /* ── anlatici sesi ── */
 function sesCal(url, btn){
+  const ayniButon = (calanBtn === btn && calan);   // calan sesin butonuna tekrar basildi = DURDUR
   if(calan){ calan.pause(); calan = null; }
-  document.querySelectorAll("#sesler .oynat").forEach(x=>x.textContent="▶ dinle");
+  document.querySelectorAll("#sesler .oynat").forEach(x=>x.textContent = x.closest(".krow") ? "▶" : "▶ dinle");
+  if(ayniButon){ calanBtn = null; return; }
   const a = new Audio(url);
-  calan = a; btn.textContent = "⏸ durdur";
-  a.onended = ()=>{ btn.textContent="▶ dinle"; calan=null; };
+  calan = a; calanBtn = btn; btn.textContent = "⏸ durdur";
+  a.onended = ()=>{ btn.textContent = btn.closest(".krow") ? "▶" : "▶ dinle"; calan=null; calanBtn=null; };
   a.play().catch(()=>{ btn.textContent="çalınamadı"; });
 }
 function secSes(id){
@@ -746,8 +748,12 @@ function sesKartlariCiz(){
 /* Kutuphane filtreleri (Ai33 arayuzundeki gibi): dil, cinsiyet, yas, aksan, kategori */
 const DIL_ADI={en:"İngilizce",tr:"Türkçe",de:"Almanca",fr:"Fransızca",es:"İspanyolca",it:"İtalyanca",
   pt:"Portekizce",ru:"Rusça",ar:"Arapça",ja:"Japonca",ko:"Korece",zh:"Çince",nl:"Felemenkçe",
-  pl:"Lehçe",hi:"Hintçe",id:"Endonezce",uk:"Ukraynaca",vi:"Vietnamca",th:"Tayca",sv:"İsveççe"};
-const YAS_ADI={young:"Genç",middle_aged:"Orta yaş","middle-aged":"Orta yaş",old:"Yaşlı",elderly:"Yaşlı",child:"Çocuk"};
+  pl:"Lehçe",hi:"Hintçe",id:"Endonezce",uk:"Ukraynaca",vi:"Vietnamca",th:"Tayca",sv:"İsveççe",
+  yue:"Kantonca",cs:"Çekçe",da:"Danca",el:"Yunanca",fil:"Filipince",hu:"Macarca",ms:"Malayca",
+  ro:"Rumence",no:"Norveççe",fi:"Fince",bg:"Bulgarca",hr:"Hırvatça",sk:"Slovakça",he:"İbranice",
+  fa:"Farsça",ta:"Tamilce",ur:"Urduca"};
+const YAS_ADI={young:"Genç",middle_aged:"Orta yaş",middle_age:"Orta yaş",old:"Yaşlı",
+  elderly:"Yaşlı",child:"Çocuk",adult:"Yetişkin"};
 const CINS_ADI={female:"Kadın",male:"Erkek",neutral:"Nötr"};
 let sesFiltre={dil:"",cinsiyet:"",yas:"",aksan:"",kategori:""};
 function filtreUygula(liste){

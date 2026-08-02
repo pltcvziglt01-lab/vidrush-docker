@@ -286,22 +286,43 @@ def ses_kutuphane(saglayici: str = "elevenlabs"):
         veri = r.json().get("data", [])
     except Exception:
         raise HTTPException(502, "Ses kütüphanesi alınamadı")
+    # Saglayicilar dil degerini karisik gonderiyor: kimi ISO kod ("en"), kimi tam ad
+    # ("English", "Cantonese"). KIRPMADAN ISO koda normallestir (eski [:5] kirpmasi
+    # "engli"/"canto" gibi bozuk degerler uretiyordu).
+    DIL_KOD = {"english": "en", "chinese": "zh", "chinese (mandarin)": "zh", "mandarin": "zh",
+               "cantonese": "yue", "japanese": "ja", "korean": "ko", "french": "fr",
+               "german": "de", "spanish": "es", "portuguese": "pt", "russian": "ru",
+               "arabic": "ar", "turkish": "tr", "italian": "it", "dutch": "nl",
+               "polish": "pl", "hindi": "hi", "indonesian": "id", "vietnamese": "vi",
+               "thai": "th", "ukrainian": "uk", "swedish": "sv", "czech": "cs",
+               "danish": "da", "greek": "el", "filipino": "fil", "hungarian": "hu",
+               "malay": "ms", "romanian": "ro", "norwegian": "no", "finnish": "fi",
+               "bulgarian": "bg", "croatian": "hr", "slovak": "sk", "hebrew": "he",
+               "persian": "fa", "tamil": "ta", "urdu": "ur"}
+
+    def _dil_kod(x):
+        x = str(x or "").strip().lower()
+        return DIL_KOD.get(x, x)
+
     def _diller(v):
         """Sesin konustugu TUM diller (languages listesi dict/str karisik gelebiliyor)."""
         out = []
         for d in (v.get("languages") or []):
-            kod = d.get("language") if isinstance(d, dict) else d
+            kod = _dil_kod(d.get("language") if isinstance(d, dict) else d)
             if kod and kod not in out:
-                out.append(str(kod).lower()[:5])
-        ana = str(v.get("language", "")).lower()[:5]
+                out.append(kod)
+        ana = _dil_kod(v.get("language", ""))
         if ana and ana not in out:
             out.insert(0, ana)
         return out
 
+    def _yas(v):   # "Middle Age" / "middle-aged" / "middle_aged" -> tek bicim
+        return str(v.get("age", "")).strip().lower().replace("-", "_").replace(" ", "_")
+
     liste = [{"voice_id": v.get("voice_id"), "ad": v.get("name") or v.get("voice_id"),
               "ozet": (v.get("description") or "")[:220],
-              "cinsiyet": v.get("gender", ""), "yas": v.get("age", ""),
-              "dil": v.get("language", ""), "diller": _diller(v),
+              "cinsiyet": str(v.get("gender", "")).strip().lower(), "yas": _yas(v),
+              "dil": _dil_kod(v.get("language", "")), "diller": _diller(v),
               "aksan": v.get("accent", ""), "kategori": v.get("category", ""),
               "onizleme": v.get("preview_url", "")}
              for v in veri if v.get("voice_id")]
