@@ -393,10 +393,11 @@ HKANAL_SOZLESME = (
     "watchmaker with white hair and a worn leather apron'); in every later scene do NOT "
     "describe the character's appearance at all (the reference image carries it) — only "
     "pose/action/emotion and the environment, with a DIFFERENT camera angle and setting per "
-    "scene. ATMOSPHERE SHOTS: roughly 1 scene in 4 should be an establishing or atmosphere "
+    "scene. ATMOSPHERE SHOTS: AT MOST one scene in five may be an establishing or atmosphere "
     "shot WITHOUT the character (an empty street, a house exterior, a stormy sky, a meaningful "
     "object in close-up); for those write 'no character' inside the scene_prompt and describe "
-    "only the place/object/mood. Never invent additional recurring people; anonymous background "
+    "only the place/object/mood. The main character MUST appear in the large majority of "
+    "scenes — they are the star of the video. Never invent additional recurring people; anonymous background "
     "extras are allowed when the story requires a crowd. Describe ONE single continuous frame — "
     "never panels, grids or split frames. (For footage scenes this prompt is the fallback if no "
     "clip is found.)\n"
@@ -1762,15 +1763,18 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
     )
 
 
-def plan_uret(story: str, prof: dict, hedef_sahne=40, devam=False, onceki_ozet="") -> dict:
+def plan_uret(story: str, prof: dict, hedef_sahne=40, devam=False, onceki_ozet="",
+              bolum_yonergesi="") -> dict:
     # max_tokens sahne sayisina gore OLCEKLI. Sabit 16000, dusuk-kademe OpenAI hesabinda
     # TPM (dakikadaki token) limitini asip HER cagriyi 429'a sokuyordu — retry bile kurtarmaz.
     # ~250 token/sahne yeterli; tavan 12000, taban 2000.
     mt = int(min(12000, max(2000, hedef_sahne * 250 + 1200)))
+    sistem = plan_sistem(prof, hedef_sahne, devam, onceki_ozet)
+    if bolum_yonergesi:   # paralel planlamada her parcaya "SEN SU BOLUMU anlat" yonergesi
+        sistem += f"\nPART DIRECTIVE: {bolum_yonergesi}\n"
     body = {
         "model": "gpt-4.1-mini",
-        "messages": [{"role": "system",
-                      "content": plan_sistem(prof, hedef_sahne, devam, onceki_ozet)},
+        "messages": [{"role": "system", "content": sistem},
                      {"role": "user", "content": story}],
         "response_format": {"type": "json_object"},
         "temperature": 0.7,
@@ -1807,6 +1811,17 @@ def plan_uret(story: str, prof: dict, hedef_sahne=40, devam=False, onceki_ozet="
         scenes.append(s)
     if not scenes:
         raise RuntimeError("Sahne plani bos")
+    # KARAKTERSIZ ORAN SIGORTASI: planlayici atmosfer sahnesini abartabiliyor (testte %51
+    # gorulmustu; hedef ~%20). Tavan %30: fazlasi karakterli sahneye cevrilir — kahraman
+    # videonun yildizi kalir, tutarlilik capasi da daha cok sahnede calisir.
+    karsiz_idx = [ix for ix, sx in enumerate(scenes)
+                  if "no character" in str(sx.get("scene_prompt", "")).lower()]
+    tavan = int(len(scenes) * 0.3)
+    if len(karsiz_idx) > tavan:
+        for ix in karsiz_idx[tavan:]:
+            sp = str(scenes[ix].get("scene_prompt", ""))
+            sp = sp.replace("no character", "").replace("No character", "").replace("NO CHARACTER", "")
+            scenes[ix]["scene_prompt"] = "The recurring main character appears in this scene. " + sp.strip()
     plan["scenes"] = scenes[:60]   # tek cagri tavani (parca basina)
     return plan
 
@@ -1815,12 +1830,34 @@ def plan_uret(story: str, prof: dict, hedef_sahne=40, devam=False, onceki_ozet="
 MAKS_SAHNE = 620   # ~60 dk hikaye tavani (6 sn/sahne x 600 + pay). Maliyet siniri sure tavaninda.
 
 
-def uzun_plan(story: str, prof: dict, sure_dk: float) -> dict:
-    hedef_sahne = int(min(MAKS_SAHNE, max(1, (sure_dk * 60) / prof["sahne_sn"])))
-    if hedef_sahne <= 55:
-        return plan_uret(story, prof, hedef_sahne=hedef_sahne)
-    # cok sahne -> parca parca (her parca ~40 sahne), sureklilik icin ozet aktarilir
-    parca = 40
+def _iskelet_cikar(story: str, n_parca: int) -> list:
+    """Hikayeyi n_parca ARDISIK bolume ayiran kisa iskelet (TEK ucuz LLM cagrisi).
+    Paralel planlamanin temeli: her parca kendi bolum ozetini bilir, oncekini BEKLEMEZ."""
+    body = {
+        "model": "gpt-4.1-mini",
+        "messages": [{"role": "system", "content": (
+            f"Split the user's story/script into EXACTLY {n_parca} sequential PARTS of roughly "
+            "equal length for video production. For each part write a 2-3 sentence summary (in "
+            "the story's language) of the concrete events/points that part covers. Parts must "
+            "not overlap and together must cover the WHOLE story in order. Respond ONLY valid "
+            "JSON: {\"parts\":[{\"n\":1,\"summary\":\"...\"}]}")},
+                     {"role": "user", "content": story}],
+        "response_format": {"type": "json_object"},
+        "temperature": 0.4,
+        "max_tokens": min(4000, n_parca * 160 + 400),
+    }
+    j = oai_chat(body, timeout=120)
+    veri = json.loads(j["choices"][0]["message"]["content"])
+    parts = [str(p.get("summary", "")).strip() for p in veri.get("parts", [])]
+    parts = [p for p in parts if p]
+    if len(parts) != n_parca:
+        raise RuntimeError(f"iskelet {len(parts)}/{n_parca} bolum dondu")
+    return parts
+
+
+def _uzun_plan_sirali(story: str, prof: dict, hedef_sahne: int, parca=40) -> dict:
+    """ESKI guvenilir yol: parca parca SIRALI planla (her parca oncekinin ozetini bekler).
+    Paralel yolun iskeleti cikarilamazsa buraya dusulur."""
     toplam_plan = None
     ozet = ""
     scenes = []
@@ -1846,8 +1883,53 @@ def uzun_plan(story: str, prof: dict, sure_dk: float) -> dict:
     if not scenes:
         raise RuntimeError("Sahne plani bos")
     toplam_plan["scenes"] = scenes[:hedef_sahne]
-    # Hedeften belirgin az sahne uretildiyse (parca basarisiz oldu) sessizce kisa video
-    # verme — ust kata bildir.
+    if len(scenes) < hedef_sahne * 0.85:
+        toplam_plan["_eksik_oran"] = round(len(scenes) / hedef_sahne, 2)
+    return toplam_plan
+
+
+def uzun_plan(story: str, prof: dict, sure_dk: float) -> dict:
+    hedef_sahne = int(min(MAKS_SAHNE, max(1, (sure_dk * 60) / prof["sahne_sn"])))
+    if hedef_sahne <= 55:
+        return plan_uret(story, prof, hedef_sahne=hedef_sahne)
+    # ── PARALEL PLANLAMA ──
+    # Eskiden parcalar SIRALI yaziliyordu (her biri oncekinin ozetini bekler; 30 dk video
+    # ~8-10 dk plan). Simdi: 1 ucuz cagriyla hikaye ISKELETI (bolum ozetleri) cikar, sonra
+    # tum parcalari AYNI ANDA yazdir — sureklilik iskeletten gelir. ~3x hizli.
+    parca = 40
+    n_parca = -(-hedef_sahne // parca)   # ceil
+    try:
+        bolumler = _iskelet_cikar(story, n_parca)
+    except Exception as e:
+        print(f"  iskelet cikarilamadi ({str(e)[:120]}) -> sirali plana donuluyor", file=sys.stderr)
+        return _uzun_plan_sirali(story, prof, hedef_sahne, parca)
+    gorevler = []
+    for i in range(n_parca):
+        bu = min(parca, hedef_sahne - parca * i)
+        onceki = " ".join(bolumler[:i])[-700:]
+        yon = (f"This is part {i+1} of {n_parca} of one continuous video. "
+               + (f"Earlier parts already covered: \"{onceki}\" — do NOT repeat any of it. " if i else "")
+               + f"THIS PART must cover ONLY the following, in order: \"{bolumler[i]}\"")
+        gorevler.append((i, bu, yon))
+    sonuc = [None] * n_parca
+    with ThreadPoolExecutor(max_workers=min(4, n_parca)) as havuz:
+        isler_f = {havuz.submit(plan_uret, story, prof, bu, i > 0, "", yon): i
+                   for i, bu, yon in gorevler}
+        for f in as_completed(isler_f):
+            i = isler_f[f]
+            try:
+                sonuc[i] = f.result()
+            except Exception as e:
+                # Tek parca coktuyse o bolum atlanir; _eksik_oran ust kata bildirir
+                print(f"  plan parca {i+1} hata: {str(e)[:140]}", file=sys.stderr)
+    if not any(sonuc):
+        raise RuntimeError("Sahne plani bos")
+    toplam_plan = next(p for p in sonuc if p)   # ilk basarili parca voice/thumbnail'i tasir
+    scenes = []
+    for p in sonuc:
+        if p:
+            scenes.extend(p.get("scenes", []))
+    toplam_plan["scenes"] = scenes[:hedef_sahne]
     if len(scenes) < hedef_sahne * 0.85:
         toplam_plan["_eksik_oran"] = round(len(scenes) / hedef_sahne, 2)
     return toplam_plan
@@ -2298,66 +2380,71 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         time.sleep(gorsel_bekle)
         return ("image", f"isler/{is_adi}/sahne_{n}.png")
 
-    # ── FAZ A: CAPA (yalniz animasyon/hikaye ve profil capasi yoksa) ──
-    # Ilk basarili sahne sonraki TUM sahnelere referans olacagi icin sirali uretilmek zorunda.
-    basla = 0
-    if mod in ("animasyon", "hikaye") and not capa_yol:
-        while basla < len(islenecek) and not bakiye_bitti:
-            i, n, s, _, _ = islenecek[basla]
-            bildir(f"Sahne {n}/{toplam}: çapa görseli üretiliyor...", 8)
-            r = _sahne_medya(n, s)
-            basla += 1
-            if r:
-                sonuc_medya[n] = r
-                gyol_full = os.path.join(PUBLIC, "isler", is_adi, f"sahne_{n}.png")
-                capa_yol = os.path.join(is_dizini, "_capa.png")   # Magnific ONCESI kucuk kopya
-                try:
-                    shutil.copy(gyol_full, capa_yol)
-                except Exception:
-                    capa_yol = gyol_full
-                # PROFIL VAR ama henuz kilitli degil -> ilk sahneyi kanalin KALICI capasi yap.
-                if kanal and not capa_profilden:
-                    if profil_capa_kilitle(profil_id, capa_yol):
-                        capa_profilden = True
-                        print(f"  profil '{profil_id}' capasi KILITLENDI", file=sys.stderr)
-                break
-            print(f"sahne {n} atlandi (capa denemesi)", file=sys.stderr)
-            if basla >= 6:   # 6 denemede capa cikmadiysa sistemsel sorun var, para yakma
-                uretim_durdu = True
-                print("  capa uretilemedi -> uretim durduruldu", file=sys.stderr)
-
-    # ── FAZ B: KALAN GORSELLER PARALEL ──
-    kalan = islenecek[basla:]
-    if kalan and not bakiye_bitti and not uretim_durdu:
-        bildir(f"Görseller üretiliyor ({paralel} paralel)...", 9)
-        basarisiz = 0
-        with ThreadPoolExecutor(max_workers=paralel) as havuz:
-            gelecek = {havuz.submit(_sahne_medya, n, s): n for i, n, s, _, _ in kalan}
-            for g in as_completed(gelecek):
-                n = gelecek[g]
-                try:
-                    r = g.result()
-                except Exception as e:   # beklenmedik istisna tek sahneyi yaksin, isi degil
-                    r = None
-                    print(f"  sahne {n} gorsel istisna: {str(e)[:140]}", file=sys.stderr)
+    # ── FAZ A+B tek fonksiyonda: thread'de kosar, SESLENDIRME ile AYNI ANDA ──
+    def _gorsel_fazi():
+        nonlocal capa_yol, capa_profilden, bakiye_bitti, uretim_durdu
+        # FAZ A: CAPA (yalniz animasyon/hikaye ve profil capasi yoksa).
+        # Ilk basarili sahne sonraki TUM sahnelere referans olacagi icin sirali uretilmek zorunda.
+        basla = 0
+        if mod in ("animasyon", "hikaye") and not capa_yol:
+            while basla < len(islenecek) and not bakiye_bitti:
+                i, n, s, _, _ = islenecek[basla]
+                bildir(f"Sahne {n}/{toplam}: çapa görseli üretiliyor...", 8)
+                r = _sahne_medya(n, s)
+                basla += 1
                 if r:
                     sonuc_medya[n] = r
-                else:
-                    basarisiz += 1
-                    print(f"sahne {n} atlandi", file=sys.stderr)
-                    # Cok basarisizlik + neredeyse hic basari yok: sistem bozuk, kalanini durdur
-                    if basarisiz >= 8 and len(sonuc_medya) < 3:
-                        uretim_durdu = True
-                with sayac_kilit:
-                    tamamlanan[0] += 1
-                    yuzde = 8 + int(50 * tamamlanan[0] / max(1, len(islenecek)))
-                bildir(f"Görsel {tamamlanan[0]}/{len(islenecek)} hazır", yuzde)
-    if bakiye_bitti:
-        print(f"  BAKIYE bitti — {len(sonuc_medya)} uretilmis sahneyle devam", file=sys.stderr)
+                    gyol_full = os.path.join(PUBLIC, "isler", is_adi, f"sahne_{n}.png")
+                    capa_yol = os.path.join(is_dizini, "_capa.png")   # Magnific ONCESI kucuk kopya
+                    try:
+                        shutil.copy(gyol_full, capa_yol)
+                    except Exception:
+                        capa_yol = gyol_full
+                    # PROFIL VAR ama henuz kilitli degil -> ilk sahneyi kanalin KALICI capasi yap.
+                    if kanal and not capa_profilden:
+                        if profil_capa_kilitle(profil_id, capa_yol):
+                            capa_profilden = True
+                            print(f"  profil '{profil_id}' capasi KILITLENDI", file=sys.stderr)
+                    break
+                print(f"sahne {n} atlandi (capa denemesi)", file=sys.stderr)
+                if basla >= 6:   # 6 denemede capa cikmadiysa sistemsel sorun var, para yakma
+                    uretim_durdu = True
+                    print("  capa uretilemedi -> uretim durduruldu", file=sys.stderr)
 
-    # ── FAZ C: SESLENDIRME PARALEL (TTS_PARALEL isci) + MONTAJ SIRALI ──
-    bildir("Seslendirme üretiliyor...", 60)
-    tts_sem = asyncio.Semaphore(max(1, int(os.environ.get("TTS_PARALEL", "3"))))
+        # FAZ B: KALAN GORSELLER PARALEL
+        kalan = islenecek[basla:]
+        if kalan and not bakiye_bitti and not uretim_durdu:
+            bildir(f"Görseller üretiliyor ({paralel} paralel)...", 9)
+            basarisiz = 0
+            with ThreadPoolExecutor(max_workers=paralel) as havuz:
+                gelecek = {havuz.submit(_sahne_medya, n, s): n for i, n, s, _, _ in kalan}
+                for g in as_completed(gelecek):
+                    n = gelecek[g]
+                    try:
+                        r = g.result()
+                    except Exception as e:   # beklenmedik istisna tek sahneyi yaksin, isi degil
+                        r = None
+                        print(f"  sahne {n} gorsel istisna: {str(e)[:140]}", file=sys.stderr)
+                    if r:
+                        sonuc_medya[n] = r
+                    else:
+                        basarisiz += 1
+                        print(f"sahne {n} atlandi", file=sys.stderr)
+                        # Cok basarisizlik + neredeyse hic basari yok: sistem bozuk, durdur
+                        if basarisiz >= 8 and len(sonuc_medya) < 3:
+                            uretim_durdu = True
+                    with sayac_kilit:
+                        tamamlanan[0] += 1
+                        yuzde = 8 + int(50 * tamamlanan[0] / max(1, len(islenecek)))
+                    bildir(f"Görsel {tamamlanan[0]}/{len(islenecek)} hazır", yuzde)
+        if bakiye_bitti:
+            print(f"  BAKIYE bitti — {len(sonuc_medya)} uretilmis sahneyle devam", file=sys.stderr)
+
+    # ── GORSELLER (thread) + SESLENDIRME (asyncio) AYNI ANDA ──
+    # TTS gorsele bagimli DEGIL (sadece metne bakar) ama eskiden gorseller bitince basliyordu
+    # (30 dk videoda ~4 dk bosa bekleme). Simdi iki faz ust uste kosar; TTS tum sahneler icin
+    # uretilir (gorseli cikmayanin sesi bosa gider — edge-tts bedava, kayip yok).
+    tts_sem = asyncio.Semaphore(max(1, int(os.environ.get("TTS_PARALEL", "5"))))
 
     async def _tts(n, metin):
         async with tts_sem:
@@ -2366,10 +2453,13 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                                                   ayar=ses_ayar)
             return n, syol, kelimeler, sure
 
-    tts_sonuc = {}
+    gorsel_gorevi = asyncio.create_task(asyncio.to_thread(_gorsel_fazi))
     tts_cikti = await asyncio.gather(
-        *[_tts(n, metin) for i, n, s, metin, _ in islenecek if n in sonuc_medya],
+        *[_tts(n, metin) for i, n, s, metin, _ in islenecek],
         return_exceptions=True)
+    await gorsel_gorevi
+
+    tts_sonuc = {}
     for t in tts_cikti:
         if isinstance(t, BaseException):
             print(f"  tts istisna: {str(t)[:120]}", file=sys.stderr)

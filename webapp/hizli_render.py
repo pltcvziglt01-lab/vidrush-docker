@@ -224,7 +224,8 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
     fps = int(props.get("fps", 24))
     gecis = str(props.get("gecis", "sinematik"))
     crf = os.environ.get("RENDER_CRF", "18")
-    paralel = max(1, int(os.environ.get("FFMPEG_PARALEL", "5")))
+    # 10 cekirdekli sunucuda 8 isci: segment render CPU-agir, 2 cekirdek sisteme kalir
+    paralel = max(1, int(os.environ.get("FFMPEG_PARALEL", "8")))
 
     tmp = tempfile.mkdtemp(prefix=f"hr_{is_adi}_", dir="/tmp")
     try:
