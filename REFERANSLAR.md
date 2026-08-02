@@ -76,6 +76,108 @@ edilmiyor, kesin HEX olarak** prompta giriyor (`palet_olc` dersinin genele yayı
 ⚠️ Palet **dünyayı** yönetir; karakterin kilitli renkleri her zaman önceliklidir — yoksa
 3. referanstaki beyaz↔turuncu salınımı geri gelir.
 
+## 7-10. Toplu kare analizi — 4 kanal, 567 kare (1 Ağu 2026)
+
+20 video yt-dlp ile indirildi, **sahne-değişim tespitiyle** kare çıkarıldı (sabit aralık değil —
+her kare farklı bir kompozisyon). Ham kareler + tam bulgular:
+`~/Desktop/stickman-referans/` · `BULGULAR.md`
+
+| # | Kanal | Abone | Kare |
+|---|---|---|---|
+| 7 | The Paint Explainer | 1.96M | 140 |
+| 8 | Serious History | 808K | 140 |
+| 9 | Aussie Money With Bruce | 2K | 140 |
+| 10 | The Simple Explainer | 88 | 140 |
+
+### 🔑 En değerli bulgu: VERİ KARTI
+Bruce'un 28 karesinin ~24'ünde tutulan tabela / laptop ekranı / fiyat etiketi var ve üstünde
+**anlatılan cümlenin tam sayısı** yazılı (`SERVICE $3,000 A YEAR`, `50% UNUSED SUBS`,
+`7.5% vs 13%+`). Karakter hiçbir zaman "sadece anlatmıyor" — sayıyı **gösteriyor**.
+
+**Kod karşılığı:** `VERI_KARTI_PLAN` (planlayıcı: somut sayı içeren her cümlede o sayıyı
+taşıyan fiziksel bir yüzey adı ver) + `VERI_KARTI_GORSEL` (görsel: yüzeyi büyük ve okunur çiz,
+karakterin **karşı tarafına** koy → iki sütun kompozisyon).
+⚠️ "Sayı yoksa uydurma" kuralı açıkça yazıldı — yoksa model her kareye sahte rakam basar.
+
+### İki bağımsız kanalda doğrulanan: MEKÂN SÜREKLİLİĞİ
+Paint Explainer bir bölüm boyunca aynı geniş arka planı, Simple Explainer poligraf masasını
+8+ karede yeniden kullanıyor. Tesadüf değil, kural.
+**Kod karşılığı:** `MEKAN_SUREKLILIGI` — sahneler 2-4'lük aynı-mekân öbeklerine gruplanır,
+sadece açı ve aksiyon değişir.
+
+### İki ZIT doğru: arka plan yoğunluğu
+- Paint Explainer (1.96M): karelerin çoğu **bomboş beyaz zeminde tek öğe**
+- Bruce + Serious History: **tıka basa dolu** mekânlar
+
+İkisi de çalışıyor → "her yer dolsun" **evrensel kural değil, kanal kararı.**
+**Kod karşılığı:** `ARKA_PLANLAR` (9 seçenek, sade/orta/zengin). `sade` seçilirse stilin
+yoğunluk dayatmasını açıkça **EZER** — palet öncelik kuralının aynı deseni.
+
+### Yeni çekim tipleri (2+ kanalda doğrulandı)
+`N SCREEN READOUT` (ekran/veri arayüzü: EKG çizgisi + `HR: 185 bpm`, çubuk grafik) ·
+`O OVERHEAD FLATLAY` (masaya tepeden bakan kare: eller, belgeler, kahve)
+
+### Marka güvenliği
+Bruce gerçek logolar kullanıyor (Netflix, Disney+, Stan). **Biz kullanmayacağız.**
+**Kod karşılığı:** `MARKA_YASAK` — jenerik karşılık üretilir.
+
+### Kaydedilen ama HENÜZ uygulanmayanlar
+- **Kalıcı bölüm bandı** (Paint Explainer: `PRECAMBRIAN` → `CAMBRIAN` üst şeridi).
+  Serious History'de YOK → evrensel değil, stil başına seçenek olmalı.
+- **Konuşma balonu** ve **düşünce balonu içinde mini sahne** (Simple Explainer)
+- **Zaman kartı** (`Three weeks later`)
+- **Gerçek arşiv fotoğrafı** — Pexels/Pixabay anahtarı gelince yapılabilir
+
+### ⚠️ Dürüst sınır
+Serious History **gerçek kare-kare animasyon** yapıyor (hareket bulanıklığı, ara kareler).
+Durağan görselle taklit edilemez. Oradan alınan ders animasyon değil, TASARIM
+(ayrıntılı kafa + sade gövde, boş nefes karesi, vuruş başına renk sıçraması).
+
+## 11. ThriftyHazel (6.4K abone, 2 aylık) — 10 video, 216 kare
+
+`@thriftyhazel` · 24 video · 379K izlenme · **2 Haz 2026'da açılmış**. Tasarruf/frugal yaşam,
+ABD yaşlı kitlesi. Formül: **"N Şey" + yaş işareti ("at 52") + birinci tekil + büyükanne nostaljisi.**
+
+### Diğer 10 referanstan TEMEL farkı: karakter çöp adam DEĞİL
+Gerçekçi-karikatür bir insan — 50'li yaşlarda kadın, yuvarlak gözlük, adaçayı hırka.
+Sıcak hikâye kitabı illüstrasyonu: ince mürekkep çizgi + kuru boya + suluboya yıkama.
+
+### Bulgular
+
+**A. İKİ REGISTER, DÖNÜŞÜMLÜ**
+- **Sunucu karesi**: anlatıcı bomboş soluk zeminde, mekân YOK, kameraya konuşuyor
+- **Dünya karesi**: tıka basa döşenmiş oda — duvar kâğıdı, çiçekli perde, saksı, duvar saati
+İkisi asla karışmıyor. Bizim tek-modlu çerçevemizden farklı.
+
+**B. GERİ SAYIM ROZETİ**
+Köşede kocaman `11` `10` `9` `8` `7`. Liste videolarının omurgası, 10 videoda da var.
+
+**C. BÖLÜM KARTI**
+Koyu kahve zeminde süslü çerçeve + zarif serif başlık: `THE RULES IN YOUR HEAD`,
+`THE RULES FOR YOUR WALLET`. Paint Explainer'ın üst bandının tam ekran versiyonu.
+
+**D. GEÇMİŞ/BUGÜN RENK KODLAMASI**
+Geçmiş sahneler **soluk sepya-kahve**, bugün sahneleri **tam sıcak renk**.
+İzleyici hangi döneme baktığını renkten anlıyor. Çok ucuz, çok etkili.
+
+**E. BİRİNCİ TEKİL ELLER (POV)**
+Anlatıcının kendi elleri karenin yakın kenarından giriyor — teneke açıyor, fatura yazıyor.
+`J HANDS ONLY`den farklı: bu "benim gözümden".
+
+**F. ✅ MARKA YASAĞIMIZI DOĞRULUYOR**
+Klarna/Afterpay yerine **uydurma** `FLEXIPAY: MANAGE YOUR PLANS` markası çizilmiş.
+Bir gün önce eklediğim `MARKA_YASAK` kuralının bağımsız doğrulaması.
+
+**G. ✅ VERİ KARTINI DOĞRULUYOR**
+El yazısı defter: `Oct 1956 $5.00 / Nov 1956 $10.00 / Dec 1956 $20.00` — modern telefonun yanında.
+Eski-yeni karşılaştırması TEK karede.
+
+**Kod karşılığı:** yeni 5. stil `ani-defteri` (`ANI_STIL/CERCEVE/SOZLESME`) + `ani-defteri` paleti
+(#F5EDDC krem, #8FA68E adaçayı, #A9743F meşe, #E8B65A lamba, #C98B7E gül kurusu, #4A3728 kahve)
++ `COUNTDOWN BADGE` ve `CHAPTER CARD` cihazları (ikisi de **koşullu** — liste değilse rakam yok).
+
+---
+
 ---
 
 ## Sistemin kendi kendine öğrendiği kurallar (referanslardan bağımsız)

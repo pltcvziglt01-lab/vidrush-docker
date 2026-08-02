@@ -173,7 +173,7 @@
           </label>
           <label class="drop" id="dropStil">
             <input type="file" id="fStil" accept="image/*">
-            <div id="stilView"><div class="lbl">🎨 Stil görseli</div><div class="hint">opsiyonel · tüm videonun görsel stilini bu görsel belirler</div></div>
+            <div id="stilView"><div class="lbl">🎨 Stil görseli</div><div class="hint">opsiyonel · yüklersen <b>çok aşamalı analiz</b> edilir (renk ölçümü + 2 bağımsız okuma + uzlaşı) ve <b>seçtiğin stilin görünümünün yerine geçer</b> — kompozisyon kuralları aynı kalır</div></div>
           </label>
         </div>
         <div class="durum" style="margin-top:10px;font-size:11px">Görseller <b>kaydedilmez</b> — gizlilik için her video sonrası silinir, her seferinde yeniden yükle.</div>
@@ -228,6 +228,38 @@
             </select>
           </div>
           <div class="durum" style="margin-top:10px;font-size:11px">📖 Hazır hikaye metnini yapıştır. Seçtiğin açılış süresi boyunca <b>yoğun hareket</b> (derin zoom + kayma — izleyiciyi tutmak için), sonrası sakin sinematik kareler.<br>🧍 <b>Karakter</b>: yukarıya görsel yüklersen her sahnede birebir o; <b>yüklemesen de</b> karakter baştan sona otomatik aynı tutulur.<br>🎨 <b>Görsel tarzı</b>: yukarıdaki "Stil görseli" alanına örnek bir fotoğraf yüklersen bütün sahneler <b>o fotoğrafın tarzında</b> üretilir (yüklemezsen sinematik film karesi stili).</div>
+        </div>
+
+        <!-- ══ IŞIK DÜZEYİ ══ -->
+        <div style="margin-top:22px;border-top:1px solid var(--line);padding-top:18px">
+          <div class="lbl2">💡 Işık düzeyi <span style="font-weight:400;color:var(--dim2)">— karelerin aydınlığı</span></div>
+          <div class="estiller" id="isiklar"><span class="durum">Yükleniyor...</span></div>
+          <div class="durum" style="margin-top:10px;font-size:11px">
+            Ölçüm: hedef kanalların ortalama parlaklığı <b>162/255</b>, bizim eski çıktımız <b>114</b> —
+            %30 daha karanlıktı. <b>Parlak Gündüz</b> artık varsayılan ve stilin/arka planın
+            karanlık eğilimini <b>ezer</b>.
+          </div>
+        </div>
+
+        <!-- ══ ANLATICI SESİ ══ -->
+        <div style="margin-top:22px;border-top:1px solid var(--line);padding-top:18px">
+          <div class="lbl2">🎙️ Anlatıcı sesi <span style="font-weight:400;color:var(--dim2)">— dinleyip seç</span></div>
+          <div class="estiller" id="sesler"><span class="durum">Yükleniyor...</span></div>
+          <div class="durum" style="margin-top:10px;font-size:11px">
+            <b>Ücretsiz</b> sesler edge-tts — yaş tarif edilemez, sadece ton farkı.
+            <b>Yaşlı/olgun</b> sesler OpenAI motoru kullanır: sesin yaşı ve tınısı tarif edilebilir,
+            video başına ~$0.03. Kanal profiline kaydedilir.
+          </div>
+        </div>
+
+        <!-- ══ ARKA PLAN: mekân dünyası + yoğunluk ══ -->
+        <div style="margin-top:22px;border-top:1px solid var(--line);padding-top:18px">
+          <div class="lbl2">🏠 Arka plan <span style="font-weight:400;color:var(--dim2)">— sahnelerin geçtiği mekân dünyası</span></div>
+          <div class="estiller" id="arkaplanlar"><span class="durum">Yükleniyor...</span></div>
+          <div class="durum" style="margin-top:10px;font-size:11px">
+            <b>Sade</b> seçersen "her yer dolu olsun" kuralı susturulur (Paint Explainer düzeni).
+            <b>Zengin</b> seçersen detaylı, yaşanmış mekânlar kurulur. Kanal profiline kaydedilir.
+          </div>
         </div>
 
         <!-- ══ RENK PALETİ: kanal genelinde sabit renk kimliği ══ -->
@@ -404,6 +436,13 @@ let sureDk=2, gecisAcik=true, zoomAcik=true;
    okuyor — tanim daha asagida kalirsa TDZ ReferenceError ile TUM script olur (hicbir sey secilemez) */
 let animStil=null, animListe=[];
 /* renk paleti — pfOzetGuncelle bunlari da okuyor, TDZ olmasin diye BURADA */
+let seciliIsik = localStorage.getItem("bedosaho_isik") || "parlak-gunduz";
+let isikListe = [];
+let seciliSes = localStorage.getItem("bedosaho_ses") || "otomatik";
+let sesListe = [];
+let calan = null;
+let seciliArkaplan = localStorage.getItem("bedosaho_arkaplan") || "otomatik";
+let arkaplanListe = [];
 let seciliPalet = localStorage.getItem("bedosaho_palet") || "otomatik";
 let paletListe = [];
 let ozelHex = (localStorage.getItem("bedosaho_palet_ozel") || "#F0E4CC,#7B8B5A,#B5651D,#7A97B8")
@@ -536,6 +575,20 @@ function profilleriYukle(){
         <b>${p.ad}</b><p>${p.tur==="animasyon"?"Animasyon":"Documentary"} · ${p.edit||""}</p>
         <div class="meta">${p.kilitli?"stil kilitli":"ilk video kilitleyecek"}${p.karakter_var?" · karakter var":""}</div>`;
       d.onclick=()=>secProfil(p.id);
+      /* Profil ne DAYATIYOR, kart uzerinde acikca yaz. Onceden gizliydi: kullanici
+         "Ani Defteri" seciyor, profildeki "hikaye-whatif" sessizce eziyordu. */
+      const zorla=[];
+      if(p.edit) zorla.push("stil: "+p.edit);
+      if(p.kilitli) zorla.push("karakter KİLİTLİ");
+      if(p.palet) zorla.push("palet: "+p.palet);
+      if(p.ses) zorla.push("ses: "+p.ses);
+      if(zorla.length){
+        const u=document.createElement("div");
+        u.style.cssText="margin-top:8px;font-size:10px;color:var(--dim2);line-height:1.5";
+        u.innerHTML="kayıtlı → "+zorla.join(" · ")+
+          '<br><span style="color:var(--ok)">bu videoda değiştirirsen SENİN seçimin geçerli</span>';
+        d.appendChild(u);
+      }
       c.appendChild(d);
     });
     if(seciliProfil && !list.some(p=>p.id===seciliProfil)) secProfil("");
@@ -554,6 +607,9 @@ function pfOzetGuncelle(){
     sat(!!karFile, `<b>Ana karakter görseli:</b> ${karFile?karFile.name:"yüklenmedi (sistem kendi karakterini üretir)"}`),
     sat(!!stilFile, `<b>Genel görsel stil:</b> ${stilFile?stilFile.name:"yüklenmedi (stilin ilk videoda kilitlenir)"}`),
     sat(altyaziAcik, `<b>Altyazı:</b> ${altyaziAcik?((altSablonlar[altSablon]||{}).ad||altSablon)+" (özelleştirilmiş)":"kapalı"}`),
+    sat(true, `<b>Işık düzeyi:</b> ${((isikListe.find(x=>x.id===seciliIsik)||{}).ad||seciliIsik)}`),
+    sat(seciliSes!=="otomatik", `<b>Anlatıcı sesi:</b> ${seciliSes==="otomatik"?"otomatik (dile göre, ücretsiz)":((sesListe.find(x=>x.id===seciliSes)||{}).ad||seciliSes)}`),
+    sat(seciliArkaplan!=="otomatik", `<b>Arka plan:</b> ${seciliArkaplan==="otomatik"?"otomatik (stilin kendi mekân kuralı)":((arkaplanListe.find(x=>x.id===seciliArkaplan)||{}).ad||seciliArkaplan)}`),
     sat(seciliPalet!=="otomatik", `<b>Renk paleti:</b> ${seciliPalet==="otomatik"?"otomatik (stilin kendi renkleri)":(seciliPalet==="ozel"?("Özel — "+ozelHex.join(" ")):((paletListe.find(x=>x.id===seciliPalet)||{}).ad||seciliPalet))}`),
   ].map(s=>`<div>${s}</div>`).join("");
 }
@@ -574,6 +630,9 @@ $("#btnProfil").onclick=async()=>{
   fd.append("edit", videoTur==="animasyon" ? (animStil||"") : (editStil||""));
   fd.append("altyazi_sablon", altyaziAcik ? JSON.stringify(ay) : "");
   fd.append("palet", seciliPalet||""); fd.append("palet_ozel", ozelHex.join(","));
+  fd.append("arkaplan", seciliArkaplan||"");
+  fd.append("ses", seciliSes||"");
+  fd.append("isik", seciliIsik||"");
   if(karFile) fd.append("karakter",karFile);
   if(stilFile) fd.append("stil",stilFile);
   $("#btnProfil").disabled=true;
@@ -584,6 +643,93 @@ $("#btnProfil").onclick=async()=>{
   }catch(e){ hata("Profil oluşturulamadı"); }
   $("#btnProfil").disabled=false;
 };
+
+/* Onizleme buyutec: karti secmeden gorseli tam boy incele */
+function buyut(src, ad){
+  const o=document.createElement("div");
+  o.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9999;display:flex;"+
+    "align-items:center;justify-content:center;flex-direction:column;gap:14px;cursor:zoom-out;padding:24px";
+  o.innerHTML=`<img src="${src}" alt="${ad}" style="max-width:94vw;max-height:82vh;border-radius:14px;
+      box-shadow:0 20px 60px rgba(0,0,0,.6)">
+    <div style="color:#fff;font-size:14px;font-weight:600">${ad}
+      <span style="color:#9aa;font-weight:400"> — kapatmak için tıkla</span></div>`;
+  o.onclick=()=>o.remove();
+  document.addEventListener("keydown",function esc(e){
+    if(e.key==="Escape"){o.remove();document.removeEventListener("keydown",esc);}});
+  document.body.appendChild(o);
+}
+
+/* ── isik duzeyi ── */
+function secIsik(id){
+  seciliIsik=id; localStorage.setItem("bedosaho_isik",id);
+  $$("#isiklar .estil").forEach(x=>x.classList.toggle("on",(x.dataset.id||"")===id));
+}
+fetch("api/isik-duzeyleri").then(r=>r.json()).then(list=>{
+  isikListe=list; const c=$("#isiklar"); if(!c) return; c.innerHTML="";
+  list.forEach(v=>{
+    const d=document.createElement("div");
+    d.className="estil"+(seciliIsik===v.id?" on":""); d.dataset.id=v.id;
+    d.innerHTML=`<span class="pick"></span><b>${v.ad}</b>
+      <span class="durum" style="font-size:11px;display:block;margin-top:5px">${v.ozet||""}</span>`;
+    d.onclick=()=>secIsik(v.id);
+    c.appendChild(d);
+  });
+}).catch(()=>{$("#isiklar").innerHTML='<span class="durum">ışık düzeyleri yüklenemedi</span>';});
+
+/* ── anlatici sesi ── */
+function sesCal(url, btn){
+  if(calan){ calan.pause(); calan = null; }
+  document.querySelectorAll("#sesler .oynat").forEach(x=>x.textContent="▶ dinle");
+  const a = new Audio(url);
+  calan = a; btn.textContent = "⏸ durdur";
+  a.onended = ()=>{ btn.textContent="▶ dinle"; calan=null; };
+  a.play().catch(()=>{ btn.textContent="çalınamadı"; });
+}
+function secSes(id){
+  seciliSes=id; localStorage.setItem("bedosaho_ses",id);
+  $$("#sesler .estil").forEach(x=>x.classList.toggle("on",(x.dataset.id||"")===id));
+}
+fetch("api/sesler").then(r=>r.json()).then(list=>{
+  sesListe=list; const c=$("#sesler"); if(!c) return; c.innerHTML="";
+  list.forEach(v=>{
+    const d=document.createElement("div");
+    d.className="estil"+(seciliSes===v.id?" on":""); d.dataset.id=v.id;
+    const rozet = v.motor==="openai"
+      ? `<span style="font-size:10px;color:var(--warn)">${v.ucret}</span>`
+      : `<span style="font-size:10px;color:var(--ok)">ücretsiz</span>`;
+    d.innerHTML=`<span class="pick"></span><b>${v.ad}</b>
+      <p>${v.ozet||""}</p>
+      <div class="meta" style="display:flex;align-items:center;gap:10px;margin-top:9px">
+        ${rozet}
+        ${v.ornek?`<button class="oynat" style="background:#0e1117;border:1px solid var(--line);
+           color:var(--txt);border-radius:8px;padding:4px 10px;font:inherit;font-size:11px;
+           cursor:pointer">▶ dinle</button>`:""}
+      </div>`;
+    const b2=d.querySelector(".oynat");
+    if(b2) b2.onclick=(e)=>{ e.stopPropagation(); sesCal(v.ornek, b2); };
+    d.onclick=()=>secSes(v.id);
+    c.appendChild(d);
+  });
+}).catch(()=>{$("#sesler").innerHTML='<span class="durum">sesler yüklenemedi</span>';});
+
+/* ── arka plan ── */
+const AP_ROZET={sade:"◻️ sade", orta:"◧ orta", zengin:"▦ zengin"};
+function secArkaplan(id){
+  seciliArkaplan=id; localStorage.setItem("bedosaho_arkaplan",id);
+  $$("#arkaplanlar .estil").forEach(x=>x.classList.toggle("on",(x.dataset.id||"")===id));
+}
+fetch("api/arkaplanlar").then(r=>r.json()).then(list=>{
+  arkaplanListe=list; const c=$("#arkaplanlar"); if(!c) return; c.innerHTML="";
+  list.forEach(a=>{
+    const d=document.createElement("div");
+    d.className="estil"+(seciliArkaplan===a.id?" on":""); d.dataset.id=a.id;
+    d.innerHTML=`<span class="pick"></span><b>${a.ad}</b>
+      <span class="durum" style="font-size:11px;display:block;margin-top:5px">${a.ozet||""}</span>
+      <span style="font-size:10px;color:var(--dim2)">${AP_ROZET[a.yogunluk]||""}</span>`;
+    d.onclick=()=>secArkaplan(a.id);
+    c.appendChild(d);
+  });
+}).catch(()=>{$("#arkaplanlar").innerHTML='<span class="durum">arka planlar yüklenemedi</span>';});
 
 /* ── renk paleti ── */
 function paletSeritHtml(renkler){
@@ -671,7 +817,17 @@ function animYukle(){
     list.forEach((s,i)=>{
       const d=document.createElement("div");
       d.className="estil"+(i===0?" on":""); d.dataset.id=s.id;
-      d.innerHTML=`<span class="pick"></span><span class="en">${ANIM_EMOJI[s.id]||"🎨"}</span>
+      /* Onizleme gorseli: stil YAZIYLA secilemez — TUM stiller AYNI sahneyi cizer,
+         yani karttaki fark sadece stilden gelir. Gorsel yoksa kart eskisi gibi calisir. */
+      const gor = s.onizleme
+        ? `<img src="${s.onizleme}" alt="${s.ad} örnek kare" decoding="async"
+             onclick="event.stopPropagation();buyut('${s.onizleme}','${s.ad}')"
+             style="width:100%;aspect-ratio:3/2;object-fit:cover;border-radius:10px;
+                    margin-bottom:10px;border:1px solid var(--line);display:block;cursor:zoom-in">`
+        : `<div style="width:100%;aspect-ratio:3/2;border-radius:10px;margin-bottom:10px;
+             border:1px dashed var(--line);display:flex;align-items:center;justify-content:center;
+             color:var(--dim2);font-size:11px">örnek görsel yok</div>`;
+      d.innerHTML=`<span class="pick"></span>${gor}<span class="en">${ANIM_EMOJI[s.id]||"🎨"}</span>
         <b>${s.ad}</b><p>${s.ozet}</p>
         <div class="meta">~${s.sahne_sn}sn/sahne</div>`;
       d.onclick=()=>{animStil=s.id; $$("#animStiller .estil").forEach(x=>x.classList.toggle("on",x.dataset.id===s.id));};
@@ -748,6 +904,9 @@ $("#btnUret").onclick=async()=>{
   if(seciliPalet && seciliPalet!=="otomatik"){
     fd.append("palet", seciliPalet); fd.append("palet_ozel", ozelHex.join(","));
   }
+  if(seciliArkaplan && seciliArkaplan!=="otomatik") fd.append("arkaplan", seciliArkaplan);
+  if(seciliSes && seciliSes!=="otomatik") fd.append("ses", seciliSes);
+  if(seciliIsik) fd.append("isik", seciliIsik);
   if(karFile) fd.append("karakter",karFile);
   if(stilFile) fd.append("stil",stilFile);
   let job;

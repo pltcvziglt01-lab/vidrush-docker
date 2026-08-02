@@ -43,10 +43,34 @@ for c in python3 python py; do
 done
 [ -n "$PYBIN" ] || { echo "HATA: calisan python bulunamadi"; exit 3; }
 KOKPY="$(cygpath -m "$KOK" 2>/dev/null || echo "$KOK")"
-PYTHONUTF8=1 "$PYBIN" -c "import ast,glob,sys
-yollar = glob.glob('$KOKPY/webapp/*.py')+['$KOKPY/app/uret.py']
-[ast.parse(open(f, encoding='utf-8').read()) for f in yollar]
-print('  ✓ syntax OK (%d dosya)' % len(yollar))" || { echo 'SYNTAX HATASI — deploy iptal'; exit 3; }
+# compile() KULLAN, ast.parse DEGIL. ast.parse "duplicate argument 'ses'" gibi hatalari
+# YAKALAMAZ (bunlar ayristirmada degil bytecode uretiminde bulunur) — 1 Agu 2026'da tam
+# boyle bir hata syntax kontrolunden gecti ve siteyi dusurdu.
+PYTHONUTF8=1 "$PYBIN" -c "import glob,sys
+yollar = sorted(glob.glob('$KOKPY/webapp/*.py'))+['$KOKPY/app/uret.py']
+hata = 0
+for f in yollar:
+    try:
+        compile(open(f, encoding='utf-8').read(), f, 'exec')
+    except SyntaxError as e:
+        print('  ✗ %s satir %s: %s' % (f, e.lineno, e.msg)); hata = 1
+sys.exit(hata) if hata else print('  ✓ derleme OK (%d dosya)' % len(yollar))" \
+  || { echo 'SYNTAX HATASI — deploy iptal'; exit 3; }
+
+# TANIMSIZ ISIM taramasi. compile() sadece SOZDIZIMINI dogrular; govdede tanimsiz bir
+# degiskene dokunmak (or. endpoint imzasina eklemeyi unuttugun bir Form alani) derlemeden
+# GECER ve ancak istek geldiginde 500 verir. 1 Agu 2026'da tam boyle oldu: /api/generate
+# 'NameError: name ses is not defined' ile patladi ve kullanicinin videosu baslamadi.
+if "$PYBIN" -m pyflakes --version >/dev/null 2>&1; then
+  TANIMSIZ=$(PYTHONUTF8=1 "$PYBIN" -m pyflakes "$KOKPY"/webapp/*.py "$KOKPY/app/uret.py" 2>&1 \
+             | grep "undefined name" || true)
+  if [ -n "$TANIMSIZ" ]; then
+    echo "  ✗ TANIMSIZ ISIM — deploy iptal:"; echo "$TANIMSIZ"; exit 3
+  fi
+  echo "  ✓ tanimsiz isim yok"
+else
+  echo "  ⚠ pyflakes kurulu degil — tanimsiz isim taramasi ATLANDI (pip install pyflakes)"
+fi
 
 echo "== 3/5 Dosyalari konteynere kopyala =="
 # webapp (pipeline/server/kaynak/static)
@@ -74,6 +98,23 @@ $SSH "docker restart bedosaho >/dev/null"
 # kalicilas tirma adimi atlaniyordu)
 # NOT: konteyner 8080 -> host 80 esli (docker port bedosaho). localhost:8080 DEGIL :80!
 $SSH 'for i in 1 2 3 4 5 6 7; do sleep 4; R=$(curl -s -m 15 http://localhost:80/api/saglik); [ -n "$R" ] && { echo "$R"; exit 0; }; done; echo "HATA: saglik yaniti alinamadi"; exit 7' ; echo ""
+
+# CANLI UC NOKTA TESTI: konteyner ayakta olmasi yetmez, arayuzun cagirdigi uclar
+# gercekten 200 donmeli. (Ucret dogurmayan, sadece-okuma uclari test edilir.)
+echo "== 4.5/5 Uc nokta testi =="
+UCLAR="api/saglik api/animasyon-stilleri api/edit-stilleri api/paletler api/arkaplanlar api/sesler api/altyazi-sablonlari api/profiller"
+BOZUK=""
+for u in $UCLAR; do
+  K=$($SSH "curl -s -o /dev/null -w '%{http_code}' --max-time 15 localhost/$u" 2>/dev/null)
+  [ "$K" = "200" ] || BOZUK="$BOZUK $u($K)"
+done
+if [ -n "$BOZUK" ]; then
+  echo "  ✗ BOZUK UC:$BOZUK"
+  echo "  Konteyner ayakta ama arayuz calismaz — imaja BASILMADI, logu incele:"
+  $SSH "docker logs --tail 25 bedosaho 2>&1 | tail -25"
+  exit 4
+fi
+echo "  ✓ 8 uc nokta 200"
 
 echo "== 5/5 Durumu imaja bas (kalici) =="
 $SSH "docker commit bedosaho bedosaho:latest >/dev/null && docker tag bedosaho:latest bedosaho && echo '  ✓ kalici'"
