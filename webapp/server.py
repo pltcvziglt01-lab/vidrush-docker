@@ -286,10 +286,24 @@ def ses_kutuphane(saglayici: str = "elevenlabs"):
         veri = r.json().get("data", [])
     except Exception:
         raise HTTPException(502, "Ses kütüphanesi alınamadı")
+    def _diller(v):
+        """Sesin konustugu TUM diller (languages listesi dict/str karisik gelebiliyor)."""
+        out = []
+        for d in (v.get("languages") or []):
+            kod = d.get("language") if isinstance(d, dict) else d
+            if kod and kod not in out:
+                out.append(str(kod).lower()[:5])
+        ana = str(v.get("language", "")).lower()[:5]
+        if ana and ana not in out:
+            out.insert(0, ana)
+        return out
+
     liste = [{"voice_id": v.get("voice_id"), "ad": v.get("name") or v.get("voice_id"),
               "ozet": (v.get("description") or "")[:220],
               "cinsiyet": v.get("gender", ""), "yas": v.get("age", ""),
-              "dil": v.get("language", ""), "onizleme": v.get("preview_url", "")}
+              "dil": v.get("language", ""), "diller": _diller(v),
+              "aksan": v.get("accent", ""), "kategori": v.get("category", ""),
+              "onizleme": v.get("preview_url", "")}
              for v in veri if v.get("voice_id")]
     _SES_KUTUPHANE_ONBELLEK[saglayici] = (time.time(), liste)
     return liste

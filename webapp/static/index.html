@@ -743,16 +743,54 @@ function sesKartlariCiz(){
     c.appendChild(d);
   });
 }
-function kutupSatirlariCiz(liste, filtre){
+/* Kutuphane filtreleri (Ai33 arayuzundeki gibi): dil, cinsiyet, yas, aksan, kategori */
+const DIL_ADI={en:"İngilizce",tr:"Türkçe",de:"Almanca",fr:"Fransızca",es:"İspanyolca",it:"İtalyanca",
+  pt:"Portekizce",ru:"Rusça",ar:"Arapça",ja:"Japonca",ko:"Korece",zh:"Çince",nl:"Felemenkçe",
+  pl:"Lehçe",hi:"Hintçe",id:"Endonezce",uk:"Ukraynaca",vi:"Vietnamca",th:"Tayca",sv:"İsveççe"};
+const YAS_ADI={young:"Genç",middle_aged:"Orta yaş","middle-aged":"Orta yaş",old:"Yaşlı",elderly:"Yaşlı",child:"Çocuk"};
+const CINS_ADI={female:"Kadın",male:"Erkek",neutral:"Nötr"};
+let sesFiltre={dil:"",cinsiyet:"",yas:"",aksan:"",kategori:""};
+function filtreUygula(liste){
+  const f=($("#sesAra")?.value||"").toLowerCase();
+  return liste.filter(v=>{
+    if(sesFiltre.dil && !( (v.diller||[]).includes(sesFiltre.dil) || v.dil===sesFiltre.dil )) return false;
+    if(sesFiltre.cinsiyet && v.cinsiyet!==sesFiltre.cinsiyet) return false;
+    if(sesFiltre.yas && v.yas!==sesFiltre.yas) return false;
+    if(sesFiltre.aksan && v.aksan!==sesFiltre.aksan) return false;
+    if(sesFiltre.kategori && v.kategori!==sesFiltre.kategori) return false;
+    if(f && !(v.ad+" "+v.ozet+" "+v.cinsiyet+" "+v.dil+" "+(v.aksan||"")).toLowerCase().includes(f)) return false;
+    return true;
+  });
+}
+function filtreBariKur(liste){
+  const fb=$("#sesFiltreler"); if(!fb) return;
+  const tekil=(al)=>[...new Set(liste.flatMap(v=>al==="dil"?(v.diller&&v.diller.length?v.diller:[v.dil]):[v[al]]).filter(Boolean))].sort();
+  const kutu=(ad,al,adlar)=>{
+    const secler=tekil(al); if(!secler.length) return "";
+    const ops=secler.map(x=>`<option value="${x}" ${sesFiltre[al]===x?"selected":""}>${(adlar&&adlar[x])||x}</option>`).join("");
+    return `<label style="display:flex;flex-direction:column;gap:3px;font-size:10.5px;color:var(--dim2)">${ad}
+      <select data-al="${al}" style="background:#0e1117;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:6px 8px;font:inherit;font-size:12px">
+        <option value="">Tümü</option>${ops}</select></label>`;
+  };
+  fb.innerHTML = kutu("Dil","dil",DIL_ADI)+kutu("Cinsiyet","cinsiyet",CINS_ADI)+
+                 kutu("Yaş","yas",YAS_ADI)+kutu("Aksan","aksan")+kutu("Kategori","kategori");
+  fb.querySelectorAll("select").forEach(s=>s.onchange=()=>{
+    sesFiltre[s.dataset.al]=s.value;
+    kutupSatirlariCiz(liste);
+  });
+}
+function kutupSatirlariCiz(liste){
   const kc=$("#sesKutupListe"); if(!kc) return; kc.innerHTML="";
-  const f=(filtre||"").toLowerCase();
   const secilenVid = seciliSes.startsWith("ozel:") ? seciliSes.slice(5) : "";
-  liste.filter(v=>!f || (v.ad+" "+v.ozet+" "+v.cinsiyet+" "+v.dil).toLowerCase().includes(f))
+  filtreUygula(liste)
        .forEach(v=>{
     const r=document.createElement("div"); r.className="krow"+(v.voice_id===secilenVid?" sec":"");
     r.dataset.vid=v.voice_id;
     r.style.cssText="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:7px;background:var(--card2)";
-    const rozetler=[v.cinsiyet==="female"?"♀":v.cinsiyet==="male"?"♂":"", v.yas?v.yas.replace("_"," "):"", v.dil?v.dil.toUpperCase():""].filter(Boolean).join(" · ");
+    const dilRozet=(v.diller&&v.diller.length?v.diller:[v.dil]).filter(Boolean).slice(0,4)
+      .map(x=>(DIL_ADI[x]||x.toUpperCase())).join(", ")+((v.diller||[]).length>4?" +"+((v.diller.length)-4):"");
+    const rozetler=[v.cinsiyet==="female"?"♀ Kadın":v.cinsiyet==="male"?"♂ Erkek":"",
+                    YAS_ADI[v.yas]||"", v.aksan||"", dilRozet].filter(Boolean).join(" · ");
     r.innerHTML=`<div style="flex:1;min-width:0"><b style="font-size:13px">${v.ad}</b>
         <div style="font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${v.ozet||""}</div>
         <div style="font-size:10px;color:var(--dim2);margin-top:2px">${rozetler}</div></div>
@@ -767,10 +805,12 @@ function kutupSatirlariCiz(liste, filtre){
 }
 function kutupYukle(saglayici){
   const kc=$("#sesKutupListe"); if(!kc) return;
-  if(kutupCache[saglayici]){ kutupSatirlariCiz(kutupCache[saglayici], $("#sesAra")?.value); return; }
+  if(kutupCache[saglayici]){ filtreBariKur(kutupCache[saglayici]); kutupSatirlariCiz(kutupCache[saglayici]); return; }
   kc.innerHTML='<span class="durum">Kütüphane yükleniyor...</span>';
   fetch("api/ses-kutuphane?saglayici="+saglayici).then(r=>r.json()).then(list=>{
-    kutupCache[saglayici]=list; kutupSatirlariCiz(list, $("#sesAra")?.value);
+    kutupCache[saglayici]=list;
+    sesFiltre={dil:"",cinsiyet:"",yas:"",aksan:"",kategori:""};   // sekme degisince filtreler sifirlanir
+    filtreBariKur(list); kutupSatirlariCiz(list);
   }).catch(()=>{ kc.innerHTML='<span class="durum">Kütüphane alınamadı.</span>'; });
 }
 function sesGruplariCiz(){
@@ -796,12 +836,13 @@ function sesGruplariCiz(){
   const grid=document.createElement("div"); grid.className="estiller"; grid.id="sesKartlari";
   c.appendChild(grid);
   const kut=document.createElement("div"); kut.id="sesKutup"; kut.style.marginTop="12px";
-  kut.innerHTML=`<div class="lbl2" style="margin-bottom:8px">📚 Tüm kütüphane — dinle, beğendiğini seç</div>
-    <input id="sesAra" placeholder="Ara: isim, tarz, dil (örn. deep, energetic, calm...)"
+  kut.innerHTML=`<div class="lbl2" style="margin-bottom:8px">📚 Tüm kütüphane — filtrele, dinle, beğendiğini seç</div>
+    <div id="sesFiltreler" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:9px"></div>
+    <input id="sesAra" placeholder="Ara: isim, tarz (örn. deep, energetic, calm, storyteller...)"
       style="width:100%;background:#0e1117;border:1px solid var(--line);border-radius:10px;color:var(--txt);padding:10px 13px;font:inherit;font-size:13px;margin-bottom:9px">
     <div id="sesKutupListe" style="max-height:340px;overflow-y:auto"></div>`;
   c.appendChild(kut);
-  $("#sesAra").oninput=()=>{ const g=SES_GRUPLARI.find(x=>x.id===sesGrubu); if(g&&g.kutuphane) kutupSatirlariCiz(kutupCache[g.kutuphane]||[], $("#sesAra").value); };
+  $("#sesAra").oninput=()=>{ const g=SES_GRUPLARI.find(x=>x.id===sesGrubu); if(g&&g.kutuphane) kutupSatirlariCiz(kutupCache[g.kutuphane]||[]); };
   function icerikCiz(){
     const g=SES_GRUPLARI.find(x=>x.id===sesGrubu)||{};
     sesKartlariCiz();
