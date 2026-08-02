@@ -236,6 +236,7 @@ def sesler():
     """Anlatici sesleri. motor=openai olanlar sesin YASINI tarif edebiliyor (edge-tts edemez)."""
     return [{"id": k, "ad": v["ad"], "ozet": v.get("ozet", ""), "motor": v["motor"],
              "ucret": v.get("ucret", ""), "dil": v.get("dil", ""),
+             "grup": v.get("grup", "ucretsiz"),
              "ornek": (f"ses-ornek/{k}.mp3"
                        if os.path.exists(os.path.join(STATIC, "ses-ornek", f"{k}.mp3")) else "")}
             for k, v in pipeline.SESLER.items()]

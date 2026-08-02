@@ -698,14 +698,17 @@ function secSes(id){
   seciliSes=id; localStorage.setItem("bedosaho_ses",id);
   $$("#sesler .estil").forEach(x=>x.classList.toggle("on",(x.dataset.id||"")===id));
 }
-fetch("api/sesler").then(r=>r.json()).then(list=>{
-  sesListe=list; const c=$("#sesler"); if(!c) return; c.innerHTML="";
-  list.forEach(v=>{
+/* Ses saglayici SEKMELERI: once program sec (Ücretsiz / OpenAI / ElevenLabs), sonra ses.
+   Yeni saglayici (MiniMax, FishAudio...) eklemek = SESLER'e grup'lu girdi + bu listeye satir. */
+const SES_GRUPLARI=[["ucretsiz","🆓 Ücretsiz"],["karakterli","🎭 Karakterli (OpenAI)"],["elevenlabs","⭐ ElevenLabs"]];
+let sesGrubu = "ucretsiz";
+function sesKartlariCiz(){
+  const c=$("#sesKartlari"); if(!c) return; c.innerHTML="";
+  sesListe.filter(v=>(v.grup||"ucretsiz")===sesGrubu).forEach(v=>{
     const d=document.createElement("div");
     d.className="estil"+(seciliSes===v.id?" on":""); d.dataset.id=v.id;
-    const rozet = v.motor==="openai"
-      ? `<span style="font-size:10px;color:var(--warn)">${v.ucret}</span>`
-      : `<span style="font-size:10px;color:var(--ok)">ücretsiz</span>`;
+    const bedava = (v.ucret||"")==="ücretsiz";
+    const rozet = `<span style="font-size:10px;color:${bedava?"var(--ok)":"var(--warn)"}">${v.ucret||""}</span>`;
     d.innerHTML=`<span class="pick"></span><b>${v.ad}</b>
       <p>${v.ozet||""}</p>
       <div class="meta" style="display:flex;align-items:center;gap:10px;margin-top:9px">
@@ -719,6 +722,30 @@ fetch("api/sesler").then(r=>r.json()).then(list=>{
     d.onclick=()=>secSes(v.id);
     c.appendChild(d);
   });
+}
+function sesGruplariCiz(){
+  const c=$("#sesler"); if(!c) return;
+  c.className=""; c.innerHTML="";
+  const bar=document.createElement("div"); bar.className="seg"; bar.style.marginBottom="12px";
+  SES_GRUPLARI.forEach(([id,ad])=>{
+    const sayi = sesListe.filter(v=>(v.grup||"ucretsiz")===id).length;
+    if(!sayi) return;
+    const b=document.createElement("button");
+    b.textContent=`${ad} (${sayi})`;
+    b.className=(sesGrubu===id)?"on":"";
+    b.onclick=()=>{ sesGrubu=id; bar.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); sesKartlariCiz(); };
+    bar.appendChild(b);
+  });
+  c.appendChild(bar);
+  const grid=document.createElement("div"); grid.className="estiller"; grid.id="sesKartlari";
+  c.appendChild(grid);
+  sesKartlariCiz();
+}
+fetch("api/sesler").then(r=>r.json()).then(list=>{
+  sesListe=list;
+  // secili ses hangi gruptaysa o sekme acik gelsin
+  const sec=list.find(v=>v.id===seciliSes); if(sec) sesGrubu=sec.grup||"ucretsiz";
+  sesGruplariCiz();
 }).catch(()=>{$("#sesler").innerHTML='<span class="durum">sesler yüklenemedi</span>';});
 
 /* ── arka plan ── */

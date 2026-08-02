@@ -1580,55 +1580,71 @@ YASLI_KADIN_TALIMAT = (
     "and slow, full of lived experience. Speak softly, as if sitting in a kitchen chair.")
 
 SESLER = {
-    "otomatik": {"ad": "Otomatik (dile göre)", "motor": "edge", "ses": "",
+    "otomatik": {"ad": "Otomatik (dile göre)", "motor": "edge", "grup": "ucretsiz", "ses": "",
                  "ozet": "Metnin diline uygun ücretsiz ses", "ucret": "ücretsiz", "dil": ""},
     # ── Kullanicinin 1 Agu 2026'da ORNEK DINLEYIP ONAYLADIGI ses ──
-    "yasli-kadin": {"ad": "Yaşlı Kadın (75)", "motor": "openai", "ses": "shimmer",
+    "yasli-kadin": {"ad": "Yaşlı Kadın (75)", "motor": "openai", "grup": "karakterli", "ses": "shimmer",
                     "talimat": YASLI_KADIN_TALIMAT, "hiz": 0.92, "dil": "en",
                     "ozet": "Kırılgan, hafif titrek, sakin — tasarruf/anı kanalları için",
                     "ucret": "~$0.03/video"},
-    "olgun-kadin": {"ad": "Olgun Kadın (68)", "motor": "openai", "ses": "coral",
+    "olgun-kadin": {"ad": "Olgun Kadın (68)", "motor": "openai", "grup": "karakterli", "ses": "coral",
                     "talimat": ("Speak as a warm woman in her late sixties. Unhurried and gentle, "
                                 "with the soft dryness and slight breathiness of an older voice. "
                                 "Lower and thinner than a young voice, with small natural pauses, "
                                 "as if remembering while she speaks. Kind, grandmotherly, never perky."),
                     "hiz": 0.94, "dil": "en", "ozet": "Anneanne tonu, hatırlarken duraklayan",
                     "ucret": "~$0.03/video"},
-    "buyukanne-abd": {"ad": "Büyükanne (Orta Batı)", "motor": "openai", "ses": "ballad",
+    "buyukanne-abd": {"ad": "Büyükanne (Orta Batı)", "motor": "openai", "grup": "karakterli", "ses": "ballad",
                       "talimat": ("A grandmother in her late sixties from the American midwest. "
                                   "Low, calm, plain-spoken, a touch of gravel. No enthusiasm, just "
                                   "quiet certainty from years of doing it herself."),
                       "hiz": 0.93, "dil": "en", "ozet": "Alçak, düz konuşan, çakıllı",
                       "ucret": "~$0.03/video"},
-    "yasli-erkek": {"ad": "Yaşlı Erkek (70)", "motor": "openai", "ses": "onyx",
+    "yasli-erkek": {"ad": "Yaşlı Erkek (70)", "motor": "openai", "grup": "karakterli", "ses": "onyx",
                     "talimat": ("A man of about seventy telling a story he has told before. Deep, "
                                 "slow and weathered, with a dry rasp. Calm authority, no drama."),
                     "hiz": 0.92, "dil": "en", "ozet": "Derin, yavaş, yıpranmış",
                     "ucret": "~$0.03/video"},
     # ── Ucretsiz edge-tts secenekleri (yas TARIF EDILEMEZ, sadece ton farki) ──
-    "en-kadin-sicak": {"ad": "Kadın · Sıcak (İng)", "motor": "edge", "ses": "en-US-JennyNeural",
+    "en-kadin-sicak": {"ad": "Kadın · Sıcak (İng)", "motor": "edge", "grup": "ucretsiz", "ses": "en-US-JennyNeural",
                        "ozet": "Şefkatli, sakin anlatıcı", "ucret": "ücretsiz", "dil": "en"},
-    "en-kadin-ingiliz": {"ad": "Kadın · İngiliz", "motor": "edge", "ses": "en-GB-SoniaNeural",
+    "en-kadin-ingiliz": {"ad": "Kadın · İngiliz", "motor": "edge", "grup": "ucretsiz", "ses": "en-GB-SoniaNeural",
                          "ozet": "Ölçülü İngiliz aksanı", "ucret": "ücretsiz", "dil": "en"},
-    "en-kadin-avustralya": {"ad": "Kadın · Avustralya", "motor": "edge", "ses": "en-AU-NatashaNeural",
+    "en-kadin-avustralya": {"ad": "Kadın · Avustralya", "motor": "edge", "grup": "ucretsiz", "ses": "en-AU-NatashaNeural",
                             "ozet": "Aussie kanalları için", "ucret": "ücretsiz", "dil": "en"},
-    "en-erkek": {"ad": "Erkek · Anlatıcı (İng)", "motor": "edge",
+    "en-erkek": {"ad": "Erkek · Anlatıcı (İng)", "motor": "edge", "grup": "ucretsiz",
                  "ses": "en-US-AndrewMultilingualNeural",
                  "ozet": "Belgesel tonu", "ucret": "ücretsiz", "dil": "en"},
-    "tr-kadin": {"ad": "Kadın · Türkçe", "motor": "edge", "ses": "tr-TR-EmelNeural",
+    "tr-kadin": {"ad": "Kadın · Türkçe", "motor": "edge", "grup": "ucretsiz", "ses": "tr-TR-EmelNeural",
                  "ozet": "Türkçe anlatıcı", "ucret": "ücretsiz", "dil": "tr"},
-    "tr-erkek": {"ad": "Erkek · Türkçe", "motor": "edge", "ses": "tr-TR-AhmetNeural",
+    "tr-erkek": {"ad": "Erkek · Türkçe", "motor": "edge", "grup": "ucretsiz", "ses": "tr-TR-AhmetNeural",
                  "ozet": "Türkçe anlatıcı", "ucret": "ücretsiz", "dil": "tr"},
     # ── PREMIUM (Ai33.Pro — ElevenLabs kalitesi, her dilde; anahtar sunucuda AI33_KEY) ──
     # eleven_multilingual_v2 otomatik: ayni ses Turkce dahil her dili dogal okur.
-    "premium-kadin": {"ad": "⭐ Premium Kadın", "motor": "ai33",
+    "premium-kadin": {"ad": "⭐ Premium Kadın", "motor": "ai33", "grup": "elevenlabs",
                       "ses": "elevenlabs_21m00Tcm4TlvDq8ikWAM", "hiz": 1.0, "dil": "",
                       "ozet": "ElevenLabs (Rachel) — en doğal kadın anlatıcı, her dil",
                       "ucret": "kredi"},
-    "premium-erkek": {"ad": "⭐ Premium Erkek", "motor": "ai33",
+    "premium-erkek": {"ad": "⭐ Premium Erkek", "motor": "ai33", "grup": "elevenlabs",
                       "ses": "elevenlabs_pNInz6obpgDQGcFmaJgB", "hiz": 1.0, "dil": "",
                       "ozet": "ElevenLabs (Adam) — derin, doğal erkek anlatıcı, her dil",
                       "ucret": "kredi"},
+    "eleven-bella": {"ad": "Bella · Yumuşak Kadın", "motor": "ai33", "grup": "elevenlabs",
+                     "ses": "elevenlabs_EXAVITQu4vr4xnSDxMaL", "hiz": 1.0, "dil": "",
+                     "ozet": "Yumuşak, genç, samimi kadın ses — duygusal hikayeler",
+                     "ucret": "kredi"},
+    "eleven-domi": {"ad": "Domi · Enerjik Kadın", "motor": "ai33", "grup": "elevenlabs",
+                    "ses": "elevenlabs_AZnzlk1XvdvUeBnXmlld", "hiz": 1.0, "dil": "",
+                    "ozet": "Canlı, kendinden emin kadın ses — tempolu anlatım",
+                    "ucret": "kredi"},
+    "eleven-antoni": {"ad": "Antoni · Sıcak Erkek", "motor": "ai33", "grup": "elevenlabs",
+                      "ses": "elevenlabs_ErXwobaYiN019PkySvjV", "hiz": 1.0, "dil": "",
+                      "ozet": "Sıcak, dengeli erkek ses — genel anlatıcı",
+                      "ucret": "kredi"},
+    "eleven-josh": {"ad": "Josh · Derin Genç Erkek", "motor": "ai33", "grup": "elevenlabs",
+                    "ses": "elevenlabs_TxGEqnHWrfWFTfGW9XjX", "hiz": 1.0, "dil": "",
+                    "ozet": "Derin, genç erkek ses — gerilim/karanlık hikayeler",
+                    "ucret": "kredi"},
 }
 VARSAYILAN_SES = "otomatik"
 
