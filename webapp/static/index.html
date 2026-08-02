@@ -170,6 +170,19 @@
 
       <div class="card">
         <h2><span class="num">1</span> Referanslar <span class="tag">her videoda yeniden yükle</span></h2>
+        <!-- ⭐ ÖNERİLEN: karakterin İÇİNDE olduğu gerçek kareler — hepsi buradan çıkarılır -->
+        <label class="drop" id="dropSref" style="margin-bottom:14px;border-color:var(--acc2)">
+          <input type="file" id="fSref" accept="image/*" multiple>
+          <div id="srefView">
+            <div class="lbl">⭐ Referans kareler <span style="color:var(--acc2);font-size:11px">— ÖNERİLEN</span></div>
+            <div class="hint">1-4 kare · <b>karakterin içinde olduğu gerçek sahneler</b> yükle.<br>
+              Motor hepsini tek seferde çıkarır: <b>karakter kimliği · çizim stili · renk paleti · ışık seviyesi</b>.<br>
+              Işık <b>ölçülür</b>, tahmin edilmez. Birden fazla kare verirsen sadece <b>hepsinde tekrar eden</b> özellikler kilitlenir.</div>
+          </div>
+        </label>
+        <div class="durum" style="font-size:11px;margin:-4px 0 12px;color:var(--dim2)">
+          — ya da eskisi gibi ayrı ayrı: —
+        </div>
         <div class="refs">
           <label class="drop" id="dropKar">
             <input type="file" id="fKar" accept="image/*">
@@ -442,6 +455,7 @@ const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 let SID=localStorage.getItem("vidrush_sid");
 if(!SID){SID="u"+Math.random().toString(36).slice(2,10);localStorage.setItem("vidrush_sid",SID);}
 let karFile=null, stilFile=null, editStil=null, videoTur="documentary";
+let srefFiles=[];   // sahne referans kareleri (1-4)
 let sureDk=2, gecisAcik=true, zoomAcik=true;
 /* animStil/animListe BURADA tanimlanmali: pfOzetGuncelle() asagida hemen cagriliyor ve bunlari
    okuyor — tanim daha asagida kalirsa TDZ ReferenceError ile TUM script olur (hicbir sey secilemez) */
@@ -478,6 +492,25 @@ function gorselSec(inputId, viewId, dropId, ata){
 }
 gorselSec("#fKar","#karView","#dropKar",f=>karFile=f);
 gorselSec("#fStil","#stilView","#dropStil",f=>stilFile=f);
+/* Coklu sahne referansi — kucuk onizlemelerle */
+(function(){
+  const inp=$("#fSref"), gor=$("#srefView"), kutu=$("#dropSref");
+  if(!inp) return;
+  inp.onchange=()=>{
+    srefFiles=[...(inp.files||[])].slice(0,4);
+    if(!srefFiles.length){ kutu.classList.remove("dolu"); return; }
+    kutu.classList.add("dolu");
+    gor.innerHTML=`<div class="lbl">⭐ ${srefFiles.length} referans kare</div>
+      <div id="srefKucuk" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:8px"></div>
+      <div class="hint" style="margin-top:6px">karakter · stil · palet · ışık bunlardan çıkarılacak</div>`;
+    const c=$("#srefKucuk");
+    srefFiles.forEach(f=>{
+      const im=document.createElement("img");
+      im.style.cssText="width:74px;height:74px;object-fit:cover;border-radius:8px;border:1px solid var(--line)";
+      im.src=URL.createObjectURL(f); c.appendChild(im);
+    });
+  };
+})();
 
 /* ayarlar: süre + geçiş + zoom */
 $("#sure").addEventListener("input",e=>{sureDk=+e.target.value; $("#sureLbl").textContent=sureDk+" dk";});
@@ -616,6 +649,7 @@ function pfOzetGuncelle(){
   const sat = (ok,txt)=>`${ok?"✅":"⬜"} ${txt}`;
   e.innerHTML = [
     sat(true, `<b>Video türü:</b> ${({animasyon:"Animasyon",documentary:"Documentary",hikaye:"Hikaye"})[videoTur]||videoTur} · ${stilAd}`),
+    sat(srefFiles.length>0, `<b>Referans kareler:</b> ${srefFiles.length?srefFiles.length+" kare — karakter+stil+palet+ışık buradan":"yüklenmedi"}`),
     sat(!!karFile, `<b>Ana karakter görseli:</b> ${karFile?karFile.name:"yüklenmedi (sistem kendi karakterini üretir)"}`),
     sat(!!stilFile, `<b>Genel görsel stil:</b> ${stilFile?stilFile.name:"yüklenmedi (stilin ilk videoda kilitlenir)"}`),
     sat(altyaziAcik, `<b>Altyazı:</b> ${altyaziAcik?((altSablonlar[altSablon]||{}).ad||altSablon)+" (özelleştirilmiş)":"kapalı"}`),
@@ -647,6 +681,7 @@ $("#btnProfil").onclick=async()=>{
   fd.append("isik", seciliIsik||"");
   if(karFile) fd.append("karakter",karFile);
   if(stilFile) fd.append("stil",stilFile);
+  srefFiles.forEach(f=>fd.append("sahne_ref", f));
   $("#btnProfil").disabled=true;
   try{
     const r=await fetch("api/profil",{method:"POST",body:fd});

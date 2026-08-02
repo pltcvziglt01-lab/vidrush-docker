@@ -13,6 +13,7 @@ import shutil
 import asyncio
 import threading
 import traceback
+from typing import List
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
@@ -346,6 +347,7 @@ async def profil_olustur(pid: str = Form(...), ad: str = Form(""),
                          palet: str = Form(""), palet_ozel: str = Form(""),
                          arkaplan: str = Form(""), ses: str = Form(""),
                          isik: str = Form(""),
+                      sahne_ref: List[UploadFile] = File(None),
                          karakter: UploadFile = File(None),
                          stil: UploadFile = File(None)):
     """Kanal profili olustur/guncelle. Karakter+stil gorselleri KALICI saklanir."""
@@ -425,7 +427,8 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
                       ses: str = Form(""),
                       isik: str = Form(""),
                       karakter: UploadFile = File(None),
-                      stil: UploadFile = File(None)):
+                      stil: UploadFile = File(None),
+                      sahne_ref: List[UploadFile] = File(None)):
     """Karakter/stil gorselleri her video icin DOGRUDAN yuklenir (kalici kayit yok).
     Magnific ve footage plana gore OTOMATIK. tur: animasyon|documentary|hikaye."""
     session = gecerli_session(session)
@@ -450,6 +453,7 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
     is_id = f"job_{int(time.time()*1000)}_{session[:6]}_{os.urandom(3).hex()}"
     idir = os.path.join(GECICI, is_id)
     os.makedirs(idir, exist_ok=True)
+    sref = []
     try:
         kar = ""
         if karakter is not None:
@@ -467,6 +471,19 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
                     raise HTTPException(413, "Stil görseli çok büyük (maks 20 MB)")
                 stil_yol = os.path.join(idir, "style.png")
                 await asyncio.to_thread(_kucult, data, stil_yol)
+        # SAHNE REFERANSLARI: 1-4 kare. Karakter + cizim stili + palet + ISIK hepsi
+        # bunlardan cikarilir (ayri ayri karakter/stil yuklemeye gerek kalmaz).
+        for i, dosya in enumerate((sahne_ref or [])[:4]):
+            if dosya is None:
+                continue
+            veri = await dosya.read()
+            if not veri:
+                continue
+            if len(veri) > MAKS_UPLOAD:
+                raise HTTPException(413, "Referans görseli çok büyük (maks 20 MB)")
+            y = os.path.join(idir, f"ref_{i+1}.png")
+            await asyncio.to_thread(_kucult, veri, y)
+            sref.append(y)
     except HTTPException:
         shutil.rmtree(idir, ignore_errors=True)
         raise
@@ -489,7 +506,7 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
                     arkaplan.strip() if arkaplan.strip() in pipeline.ARKA_PLANLAR else "",
                     _ses_secimi(ses),
                     isik.strip() if isik.strip() in pipeline.ISIK_DUZEYLERI else "",
-                    acilis_dk))
+                    acilis_dk, sref))
     return {"job_id": is_id, "kuyruk": is_kuyrugu.qsize(), "tur": mod, "edit": edit_id,
             "profil": profil.strip()}
 
@@ -567,7 +584,7 @@ def cikti(dosya: str):
 
 def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom_acik,
             profil_id="", altyazi="", altyazi_sablon="", palet="", palet_ozel="",
-            arkaplan="", ses_secim="", isik="", acilis_dk=None):
+            arkaplan="", ses_secim="", isik="", acilis_dk=None, sahne_ref=None):
     d = isler.get(is_id)
     if not d:
         return
@@ -586,7 +603,7 @@ def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom
                                           altyazi_ac=altyazi, palet=palet,
                                           palet_ozel=palet_ozel, arkaplan=arkaplan,
                                           ses_secim=ses_secim, isik=isik,
-                                          acilis_dk=acilis_dk))
+                                          acilis_dk=acilis_dk, sahne_ref=sahne_ref))
         d.update({"durum": "bitti", "ilerleme": 100, "mesaj": "Hazir!",
                   "video": "ciktilar/" + sonuc["video"],
                   "kapak": ("ciktilar/" + sonuc["kapak"]) if sonuc.get("kapak") else None,
