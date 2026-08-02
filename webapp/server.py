@@ -426,6 +426,38 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
             "profil": profil.strip()}
 
 
+@app.get("/api/isler")
+def is_listesi(session: str):
+    """Bu oturumun TUM isleri (Videolarim sekmesi) — sayfa yenilense/kapansa da is kaybolmaz.
+    Kaynak: diskteki durum dosyalari; bellekte daha guncel hal varsa o kullanilir.
+    Is id'si 'job_<ts>_<session[:6]>_<hex>' oldugu icin oturum eslesmesi id icinden yapilir."""
+    import json
+    session = gecerli_session(session)
+    on6 = session[:6]
+    cikti = []
+    try:
+        for ad in os.listdir(IS_DURUM_DIR):
+            if not ad.endswith(".json") or f"_{on6}_" not in ad:
+                continue
+            yol = os.path.join(IS_DURUM_DIR, ad)
+            try:
+                d = isler.get(ad[:-5])
+                if d is None:
+                    with open(yol, encoding="utf-8") as f:
+                        d = json.load(f)
+                cikti.append({"id": ad[:-5], "durum": d.get("durum"),
+                              "ilerleme": d.get("ilerleme", 0), "mesaj": d.get("mesaj", ""),
+                              "video": d.get("video"), "kapak": d.get("kapak"),
+                              "sure": d.get("sure"), "edit": d.get("edit"),
+                              "t": os.path.getmtime(yol)})
+            except Exception:
+                continue
+    except Exception:
+        pass
+    cikti.sort(key=lambda x: -x["t"])
+    return cikti[:30]
+
+
 @app.get("/api/job/{is_id}")
 def is_durum(is_id: str):
     d = isler.get(is_id)

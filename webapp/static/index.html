@@ -150,6 +150,7 @@
     <div class="brand"><span class="logo"></span><span><b>BEDOSAHO</b><small>AI</small></span></div>
     <div class="navlbl">Üretim</div>
     <div class="nav on" data-view="studio"><span class="ic">🎬</span> Yeni Video</div>
+    <div class="nav" data-view="videolar"><span class="ic">📼</span> Videolarım</div>
     <div class="nav" data-view="styles"><span class="ic">🎞️</span> Edit Stilleri</div>
     <div class="navlbl">Sistem</div>
     <div class="nav" data-view="sources"><span class="ic">📥</span> Kaynaklar</div>
@@ -217,8 +218,8 @@
         </div>
 
         <div id="hikayeWrap" style="display:none">
-          <div class="ay" style="margin-top:12px;max-width:340px">
-            <span>🎬 Hareketli açılış süresi <b id="acilisLbl">İlk 2,5 dk</b></span>
+          <div class="ay" style="margin:14px 0 6px;max-width:400px;background:linear-gradient(160deg,#1d1836,#12211d);border:1.5px solid var(--acc);border-radius:13px;padding:14px 16px">
+            <span style="font-size:14px;color:var(--txt)">🎬 <b>Hareketli açılış süresi</b><b id="acilisLbl" style="color:var(--acc2)">İlk 2,5 dk</b></span>
             <select id="acilisSec">
               <option value="0">Kapalı — baştan sona sakin</option>
               <option value="1">İlk 1 dakika</option>
@@ -394,6 +395,13 @@
     </section>
 
     <!-- ─────────── EDIT STİLLERİ ─────────── -->
+    <section class="view" id="view-videolar">
+      <p class="eyebrow">OTURUM ARŞİVİ</p>
+      <h1>Videolarım</h1>
+      <p class="lead">Bu tarayıcıdan başlatılan işler. Sayfa yenilense ya da kapansa bile üretim sunucuda devam eder — devam edenleri buradan izleyebilir, bitenleri indirebilirsin. Çıktılar sunucuda 14 gün saklanır.</p>
+      <div class="list" id="isListesi"><span class="durum">Yükleniyor...</span></div>
+    </section>
+
     <section class="view" id="view-styles">
       <p class="eyebrow">Gerçek belgesel kanallarından türetildi</p>
       <h1>Edit Stilleri</h1>
@@ -453,6 +461,7 @@ $$(".nav").forEach(n=>n.onclick=()=>{
   $$(".nav").forEach(x=>x.classList.remove("on")); n.classList.add("on");
   $$(".view").forEach(v=>v.classList.remove("on"));
   $("#view-"+n.dataset.view).classList.add("on");
+  if(n.dataset.view==="videolar") videolariYukle();   // sekme acilinca listeyi tazele
   window.scrollTo(0,0);
 });
 
@@ -915,6 +924,7 @@ $("#btnUret").onclick=async()=>{
     if(!r.ok)throw new Error(await r.text());
     job=(await r.json()).job_id;
   }catch(e){hata(e.message);return;}
+  localStorage.setItem("bedosaho_son_is", job);   // yenileme/kapanma sonrasi otomatik baglanmak icin
   takip(job);
 };
 function hata(m){$("#err").textContent="⚠ "+m;$("#err").classList.remove("hidden");
@@ -945,6 +955,53 @@ async function takip(job){
   };
   poll();
 }
+
+/* ── Videolarım: oturumun tüm işleri (yenileme/kapanma iş kaybettirmez) ── */
+async function videolariYukle(){
+  const c=$("#isListesi"); if(!c) return;
+  try{
+    const r=await fetch("api/isler?session="+SID);
+    const list=await r.json();
+    if(!list.length){c.innerHTML='<span class="durum">Henüz bu tarayıcıdan video üretilmedi.</span>';return;}
+    c.innerHTML="";
+    list.forEach(j=>{
+      const it=document.createElement("div"); it.className="item";
+      const t=new Date(j.t*1000).toLocaleString("tr-TR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
+      let ic="🎬", dur="", sag="";
+      if(j.durum==="bitti"){ ic="✅"; dur=(j.edit||"Video")+" · "+(j.sure?Math.round(j.sure)+" sn":"");
+        sag=`<a class="dlbtn" href="${j.video}" target="_blank" style="font-size:12px;padding:8px 14px">▶ İzle / İndir</a>`; }
+      else if(j.durum==="hata"){ ic="❌"; dur=j.mesaj||"Hata"; sag='<span class="pill req">hata</span>'; }
+      else { ic="⏳"; dur=(j.mesaj||"Üretiliyor")+" — %"+(j.ilerleme||0);
+        sag=`<button class="btn ghost" data-is="${j.id}" style="padding:8px 14px;font-size:12px">İlerlemeyi izle</button>`; }
+      it.innerHTML=`<span class="ci">${ic}</span><div class="ct"><b>${t}</b><p>${dur}</p></div>${sag}`;
+      const b=it.querySelector("button[data-is]"); if(b) b.onclick=()=>isiIzle(b.dataset.is);
+      c.appendChild(it);
+    });
+  }catch(e){ c.innerHTML='<span class="durum">Liste alınamadı (sunucuya ulaşılamıyor olabilir).</span>'; }
+}
+function isiIzle(id){
+  localStorage.setItem("bedosaho_son_is", id);
+  $$(".nav").forEach(x=>x.classList.toggle("on",x.dataset.view==="studio"));
+  $$(".view").forEach(v=>v.classList.remove("on")); $("#view-studio").classList.add("on");
+  $("#barWrap").classList.remove("hidden"); $("#btnUret").disabled=true;
+  $("#uretDurum").textContent="Devam eden üretime bağlanıldı...";
+  window.scrollTo(0,document.body.scrollHeight); takip(id);
+}
+/* Videolarım açıkken liste 5 sn'de bir tazelenir (ilerleme yüzdesi canlı aksın) */
+setInterval(()=>{ const v=$("#view-videolar"); if(v && v.classList.contains("on")) videolariYukle(); }, 5000);
+
+/* SAYFA AÇILIŞI: yarım kalan iş varsa OTOMATİK bağlan — yenileme/kapanma işi kaybettirmez */
+(function(){
+  const son=localStorage.getItem("bedosaho_son_is");
+  if(!son) return;
+  fetch("api/job/"+son).then(r=>r.ok?r.json():null).then(d=>{
+    if(d && (d.durum==="uretiliyor"||d.durum==="kuyrukta")){
+      $("#barWrap").classList.remove("hidden"); $("#btnUret").disabled=true;
+      $("#uretDurum").textContent="Devam eden üretime yeniden bağlanıldı...";
+      takip(son);
+    }
+  }).catch(()=>{});
+})();
 </script>
 </body>
 </html>
