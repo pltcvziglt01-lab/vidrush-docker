@@ -366,14 +366,42 @@ HKANAL_STIL = (
 )
 # Karakter yuklenmezse: gorunusu SABITLEMEZ (hikayeye gore model secer), ayni kalmasini SART kosar.
 HKANAL_VARSAYILAN_KARAKTER = (
-    "The recurring main character is the SAME real person in every scene: identical face, age, "
-    "hair, build and outfit throughout the whole story — never swap, restyle or replace them"
+    "In every scene that includes the main character, they are the SAME real person: identical "
+    "face, age, hair, build and outfit throughout the whole story — never swap, restyle or "
+    "replace them. (Scenes marked 'no character' contain no people at all.)"
 )
 HKANAL_CERCEVE = (
     "Frame like a narrative feature film: vary shot sizes deliberately across scenes (wide "
     "establishing, medium, close-up), keep the main character clearly visible and emotionally "
     "readable, single continuous frame, never split screens or collages"
 )
+# Hikaye planlayici sozlesmesi — genel kuraldan iki kritik farki var:
+# 1) ATMOSFER SAHNELERI: her ~4 sahneden 1'i KARAKTERSIZ olabilir (bos ev, sokak, gokyuzu,
+#    onemli obje). Planlayici prompt'a 'no character' yazar -> referansli_gorsel kimlik
+#    kilidini atlar, kareye figur zorlanmaz. Gercek hikaye kanallarinin dokusunu verir.
+# 2) ILK GORUNUM TARIFI: karakter gorseli yuklenmediginde modelin karakteri hikayeye uygun
+#    kurmasi icin ILK karakterli sahnede yas/tip/kiyafet tarifi YAZILIR (once yazilmiyordu;
+#    'yasli saatci' genc cizilmisti). Sonraki sahneler tarifi TEKRARLAMAZ (capa tasir).
+HKANAL_SOZLESME = (
+    "IMPORTANT: give scene_prompt for EVERY scene = a vivid 16:9 ENGLISH description of the "
+    "action/place/camera/mood, like a frame from a narrative feature film. CHARACTER RULE: the "
+    "story has ONE main character who must look visually IDENTICAL across the whole video. In "
+    "scenes where the character appears, the scene_prompt MUST contain the exact phrase 'the "
+    "main character' as the acting subject. FIRST APPEARANCE ONLY: in the very first scene "
+    "where the character appears, add a brief physical description drawn from the STORY right "
+    "after that phrase (age, build, hair, clothing, era — e.g. 'the main character, an elderly "
+    "watchmaker with white hair and a worn leather apron'); in every later scene do NOT "
+    "describe the character's appearance at all (the reference image carries it) — only "
+    "pose/action/emotion and the environment, with a DIFFERENT camera angle and setting per "
+    "scene. ATMOSPHERE SHOTS: roughly 1 scene in 4 should be an establishing or atmosphere "
+    "shot WITHOUT the character (an empty street, a house exterior, a stormy sky, a meaningful "
+    "object in close-up); for those write 'no character' inside the scene_prompt and describe "
+    "only the place/object/mood. Never invent additional recurring people; anonymous background "
+    "extras are allowed when the story requires a crowd. Describe ONE single continuous frame — "
+    "never panels, grids or split frames. (For footage scenes this prompt is the fallback if no "
+    "clip is found.)\n"
+)
+
 HIKAYE_KANALI_PROFIL = {
     "ad": "Sinematik Hikaye",
     "ozet": "Hikaye kanalı formatı — film karesi görseller, hareketli açılış, altyazı, tutarlı karakter",
@@ -384,6 +412,7 @@ HIKAYE_KANALI_PROFIL = {
     "gorsel_ek": HKANAL_STIL,
     "varsayilan_karakter": HKANAL_VARSAYILAN_KARAKTER,
     "cerceve": HKANAL_CERCEVE,
+    "sahne_sozlesme": HKANAL_SOZLESME,
 }
 HIKAYE_STILLERI = {"sinematik-hikaye": HIKAYE_KANALI_PROFIL}
 VARSAYILAN_HIKAYE = "sinematik-hikaye"
