@@ -170,13 +170,38 @@ def _zoompan_ifadeleri(sahne, gecis, fps, F):
 
 
 def _segment_uret(sahne, gecis, fps, crf, seg_yol):
-    """Tek sahne segmentini uretir: gorsel (Ken Burns) + kendi sesi, h264+aac."""
-    gorsel = os.path.join(PUBLIC, sahne["medya"])
+    """Tek sahne segmentini uretir. Gorsel sahne: Ken Burns + kendi sesi.
+    VIDEO sahne (Sora klibi / footage): klip 1080p'ye olceklenir, gerekirse dongulenir,
+    uzerine sahnenin TTS sesi biner (klibin kendi sesi kullanilmaz)."""
+    medya = os.path.join(PUBLIC, sahne["medya"])
     ses = os.path.join(PUBLIC, sahne["ses"])
     sure = float(sahne["sure"])
-    if not (os.path.exists(gorsel) and os.path.exists(ses)) or sure <= 0:
+    if not (os.path.exists(medya) and os.path.exists(ses)) or sure <= 0:
         return False
     F = max(1, int(round(sure * fps)))
+    if sahne.get("tur") == "video":
+        # Gercek video: Ken Burns YOK (klibin kendi hareketi var). Kisa klip donguyle uzar.
+        vf = (f"scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,"
+              f"fps={fps},format=yuv420p")
+        komut = ["ffmpeg", "-y", "-loglevel", "error",
+                 "-stream_loop", "-1", "-i", medya, "-i", ses,
+                 "-filter_complex", f"[0:v]{vf}[v]",
+                 "-map", "[v]", "-map", "1:a",
+                 "-af", f"apad=whole_dur={sure:.3f}",
+                 "-t", f"{sure:.3f}", "-r", str(fps),
+                 "-c:v", "libx264", "-crf", str(crf), "-preset", "veryfast",
+                 "-c:a", "aac", "-ar", "44100", "-b:a", "160k",
+                 seg_yol]
+        try:
+            r = subprocess.run(komut, capture_output=True, text=True, timeout=420)
+            if r.returncode != 0:
+                print(f"  ffmpeg video-segment hata: {r.stderr[-300:]}", file=sys.stderr)
+                return False
+            return os.path.exists(seg_yol) and os.path.getsize(seg_yol) > 1000
+        except Exception as e:
+            print(f"  ffmpeg video-segment istisna: {str(e)[:160]}", file=sys.stderr)
+            return False
+    gorsel = medya
     z, x, y = _zoompan_ifadeleri(sahne, gecis, fps, F)
     vf = (f"scale=2880:1620:force_original_aspect_ratio=increase,crop=2880:1620,"
           f"zoompan=z='{z}':x='{x}':y='{y}':d={F}:s=1920x1080:fps={fps}")
@@ -214,11 +239,9 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
     sahneler = props.get("sahneler") or []
     if not sahneler:
         return False
-    # KAPSAM KONTROLU: video sahnesi (footage) veya overlay basligi -> Remotion isi
+    # KAPSAM KONTROLU: video sahneleri artik DESTEKLI (Sora klipleri/footage segment olur).
+    # Sadece overlay basligi olan isler Remotion'a gider (kinetik baslik v1'de yok).
     for s in sahneler:
-        if s.get("tur") != "image":
-            print("  hizli motor: video sahnesi var -> Remotion", file=sys.stderr)
-            return False
         if str(s.get("overlay") or "").strip():
             print("  hizli motor: overlay basligi var -> Remotion", file=sys.stderr)
             return False

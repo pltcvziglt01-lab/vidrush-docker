@@ -243,6 +243,10 @@
               <option value="5">İlk 5 dakika</option>
               <option value="60">Tüm video hareketli</option>
             </select>
+            <div class="switch" id="swSora" style="margin-top:11px">
+              <span class="tr"></span>
+              <span>🎬 Gerçek video açılış (Sora)<small>açılış sahneleri AI ile GERÇEK videoya dönüşür (yağmur yağar, karakter kıpırdar) · sahne başı ~$0.80 ek maliyet</small></span>
+            </div>
           </div>
           <div class="durum" style="margin-top:10px;font-size:11px">📖 Hazır hikaye metnini yapıştır. Seçtiğin açılış süresi boyunca <b>yoğun hareket</b> (derin zoom + kayma — izleyiciyi tutmak için), sonrası sakin sinematik kareler.<br>🧍 <b>Karakter</b>: yukarıya görsel yüklersen her sahnede birebir o; <b>yüklemesen de</b> karakter baştan sona otomatik aynı tutulur.<br>🎨 <b>Görsel tarzı</b>: yukarıdaki "Stil görseli" alanına örnek bir fotoğraf yüklersen bütün sahneler <b>o fotoğrafın tarzında</b> üretilir (yüklemezsen sinematik film karesi stili).</div>
         </div>
@@ -1050,6 +1054,13 @@ $("#acilisSec") && ($("#acilisSec").onchange=()=>{
   const l=$("#acilisLbl"); if(l) l.textContent=m[$("#acilisSec").value]||($("#acilisSec").value+" dk");
 });
 
+/* hikaye: Sora gercek video acilis anahtari */
+let soraAcik=false;
+$("#swSora") && ($("#swSora").onclick=()=>{
+  soraAcik=!soraAcik;
+  $("#swSora").classList.toggle("on",soraAcik);
+});
+
 /* krediler */
 function krediYukle(){
   fetch("api/saglik").then(r=>r.json()).then(h=>{
@@ -1088,7 +1099,10 @@ $("#btnUret").onclick=async()=>{
   fd.append("sure_dk",sureDk); fd.append("gecis",gecisAcik?"1":"0"); fd.append("zoom",zoomAcik?"1":"0");
   fd.append("altyazi", altyaziAcik?"1":"0");
   if(altyaziAcik) fd.append("altyazi_sablon", JSON.stringify(ay));
-  if(videoTur==="hikaye"){ const a=$("#acilisSec"); if(a) fd.append("acilis", a.value); }
+  if(videoTur==="hikaye"){
+    const a=$("#acilisSec"); if(a) fd.append("acilis", a.value);
+    fd.append("sora", soraAcik?"1":"0");
+  }
   if(seciliProfil) fd.append("profil", seciliProfil);
   if(seciliPalet && seciliPalet!=="otomatik"){
     fd.append("palet", seciliPalet); fd.append("palet_ozel", ozelHex.join(","));

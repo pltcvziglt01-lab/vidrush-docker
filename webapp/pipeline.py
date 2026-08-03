@@ -2268,13 +2268,75 @@ def capa_uret(ref_yol: str, hedef: str, kimlik: str, stil: str, stil_yol: str = 
                              kanon_modu=True)
 
 
+def sora_klip(gorsel_yol: str, scene_prompt: str, hedef_mp4: str) -> bool:
+    """GERCEK VIDEOLASTIRMA: uretilmis sahne gorselini OpenAI Sora'ya referans verip
+    gercek video klibe cevirir (yagmur yagar, karakter kipirdar, kamera suzulur).
+    Maliyet ~$0.10/sn (sora-2 720p) -> 8 sn klip ~$0.80. Hata -> False (sahne
+    efektli fotograf olarak devam eder, is asla yarim kalmaz)."""
+    ref = hedef_mp4 + ".ref.png"
+    try:
+        saniye = os.environ.get("SORA_SANIYE", "8")
+        # Sora input_reference cikti boyutuyla ayni olmali -> 1280x720 kirp
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", gorsel_yol,
+                        "-vf", "scale=1280:720:force_original_aspect_ratio=increase,crop=1280:720",
+                        ref], timeout=60, check=True)
+        prompt = ((scene_prompt or "").strip()[:900] +
+                  " Cinematic live-action: natural motion of the elements and characters, "
+                  "subtle camera drift, photorealistic film look, no on-screen text.")
+        with open(ref, "rb") as f:
+            r = requests.post("https://api.openai.com/v1/videos", headers=OAI_H,
+                              files={"input_reference": ("ref.png", f, "image/png")},
+                              data={"model": os.environ.get("SORA_MODEL", "sora-2"),
+                                    "size": "1280x720", "seconds": str(saniye),
+                                    "prompt": prompt}, timeout=180)
+        if r.status_code >= 400:
+            print(f"  sora baslatma hata {r.status_code}: {r.text[:200]}", file=sys.stderr)
+            return False
+        vid = r.json().get("id")
+        if not vid:
+            return False
+        bas = time.time()
+        durum = ""
+        while time.time() - bas < 420:   # klip basina 7 dk tavan
+            time.sleep(10)
+            try:
+                d = requests.get(f"https://api.openai.com/v1/videos/{vid}",
+                                 headers=OAI_H, timeout=30).json()
+            except Exception:
+                continue
+            durum = d.get("status", "")
+            if durum == "completed":
+                break
+            if durum == "failed":
+                print(f"  sora klip basarisiz: {str(d.get('error'))[:200]}", file=sys.stderr)
+                return False
+        if durum != "completed":
+            print("  sora klip zaman asimi", file=sys.stderr)
+            return False
+        c = requests.get(f"https://api.openai.com/v1/videos/{vid}/content",
+                         headers=OAI_H, timeout=300)
+        if c.status_code >= 400 or len(c.content) < 50000:
+            return False
+        with open(hedef_mp4, "wb") as f:
+            f.write(c.content)
+        return True
+    except Exception as e:
+        print(f"  sora istisna: {str(e)[:160]}", file=sys.stderr)
+        return False
+    finally:
+        try:
+            os.remove(ref)
+        except Exception:
+            pass
+
+
 async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                mod: str = "documentary", edit_id: str = VARSAYILAN_EDIT,
                sure_dk: float = 2, gecis_acik: bool = True, zoom_acik: bool = True,
                ilerle=None, profil_id: str = "", altyazi_sablon: str = "",
                altyazi_ac: str = "", palet: str = "", palet_ozel: str = "",
                arkaplan: str = "", ses_secim: str = "", isik: str = "",
-               acilis_dk=None, sahne_ref: list = None) -> dict:
+               acilis_dk=None, sahne_ref: list = None, sora_acik: bool = False) -> dict:
     """Tam hat. mod: 'animasyon'|'documentary'. stil_yol: referans stil gorseli (opsiyonel).
     sure_dk: hedef sure (hikaye maks 60, digerleri maks 14). gecis_acik/zoom_acik: kullanicinin tercihi.
     profil_id: KANAL PROFILI — verilirse karakter/capa/kilitler profilden gelir ve tum
@@ -2546,8 +2608,23 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     sayac_kilit = threading.Lock()
     tamamlanan = [0]
 
+    # ── SORA GERCEK VIDEO ADAYLARI ──
+    # Kullanici "Gercek video (Sora)" actiysa: ACILIS suresine dusen ilk sahnelerin
+    # gorselleri Sora'ya referans verilip GERCEK video klibe cevrilir (~$0.8/sahne).
+    # Klip tavani SORA_KLIP_MAKS (maliyet sigortasi). Basarisiz klip -> efektli fotograf.
+    sora_adaylari = set()
+    if sora_acik and mod == "hikaye" and acilis_sn > 0:
+        adet = int(min(float(os.environ.get("SORA_KLIP_MAKS", "20")),
+                       max(0, round(acilis_sn / prof["sahne_sn"]))))
+        for sira, (i, n, s, metin, ov) in enumerate(islenecek):
+            if sira < adet:
+                sora_adaylari.add(n)
+        if sora_adaylari:
+            print(f"  SORA acik: {len(sora_adaylari)} acilis sahnesi videolastirilacak",
+                  file=sys.stderr)
+
     def _sahne_medya(n, s):
-        """Tek sahnenin medyasini (footage veya AI gorsel) uretir. Thread icinde calisir."""
+        """Tek sahnenin medyasini (footage / AI gorsel / Sora video) uretir. Thread'de kosar."""
         nonlocal bakiye_bitti, uretim_durdu
         if bakiye_bitti or uretim_durdu:
             return None
@@ -2572,6 +2649,13 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             return None
         if mag_profil and s.get("hd"):   # OTOMATIK: sadece plan HD isaretlediyse
             kaynak.magnific_upscale(gyol_full, optimized_for=mag_profil, scale="2x")
+        # 3) SORA: acilis sahnesiyse gorseli GERCEK videoya cevir (basarisizsa fotografla devam)
+        if n in sora_adaylari and not bakiye_bitti and not uretim_durdu:
+            svyol = os.path.join(PUBLIC, "isler", is_adi, f"sahne_{n}_sora.mp4")
+            if sora_klip(gyol_full, sp, svyol):
+                time.sleep(gorsel_bekle)
+                return ("video", f"isler/{is_adi}/sahne_{n}_sora.mp4")
+            print(f"  sahne {n}: sora klip olmadi, efektli fotografla devam", file=sys.stderr)
         # Hiz limiti: her ISCI kendi isteginden sonra bekler (toplam hiz = paralel/(uretim+bekleme))
         time.sleep(gorsel_bekle)
         return ("image", f"isler/{is_adi}/sahne_{n}.png")
