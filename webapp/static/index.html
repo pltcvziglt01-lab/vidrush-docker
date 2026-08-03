@@ -485,6 +485,13 @@
           <span class="tag" id="stSesEtiket"></span></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px" id="stSesGrup"></div>
         <div class="estiller" id="stSesler"><span class="durum">Yükleniyor...</span></div>
+        <div id="stKutup" style="display:none;margin-top:14px">
+          <div class="lbl2" style="margin-bottom:8px">📚 Tüm kütüphane — filtrele, dinle, beğendiğini seç</div>
+          <div id="stKutupF" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:9px"></div>
+          <input id="stAra" placeholder="Ara: isim, tarz (deep, energetic, calm, storyteller...)"
+            style="width:100%;background:#0e1117;border:1px solid var(--line);border-radius:10px;color:var(--txt);padding:10px 13px;font:inherit;font-size:13px;margin-bottom:9px">
+          <div id="stKutupListe" style="max-height:320px;overflow-y:auto"></div>
+        </div>
       </div>
 
       <div class="ak" id="akKalite" style="display:none">
@@ -1473,18 +1480,86 @@ setInterval(()=>{ const v=$("#view-videolar"); if(v && v.classList.contains("on"
       c.appendChild(d);
     });
   }
+  /* KUTUPHANE: saglayicinin TUM katalogu (ana ekrandaki kutupCache + DIL/YAS/CINS
+     sozlukleri global oldugu icin buradan da kullanilir). Sec -> stSes="ozel:<voice_id>" */
+  const ST_KUTUP={elevenlabs:"elevenlabs",minimax:"minimax",fishaudio:"fishaudio",kokoro:"kokoro"};
+  let stFilt={dil:"",cinsiyet:"",yas:"",aksan:"",kategori:""}, stAktifSag="";
+  function stKutupCiz(liste){
+    const kc=$s("#stKutupListe"); if(!kc) return; kc.innerHTML="";
+    const f=($s("#stAra")?.value||"").toLowerCase();
+    const secilen = stSes.startsWith("ozel:") ? stSes.slice(5) : "";
+    liste.filter(v=>{
+      if(stFilt.dil && !((v.diller||[]).includes(stFilt.dil)||v.dil===stFilt.dil)) return false;
+      if(stFilt.cinsiyet && v.cinsiyet!==stFilt.cinsiyet) return false;
+      if(stFilt.yas && v.yas!==stFilt.yas) return false;
+      if(stFilt.aksan && v.aksan!==stFilt.aksan) return false;
+      if(stFilt.kategori && v.kategori!==stFilt.kategori) return false;
+      if(f && !(v.ad+" "+v.ozet+" "+(v.aksan||"")).toLowerCase().includes(f)) return false;
+      return true;
+    }).forEach(v=>{
+      const r=document.createElement("div"); r.className="krow"+(v.voice_id===secilen?" sec":"");
+      r.style.cssText="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);border-radius:10px;margin-bottom:7px;background:var(--card2)";
+      const dilR=(v.diller&&v.diller.length?v.diller:[v.dil]).filter(Boolean).slice(0,3).map(x=>(DIL_ADI[x]||x.toUpperCase())).join(", ");
+      const roz=[v.cinsiyet==="female"?"♀ Kadın":v.cinsiyet==="male"?"♂ Erkek":"",YAS_ADI[v.yas]||"",dilR].filter(Boolean).join(" · ");
+      r.innerHTML=`<div style="flex:1;min-width:0"><b style="font-size:13px">${v.ad}</b>
+          <div style="font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${v.ozet||""}</div>
+          <div style="font-size:10px;color:var(--dim2);margin-top:2px">${roz}</div></div>
+        ${v.onizleme?`<button class="oyn" style="background:#0e1117;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:5px 10px;font:inherit;font-size:11px;cursor:pointer;flex:0 0 auto">▶</button>`:""}
+        <button class="btn" style="padding:6px 14px;font-size:12px;flex:0 0 auto">Seç</button>`;
+      const oy=r.querySelector(".oyn"); if(oy) oy.onclick=()=>sesCal2(v.onizleme,oy);
+      r.querySelector(".btn").onclick=()=>{
+        stSes="ozel:"+v.voice_id;
+        document.querySelectorAll("#stSesler .estil").forEach(x=>x.classList.remove("on"));
+        document.querySelectorAll("#stKutupListe .krow").forEach(x=>x.classList.remove("sec"));
+        r.classList.add("sec");
+        $s("#stSesEtiket").textContent=v.ad+" (kütüphane)"; sayacGuncelle();
+      };
+      kc.appendChild(r);
+    });
+    if(!kc.children.length) kc.innerHTML='<span class="durum">Eşleşen ses yok.</span>';
+  }
+  function stFiltBar(liste){
+    const fb=$s("#stKutupF"); if(!fb) return;
+    const tekil=al=>[...new Set(liste.flatMap(v=>al==="dil"?(v.diller&&v.diller.length?v.diller:[v.dil]):[v[al]]).filter(Boolean))].sort();
+    const kutu=(ad,al,adlar)=>{
+      const sec=tekil(al); if(!sec.length) return "";
+      return `<label style="display:flex;flex-direction:column;gap:3px;font-size:10.5px;color:var(--dim2)">${ad}
+        <select data-al="${al}" style="background:#0e1117;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:6px 8px;font:inherit;font-size:12px">
+          <option value="">Tümü</option>${sec.map(x=>`<option value="${x}">${(adlar&&adlar[x])||x}</option>`).join("")}</select></label>`;
+    };
+    fb.innerHTML=kutu("Dil","dil",DIL_ADI)+kutu("Cinsiyet","cinsiyet",CINS_ADI)+kutu("Yaş","yas",YAS_ADI)+kutu("Aksan","aksan")+kutu("Kategori","kategori");
+    fb.querySelectorAll("select").forEach(s2=>s2.onchange=()=>{ stFilt[s2.dataset.al]=s2.value; stKutupCiz(liste); });
+  }
+  function stKutupGoster(gr){
+    const sag=ST_KUTUP[gr], k=$s("#stKutup");
+    if(!k) return;
+    if(!sag){ k.style.display="none"; stAktifSag=""; return; }
+    k.style.display=""; stAktifSag=sag;
+    stFilt={dil:"",cinsiyet:"",yas:"",aksan:"",kategori:""};
+    if(kutupCache[sag]){ stFiltBar(kutupCache[sag]); stKutupCiz(kutupCache[sag]); return; }
+    $s("#stKutupListe").innerHTML='<span class="durum">Kütüphane yükleniyor...</span>';
+    fetch("api/ses-kutuphane?saglayici="+sag).then(r=>r.json()).then(l=>{
+      kutupCache[sag]=l; stFiltBar(l); stKutupCiz(l);
+    }).catch(()=>{ $s("#stKutupListe").innerHTML='<span class="durum">Kütüphane alınamadı.</span>'; });
+  }
+  $s("#stAra") && ($s("#stAra").oninput=()=>{ if(stAktifSag) stKutupCiz(kutupCache[stAktifSag]||[]); });
+
   fetch("api/sesler").then(r=>r.json()).then(list=>{
     sesListe2=list;
+    /* SESLER gruplari + sadece-kutuphane saglayicilari (minimax/fishaudio/kokoro) tek sirada */
     const gruplar=[...new Set(list.map(v=>v.grup||"ucretsiz"))];
+    ["minimax","fishaudio","kokoro"].forEach(x=>{ if(!gruplar.includes(x)) gruplar.push(x); });
+    const GRUP_AD2={...GRUP_AD, elevenlabs:"⭐ ElevenLabs", minimax:"🎵 MiniMax",
+                    fishaudio:"🐟 FishAudio", kokoro:"🌸 Kokoro"};
     const g=$s("#stSesGrup");
     gruplar.forEach((gr,i)=>{
       const b2=document.createElement("span");
-      b2.className="cip"+(i===0?" on":""); b2.textContent=GRUP_AD[gr]||gr;
+      b2.className="cip"+(i===0?" on":""); b2.textContent=GRUP_AD2[gr]||gr;
       b2.onclick=()=>{ document.querySelectorAll("#stSesGrup .cip").forEach(x=>x.classList.remove("on"));
-        b2.classList.add("on"); cizSesler(gr); };
+        b2.classList.add("on"); cizSesler(gr); stKutupGoster(gr); };
       g.appendChild(b2);
     });
-    cizSesler(gruplar[0]);
+    cizSesler(gruplar[0]); stKutupGoster(gruplar[0]);
     const v0=list.find(v=>v.id===stSes); if(v0) $s("#stSesEtiket").textContent=v0.ad;
   }).catch(()=>{$s("#stSesler").innerHTML='<span class="durum">sesler yüklenemedi</span>';});
 
