@@ -567,6 +567,17 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
         acilis_dk = max(0.0, min(60.0, float(acilis))) if acilis.strip() != "" else None
     except Exception:
         acilis_dk = None
+    # ⚠ 3 Agu 2026 — REFERANSSIZ ANIMASYON REDDEDILIR.
+    # Kullanici eski panelden referanssiz istek gonderdi, sistem fotogercekci "hikaye"
+    # modunda 30 gorsel uretti ve para yandi. Artik animasyon istegi en az bir gorsel
+    # referans ISTER — sessizce yanlis sey uretmektense NET HATA versin.
+    if mod == "animasyon" and not sref and not kar and not stil_yol:
+        shutil.rmtree(idir, ignore_errors=True)
+        raise HTTPException(400,
+            "Animasyon için en az 1 referans kare gerekli. Animasyon Stüdyosu'ndan "
+            "yapmak istediğin tarzdan 2-6 kare yükle — karakter, çizim stili, palet ve "
+            "ışık hepsi o karelerden çıkarılır.")
+
     is_kuyrugu.put((is_id, story.strip(), kar, stil_yol, mod, edit_id, sd, gecis_acik, zoom_acik,
                     profil.strip(), altyazi.strip(), altyazi_sablon.strip(),
                     pal, palet_ozel.strip()[:80],

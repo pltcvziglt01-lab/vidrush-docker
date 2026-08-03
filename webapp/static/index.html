@@ -187,260 +187,10 @@
     <!-- ─────────── STÜDYO ─────────── -->
     <!-- Eski elle-ayar paneli: menuden kaldirildi (Polat, 3 Agu 2026). DOM'da duruyor —
          geri getirmek icin menuye <div class="nav" data-view="studio">...</div> eklemek yeter. -->
-    <section class="view" id="view-studio">
-      <p class="eyebrow">Metinden Video</p>
-      <h1>Yeni Video</h1>
-      <p class="lead">Hikaye metnini ver, türü/stili seç, Video Üret'e bas. Görsel üretimi, gerçek footage, seslendirme, senkron ve profesyonel kurgu araca ait. Karakterli hikayeler için isteğe bağlı referans karakter yükleyebilirsin.</p>
-
-      <div class="card">
-        <h2><span class="num">1</span> Referanslar <span class="tag">her videoda yeniden yükle</span></h2>
-        <!-- ⭐ ÖNERİLEN: karakterin İÇİNDE olduğu gerçek kareler — hepsi buradan çıkarılır -->
-        <label class="drop" id="dropSref" style="margin-bottom:14px;border-color:var(--acc2)">
-          <input type="file" id="fSref" accept="image/*" multiple>
-          <div id="srefView">
-            <div class="lbl">⭐ Referans kareler <span style="color:var(--acc2);font-size:11px">— ÖNERİLEN</span></div>
-            <div class="hint">1-4 kare · <b>karakterin içinde olduğu gerçek sahneler</b> yükle.<br>
-              Motor hepsini tek seferde çıkarır: <b>karakter kimliği · çizim stili · renk paleti · ışık seviyesi</b>.<br>
-              Işık <b>ölçülür</b>, tahmin edilmez. Birden fazla kare verirsen sadece <b>hepsinde tekrar eden</b> özellikler kilitlenir.</div>
-          </div>
-        </label>
-        <div class="durum" style="font-size:11px;margin:-4px 0 12px;color:var(--dim2)">
-          — ya da eskisi gibi ayrı ayrı: —
-        </div>
-        <div class="refs">
-          <label class="drop" id="dropKar">
-            <input type="file" id="fKar" accept="image/*">
-            <div id="karView"><div class="lbl">🧍 Karakter görseli</div><div class="hint">opsiyonel · detaylı analiz edilip HER sahnede birebir aynı karakter</div></div>
-          </label>
-          <label class="drop" id="dropStil">
-            <input type="file" id="fStil" accept="image/*">
-            <div id="stilView"><div class="lbl">🎨 Stil görseli</div><div class="hint">opsiyonel · yüklersen <b>çok aşamalı analiz</b> edilir (renk ölçümü + 2 bağımsız okuma + uzlaşı) ve <b>seçtiğin stilin görünümünün yerine geçer</b> — kompozisyon kuralları aynı kalır</div></div>
-          </label>
-        </div>
-        <div class="durum" style="margin-top:10px;font-size:11px">Görseller <b>kaydedilmez</b> — gizlilik için her video sonrası silinir, her seferinde yeniden yükle.</div>
-      </div>
-
-      <div class="card">
-        <h2><span class="num">2</span> Hikaye Metni</h2>
-        <textarea id="story" placeholder="Hikayeni buraya yaz (herhangi bir dilde)... Örn: 'Okyanusun en derin noktasında, ışığın hiç ulaşmadığı yerde...'"></textarea>
-      </div>
-
-      <div class="card">
-        <h2><span class="num">3</span> Video Türü</h2>
-        <div class="estiller" style="grid-template-columns:1fr 1fr 1fr" id="turler">
-          <div class="estil" data-tur="animasyon">
-            <span class="pick"></span><span class="en">🧍</span>
-            <b>Animasyon</b><p>Elle çizilmiş karakter animasyonu; anlatı veya eğitici stil.</p>
-            <div class="meta">2 stil · footage/HD yok</div>
-          </div>
-          <div class="estil on" data-tur="documentary">
-            <span class="pick"></span><span class="en">🎬</span>
-            <b>Documentary</b><p>Gerçekçi belgesel; içinde stil seçimi + otomatik footage & HD.</p>
-            <div class="meta">3 stil · otomatik footage/Magnific</div>
-          </div>
-          <div class="estil" data-tur="hikaye">
-            <span class="pick"></span><span class="en">📖</span>
-            <b>Hikaye</b><p>Hikaye kanalı formatı: film karesi görseller, hareketli açılış, altyazı.</p>
-            <div class="meta">sinematik gerçekçi · tutarlı karakter</div>
-          </div>
-        </div>
-
-        <div id="editWrap">
-          <div class="lbl2">🎞️ Documentary stili</div>
-          <div class="estiller" id="estiller"><span class="durum">Yükleniyor...</span></div>
-          <div class="durum" style="margin-top:10px;font-size:11px">Footage (YouTube/stok) ve Magnific HD, metne göre <b>otomatik</b> kullanılır — ayar gerekmez.</div>
-        </div>
-
-        <div id="animWrap" style="display:none">
-          <div class="lbl2">🎨 Animasyon stili</div>
-          <div class="estiller" id="animStiller"><span class="durum">Yükleniyor...</span></div>
-          <div class="durum" style="margin-top:10px;font-size:11px"><b>Anlatı</b>: psikoloji/felsefe/deneme — soluk palet, detaylı ortamlar. <b>Eğitici</b>: tarih/bilim/nasıl-çalışır — canlı renkler, diyagram kartları. <b>Hikaye</b>: macera/what-if — sade beyaz stickman + boyalı sinematik dünya. <b>Renkli Kalem</b>: para/hayat dersi anlatımı — kremli kâğıda kurşun kalem, sıcak gündelik mekânlar, imza aksesuarlı anlatıcı.</div>
-        </div>
-
-        <div id="hikayeWrap" style="display:none">
-          <div class="ay" style="margin:14px 0 6px;max-width:400px;background:linear-gradient(160deg,#1d1836,#12211d);border:1.5px solid var(--acc);border-radius:13px;padding:14px 16px">
-            <span style="font-size:14px;color:var(--txt)">🎬 <b>Hareketli açılış süresi</b><b id="acilisLbl" style="color:var(--acc2)">İlk 2,5 dk</b></span>
-            <select id="acilisSec">
-              <option value="0">Kapalı — baştan sona sakin</option>
-              <option value="1">İlk 1 dakika</option>
-              <option value="2.5" selected>İlk 2,5 dakika (önerilen)</option>
-              <option value="5">İlk 5 dakika</option>
-              <option value="60">Tüm video hareketli</option>
-            </select>
-            <div class="switch" id="swSora" style="margin-top:11px">
-              <span class="tr"></span>
-              <span>🎬 Gerçek video açılış (Sora)<small>açılış sahneleri AI ile GERÇEK videoya dönüşür (yağmur yağar, karakter kıpırdar) · sahne başı ~$0.80 ek maliyet</small></span>
-            </div>
-          </div>
-          <div class="durum" style="margin-top:10px;font-size:11px">📖 Hazır hikaye metnini yapıştır. Seçtiğin açılış süresi boyunca <b>yoğun hareket</b> (derin zoom + kayma — izleyiciyi tutmak için), sonrası sakin sinematik kareler.<br>🧍 <b>Karakter</b>: yukarıya görsel yüklersen her sahnede birebir o; <b>yüklemesen de</b> karakter baştan sona otomatik aynı tutulur.<br>🎨 <b>Görsel tarzı</b>: yukarıdaki "Stil görseli" alanına örnek bir fotoğraf yüklersen bütün sahneler <b>o fotoğrafın tarzında</b> üretilir (yüklemezsen sinematik film karesi stili).</div>
-        </div>
-
-        <!-- ══ IŞIK DÜZEYİ ══ -->
-        <div style="margin-top:22px;border-top:1px solid var(--line);padding-top:18px">
-          <div class="lbl2">💡 Işık düzeyi <span style="font-weight:400;color:var(--dim2)">— karelerin aydınlığı</span></div>
-          <div class="estiller" id="isiklar"><span class="durum">Yükleniyor...</span></div>
-          <div class="durum" style="margin-top:10px;font-size:11px">
-            Ölçüm: hedef kanalların ortalama parlaklığı <b>162/255</b>, bizim eski çıktımız <b>114</b> —
-            %30 daha karanlıktı. <b>Parlak Gündüz</b> artık varsayılan ve stilin/arka planın
-            karanlık eğilimini <b>ezer</b>.
-          </div>
-        </div>
-
-        <!-- ══ ANLATICI SESİ ══ -->
-        <div style="margin-top:22px;border-top:1px solid var(--line);padding-top:18px">
-          <div class="lbl2">🎙️ Anlatıcı sesi <span style="font-weight:400;color:var(--dim2)">— dinleyip seç</span></div>
-          <div class="estiller" id="sesler"><span class="durum">Yükleniyor...</span></div>
-          <div class="durum" style="margin-top:10px;font-size:11px">
-            <b>Ücretsiz</b> sesler edge-tts — yaş tarif edilemez, sadece ton farkı.
-            <b>Yaşlı/olgun</b> sesler OpenAI motoru kullanır: sesin yaşı ve tınısı tarif edilebilir,
-            video başına ~$0.03. Kanal profiline kaydedilir.
-          </div>
-        </div>
-
-        <!-- ══ ARKA PLAN: mekân dünyası + yoğunluk ══ -->
-        <div style="margin-top:22px;border-top:1px solid var(--line);padding-top:18px">
-          <div class="lbl2">🏠 Arka plan <span style="font-weight:400;color:var(--dim2)">— sahnelerin geçtiği mekân dünyası</span></div>
-          <div class="estiller" id="arkaplanlar"><span class="durum">Yükleniyor...</span></div>
-          <div class="durum" style="margin-top:10px;font-size:11px">
-            <b>Sade</b> seçersen "her yer dolu olsun" kuralı susturulur (Paint Explainer düzeni).
-            <b>Zengin</b> seçersen detaylı, yaşanmış mekânlar kurulur. Kanal profiline kaydedilir.
-          </div>
-        </div>
-
-        <!-- ══ RENK PALETİ: kanal genelinde sabit renk kimliği ══ -->
-        <div style="margin-top:22px;border-top:1px solid var(--line);padding-top:18px">
-          <div class="lbl2">🎨 Renk paleti <span style="font-weight:400;color:var(--dim2)">— kanalın renk kimliği, her videoda aynı</span></div>
-          <div class="estiller" id="paletler"><span class="durum">Yükleniyor...</span></div>
-          <div id="ozelPaletWrap" style="display:none;margin-top:14px;padding:14px;border-radius:12px;
-               border:1px solid var(--line);background:#14141c">
-            <div class="durum" style="margin-bottom:10px;font-size:12px">Kendi renklerin — en az 2, en fazla 6:</div>
-            <div id="ozelRenkler" style="display:flex;gap:10px;flex-wrap:wrap"></div>
-          </div>
-          <div class="durum" style="margin-top:10px;font-size:11px">
-            Palet <b>kesin HEX kodu</b> olarak prompta girer (kelimeyle tarif değil) — bu yüzden sahneler arası renk kaymaz.
-            Palet <b>dünyayı</b> yönetir; ana karakterin kendi kilitli renkleri her zaman önceliklidir.
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2><span class="num">4</span> Ayarlar</h2>
-        <div class="opt" style="align-items:flex-start;gap:26px">
-          <div>
-            <div class="durum" style="margin-bottom:8px">Süre: <b id="sureLbl">2 dk</b></div>
-            <input type="range" id="sure" min="1" max="14" step="1" value="2" style="width:220px;accent-color:var(--acc)">
-            <div class="durum" id="sureHint" style="font-size:11px;margin-top:4px">1–14 dk. Uzun sürede render dakikalarca sürebilir.</div>
-          </div>
-          <div class="switch on" id="swGecis" style="margin-top:4px">
-            <span class="tr"></span><span>Geçişler<small>kapalıysa sade kesme</small></span>
-          </div>
-          <div class="switch on" id="swZoom" style="margin-top:4px">
-            <span class="tr"></span><span>Zoom (Ken Burns)<small>görselde yakınlaşma/kaydırma</small></span>
-          </div>
-          <div class="switch" id="swAltyazi" style="margin-top:4px">
-            <span class="tr"></span><span>Altyazı<small>konuşmayı ekrana yaz</small></span>
-          </div>
-        </div>
-        <div id="altyaziWrap" style="display:none;margin-top:18px">
-          <div class="lbl2">🔤 Hazır şablonlar <span style="font-weight:400;color:var(--dim2)">— YouTube'da yaygın kullanılanlar</span></div>
-          <div class="estiller" id="altSablonlar"><span class="durum">Yükleniyor...</span></div>
-
-          <!-- CANLI ÖNİZLEME -->
-          <div style="margin-top:18px">
-            <div class="lbl2">👁️ Canlı önizleme</div>
-            <div id="altOnizleme" style="position:relative;border-radius:14px;overflow:hidden;
-                 border:1px solid var(--line);aspect-ratio:16/9;max-height:260px;
-                 background:linear-gradient(140deg,#2c3e50 0%,#4a6572 40%,#8a7f6d 100%);
-                 display:flex;align-items:flex-end;justify-content:center">
-              <div id="altOnizYazi" style="margin-bottom:9%;max-width:84%;text-align:center"></div>
-            </div>
-            <div class="durum" style="font-size:11px;margin-top:6px">Görseldeki gibi videoda da böyle görünecek.</div>
-          </div>
-
-          <!-- İNCE AYAR -->
-          <div class="lbl2" style="margin-top:20px">🎛️ İnce ayar</div>
-          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px">
-            <label class="ay"><span>Font</span>
-              <select id="ayFont">
-                <option value="montserrat">Montserrat (kalın, modern)</option>
-                <option value="anton">Anton (çok kalın, viral)</option>
-                <option value="bebas">Bebas Neue (dar, uzun)</option>
-                <option value="poppins">Poppins (yuvarlak)</option>
-                <option value="oswald">Oswald (ince, sinematik)</option>
-              </select></label>
-            <label class="ay"><span>Boyut <b id="ayBoyutV">52</b>px</span>
-              <input type="range" id="ayBoyut" min="28" max="96" step="2" value="52"></label>
-            <label class="ay"><span>Kalınlık <b id="ayAgirlikV">800</b></span>
-              <input type="range" id="ayAgirlik" min="300" max="900" step="100" value="800"></label>
-            <label class="ay"><span>Yazı rengi</span>
-              <input type="color" id="ayRenk" value="#ffffff"></label>
-            <label class="ay"><span>Kontur (kenar) rengi</span>
-              <input type="color" id="ayKonturRenk" value="#000000"></label>
-            <label class="ay"><span>Kontur kalınlığı <b id="ayKonturV">5</b>px</span>
-              <input type="range" id="ayKontur" min="0" max="14" step="1" value="5"></label>
-            <label class="ay"><span>Konum</span>
-              <select id="ayKonum">
-                <option value="alt">Alt (klasik)</option>
-                <option value="orta">Orta (kısa video tarzı)</option>
-                <option value="ust">Üst</option>
-              </select></label>
-            <label class="ay"><span>Arka plan kutusu</span>
-              <select id="ayArka">
-                <option value="yok">Yok (şeffaf)</option>
-                <option value="rgba(0,0,0,0.72)">Siyah kutu</option>
-                <option value="rgba(0,0,0,0.45)">Hafif siyah</option>
-                <option value="rgba(255,212,0,0.95)">Sarı kutu</option>
-                <option value="rgba(255,255,255,0.92)">Beyaz kutu</option>
-              </select></label>
-            <label class="ay"><span>Harf aralığı <b id="ayAralikV">0</b></span>
-              <input type="range" id="ayAralik" min="-1" max="6" step="0.5" value="0"></label>
-          </div>
-          <div class="opt" style="margin-top:14px">
-            <div class="switch" id="swBuyukHarf"><span class="tr"></span><span>BÜYÜK HARF<small>tümü kapital</small></span></div>
-            <div class="switch on" id="swGolge"><span class="tr"></span><span>Gölge<small>yumuşak dış gölge</small></span></div>
-            <button class="btn ghost" id="btnAltSifirla" style="padding:9px 18px;font-size:13px">↺ Şablona dön</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2><span class="num">5</span> Kanal Profili <span class="durum" style="font-weight:400">— her videoda aynı stil</span></h2>
-        <div class="durum" style="font-size:12px;margin-bottom:12px">
-          Profil seçersen karakter ve görsel stili <b>kaydedilir</b>; sonraki tüm videolar aynı görünür.
-          İlk video görünümü <b>kilitler</b>, sonrakiler ona uyar — evergreen kanal için şart.
-        </div>
-        <div class="estiller" id="profiller"><span class="durum">Yükleniyor...</span></div>
-        <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-          <input id="pfId" placeholder="profil-kimligi (or. bahce-kanali)" style="flex:1;min-width:200px;padding:10px 12px;border-radius:10px;border:1px solid #2a2a35;background:#14141c;color:#eee">
-          <input id="pfAd" placeholder="Görünen ad" style="flex:1;min-width:160px;padding:10px 12px;border-radius:10px;border:1px solid #2a2a35;background:#14141c;color:#eee">
-          <button class="btn" id="btnProfil" style="padding:10px 18px">+ Profil Oluştur</button>
-        </div>
-        <div class="durum" style="font-size:11.5px;margin-top:10px;background:#0e1117;border:1px solid var(--line);border-radius:10px;padding:11px 13px">
-          <b style="color:var(--txt)">Kaydedilecekler</b> — yukarıdaki seçimlerin kullanılır, ayrıca bir şey sorulmaz:
-          <div id="pfOzet" style="margin-top:7px;line-height:1.75"></div>
-        </div>
-      </div>
-
-      <div class="row">
-        <button class="btn" id="btnUret">🎬 Video Üret</button>
-        <span class="durum" id="uretDurum"></span>
-      </div>
-      <div class="bar hidden" id="barWrap"><i id="bar"></i></div>
-      <div class="err hidden" id="err"></div>
-
-      <div class="card hidden" id="sonucCard" style="margin-top:18px">
-        <h2>✨ Videon Hazır</h2>
-        <video id="player" controls></video>
-        <div class="dl">
-          <a class="dlbtn" id="dlVideo" download>⬇ Videoyu İndir</a>
-          <a class="dlbtn sec" id="dlKapak" download>🖼 Kapağı İndir</a>
-        </div>
-      </div>
-    </section>
-
-    <!-- ─────────── EDIT STİLLERİ ─────────── -->
-    <!-- ══════════ ANİMASYON STÜDYOSU ══════════ -->
-    <section class="view on" id="view-studyo">
+    <!-- Eski elle-ayar paneli 3 Agu 2026 SILINDI. Iki uretim yolu acik kalinca
+     kullanici yanlislikla referanssiz "hikaye" modunda uretti ve para yandi.
+     Tek yol: Animasyon Studyosu. Git gecmisinde duruyor. -->
+<section class="view on" id="view-studyo">
       <p class="eyebrow">Animasyon Stüdyosu</p>
       <h1>Referans ver, gerisini motor halletsin</h1>
       <p class="lead">Yapmak istediğin tarzdan birkaç kare yükle. Motor karakteri, çizim dilini,
@@ -1384,6 +1134,8 @@ setInterval(()=>{ const v=$("#view-videolar"); if(v && v.classList.contains("on"
   /* ── 5. Üret ── */
   $s("#stUret") && ($s("#stUret").onclick=async()=>{
     const b=$s("#stUret"), d=$s("#stUretDurum");
+    if(!stFiles.length){ d.textContent="Önce referans kare yükle — animasyon referanssız üretilmiyor."; return; }
+    if(!stAnalizSonuc){ d.textContent="Önce 'Analiz et'e bas."; return; }
     b.disabled=true; d.textContent="Kuyruğa alınıyor...";
     const fd=new FormData();
     fd.append("session",(localStorage.getItem("vidrush_sid")||"u1"));
@@ -1397,7 +1149,9 @@ setInterval(()=>{ const v=$("#view-videolar"); if(v && v.classList.contains("on"
       const r=await fetch("api/generate",{method:"POST",body:fd});
       const j=await r.json();
       if(!r.ok || !j.job_id){ d.textContent="Başlatılamadı: "+(j.detail||r.status); b.disabled=false; return; }
-      stIs=j.job_id; d.textContent=""; goster("#ak5"); kaydir("#ak5"); izle();
+      stIs=j.job_id;
+      d.textContent = j.kuyruk>1 ? `Kuyruğa alındı — önünde ${j.kuyruk-1} iş var` : "Başlıyor...";
+      goster("#ak5"); kaydir("#ak5"); izle();
     }catch(e){ d.textContent="Başlatılamadı."; b.disabled=false; }
   });
 
@@ -1407,7 +1161,15 @@ setInterval(()=>{ const v=$("#view-videolar"); if(v && v.classList.contains("on"
       try{
         const r=await fetch("api/job/"+stIs); const j=await r.json();
         $s("#stBar").style.width=(j.ilerleme||0)+"%";
-        $s("#stIlerleme").textContent=(j.mesaj||"")+(j.ilerleme?` — %${j.ilerleme}`:"");
+        /* Kuyrukta beklerken "Sırada..." donmus gibi duruyordu — kacinci sirada oldugunu YAZ */
+        let m=(j.mesaj||"");
+        if(j.durum==="kuyrukta"){
+          const s1=j.kuyruk_sira, t1=j.kuyruk_toplam;
+          m = s1 ? `Sırada — önünde ${s1-1} iş var (toplam ${t1}). Tek işçi çalışıyor, sırası gelince başlayacak.`
+                 : "Sırada bekliyor — tek işçi çalışıyor.";
+        }
+        $s("#stIlerleme").innerHTML = m + (j.ilerleme?` — %${j.ilerleme}`:"") +
+          `<div style="font-size:10.5px;color:var(--dim2);margin-top:6px;font-family:ui-monospace,Menlo,monospace">${stIs}</div>`;
         if(j.durum==="bitti"){
           clearInterval(stTimer);
           $s("#stSonuc").innerHTML=`<video src="${j.video}" controls style="width:100%;border-radius:12px"></video>

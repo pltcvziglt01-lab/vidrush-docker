@@ -572,7 +572,9 @@ EXP_STIL = (
     "no panel or card border. "
     "Any lettering is thick hand-lettered marker CAPITALS: upright, uniform stroke, solid fill, black "
     "or alert red only. Full-bleed art. Keep out: gradients, texture, grain, 3D or photographic "
-    "rendering, borders, frames, logos, watermarks, subtitle bars"
+    "rendering, borders, frames, logos, watermarks, subtitle bars."
+    " This is a drawn illustration, NEVER a photograph: no photorealism, no camera lens "
+    "effects, no real human skin or hair texture, no film still look."
 )
 EXP_VARSAYILAN_KARAKTER = (
     "The recurring hero is a simple cartoon everyman about 4.5 heads tall: round head, one flat skin "
@@ -707,6 +709,7 @@ HIK_STIL = (
     "Lettering, when present, is a bold flat uppercase sans-serif graphic overlay or a plain outlined "
     "label box drawn on top of the painting. Avoid: photorealism, 3D render, anime, outlined or "
     "vector-flat scenery, shaded or muscular or textured figures, detailed faces"
+    " This is a drawn illustration, NEVER a photograph: no photorealism, no camera lens effects, no real human skin or hair texture, no film still look."
 )
 HIK_VARSAYILAN_KARAKTER = (
     "The hero is one white stick figure: thin uniform black outline, completely white unshaded head "
@@ -804,6 +807,7 @@ KALEM_STIL = (
     "rounded head, thin dark limbs, small oval hands and feet, no nose, no neck; all the drawing "
     "detail is spent on the ENVIRONMENT and the props, never on the body. "
     "Avoid: photorealism, 3D render, anime, glossy digital vector art, neon colours, airbrush"
+    " This is a drawn illustration, NEVER a photograph: no photorealism, no camera lens effects, no real human skin or hair texture, no film still look."
 )
 KALEM_VARSAYILAN_KARAKTER = (
     "The narrator is one simple stick figure: plain white rounded head with two black dot eyes, two "
@@ -2370,6 +2374,16 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         if kanal.get("edit") and edit_id and kanal["edit"] != edit_id:
             print(f"  NOT: profil '{profil_id}' stili '{kanal['edit']}' ama bu videoda "
                   f"'{edit_id}' secilmis -> SECIM kazanir", file=sys.stderr)
+
+    # ⚠ IS KUNYESI — her isin BASINDA ne aldigini tek satirda logla.
+    # 3 Agu 2026'da "referanslar neden uygulanmadi" sorusunu cevaplamak icin log kazmak
+    # zorunda kaldik. Artik ilk satirda gorunur: mod, stil, kac referans, profil.
+    print(f"  ┌ IS KUNYESI {is_adi}\n"
+          f"  │ mod={mod} edit={edit_id} sure={sure_dk}dk profil={profil_id or '-'}\n"
+          f"  │ sahne_ref={len(sahne_ref or [])} karakter={'VAR' if (kar_yol and os.path.exists(kar_yol)) else 'yok'} "
+          f"stil_gorseli={'VAR' if (stil_yol and os.path.exists(stil_yol)) else 'yok'}\n"
+          f"  └ palet={palet or '-'} arkaplan={arkaplan or '-'} isik={isik or '-'} ses={ses_secim or '-'}",
+          file=sys.stderr)
 
     prof = profil_coz(mod, edit_id)
     gorsel_ek = prof["gorsel_ek"]
