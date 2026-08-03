@@ -480,9 +480,30 @@
         <div class="row"><button class="btn ghost" id="stTekrar">Kareleri değiştir</button></div>
       </div>
 
+      <div class="ak" id="akSes" style="display:none">
+        <div class="akbas"><span class="aknum">🎙️</span> Anlatıcı sesi
+          <span class="tag" id="stSesEtiket"></span></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px" id="stSesGrup"></div>
+        <div class="estiller" id="stSesler"><span class="durum">Yükleniyor...</span></div>
+      </div>
+
+      <div class="ak" id="akKalite" style="display:none">
+        <div class="akbas"><span class="aknum">🖼️</span> Görsel kalitesi</div>
+        <div class="estiller" id="stKalite">
+          <div class="estil on" data-model="gpt-image-1-mini"><span class="pick"></span>
+            <b>Standart</b><p>Hızlı ve ucuz — $0.013/kare</p>
+            <div class="meta" id="mStd">—</div></div>
+          <div class="estil" data-model="gpt-image-2"><span class="pick"></span>
+            <b>Yüksek</b><p>Daha temiz çizgi ve detay — $0.048/kare</p>
+            <div class="meta" id="mYuk">—</div></div>
+        </div>
+      </div>
+
       <div class="ak" id="ak3" style="display:none">
         <div class="akbas"><span class="aknum">3</span> Metin</div>
-        <textarea id="stMetin" placeholder="Videonun anlatım metnini buraya yapıştır..."></textarea>
+        <textarea id="stMetin" maxlength="30000" style="min-height:200px"
+          placeholder="Videonun anlatım metnini buraya yapıştır... (30.000 karaktere kadar)"></textarea>
+        <div class="durum" id="stSayac" style="margin-top:8px;font-size:12px">0 karakter · 0 kelime</div>
         <div class="row"><button class="btn" id="stDevam">Devam</button>
           <span class="durum" id="stMetinDurum"></span></div>
       </div>
@@ -1315,7 +1336,7 @@ setInterval(()=>{ const v=$("#view-videolar"); if(v && v.classList.contains("on"
     const l=document.querySelector("#view-studyo .lead");    if(l) l.innerHTML=b[2];
     const e=$s("#stRefEtiket"); if(e) e.textContent = refZorunlu()?"zorunlu":"isteğe bağlı";
     const w=$s("#stEditWrap");  if(w) w.style.display = (t==="documentary")?"":"none";
-    if(!refZorunlu()) goster("#ak3");
+    if(!refZorunlu()){ goster("#akSes"); goster("#akKalite"); goster("#ak3"); sayacGuncelle(); }
   };
   fetch("api/edit-stilleri").then(r=>r.json()).then(list=>{
     const c=$s("#stEdit"); if(!c) return; c.innerHTML="";
@@ -1357,7 +1378,8 @@ setInterval(()=>{ const v=$("#view-videolar"); if(v && v.classList.contains("on"
       const j=await r.json();
       if(!r.ok || j.ok===false){ d.textContent="Hata: "+(j.hata||j.detail||r.status); b.disabled=false; return; }
       stAnalizSonuc=j; d.textContent="";
-      cizAnaliz(j); goster("#ak2"); goster("#ak3"); kaydir("#ak2");
+      cizAnaliz(j); goster("#ak2"); goster("#akSes"); goster("#akKalite"); goster("#ak3");
+      sayacGuncelle(); kaydir("#ak2");
     }catch(e){ d.textContent="Analiz başarısız — tekrar dene."; b.disabled=false; }
   });
 
@@ -1387,6 +1409,78 @@ setInterval(()=>{ const v=$("#view-videolar"); if(v && v.classList.contains("on"
   $s("#stTekrar") && ($s("#stTekrar").onclick=()=>{
     $s("#stAnaliz").disabled=false; $s("#stAnalizDurum").textContent=""; kaydir("#ak1");
   });
+
+  /* ── Anlatıcı sesi (ai33/OpenAI/edge — hepsi tek listede, gruba göre süzülür) ── */
+  let stSes="otomatik", sesListe2=[], stCalan=null;
+  const GRUP_AD={"ucretsiz":"Ücretsiz","karakterli":"Karakterli (OpenAI)","premium":"⭐ Premium"};
+  function sesCal2(url,btn){
+    if(stCalan){ stCalan.pause(); stCalan=null; }
+    document.querySelectorAll("#stSesler .oyn").forEach(x=>x.textContent="▶");
+    const a2=new Audio(url); stCalan=a2; btn.textContent="⏸";
+    a2.onended=()=>{ btn.textContent="▶"; stCalan=null; };
+    a2.play().catch(()=>btn.textContent="✕");
+  }
+  function cizSesler(grup){
+    const c=$s("#stSesler"); if(!c) return; c.innerHTML="";
+    sesListe2.filter(v=>!grup||(v.grup||"ucretsiz")===grup).forEach(v=>{
+      const d=document.createElement("div");
+      d.className="estil"+(stSes===v.id?" on":""); d.dataset.id=v.id;
+      const rz = v.motor==="edge" ? '<span style="color:var(--ok);font-size:10px">ücretsiz</span>'
+                                  : `<span style="color:var(--warn);font-size:10px">${v.ucret||""}</span>`;
+      d.innerHTML=`<span class="pick"></span><b>${v.ad}</b><p>${v.ozet||""}</p>
+        <div class="meta" style="display:flex;align-items:center;gap:8px;margin-top:8px">${rz}
+        ${v.ornek?`<button class="oyn" style="background:#0e1117;border:1px solid var(--line);
+          color:var(--txt);border-radius:7px;padding:3px 9px;font:inherit;font-size:11px;cursor:pointer">▶</button>`:""}</div>`;
+      const b2=d.querySelector(".oyn");
+      if(b2) b2.onclick=(e)=>{ e.stopPropagation(); sesCal2(v.ornek,b2); };
+      d.onclick=()=>{ stSes=v.id;
+        document.querySelectorAll("#stSesler .estil").forEach(x=>x.classList.toggle("on",x.dataset.id===v.id));
+        $s("#stSesEtiket").textContent=v.ad; sayacGuncelle(); };
+      c.appendChild(d);
+    });
+  }
+  fetch("api/sesler").then(r=>r.json()).then(list=>{
+    sesListe2=list;
+    const gruplar=[...new Set(list.map(v=>v.grup||"ucretsiz"))];
+    const g=$s("#stSesGrup");
+    gruplar.forEach((gr,i)=>{
+      const b2=document.createElement("span");
+      b2.className="cip"+(i===0?" on":""); b2.textContent=GRUP_AD[gr]||gr;
+      b2.onclick=()=>{ document.querySelectorAll("#stSesGrup .cip").forEach(x=>x.classList.remove("on"));
+        b2.classList.add("on"); cizSesler(gr); };
+      g.appendChild(b2);
+    });
+    cizSesler(gruplar[0]);
+    const v0=list.find(v=>v.id===stSes); if(v0) $s("#stSesEtiket").textContent=v0.ad;
+  }).catch(()=>{$s("#stSesler").innerHTML='<span class="durum">sesler yüklenemedi</span>';});
+
+  /* ── Görsel kalitesi ── */
+  let stModel="gpt-image-1-mini";
+  document.querySelectorAll("#stKalite .estil").forEach(k=>k.onclick=()=>{
+    document.querySelectorAll("#stKalite .estil").forEach(x=>x.classList.remove("on"));
+    k.classList.add("on"); stModel=k.dataset.model; sayacGuncelle();
+  });
+
+  /* ── Canlı sayaç: karakter, kelime, TAHMINI SURE, maliyet ── */
+  const KELIME_DK = 178;          // olculen: edge-tts +%15 hiz = ~178 kelime/dk
+  const SAHNE_SN  = 5;            // ANIM_SAHNE_SN varsayilani
+  function sayacGuncelle(){
+    const t=($s("#stMetin")?.value||"");
+    const kel=(t.trim().match(/\S+/g)||[]).length;
+    const dk = kel/KELIME_DK;
+    const sahne = Math.max(1, Math.round(dk*60/SAHNE_SN));
+    const el=$s("#stSayac"); if(!el) return;
+    if(!kel){ el.textContent="0 karakter · 0 kelime"; return; }
+    const mm=Math.floor(dk), ss=Math.round((dk-mm)*60);
+    const fiyat = f => (sahne*f).toFixed(2);
+    el.innerHTML = `<b>${t.length.toLocaleString("tr")}</b> / 30.000 karakter · <b>${kel.toLocaleString("tr")}</b> kelime
+      → tahmini <b style="color:var(--acc2)">${mm} dk ${ss} sn</b> · ~${sahne} sahne
+      · görsel maliyeti <b>$${fiyat(stModel==="gpt-image-2"?0.048:0.013)}</b>`;
+    const md=$s("#mStd"), my=$s("#mYuk");
+    if(md) md.textContent = `bu metin: $${fiyat(0.013)}`;
+    if(my) my.textContent = `bu metin: $${fiyat(0.048)}`;
+  }
+  $s("#stMetin") && ($s("#stMetin").oninput=sayacGuncelle);
 
   /* ── 3. Metin → sorular ── */
   $s("#stDevam") && ($s("#stDevam").onclick=async()=>{
@@ -1438,9 +1532,13 @@ setInterval(()=>{ const v=$("#view-videolar"); if(v && v.classList.contains("on"
     fd.append("story",($s("#stMetin").value||"").trim());
     fd.append("tur", stTur);
     if(stTur==="documentary" && stEditStil) fd.append("edit", stEditStil);
-    fd.append("sure_dk", (stCevaplar.sure_dk||"2").replace(/[^0-9.]/g,"")||"2");
+    const kelS=(($s("#stMetin").value||"").trim().match(/\S+/g)||[]).length;
+    const tahminDk = Math.max(1, Math.round(kelS/178));
+    fd.append("sure_dk", (stCevaplar.sure_dk||"").replace(/[^0-9.]/g,"") || String(tahminDk));
     fd.append("gecis","1"); fd.append("zoom","1");
     if((stCevaplar.altyazi||"").match(/olsun|evet|aç|var/i)) fd.append("altyazi","1");
+    if(stSes && stSes!=="otomatik") fd.append("ses", stSes);
+    if(stModel) fd.append("gorsel_model", stModel);
     stFiles.forEach(f=>fd.append("sahne_ref",f));   /* analizin AYNI kareleri üretime de gider */
     try{
       const r=await fetch("api/generate",{method:"POST",body:fd});

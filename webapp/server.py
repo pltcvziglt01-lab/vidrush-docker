@@ -493,6 +493,7 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
                       arkaplan: str = Form(""),
                       ses: str = Form(""),
                       isik: str = Form(""),
+                      gorsel_model: str = Form(""),
                       karakter: UploadFile = File(None),
                       stil: UploadFile = File(None),
                       sahne_ref: List[UploadFile] = File(None)):
@@ -584,7 +585,7 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
                     arkaplan.strip() if arkaplan.strip() in pipeline.ARKA_PLANLAR else "",
                     _ses_secimi(ses),
                     isik.strip() if isik.strip() in pipeline.ISIK_DUZEYLERI else "",
-                    acilis_dk, sref, _bayrak(sora)))
+                    acilis_dk, sref, _bayrak(sora), gorsel_model.strip()))
     return {"job_id": is_id, "kuyruk": is_kuyrugu.qsize(), "tur": mod, "edit": edit_id,
             "profil": profil.strip()}
 
@@ -663,7 +664,7 @@ def cikti(dosya: str):
 def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom_acik,
             profil_id="", altyazi="", altyazi_sablon="", palet="", palet_ozel="",
             arkaplan="", ses_secim="", isik="", acilis_dk=None, sahne_ref=None,
-            sora_acik=False):
+            sora_acik=False, gorsel_model_secim=""):
     d = isler.get(is_id)
     if not d:
         return
@@ -683,7 +684,8 @@ def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom
                                           palet_ozel=palet_ozel, arkaplan=arkaplan,
                                           ses_secim=ses_secim, isik=isik,
                                           acilis_dk=acilis_dk, sahne_ref=sahne_ref,
-                                          sora_acik=sora_acik))
+                                          sora_acik=sora_acik,
+                                          gorsel_model_secim=gorsel_model_secim))
         d.update({"durum": "bitti", "ilerleme": 100, "mesaj": "Hazir!",
                   "video": "ciktilar/" + sonuc["video"],
                   "kapak": ("ciktilar/" + sonuc["kapak"]) if sonuc.get("kapak") else None,

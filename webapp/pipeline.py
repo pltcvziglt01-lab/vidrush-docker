@@ -2340,7 +2340,8 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                ilerle=None, profil_id: str = "", altyazi_sablon: str = "",
                altyazi_ac: str = "", palet: str = "", palet_ozel: str = "",
                arkaplan: str = "", ses_secim: str = "", isik: str = "",
-               acilis_dk=None, sahne_ref: list = None, sora_acik: bool = False) -> dict:
+               acilis_dk=None, sahne_ref: list = None, sora_acik: bool = False,
+               gorsel_model_secim: str = "") -> dict:
     """Tam hat. mod: 'animasyon'|'documentary'. stil_yol: referans stil gorseli (opsiyonel).
     sure_dk: hedef sure (hikaye maks 60, digerleri maks 14). gecis_acik/zoom_acik: kullanicinin tercihi.
     profil_id: KANAL PROFILI — verilirse karakter/capa/kilitler profilden gelir ve tum
@@ -2438,6 +2439,10 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     footage_acik = prof.get("footage_pct", 0) > 0
     # Maliyet/kalite: animasyon (duz vektor) ucuz mini, documentary (foto-gercekci) gpt-image-2
     gorsel_model = GORSEL_MODEL_ANIM if mod == "animasyon" else GORSEL_MODEL_DOC
+    # Kullanici Studyo'dan kalite sectiyse o kazanir (Standart=mini / Yuksek=gpt-image-2)
+    if gorsel_model_secim in ("gpt-image-1-mini", "gpt-image-2", "gpt-image-1"):
+        gorsel_model = gorsel_model_secim
+        print(f"  gorsel modeli (kullanici secimi): {gorsel_model}", file=sys.stderr)
     yt_once = True
     # Sure tavani: hikaye kanali 60 dk (uzun hikaye formati), diger turler 14 dk.
     # 60 dk hikaye (8sn sahne, paralel gorsel, 10 cekirdek render) ~2-2.5 saat, ~$40 gorsel.
