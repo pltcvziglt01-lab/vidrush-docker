@@ -78,6 +78,27 @@
   .ay input[type=range]{accent-color:var(--acc);width:100%}
   .ay input[type=color]{width:100%;height:36px;background:#0e1117;border:1px solid var(--line);
     border-radius:9px;padding:3px;cursor:pointer}
+  /* Animasyon Studyosu adim kartlari — yumusak acilis */
+  .ak{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;
+    margin-bottom:16px;animation:akGir .42s cubic-bezier(.16,1,.3,1) both}
+  @keyframes akGir{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  .akbas{font-size:15px;font-weight:600;display:flex;align-items:center;gap:10px;margin-bottom:16px}
+  .aknum{display:inline-flex;width:24px;height:24px;border-radius:50%;background:var(--grad);
+    color:#06110d;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex:0 0 24px}
+  .akbas .tag{margin-left:auto}
+  .ozk{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px}
+  .ozk h4{margin:0 0 10px;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--dim2)}
+  .ozs{display:flex;gap:8px;font-size:12.5px;padding:5px 0;border-bottom:1px solid #ffffff08}
+  .ozs:last-child{border:0}
+  .ozs b{color:var(--dim);min-width:118px;font-weight:600}
+  .sw{display:inline-flex;border-radius:6px;overflow:hidden;border:1px solid #0006;vertical-align:middle}
+  .sw i{width:26px;height:26px;display:block}
+  .sor{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px}
+  .sor .q{font-size:13.5px;font-weight:600;margin-bottom:10px}
+  .cip{display:inline-block;background:#0e1117;border:1px solid var(--line);border-radius:99px;
+    padding:7px 14px;font-size:12.5px;cursor:pointer;margin:0 7px 7px 0;transition:.14s}
+  .cip:hover{border-color:var(--acc)}
+  .cip.on{background:var(--grad);color:#06110d;border-color:transparent;font-weight:700}
   .estil{background:var(--card2);border:1.5px solid var(--line);border-radius:14px;padding:16px;
     cursor:pointer;transition:.15s;position:relative}
   .estil:hover{border-color:var(--acc)}
@@ -153,6 +174,7 @@
     <div class="brand"><span class="logo"></span><span><b>BEDOSAHO</b><small>AI</small></span></div>
     <div class="navlbl">Üretim</div>
     <div class="nav on" data-view="studio"><span class="ic">🎬</span> Yeni Video</div>
+    <div class="nav" data-view="studyo"><span class="ic">✨</span> Animasyon Stüdyosu</div>
     <div class="nav" data-view="videolar"><span class="ic">📼</span> Videolarım</div>
     <div class="nav" data-view="styles"><span class="ic">🎞️</span> Edit Stilleri</div>
     <div class="navlbl">Sistem</div>
@@ -415,6 +437,58 @@
     </section>
 
     <!-- ─────────── EDIT STİLLERİ ─────────── -->
+    <!-- ══════════ ANİMASYON STÜDYOSU ══════════ -->
+    <section class="view" id="view-studyo">
+      <p class="eyebrow">Animasyon Stüdyosu</p>
+      <h1>Referans ver, gerisini motor halletsin</h1>
+      <p class="lead">Yapmak istediğin tarzdan birkaç kare yükle. Motor karakteri, çizim dilini,
+        renk paletini ve ışık seviyesini <b>ölçerek</b> çıkarır — elle ayar yok.
+        Eksik gördüğünü sana sorar, sonra videoyu üretir.</p>
+
+      <div class="ak" id="ak1">
+        <div class="akbas"><span class="aknum">1</span> Referans kareler</div>
+        <label class="drop" id="stDrop" style="min-height:170px">
+          <input type="file" id="stFile" accept="image/*" multiple>
+          <div id="stDropView">
+            <div class="lbl">⭐ 2-6 kare sürükle ya da seç</div>
+            <div class="hint">Yapmak istediğin videolardan gerçek kareler — karakterin içinde olduğu sahneler en iyisi.<br>
+              Ne kadar çok kare, o kadar sağlam: sadece <b>hepsinde tekrar eden</b> özellikler kilitlenir.</div>
+          </div>
+        </label>
+        <div class="row"><button class="btn" id="stAnaliz" disabled>Analiz et</button>
+          <span class="durum" id="stAnalizDurum"></span></div>
+      </div>
+
+      <div class="ak" id="ak2" style="display:none">
+        <div class="akbas"><span class="aknum">2</span> Motorun anladıkları
+          <span class="tag" id="stGuven"></span></div>
+        <div id="stAnalizKart"></div>
+        <div class="row"><button class="btn ghost" id="stTekrar">Kareleri değiştir</button></div>
+      </div>
+
+      <div class="ak" id="ak3" style="display:none">
+        <div class="akbas"><span class="aknum">3</span> Metin</div>
+        <textarea id="stMetin" placeholder="Videonun anlatım metnini buraya yapıştır..."></textarea>
+        <div class="row"><button class="btn" id="stDevam">Devam</button>
+          <span class="durum" id="stMetinDurum"></span></div>
+      </div>
+
+      <div class="ak" id="ak4" style="display:none">
+        <div class="akbas"><span class="aknum">4</span> Birkaç sorum var</div>
+        <div id="stSorular"></div>
+        <div class="row"><button class="btn" id="stUret">Videoyu üret</button>
+          <span class="durum" id="stUretDurum"></span></div>
+      </div>
+
+      <div class="ak" id="ak5" style="display:none">
+        <div class="akbas"><span class="aknum">5</span> Üretiliyor</div>
+        <div class="bar"><i id="stBar" style="display:block;height:100%;width:0;background:var(--grad);transition:width .5s"></i></div>
+        <div class="durum" id="stIlerleme" style="margin-top:10px"></div>
+        <div id="stKareler" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:16px"></div>
+        <div id="stSonuc" style="margin-top:16px"></div>
+      </div>
+    </section>
+
     <section class="view" id="view-videolar">
       <p class="eyebrow">OTURUM ARŞİVİ</p>
       <h1>Videolarım</h1>
@@ -1196,6 +1270,157 @@ setInterval(()=>{ const v=$("#view-videolar"); if(v && v.classList.contains("on"
     }
   }).catch(()=>{});
 })();
+
+/* ══════════ ANİMASYON STÜDYOSU ══════════
+   Tasarim: elle ayar YOK. Referans kareler olculur, motor eksigini sorar, uretir. */
+(function(){
+  const $s=(q)=>document.querySelector(q);
+  let stFiles=[], stAnalizSonuc=null, stCevaplar={}, stIs=null, stTimer=null;
+  const OT = "st"+(localStorage.getItem("vidrush_sid")||"x").replace(/[^A-Za-z0-9_-]/g,"");
+
+  function goster(id){ const e=$s(id); if(e && e.style.display==="none"){ e.style.display=""; 
+    e.style.animation="none"; void e.offsetWidth; e.style.animation=""; } }
+  function kaydir(id){ const e=$s(id); if(e) e.scrollIntoView({behavior:"smooth",block:"start"}); }
+
+  /* ── 1. Kareler ── */
+  const inp=$s("#stFile"), kutu=$s("#stDrop"), gor=$s("#stDropView");
+  if(inp){
+    inp.onchange=()=>{
+      stFiles=[...(inp.files||[])].slice(0,6);
+      $s("#stAnaliz").disabled = stFiles.length===0;
+      if(!stFiles.length){ kutu.classList.remove("dolu"); return; }
+      kutu.classList.add("dolu");
+      gor.innerHTML=`<div class="lbl">⭐ ${stFiles.length} kare seçildi</div>
+        <div id="stKck" style="display:flex;gap:7px;flex-wrap:wrap;justify-content:center;margin-top:10px"></div>`;
+      const c=$s("#stKck");
+      stFiles.forEach(f=>{ const im=document.createElement("img");
+        im.style.cssText="width:82px;height:82px;object-fit:cover;border-radius:9px;border:1px solid var(--line)";
+        im.src=URL.createObjectURL(f); c.appendChild(im); });
+    };
+  }
+
+  $s("#stAnaliz") && ($s("#stAnaliz").onclick=async()=>{
+    const b=$s("#stAnaliz"), d=$s("#stAnalizDurum");
+    b.disabled=true; d.textContent="Kareler çözümleniyor (renk ölçümü + 2 bağımsız okuma + uzlaşı)...";
+    const fd=new FormData(); fd.append("oturum",OT);
+    stFiles.forEach(f=>fd.append("kare",f));
+    try{
+      const r=await fetch("api/anim/analiz",{method:"POST",body:fd});
+      const j=await r.json();
+      if(!r.ok || j.ok===false){ d.textContent="Hata: "+(j.hata||j.detail||r.status); b.disabled=false; return; }
+      stAnalizSonuc=j; d.textContent="";
+      cizAnaliz(j); goster("#ak2"); goster("#ak3"); kaydir("#ak2");
+    }catch(e){ d.textContent="Analiz başarısız — tekrar dene."; b.disabled=false; }
+  });
+
+  function sat(ad,deg){ return deg ? `<div class="ozs"><b>${ad}</b><span>${deg}</span></div>` : ""; }
+  function cizAnaliz(j){
+    const k=j.karakter||{}, st=j.stil||{}, o=j.olcum||{};
+    const pal=(j.palet||[]).map(h=>`<i style="background:${h}"></i>`).join("");
+    const g=Math.round(100*Math.max(k.guven||0, st.guven||0));
+    $s("#stGuven").textContent = g? `güven %${g}` : "";
+    $s("#stAnalizKart").innerHTML=`
+      <div class="ozk"><h4>Karakter</h4>
+        ${sat("Tür",k.tur)}${sat("Gövde rengi",k.govde_rengi)}${sat("Kafa",k.kafa)}
+        ${sat("Gözler",k.gozler)}${sat("Saç",k.sac)}${sat("Kıyafet",k.kiyafet)}
+        ${sat("Ayırt edici",k.ayirt_edici)}</div>
+      <div class="ozk"><h4>Çizim dili</h4>
+        ${sat("Medyum",st.medyum)}${sat("Çizgi",st.cizgi)}${sat("Gölgeleme",st.golgeleme)}
+        ${sat("Doku",st.doku)}${sat("Işık",st.isik_tarifi)}${sat("Detay",st.detay)}
+        ${sat("Ruh",st.ruh)}${sat("Arka plan",st.arka_plan_yogunlugu)}</div>
+      <div class="ozk"><h4>Ölçüm — tahmin değil</h4>
+        <div class="ozs"><b>Palet</b><span class="sw">${pal}</span></div>
+        ${sat("Parlaklık",`${o.parlaklik}/255 — ${o.isik_tr||""}`)}
+        ${sat("Doygunluk",`${o.doygunluk} — ${o.doygunluk_tr||""}`)}
+        ${sat("Kontrast",`${o.kontrast} — ${o.kontrast_tr||""}`)}
+        ${sat("Kare sayısı",j.kare_sayisi)}</div>`;
+  }
+
+  $s("#stTekrar") && ($s("#stTekrar").onclick=()=>{
+    $s("#stAnaliz").disabled=false; $s("#stAnalizDurum").textContent=""; kaydir("#ak1");
+  });
+
+  /* ── 3. Metin → sorular ── */
+  $s("#stDevam") && ($s("#stDevam").onclick=async()=>{
+    const metin=($s("#stMetin").value||"").trim(), d=$s("#stMetinDurum");
+    if(metin.length<40){ d.textContent="Metin çok kısa — en az birkaç cümle yapıştır."; return; }
+    d.textContent="Metin okunuyor...";
+    const fd=new FormData(); fd.append("oturum",OT); fd.append("metin",metin);
+    try{
+      const r=await fetch("api/anim/sorular",{method:"POST",body:fd});
+      const j=await r.json(); d.textContent="";
+      cizSorular(j.sorular||[]); goster("#ak4"); kaydir("#ak4");
+    }catch(e){ d.textContent=""; cizSorular([]); goster("#ak4"); kaydir("#ak4"); }
+  });
+
+  function cizSorular(list){
+    const c=$s("#stSorular");
+    if(!list.length){
+      c.innerHTML='<div class="durum">Metinden her şeyi çıkarabildim — soru yok. Üretmeye hazırım.</div>';
+      return;
+    }
+    c.innerHTML=list.map((s,i)=>`<div class="sor" data-alan="${s.alan}">
+      <div class="q">${i+1}. ${s.soru}</div>
+      <div>${(s.secenekler||[]).map(o=>`<span class="cip">${o}</span>`).join("")}</div>
+      <input class="sorEl" placeholder="ya da kendin yaz..." style="margin-top:8px;width:100%;
+        padding:9px 11px;border-radius:9px;border:1px solid var(--line);background:#0e1117;color:var(--txt)">
+    </div>`).join("");
+    c.querySelectorAll(".sor").forEach(box=>{
+      const alan=box.dataset.alan;
+      box.querySelectorAll(".cip").forEach(ci=>ci.onclick=()=>{
+        box.querySelectorAll(".cip").forEach(x=>x.classList.remove("on"));
+        ci.classList.add("on"); stCevaplar[alan]=ci.textContent;
+        box.querySelector(".sorEl").value="";
+      });
+      box.querySelector(".sorEl").oninput=(e)=>{
+        if(e.target.value.trim()){ box.querySelectorAll(".cip").forEach(x=>x.classList.remove("on")); }
+        stCevaplar[alan]=e.target.value.trim();
+      };
+    });
+  }
+
+  /* ── 5. Üret ── */
+  $s("#stUret") && ($s("#stUret").onclick=async()=>{
+    const b=$s("#stUret"), d=$s("#stUretDurum");
+    b.disabled=true; d.textContent="Kuyruğa alınıyor...";
+    const fd=new FormData();
+    fd.append("session",(localStorage.getItem("vidrush_sid")||"u1"));
+    fd.append("story",($s("#stMetin").value||"").trim());
+    fd.append("tur","animasyon");
+    fd.append("sure_dk", (stCevaplar.sure_dk||"2").replace(/[^0-9.]/g,"")||"2");
+    fd.append("gecis","1"); fd.append("zoom","1");
+    if((stCevaplar.altyazi||"").match(/olsun|evet|aç|var/i)) fd.append("altyazi","1");
+    stFiles.forEach(f=>fd.append("sahne_ref",f));   /* analizin AYNI kareleri üretime de gider */
+    try{
+      const r=await fetch("api/generate",{method:"POST",body:fd});
+      const j=await r.json();
+      if(!r.ok || !j.job_id){ d.textContent="Başlatılamadı: "+(j.detail||r.status); b.disabled=false; return; }
+      stIs=j.job_id; d.textContent=""; goster("#ak5"); kaydir("#ak5"); izle();
+    }catch(e){ d.textContent="Başlatılamadı."; b.disabled=false; }
+  });
+
+  function izle(){
+    clearInterval(stTimer);
+    stTimer=setInterval(async()=>{
+      try{
+        const r=await fetch("api/job/"+stIs); const j=await r.json();
+        $s("#stBar").style.width=(j.ilerleme||0)+"%";
+        $s("#stIlerleme").textContent=(j.mesaj||"")+(j.ilerleme?` — %${j.ilerleme}`:"");
+        if(j.durum==="bitti"){
+          clearInterval(stTimer);
+          $s("#stSonuc").innerHTML=`<video src="${j.video}" controls style="width:100%;border-radius:12px"></video>
+            <div class="row"><a class="btn" href="${j.video}" download>Videoyu indir</a></div>`;
+          $s("#stUret").disabled=false;
+        } else if(j.durum==="hata"){
+          clearInterval(stTimer);
+          $s("#stIlerleme").textContent="Hata: "+(j.hata||"bilinmeyen");
+          $s("#stUret").disabled=false;
+        }
+      }catch(e){}
+    }, 4000);
+  }
+})();
+
 </script>
 </body>
 </html>

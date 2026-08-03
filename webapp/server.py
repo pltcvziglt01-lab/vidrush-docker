@@ -20,6 +20,7 @@ from fastapi.responses import HTMLResponse, FileResponse
 from PIL import Image
 
 import pipeline
+import anim_studyo
 
 KOK = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(KOK, "static")
@@ -342,6 +343,49 @@ def ses_ornek(dosya: str):
         raise HTTPException(404, "yok")
     return FileResponse(yol, media_type="audio/mpeg",
                         headers={"Cache-Control": "public, max-age=86400"})
+
+
+# ═══════════ ANIMASYON STUDYOSU (sohbet paneli) ═══════════
+@app.post("/api/anim/analiz")
+async def anim_analiz(oturum: str = Form(...), kare: List[UploadFile] = File(None)):
+    """Referans kareleri coz: karakter + stil + palet + ISIK (olculur, tahmin degil)."""
+    try:
+        d = anim_studyo.oturum_dizini(oturum)
+    except ValueError:
+        raise HTTPException(400, "geçersiz oturum")
+    yollar = []
+    try:
+        for i, dosya in enumerate((kare or [])[:6]):
+            if dosya is None:
+                continue
+            veri = await dosya.read()
+            if not veri:
+                continue
+            if len(veri) > MAKS_UPLOAD:
+                raise HTTPException(413, "Görsel çok büyük (maks 20 MB)")
+            y = os.path.join(d, f"ref_{i+1}.png")
+            await asyncio.to_thread(_kucult, veri, y)
+            yollar.append(y)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(400, "Görsel okunamadı (geçerli bir resim yükleyin)")
+    if not yollar:
+        raise HTTPException(400, "En az 1 referans kare gerekli")
+    try:
+        return await asyncio.to_thread(anim_studyo.analiz_yap, oturum, yollar)
+    except pipeline.BakiyeHatasi as e:
+        raise HTTPException(402, str(e))
+
+
+@app.post("/api/anim/sorular")
+async def anim_sorular(oturum: str = Form(...), metin: str = Form("")):
+    """Motor SADECE cikaramadigi seyi sorar; her sey belliyse bos liste doner."""
+    try:
+        anim_studyo.oturum_dizini(oturum)
+    except ValueError:
+        raise HTTPException(400, "geçersiz oturum")
+    return await asyncio.to_thread(anim_studyo.sorular_uret, oturum, metin)
 
 
 @app.get("/api/isik-duzeyleri")
