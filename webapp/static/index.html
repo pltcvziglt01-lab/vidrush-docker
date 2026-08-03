@@ -1394,10 +1394,15 @@ setInterval(()=>{ const v=$("#view-videolar"); if(v && v.classList.contains("on"
         ${sat("Tür",k.tur)}${sat("Gövde rengi",k.govde_rengi)}${sat("Kafa",k.kafa)}
         ${sat("Gözler",k.gozler)}${sat("Saç",k.sac)}${sat("Kıyafet",k.kiyafet)}
         ${sat("Ayırt edici",k.ayirt_edici)}</div>
-      <div class="ozk"><h4>Çizim dili</h4>
-        ${sat("Medyum",st.medyum)}${sat("Çizgi",st.cizgi)}${sat("Gölgeleme",st.golgeleme)}
-        ${sat("Doku",st.doku)}${sat("Işık",st.isik_tarifi)}${sat("Detay",st.detay)}
-        ${sat("Ruh",st.ruh)}${sat("Arka plan",st.arka_plan_yogunlugu)}</div>
+      <div class="ozk"><h4>Çizim dili — 16 alan</h4>
+        ${sat("Medyum",st.medyum)}${sat("Çizgi",st.cizgi)}${sat("Dolgu",st.dolgu)}
+        ${sat("Gölgeleme",st.golgeleme)}${sat("Kenar",st.kenar)}${sat("Doku",st.doku)}
+        ${sat("Işık",st.isik_tarifi)}${sat("Kontrast",st.kontrast)}${sat("Detay",st.detay)}
+        ${sat("Arka plan",st.arka_plan_yogunlugu)}${sat("Oranlar",st.oranlar)}
+        ${sat("Renk uyumu",st.renk_uyumu)}${sat("Yazı",st.yazi)}${sat("Ruh",st.ruh)}</div>
+      <div class="ozk"><h4>Kimlik taşıyan alanlar</h4>
+        ${sat("İnsanlar nasıl çiziliyor",st.karakter_cizim)}
+        ${sat("⛔ Bu stil ŞU DEĞİL",st.kacinilacak)}</div>
       <div class="ozk"><h4>Ölçüm — tahmin değil</h4>
         <div class="ozs"><b>Palet</b><span class="sw">${pal}</span></div>
         ${sat("Parlaklık",`${o.parlaklik}/255 — ${o.isik_tr||""}`)}

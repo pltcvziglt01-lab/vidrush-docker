@@ -1433,7 +1433,13 @@ def kunye_metni(k: dict) -> str:
 # -> kullanici stil gorseli yukluyor ama cikti hala dahili stile benziyor.
 # COZUM: karakter kunyesinin aynisi (palet olcumu + 2 bagimsiz okuma + kod uzlasisi),
 # ve uretilen kunye dahili sanat yonergesinin YERINE gecer (yanina degil).
-STIL_ALANLARI = ("medyum", "cizgi", "golgeleme", "doku", "isik", "detay", "ruh", "arka_plan")
+# 16 alan: bir gorsel stili KOPYALANABILIR kilan her sey. 8 alanla stil "yaklasik"
+# tutuluyordu; kalan bosluklari model kendi genel AI estetigiyle dolduruyordu.
+# Amac (Polat, 3 Agu 2026): YouTube'da ~100 animasyon stili var, hicbirini elle
+# kodlamadan SADECE referans karelerden kilitlemek.
+STIL_ALANLARI = ("medyum", "cizgi", "dolgu", "golgeleme", "kenar", "doku",
+                 "isik", "kontrast", "detay", "arka_plan", "karakter_cizim",
+                 "oranlar", "renk_uyumu", "yazi", "ruh", "kacinilacak")
 
 
 def _stil_tek_okuma(img_yol: str, sicaklik: float, paletler: list) -> dict:
@@ -1442,19 +1448,35 @@ def _stil_tek_okuma(img_yol: str, sicaklik: float, paletler: list) -> dict:
         b64 = base64.b64encode(f.read()).decode()
     pal_txt = ", ".join(f"{p['hex']} (%{int(p['oran']*100)})" for p in paletler[:6]) or "yok"
     istek = (
-        "You are an art-direction analyst. Describe ONLY the ART STYLE of this image so another "
-        "artist could redraw ANY subject in exactly this style. Return STRICT JSON with exactly "
-        'these keys: "medyum" (medium and rendering technique, 6-14 words, e.g. "coloured pencil '
-        'and watercolour wash on textured paper"), "cizgi" (line quality and weight, 5-12 words, '
-        'or "none" if there are no outlines), "golgeleme" (shading model, 5-12 words), '
-        '"doku" (surface texture and grain, 4-10 words, or "none"), '
-        '"isik" (lighting character and direction, 5-12 words), '
-        '"detay" (level of detail, one of: minimal, moderate, high, very high), '
-        '"ruh" (overall mood in 3-6 words), '
-        '"arka_plan" (background density, one of: empty, sparse, moderate, dense). '
+        "You are a senior art-direction analyst. Another artist must be able to redraw ANY new "
+        "scene so that it looks like it came from the SAME production as this image. Describe ONLY "
+        "the visual style, in enough detail that nothing is left to imagination. "
+        "Return STRICT JSON with exactly these keys:\n"
+        '"medyum" (medium and rendering technique, 8-18 words — e.g. "flat digital vector cartoon, '
+        'clean fills, no visible brush or pencil marks")\n'
+        '"cizgi" (outlines: present or absent, their colour, weight, evenness, 6-16 words, '
+        'or "none" if the art has no outlines)\n'
+        '"dolgu" (how areas are filled: flat solid / two-tone / soft gradient / painterly / '
+        'hatched, 5-14 words)\n'
+        '"golgeleme" (shading model and how many tones, 5-14 words)\n'
+        '"kenar" (edge quality: crisp vector / slightly wobbly hand-drawn / soft airbrushed / '
+        'rough, 4-10 words)\n'
+        '"doku" (surface texture or grain over the art, 4-12 words, or "none" if perfectly clean)\n'
+        '"isik" (light direction, softness and whether shadows are cast, 6-14 words)\n'
+        '"kontrast" (one of: low, medium, high)\n'
+        '"detay" (one of: minimal, moderate, high, very high)\n'
+        '"arka_plan" (how backgrounds are treated — density, depth, perspective, 6-14 words)\n'
+        '"karakter_cizim" (CRITICAL — exactly how people are drawn: face construction, eye and '
+        'mouth style, hair treatment, hands, how much anatomical detail, 10-22 words)\n'
+        '"oranlar" (body proportions and stylisation level, 5-12 words)\n'
+        '"renk_uyumu" (colour harmony and saturation behaviour, 6-14 words)\n'
+        '"yazi" (how any on-image lettering is drawn, 5-12 words, or "none")\n'
+        '"ruh" (overall mood in 3-6 words)\n'
+        '"kacinilacak" (3-6 things this style is clearly NOT — name the nearest wrong looks that '
+        "an AI would drift into, e.g. \"photorealism, 3D render, anime eyes, heavy grain\")\n"
         f"The measured dominant colours are: {pal_txt}. "
-        "RULES: describe ONLY the style. NEVER describe the subject, the character, the objects, "
-        "the scene or what is happening — those change every frame. If a field is not clearly "
+        "RULES: describe ONLY style. NEVER describe the subject, the character's identity, the "
+        "objects or what is happening — those change every frame. If a field is not clearly "
         "readable, use an empty string rather than guessing. English only."
     )
     body = {
@@ -1464,7 +1486,7 @@ def _stil_tek_okuma(img_yol: str, sicaklik: float, paletler: list) -> dict:
             {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
         ]}],
         "response_format": {"type": "json_object"},
-        "max_tokens": 500, "temperature": sicaklik,
+        "max_tokens": 1100, "temperature": sicaklik,
     }
     j = oai_chat(body, timeout=90)
     ic = (j.get("choices") or [{}])[0].get("message", {}).get("content") or "{}"
@@ -1514,40 +1536,69 @@ def stil_kunyesi(img_yol: str) -> dict:
 
 
 def stil_kunye_metni(k: dict) -> str:
-    """Stil kunyesini gorsel promptu icin sanat yonergesine cevir.
-    Renkler KESIN HEX olarak girer (kelimeyle tarif etme dersi)."""
+    """16 alanli stil kunyesini, HER sahne promptunda birebir tekrarlanan bir STIL
+    PARMAK IZI'ne cevirir.
+
+    Tasarim ilkesi (Polat, 3 Agu 2026): "YouTube'da yuze yakin animasyon stili var,
+    tek tek ogretmek bitmez — sistem referansi o kadar iyi analiz etsin ki stili
+    kilitlesin." Bu yuzden burada TARIF degil SOZLESME uretilir: numaralandirilmis,
+    kisa, atlanmasi zor maddeler + acik bir YASAK listesi. Yasak listesi kritik —
+    model bosluk buldugu her yerde kendi genel AI estetigine kayiyor.
+    """
     if not k:
         return ""
-    p = []
-    for alan, on in (("medyum", "Medium and rendering"), ("cizgi", "Line work"),
-                     ("golgeleme", "Shading"), ("doku", "Surface texture"),
-                     ("isik", "Lighting"), ("ruh", "Mood")):
-        v = k.get(alan)
-        if v and str(v).lower() not in ("none", "yok", ""):
-            p.append(f"{on}: {v}")
-    # GUVENLIK: renk ya da "detay: high" TEK BASINA stil DEGILDIR. Gercek bir sanat alani
-    # (medyum/cizgi/golgeleme/doku/isik/ruh) cikmadiysa bos don -> dahili sanat yonergesi
-    # yerinde kalir. Aksi halde 250 kelimelik yonergeyi bir hex listesiyle degistirip
-    # gorunusu tamamen kaybederdik. Bu kontrol detay/renk EKLENMEDEN once yapilmali.
-    if not p:
+    ETIKET = [
+        ("medyum",         "MEDIUM"),
+        ("cizgi",          "LINE"),
+        ("dolgu",          "FILL"),
+        ("golgeleme",      "SHADING"),
+        ("kenar",          "EDGES"),
+        ("doku",           "TEXTURE"),
+        ("isik",           "LIGHT"),
+        ("kontrast",       "CONTRAST"),
+        ("detay",          "DETAIL LEVEL"),
+        ("arka_plan",      "BACKGROUNDS"),
+        ("karakter_cizim", "HOW PEOPLE ARE DRAWN"),
+        ("oranlar",        "PROPORTIONS"),
+        ("renk_uyumu",     "COLOUR"),
+        ("yazi",           "LETTERING"),
+        ("ruh",            "MOOD"),
+    ]
+    maddeler = []
+    for alan, et in ETIKET:
+        v = str(k.get(alan, "") or "").strip()
+        if v and v.lower() not in ("none", "yok", "-"):
+            maddeler.append(f"{et}: {v}")
+    # GUVENLIK: renk ya da tek kelimelik olcek alani TEK BASINA stil degildir.
+    # Gercek bir sanat alani cikmadiysa bos don -> dahili yonerge yerinde kalir.
+    # "kontrast: high" ya da "detay: moderate" TEK BASINA stil degildir — bunlar olcek,
+    # icerik degil. Gercek sanat alani sayilanlar sadece sunlar:
+    ICERIK = ("medyum", "cizgi", "dolgu", "golgeleme", "kenar", "doku",
+              "isik", "arka_plan", "karakter_cizim", "oranlar", "renk_uyumu")
+    gercek = [a for a in ICERIK if str(k.get(a, "") or "").strip()
+              and str(k.get(a)).lower() not in ("none", "yok", "-")]
+    if not gercek:
         return ""
-    if k.get("detay"):
-        p.append(f"Level of detail: {k['detay']}")
+
     hexler = [c["hex"] for c in (k.get("_palet") or [])][:6]
     if hexler:
-        p.append("Colours are drawn from this measured set: " + ", ".join(hexler))
-    return ("REFERENCE ART STYLE (this is the definitive look — the user supplied a style image and "
-            "every frame must match it): " + ". ".join(p) +
-            ". Reproduce this exact medium, line quality, shading and colour family in every single "
-            "frame; do not substitute a different illustration style.")
+        maddeler.append("EXACT COLOURS: build everything from " + ", ".join(hexler) +
+                        " (tints, shades and mixes of these only)")
 
+    yasak = str(k.get("kacinilacak", "") or "").strip()
+    if not yasak or yasak.lower() in ("none", "yok"):
+        yasak = "photorealism, 3D render, generic AI illustration look, unrequested texture or grain"
 
-# ═══════════ SAHNE REFERANSI — tek gorselden HER SEYI cikar ═══════════
-# Kullanicinin 2 Agu 2026 onerisi: "karakter + stil ayri ayri degil; karakterin ICINDE
-# oldugu bir kare vereyim, motor tum video stilini oradan anlasin."
-# Dogru fikir: gercek bir kare hem karakteri, hem cizim dilini, hem paleti, hem de
-# ISIK SEVIYESINI ayni anda tasir. Ustelik isigi TAHMIN etmek yerine OLCEBILIYORUZ —
-# 1 Agu'de temalarin karanlik cikmasinin sebebi tahmindi.
+    return (
+        " ══ STYLE CONTRACT (derived from the reference frames the user supplied — this is the "
+        "definitive look and it OVERRIDES any other art direction) ══ "
+        + " | ".join(f"{i+1}) {m}" for i, m in enumerate(maddeler)) +
+        f" || FORBIDDEN — this style is NOT: {yasak}. "
+        "Every single frame of this video must obey all of the above exactly, as if drawn by the "
+        "same artist in the same session. Do not modernise it, do not add detail it does not have, "
+        "do not simplify detail it does have, and never substitute a different illustration style."
+    )
+
 def gorsel_olcum(yol: str) -> dict:
     """Referans karenin parlaklik / doygunluk / kontrastini PIKSELDEN olcer ($0, tahmin yok)."""
     try:
@@ -1614,18 +1665,25 @@ def sahne_referansi(yollar: list, bildir=None) -> dict:
             print(f"  ref{i+1} stil hata: {str(e)[:120]}", file=sys.stderr)
 
     def uzlas(sozlukler, alanlar):
-        """Tek gorsel: oldugu gibi. Coklu: en az iki gorselde AYNI cikan alan gecerli."""
+        """Tek gorsel: oldugu gibi (guven okumanin kendi guveni).
+        Coklu: en az iki gorselde AYNI cikan alan gecerli; guven = uzlasan/dolu."""
         sozlukler = [d for d in sozlukler if d]
         if not sozlukler:
             return {}
         if len(sozlukler) == 1:
-            return dict(sozlukler[0])
+            tek = dict(sozlukler[0])
+            if "_guven" not in tek:      # ⚠ eksikti -> arayuzde 'guven=None' gorunuyordu
+                dolu = sum(1 for a2 in alanlar if str(tek.get(a2, "") or "").strip())
+                tek["_guven"] = round(dolu / max(1, len(alanlar)), 2)
+            return tek
         out = {}
+        _dolu = _uz = 0
         for alan in alanlar:
             degerler = [str(d.get(alan, "") or "").strip() for d in sozlukler]
             degerler = [v for v in degerler if v and v.lower() not in ("none", "yok")]
             if not degerler:
                 continue
+            _dolu += 1
             for i, a in enumerate(degerler):
                 esles = False
                 for b2 in degerler[i + 1:]:
@@ -1635,7 +1693,9 @@ def sahne_referansi(yollar: list, bildir=None) -> dict:
                         break
                 if esles:
                     out[alan] = a
+                    _uz += 1
                     break
+        out["_guven"] = round(_uz / _dolu, 2) if _dolu else 0.0
         return out
 
     kimlik = uzlas(kimlikler, KUNYE_ALANLARI)
@@ -2158,13 +2218,27 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
         prompt += (" ART-STYLE LOCK: match the EXACT art style of the reference images — identical "
                    "rendering technique, line weight, color palette, shading, texture and level of "
                    "detail. The whole series must look like one consistent piece by the same artist.")
-    if stil_kilit:
-        prompt += f" Canonical style: {stil_kilit}."
-    if stil_prompt:
-        prompt += f" Art direction: {stil_prompt}."
+    # ── STIL: SON SOZ ONUN OLMALI ──
+    # Onceden stil kunyesi hem "Canonical style" hem "Art direction" olarak IKI KEZ
+    # giriyordu (ayni 1000+ karakter) ve ortada kaliyordu; sonrasindaki cerceve/kompozisyon
+    # metni onu sulandiriyordu. Artik: referanstan tureyen SOZLESME varsa TEK KEZ ve
+    # promptun EN SONUNDA verilir — modele en yakin talimat en guclusudur.
+    sozlesme = stil_kilit if "STYLE CONTRACT" in (stil_kilit or "") else ""
+    if not sozlesme and "STYLE CONTRACT" in (stil_prompt or ""):
+        sozlesme = stil_prompt
+    if sozlesme:
+        if stil_prompt and stil_prompt != sozlesme:
+            prompt += f" Art direction: {stil_prompt}."
+    else:
+        if stil_kilit:
+            prompt += f" Canonical style: {stil_kilit}."
+        if stil_prompt:
+            prompt += f" Art direction: {stil_prompt}."
     if cerceve:
         prompt += cerceve   # kompozisyon/cerceveleme (ortam basrol, karakter cerceveyi doldurmaz)
     prompt += " 16:9 cinematic composition."
+    if sozlesme:
+        prompt += sozlesme          # EN SON: referanstan turemis stil sozlesmesi
     if yazi_yasak:
         # Kullanici: goruntude MINIMAL yazi sorun degil; istenmeyen sey altyazi bandi/filigran.
         prompt += (" Do NOT add subtitle bars, caption strips, lower-thirds or watermarks. Small "
