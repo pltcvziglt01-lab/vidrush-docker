@@ -499,6 +499,24 @@
         </div>
       </div>
 
+      <div class="ak" id="akAcilis" style="display:none">
+        <div class="akbas"><span class="aknum">🎬</span> Hareketli açılış</div>
+        <div class="ay" style="max-width:400px">
+          <span style="font-size:13px;color:var(--txt)">Açılış süresi <b id="stAcilisLbl" style="color:var(--acc2)">İlk 2,5 dk</b></span>
+          <select id="stAcilis" style="background:#0e1117;border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font:inherit;font-size:12.5px">
+            <option value="0">Kapalı — baştan sona sakin</option>
+            <option value="1">İlk 1 dakika</option>
+            <option value="2.5" selected>İlk 2,5 dakika (önerilen)</option>
+            <option value="5">İlk 5 dakika</option>
+            <option value="60">Tüm video hareketli</option>
+          </select>
+        </div>
+        <div class="switch" id="stSora" style="margin-top:12px">
+          <span class="tr"></span>
+          <span>🎬 Gerçek video açılış (Sora)<small>açılış sahneleri AI ile GERÇEK videoya dönüşür (yağmur yağar, karakter kıpırdar) · sahne başı ~$0.80 ek maliyet</small></span>
+        </div>
+      </div>
+
       <div class="ak" id="ak3" style="display:none">
         <div class="akbas"><span class="aknum">3</span> Metin</div>
         <textarea id="stMetin" maxlength="30000" style="min-height:200px"
@@ -1336,8 +1354,19 @@ setInterval(()=>{ const v=$("#view-videolar"); if(v && v.classList.contains("on"
     const l=document.querySelector("#view-studyo .lead");    if(l) l.innerHTML=b[2];
     const e=$s("#stRefEtiket"); if(e) e.textContent = refZorunlu()?"zorunlu":"isteğe bağlı";
     const w=$s("#stEditWrap");  if(w) w.style.display = (t==="documentary")?"":"none";
+    /* hareketli acilis + Sora yalniz HIKAYE turunde anlamli */
+    const aA=$s("#akAcilis"); if(aA) aA.style.display = (t==="hikaye")?"":"none";
     if(!refZorunlu()){ goster("#akSes"); goster("#akKalite"); goster("#ak3"); sayacGuncelle(); }
   };
+  /* acilis etiketi + Sora anahtari (studyo yerel durumu) */
+  let stSoraAcik=false;
+  $s("#stSora") && ($s("#stSora").onclick=()=>{
+    stSoraAcik=!stSoraAcik; $s("#stSora").classList.toggle("on",stSoraAcik);
+  });
+  $s("#stAcilis") && ($s("#stAcilis").onchange=()=>{
+    const m={"0":"Kapalı","1":"İlk 1 dk","2.5":"İlk 2,5 dk","5":"İlk 5 dk","60":"Tümü"};
+    const l=$s("#stAcilisLbl"); if(l) l.textContent=m[$s("#stAcilis").value]||$s("#stAcilis").value;
+  });
   fetch("api/edit-stilleri").then(r=>r.json()).then(list=>{
     const c=$s("#stEdit"); if(!c) return; c.innerHTML="";
     stEditStil = list[0] && list[0].id;
@@ -1544,6 +1573,10 @@ setInterval(()=>{ const v=$("#view-videolar"); if(v && v.classList.contains("on"
     if((stCevaplar.altyazi||"").match(/olsun|evet|aç|var/i)) fd.append("altyazi","1");
     if(stSes && stSes!=="otomatik") fd.append("ses", stSes);
     if(stModel) fd.append("gorsel_model", stModel);
+    if(stTur==="hikaye"){
+      const a=$s("#stAcilis"); if(a) fd.append("acilis", a.value);
+      fd.append("sora", stSoraAcik?"1":"0");
+    }
     stFiles.forEach(f=>fd.append("sahne_ref",f));   /* analizin AYNI kareleri üretime de gider */
     try{
       const r=await fetch("api/generate",{method:"POST",body:fd});
