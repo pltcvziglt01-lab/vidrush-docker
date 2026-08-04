@@ -1929,6 +1929,99 @@ TIP_KARAKTERSIZ = ["I OBJECT MACRO", "J HANDS ONLY", "K MAP ROUTE", "G INFOGRAPH
                    "N SCREEN READOUT", "O OVERHEAD FLATLAY"]
 
 
+# ═══════════════ METIN DERIN ANALIZI → SAHNE BAZINDA EDIT ═══════════════
+# Sorun (Polat, 4 Agu 2026): zoom tek-cift donuyordu, pan sirayla (sag/sol/ust/alt),
+# vurgu sadece hikaye acilisinda. Yani KURGU metnin ne dedigini hic bilmiyordu.
+# Cozum: her satirin ISLEVINI cikar (acilis / liste maddesi / vurgu / donus / sonuc...)
+# ve editorun GERCEKTEN yapabildigi seylere cevir: zoom yonu, pan yonu, vurgu, overlay.
+# Editorun kapasitesi olculdu: zoom(in/out), pan(4 yon), vurgu(derin zoom+push-in),
+# overlay(kinetik yazi), sure. Sahne basina FARKLI GECIS TIPI yok — hepsi crossfade.
+ISLEV_TIPLERI = {
+    "acilis":      "opening hook — the first promise or question",
+    "liste":       "the start of a numbered list item",
+    "vurgu":       "the punch: a shocking number, a reveal, a turn",
+    "aciklama":    "calm explanation or context",
+    "ornek":       "a concrete example or small story",
+    "gecmis":      "a memory or flashback to the past",
+    "karsilastir": "comparing two things",
+    "soru":        "a direct question to the viewer",
+    "sonuc":       "the takeaway or closing line",
+}
+
+
+def metin_islev_analizi(scenes: list) -> list:
+    """Her sahnenin ANLATIM ISLEVINI cikarir. LLM sadece kilitli listeden secebilir;
+    uyduramaz. Basarisiz olursa [] doner ve cagiran eski mekanik atamaya duser —
+    kurgu analizi yuzunden video OLMEZ."""
+    if not scenes:
+        return []
+    satirlar = []
+    for i, sc in enumerate(scenes):
+        vo = (sc.get("voiceover") or "").strip().replace("\n", " ")
+        satirlar.append(f"{i+1}. {vo[:220]}")
+    istek = (
+        "You are a video editor reading a narration script. For EACH numbered line, decide its "
+        "narrative FUNCTION and how the camera should behave. Return STRICT JSON:\n"
+        '{"sahneler": [{"n": <line number>, "islev": <one key below>, '
+        '"yogunluk": <1-5>, "baslik": <short ALL-CAPS title or "">}]}\n'
+        "ALLOWED islev KEYS (use these exact strings, nothing else):\n"
+        + "\n".join(f'  "{k}" = {v}' for k, v in ISLEV_TIPLERI.items()) + "\n"
+        "yogunluk = how much visual energy this moment deserves, 1 (calm) to 5 (peak).\n"
+        "baslik = ONLY when islev is \"liste\" and the line clearly opens a numbered item "
+        "(\"number nine\", \"rule three\", \"the fourth thing\"). Then give the item number and "
+        "its subject as a very short ALL-CAPS title, max 3 words, e.g. \"9 GROCERY BILLS\". "
+        "For every other line baslik MUST be an empty string.\n"
+        "Return one entry for EVERY line, in order. No commentary.\n\n"
+        + "\n".join(satirlar)[:14000]
+    )
+    try:
+        j = oai_chat({"model": "gpt-4.1-mini",
+                      "messages": [{"role": "user", "content": istek}],
+                      "response_format": {"type": "json_object"},
+                      "max_tokens": min(6000, 60 * len(scenes) + 400),
+                      "temperature": 0.2}, timeout=180)
+        ic = json.loads(j["choices"][0]["message"]["content"])
+        ham = {int(x.get("n", 0)): x for x in (ic.get("sahneler") or []) if x.get("n")}
+    except BakiyeHatasi:
+        raise
+    except Exception as e:
+        print(f"  metin_islev_analizi hata (mekanik atamaya dusuluyor): {str(e)[:140]}",
+              file=sys.stderr)
+        return []
+    out = []
+    for i in range(len(scenes)):
+        x = ham.get(i + 1) or {}
+        islev = x.get("islev") if x.get("islev") in ISLEV_TIPLERI else "aciklama"
+        try:
+            yog = max(1, min(5, int(x.get("yogunluk") or 3)))
+        except Exception:
+            yog = 3
+        baslik = str(x.get("baslik") or "").strip().upper()[:24] if islev == "liste" else ""
+        out.append({"islev": islev, "yogunluk": yog, "baslik": baslik})
+    dagilim = {}
+    for o in out:
+        dagilim[o["islev"]] = dagilim.get(o["islev"], 0) + 1
+    print(f"  metin analizi: {dagilim} | vurgu(4-5)={sum(1 for o in out if o['yogunluk']>=4)}"
+          f" | liste basligi={sum(1 for o in out if o['baslik'])}", file=sys.stderr)
+    return out
+
+
+def islev_kurgu(islev: str, yogunluk: int, i: int) -> dict:
+    """Anlatim islevini editorun YAPABILDIGI seylere cevirir.
+    (Olculen kapasite: zoom in/out, pan 4 yon, vurgu bayragi, overlay yazi.)"""
+    # zoom: yaklasma = gerilim/odak, uzaklasma = aciklama/baglam
+    ZOOM = {"acilis": "in", "liste": "in", "vurgu": "in", "soru": "in",
+            "aciklama": "out", "ornek": "out", "gecmis": "out",
+            "karsilastir": "out", "sonuc": "out"}
+    # pan: gecmis geriye (sol), sonuc ileriye (sag), karsilastirma yatay, digerleri dengeli
+    PAN = {"gecmis": "left", "sonuc": "right", "karsilastir": "right",
+           "acilis": "top", "sonuc_alt": "bottom"}
+    pan = PAN.get(islev) or ("right", "left", "top", "bottom")[i % 4]
+    return {"zoom": ZOOM.get(islev, "in" if i % 2 == 0 else "out"),
+            "pan": pan,
+            "vurgu": yogunluk >= 4}
+
+
 def sahne_tipi_atamasi(adet: int) -> str:
     """Sahne basina cekim tipi atar: tek indeksler KARAKTERSIZ -> ~%50 oran, ard arda yok."""
     satir = []
@@ -2678,6 +2771,16 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     bildir("Hikaye sahnelere bölünüyor...", 5)
     plan = uzun_plan(story, prof, sure_dk)
     scenes = plan["scenes"]
+    # ── METIN DERIN ANALIZI: her satirin anlatim islevi -> sahne bazinda kurgu ──
+    # Basarisiz olursa bos liste doner ve asagida eski mekanik atamaya dusulur.
+    bildir("Metin kurgu açısından analiz ediliyor...", 6)
+    try:
+        kurgu_analiz = metin_islev_analizi(scenes)
+    except BakiyeHatasi:
+        raise
+    except Exception:
+        kurgu_analiz = []
+
     ses = ses_coz(plan)   # dogrulanmis, dile uygun ses (en-US-on-Turkce ve halusinasyon fix)
     # SES SECIMI: bu videoda secilmediyse kanal profilininki (kanal genelinde ayni anlatici)
     if not ses_secim and kanal:
@@ -2902,12 +3005,18 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         syol, kelimeler, sure = tts_sonuc[n]
         props_sahneler.append({
             "tur": tur, "medya": medya, "ses": syol, "sure": round(sure, 3),
-            "zoom": ("in" if i % 2 == 0 else "out") if zoom_acik else "yok",
-            "pan": panlar[i % 4] if zoom_acik else "yok",
-            "overlay": overlay,
+            **({"zoom": "yok", "pan": "yok"} if not zoom_acik else
+               (lambda k: {"zoom": k["zoom"], "pan": k["pan"]})(
+                   islev_kurgu(kurgu_analiz[i]["islev"], kurgu_analiz[i]["yogunluk"], i)
+                   if i < len(kurgu_analiz) else
+                   {"zoom": "in" if i % 2 == 0 else "out", "pan": panlar[i % 4]})),
+            # Liste maddesi acilisinda basligi kareye yaz ("9 GROCERY BILLS")
+            "overlay": (kurgu_analiz[i]["baslik"] if i < len(kurgu_analiz)
+                        and kurgu_analiz[i].get("baslik") else overlay),
             "altyazi": uretmod.altyazi_parcala(kelimeler, sure),
-            # Hikaye kanali: acilis dakikalarindaki sahneler yogun hareket alir (Video.tsx "vurgu")
-            "vurgu": mod == "hikaye" and kumulatif_sn < acilis_sn,
+            # Vurgu: metin analizi yogunluk>=4 dediyse VEYA hikaye acilisindaysa
+            "vurgu": bool((i < len(kurgu_analiz) and kurgu_analiz[i]["yogunluk"] >= 4)
+                          or (mod == "hikaye" and kumulatif_sn < acilis_sn)),
         })
         kumulatif_sn += sure
 
