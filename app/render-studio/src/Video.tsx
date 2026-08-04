@@ -6,12 +6,19 @@ import {
   Img,
   OffthreadVideo,
   interpolate,
+  spring,
   staticFile,
   useCurrentFrame,
   useVideoConfig,
 } from 'remotion';
 import {TransitionSeries, linearTiming} from '@remotion/transitions';
+import type {TransitionPresentation} from '@remotion/transitions';
 import {fade} from '@remotion/transitions/fade';
+// AE tarzi gecisler: kutuphane zaten kurulu (@remotion/transitions 4.0.410),
+// sadece fade() kullaniliyordu. Anlatim islevine gore sahne basina secilir.
+import {slide} from '@remotion/transitions/slide';
+import {wipe} from '@remotion/transitions/wipe';
+import {clockWipe} from '@remotion/transitions/clock-wipe';
 import {fontlariYukle, fontAilesi, ayarCoz, FontAdi, AltyaziAyar} from './fontlar';
 
 export type AltyaziParcasi = {t0: number; t1: number; metin: string};
@@ -26,6 +33,9 @@ export type Sahne = {
   overlay?: string;
   altyazi: AltyaziParcasi[];
   vurgu?: boolean; // hikaye kanalı açılış sahnesi: yoğun hareket (derin zoom + push-in + paralaks)
+  // Metin derin analizinden gelen anlatım işlevi — geçiş tipini o belirler.
+  islev?: 'acilis' | 'liste' | 'vurgu' | 'aciklama' | 'ornek' | 'gecmis'
+        | 'karsilastir' | 'soru' | 'sonuc';
 };
 
 export type Motion = 'sinematik' | 'anlati' | 'hizli' | 'kesme' | 'fade' | 'dinamik' | 'hikaye';
@@ -122,20 +132,23 @@ const OverlayBaslik: React.FC<{metin: string; motion: string; kareSayisi: number
   kareSayisi,
 }) => {
   const frame = useCurrentFrame();
+  const {fps} = useVideoConfig();
   if (!metin) return null;
-  const gir = interpolate(frame, [0, 8], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-    easing: Easing.out(Easing.cubic),
-  });
   const hizli = motion === 'hizli';
-  const cikisBas = hizli ? kareSayisi - 6 : Math.min(kareSayisi - 6, 60);
+
+  // ── AE tarzı: kelimeler TEK TEK, spring ile yaylanarak girer ──
+  // Tek blok halinde fade yerine kelime bazlı gecikmeli giriş; her kelime
+  // aşağıdan yukarı yaylanır, hafif büyür ve blur'dan netliğe geçer.
+  const kelimeler = metin.split(/\s+/).filter(Boolean);
+  const gecikme = hizli ? 2 : 3;           // kelimeler arası kare farkı
+
+  // Çıkış: blok halinde yumuşak sönüm (girişi bozmasın diye ayrı)
+  const cikisBas = hizli ? kareSayisi - 8 : Math.min(kareSayisi - 8, 64);
   const cik = interpolate(frame, [cikisBas, kareSayisi], [1, 0], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
+    easing: Easing.in(Easing.cubic),
   });
-  const opak = Math.min(gir, cik);
-  const ty = (1 - gir) * 24;
 
   return (
     <AbsoluteFill
@@ -147,26 +160,62 @@ const OverlayBaslik: React.FC<{metin: string; motion: string; kareSayisi: number
     >
       <div
         style={{
-          opacity: opak,
-          transform: `translateY(${ty}px)`,
+          opacity: cik,
           maxWidth: '84%',
           textAlign: 'center',
           overflowWrap: 'anywhere',
           wordBreak: 'break-word',
-          // Kinetik baslik da gomulu fontu kullansin (sistem fontu yerine) — tutarli marka
           fontFamily: fontAilesi(hizli ? 'anton' : 'montserrat'),
           fontWeight: hizli ? 400 : 800,
+          // ⚠ Bu bes satir kelime-animasyonu yazilirken DUSMUSTU: yazi 68px yerine
+          // varsayilan ~16px ciziliyordu ve karede okunmuyordu. Render testinde yakalandi.
           fontSize: hizli ? 96 : 68,
           lineHeight: 1.05,
           letterSpacing: hizli ? 0 : -1,
           color: hizli ? '#0a0a0a' : '#ffffff',
+          // Kontur: acik zeminlerde (krem mutfak gibi) beyaz yazi golgeyle bile
+          // okunmuyordu. paint-order konturu yazinin ARKASINA cizer — altyazi
+          // sistemindeki cozumun aynisi, her zeminde okunur.
+          textShadow: hizli ? 'none' : '0 3px 18px rgba(0,0,0,0.55)',
+          WebkitTextStroke: hizli ? '0' : '5px #000000',
+          paintOrder: 'stroke fill',
           background: hizli ? '#ffd400' : 'transparent',
           padding: hizli ? '10px 26px' : 0,
           borderRadius: hizli ? 10 : 0,
-          textShadow: hizli ? 'none' : '0 4px 24px rgba(0,0,0,0.75)',
+          display: 'flex',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          gap: '0 0.32em',
         }}
       >
-        {metin}
+        {kelimeler.map((k, i) => {
+          // Her kelimenin kendi yayı — damping yüksek ki titremesin, AE'deki
+          // "ease out back" hissi verir.
+          const y = spring({
+            frame: frame - i * gecikme,
+            fps,
+            config: {damping: 18, stiffness: 140, mass: 0.7},
+            durationInFrames: hizli ? 14 : 20,
+          });
+          const opak = interpolate(y, [0, 0.55], [0, 1], {extrapolateRight: 'clamp'});
+          const ty = (1 - y) * (hizli ? 34 : 26);
+          const olcek = 0.9 + y * 0.1;
+          const bul = (1 - y) * 5;
+          return (
+            <span
+              key={i}
+              style={{
+                display: 'inline-block',
+                opacity: opak,
+                transform: `translateY(${ty}px) scale(${olcek})`,
+                filter: bul > 0.15 ? `blur(${bul}px)` : 'none',
+                willChange: 'transform, opacity',
+              }}
+            >
+              {k}
+            </span>
+          );
+        })}
       </div>
     </AbsoluteFill>
   );
@@ -242,15 +291,13 @@ const kesmeHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
 
 // blur YOK. Push-in reveal transform ile. fade her sahnede degil -> gecis crossfade yapar (flash yok).
 const anlatiHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
-  const g = Math.max(8, Math.min(16, Math.floor(K / 4)));
-  const girisP = interpolate(frame, [0, g], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-    easing: Easing.out(Easing.cubic),
-  });
-  const girisOlcek = 1.12 - 0.12 * girisP;
+  // ⚠ 4 Agu 2026: giris push-in (1.12 -> 1.0) KALDIRILDI.
+  // Crossfade sirasinda giden sahne zoom sonunda (~1.12), gelen sahne ayni anda
+  // 1.12'den 1.0'a HIZLA kuculuyordu. Iki farkli olcek ust uste karisinca goz
+  // bunu TAKILMA olarak goruyor (Polat bildirdi). Artik tek surekli hareket var:
+  // sadece Ken Burns, sahne boyunca duzgun akiyor, gecis onu bozmuyor.
   const {olcek: kb, tx: kbTx, ty: kbTy} = kbHesap(sahne, frame, K, 1.12, 40);
-  return {transform: `translate(${kbTx}px, ${kbTy}px) scale(${kb * girisOlcek})`};
+  return {transform: `translate(${kbTx}px, ${kbTy}px) scale(${kb})`};
 };
 
 const hizliHesapla = (sahne: Sahne, frame: number, K: number, indeks: number): Gorunum => {
@@ -261,16 +308,12 @@ const hizliHesapla = (sahne: Sahne, frame: number, K: number, indeks: number): G
     extrapolateRight: 'clamp',
     easing: Easing.out(Easing.cubic),
   });
-  const girisOlcek = 1.18 - 0.18 * girisP;
+  // Hizli modda giris(1.18->1.0) + cikis(1.0->1.12) olcegi geciste ust uste
+  // binip zipliyordu. Yanal kayma korundu (o gecisle catismiyor), olcek ziplamasi
+  // kaldirildi — tek surekli Ken Burns kaldi.
   const girisX = (1 - girisP) * yon * 60;
-  const cikisP = interpolate(frame, [K - g, K], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-    easing: Easing.in(Easing.cubic),
-  });
-  const cikisOlcek = 1 + cikisP * 0.12;
   const {olcek: kb} = kbHesap(sahne, frame, K, 1.08, 0);
-  return {transform: `translateX(${girisX}px) scale(${kb * girisOlcek * cikisOlcek})`};
+  return {transform: `translateX(${girisX}px) scale(${kb})`};
 };
 
 // Hikaye kanali: ACILIS sahneleri (vurgu=true, ilk ~2.5dk) yogun hareket alir — derin zoom +
@@ -284,7 +327,9 @@ const hikayeHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
       extrapolateRight: 'clamp',
       easing: Easing.out(Easing.cubic),
     });
-    const girisOlcek = 1.2 - 0.2 * girisP; // sert push-in giris
+    // Vurgu sahnesinde push-in KORUNUYOR ama cok daha yumusak (1.2 -> 1.06):
+    // gecisle carpismasin diye. Derin zoom + genis pan zaten hareketi tasiyor.
+    const girisOlcek = 1.06 - 0.06 * girisP;
     // 1.16/48 yetersizdi ("videolasmis" hissi vermiyordu) -> 1.30/110: kamera geziyor hissi
     const {olcek, tx, ty} = kbHesap(sahne, frame, K, 1.3, 110); // derin zoom + genis pan
     return {transform: `translate(${tx}px, ${ty}px) scale(${olcek * girisOlcek})`};
@@ -363,6 +408,7 @@ export const VidrushVideo: React.FC<VideoProps> = ({
   fps, gecis, altyaziStil, altyaziAyar, sahneler,
 }) => {
   fontlariYukle();   // gomulu altyazi fontlarini enjekte et + yuklenene kadar render'i beklet
+  const {width, height} = useVideoConfig();   // clockWipe gecisi boyut ister
   const motion = normMotion(gecis);
   const alt: AltyaziStil = altyaziStil ?? 'orta';   // yalnizca undefined/null -> 'orta' ('yok' korunur)
   const {Ks, gecisler} = hesaplaKareler(sahneler, fps, motion);
@@ -382,11 +428,26 @@ export const VidrushVideo: React.FC<VideoProps> = ({
       </TransitionSeries.Sequence>,
     );
     if (i < sahneler.length - 1 && gecisler[i] > 0) {
+      // Geçiş tipi SONRAKİ sahnenin işlevine göre — o sahneye nasıl giriliyor?
+      //   liste  -> yeni madde: sayfa çevirir gibi yandan kayma
+      //   gecmis -> geçmişe dönüş: saat yönünde silme (zaman hissi)
+      //   vurgu  -> vuruş: keskin silme
+      //   diğer  -> yumuşak crossfade (varsayılan, siyah flaş yok)
+      const sonraki = sahneler[i + 1]?.islev;
+      const sure = gecisler[i];
+      const sunum =
+        sonraki === 'liste'
+          ? (slide({direction: 'from-right'}) as unknown as TransitionPresentation<Record<string, unknown>>)
+          : sonraki === 'gecmis'
+            ? (clockWipe({width, height}) as unknown as TransitionPresentation<Record<string, unknown>>)
+            : sonraki === 'vurgu'
+              ? (wipe({direction: 'from-left'}) as unknown as TransitionPresentation<Record<string, unknown>>)
+              : (fade() as unknown as TransitionPresentation<Record<string, unknown>>);
       cocuklar.push(
         <TransitionSeries.Transition
           key={`t${i}`}
-          presentation={fade()}
-          timing={linearTiming({durationInFrames: gecisler[i]})}
+          presentation={sunum}
+          timing={linearTiming({durationInFrames: sure})}
         />,
       );
     }

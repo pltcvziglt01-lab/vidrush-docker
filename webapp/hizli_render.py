@@ -10,7 +10,7 @@ Ayni is ~8-12 dk.
 KAPSAM (v1):
   - Tum sahneler IMAGE olmali (documentary footage klipleri varsa Remotion'a doner)
   - Overlay basligi olan sahne varsa Remotion'a doner (kinetik baslik v1'de yok)
-  - Gecisler HARD CUT (crossfade v1'de yok — Remotion'daki 0.4 sn fade yerine kesme)
+  - Gecisler CROSSFADE (v2, 4 Agu 2026): xfade+acrossfade, obek obek zincirlenir
 Uygunsuz durumda False doner; pipeline otomatik Remotion'a duser. RISK YOK.
 
 ACMA/KAPAMA: env RENDER_MOTOR=ffmpeg  VEYA  /opt/vidrush/RENDER_MOTOR dosyasina
@@ -280,18 +280,73 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
                   file=sys.stderr)
             return False
 
-        # ── 2) Concat (yeniden kodlama YOK — aninda) ──
-        bildir("Hızlı render: birleştiriliyor...", 90)
-        liste = os.path.join(tmp, "liste.txt")
-        with open(liste, "w") as f:
-            for i in range(len(sahneler)):
-                f.write(f"file '{seg_yollar[i]}'\n")
+        # ── 2) Birlestirme ──
+        # CROSSFADE (4 Agu 2026): v1'de sert kesme vardi ve bu yuzden motor kapali
+        # duruyordu. Artik xfade ile yumusak gecis var. Cok girdili tek xfade zinciri
+        # (132 segment) bellekte sisiyor -> OBEK OBEK zincirlenir, obekler de birbirine
+        # xfade ile baglanir. Gecis suresi Remotion'daki ile ayni mantik: en kisa
+        # komsu sahnenin yarisini asamaz.
         birlesik = os.path.join(tmp, "birlesik.mp4")
-        r = subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "concat", "-safe", "0",
-                            "-i", liste, "-c", "copy", birlesik],
-                           capture_output=True, text=True, timeout=600)
-        if r.returncode != 0 or not os.path.exists(birlesik):
-            print(f"  hizli motor concat hata: {r.stderr[-300:]}", file=sys.stderr)
+        GECIS_SN = float(os.environ.get("HIZLI_GECIS_SN", "0.4"))
+
+        def _sure(yol):
+            try:
+                r2 = subprocess.run(["ffprobe", "-v", "error", "-show_entries",
+                                     "format=duration", "-of", "csv=p=0", yol],
+                                    capture_output=True, text=True, timeout=30)
+                return float((r2.stdout or "0").strip())
+            except Exception:
+                return 0.0
+
+        def _xfade_zincir(yollar, cikti):
+            """Verilen segmentleri xfade ile birlestirir. Tek segment ise kopyalar."""
+            if len(yollar) == 1:
+                shutil.copy(yollar[0], cikti)
+                return True
+            sureler = [_sure(y) for y in yollar]
+            if any(d <= 0 for d in sureler):
+                return False
+            girdi, filt, offset = [], [], 0.0
+            son_v, son_a = "0:v", "0:a"
+            for i, y in enumerate(yollar):
+                girdi += ["-i", y]
+            for i in range(1, len(yollar)):
+                g = min(GECIS_SN, sureler[i - 1] / 2, sureler[i] / 2)
+                offset = (offset + sureler[i - 1] - g) if i > 1 else (sureler[0] - g)
+                vo, ao = f"v{i}", f"a{i}"
+                filt.append(f"[{son_v}][{i}:v]xfade=transition=fade:duration={g:.3f}:"
+                            f"offset={offset:.3f}[{vo}]")
+                filt.append(f"[{son_a}][{i}:a]acrossfade=d={g:.3f}[{ao}]")
+                son_v, son_a = vo, ao
+            komut = (["ffmpeg", "-y", "-loglevel", "error"] + girdi +
+                     ["-filter_complex", ";".join(filt),
+                      "-map", f"[{son_v}]", "-map", f"[{son_a}]",
+                      "-c:v", "libx264", "-crf", str(crf), "-preset", "veryfast",
+                      "-c:a", "aac", "-ar", "44100", "-b:a", "160k", cikti])
+            r2 = subprocess.run(komut, capture_output=True, text=True,
+                                timeout=int(max(900, sum(sureler) * 4)))
+            if r2.returncode != 0:
+                print(f"  xfade hata: {r2.stderr[-300:]}", file=sys.stderr)
+                return False
+            return os.path.exists(cikti) and os.path.getsize(cikti) > 1000
+
+        sirali = [seg_yollar[i] for i in range(len(sahneler))]
+        OBEK = max(2, int(os.environ.get("HIZLI_OBEK", "12")))
+        bildir("Hızlı render: geçişler ekleniyor...", 90)
+        if len(sirali) <= OBEK:
+            ok_birlestir = _xfade_zincir(sirali, birlesik)
+        else:
+            obekler = []
+            for k in range(0, len(sirali), OBEK):
+                oy = os.path.join(tmp, f"obek_{k // OBEK:03d}.mp4")
+                if not _xfade_zincir(sirali[k:k + OBEK], oy):
+                    ok_birlestir = False
+                    break
+                obekler.append(oy)
+            else:
+                ok_birlestir = _xfade_zincir(obekler, birlesik)
+        if not ok_birlestir:
+            print("  hizli motor: xfade basarisiz -> Remotion", file=sys.stderr)
             return False
 
         # ── 3) Altyazi (varsa tek gecişte ASS ile gomulur) ──

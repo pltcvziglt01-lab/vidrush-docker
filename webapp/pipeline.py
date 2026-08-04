@@ -474,6 +474,26 @@ KARE_CESITLILIGI = (
     "something. Scenes written as 'no character in frame' must not contain any figure at all.\n"
 )
 
+# ── CEKIM OLCEGI DENGESI (Polat, 4 Agu 2026: "cok uzaktan cekilmis gorseller
+# kullanmasin, daha dogal olsun — yakinda olsun uzakta olsun") ──
+# Olculen sorun: cerceve metni "kamerayi yakinlastirma" ve "nesneler dort kenara
+# kadar dolsun" diyordu; bu her kareyi geriye itiyordu. Ustune "orta cekim" bandi
+# %30-50 olarak tanimliydi, ki bu zaten uzak. Gercek kanallarda oran tersine:
+# yakin ve orta agirlikli, genis plan az ve sadece MEKANI TANITMAK icin.
+CEKIM_OLCEGI = (
+    "SHOT DISTANCE — MAKE IT FEEL NATURAL, NOT DISTANT. Vary how close the camera is the way a real "
+    "film does, and lean CLOSER than you think:\n"
+    "  • About 1 scene in 6 is a WIDE establishing shot — use it only when the viewer genuinely "
+    "needs to see where they are, or when the place itself is the point.\n"
+    "  • About half the scenes are MEDIUM: the subject fills 45-70% of the frame height, close "
+    "enough that faces, hands and objects read clearly on a phone.\n"
+    "  • About 1 scene in 3 is CLOSE: a face, a pair of hands, a single object filling 70-95% of "
+    "the frame.\n"
+    "Never place the camera far back just to show off the room. If a scene is about a feeling, a "
+    "decision or a small object, get CLOSE to it. Two consecutive scenes must not use the same "
+    "distance — alternate near and far so the video breathes.\n"
+)
+
 DESTEK_GORSEL = (
     " STORYTELLING FRAME: this is a narrated explainer picture, so the frame must SHOW the idea, not "
     "just the character. Besides the character and the background, clearly render the supporting "
@@ -546,13 +566,13 @@ ANIM_VARSAYILAN_KARAKTER = (
 # Kompozisyon/cerceveleme kurali (referansli_gorsel promptuna eklenir)
 ANIM_CERCEVE = (
     " FRAMING: obey the shot type and character-scale phrase written in the scene description "
-    "exactly; do not pull the camera closer, do not enlarge or centre the character. The ENVIRONMENT "
+    "as a guide; when the moment is intimate you may move CLOSER than the band suggests. The ENVIRONMENT "
     "is the main subject. Build a complete believable place: a foreground object cutting into the "
     "frame, a middle ground where the action happens, and a detailed background with true perspective "
     "and receding depth. Objects, furniture and signage must run to all four edges of the image, and "
     "at least one piece of furniture or foreground object must pass in front of the character and "
-    "partly overlap it — nothing floats in open space, no blank areas. Keep ONE dominant light source "
-    "with a clearly visible direction, casting soft readable shadows that shape the composition."
+    "partly overlap it. In CLOSE shots the background may fall away entirely — that is correct. "
+    "Light the scene to MATCH the measured brightness target given later in this prompt; if no target is given, use one soft dominant source with soft readable shadows."
 )
 
 # ═════════ EXPLAINER STILI (2. referans: "Salt" videosu analizinden) ═════════
@@ -640,7 +660,7 @@ EXP_SOZLESME = (
     "The character is referred to ONLY as \"the hero\" — never restate appearance, clothing or "
     "colours. Do NOT mention camera, lens, lighting, style, texture or medium in scene_prompt; all "
     "styling lives in the global block.\n"
-    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI + CEKIM_OLCEGI
 )
 
 
@@ -681,7 +701,7 @@ ANIM_SOZLESME = (
     "style consistency between scenes.\n"
     "TEXT: at most one short natural in-world sign, under four words, written as: sign reads "
     "\"NEW & IMPROVED\". Never captions, subtitles, watermarks or logos.\n"
-    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI + CEKIM_OLCEGI
 )
 
 # ═════════ HIKAYE / WHAT-IF STILI (3. referans: "You Wake Up 100,000 Years Ago") ═════════
@@ -790,7 +810,7 @@ HIK_SOZLESME = (
     "commas, no punctuation, no plus signs, no chemical symbols, no thousand separators — write "
     "\"100K YEARS\" not \"100,000\". Each infographic label box obeys the same limit. Text never sits "
     "in the top or bottom 9% of the frame.\n"
-    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI + CEKIM_OLCEGI
 )
 
 # ═════════ RENKLI KALEM STILI (6. referans: "Aussie Money With Bruce") ═════════
@@ -820,12 +840,12 @@ KALEM_CERCEVE = (
     " FRAMING for a 16:9 centre crop of this 1536x1024 image: the top 9% and bottom 9% get cut away, "
     "so every face, sign and key silhouette stays inside 10%-90% of frame height and 8% clear of the "
     "left and right edges. Obey the shot type and character-scale band written in the scene text "
-    "exactly; do not pull the camera closer or enlarge the figure. THE PLACE IS THE SUBJECT: build a "
+    "as a guide; when the moment is intimate you may move CLOSER than the band suggests. THE PLACE IS THE SUBJECT: build a "
     "complete believable room or exterior with a foreground object cutting into the frame, a "
     "midground where the action happens and a background with true perspective, and let furniture, "
     "shelves, signage and clutter run to all four edges — nothing floats on blank paper. At least one "
-    "object must pass in front of the figure and partly overlap it. Keep ONE dominant light source "
-    "with a clear direction and soft pencil-shaded shadows. Keep the figure's white head clearly "
+    "object must pass in front of the figure and partly overlap it. "
+    "Light the scene to MATCH the measured brightness target given later in this prompt; if no target is given, use one soft dominant source with soft pencil-shaded shadows. Keep the figure's white head clearly "
     "readable against whatever sits behind it."
 )
 KALEM_SOZLESME = (
@@ -875,7 +895,7 @@ KALEM_SOZLESME = (
     "and 14 characters, ALL CAPS, letters A-Z digits 0-9 spaces and the $ sign only, inside double "
     "quotes. No commas, no thousand separators — write \"12 MILLION\" not \"12,000,000\". Text never "
     "sits in the top or bottom 9% of the frame.\n"
-    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI + CEKIM_OLCEGI
 )
 
 # ═════════ ANI DEFTERI STILI (11. referans: "ThriftyHazel" — 216 kare) ═════════
@@ -911,8 +931,8 @@ ANI_CERCEVE = (
     "speaking directly to camera; a WORLD frame places her (or the objects) inside a fully furnished "
     "room or street with a foreground object cutting into the frame, a midground where the action "
     "happens and a background with real perspective. Never blend the two — a backdrop frame has NO "
-    "scenery, a world frame is completely furnished to all four edges. Keep ONE warm dominant light "
-    "source with a visible direction and soft shadows."
+    "scenery, a world frame is furnished with real depth. "
+    "Light the scene to MATCH the measured brightness target given later in this prompt; if no target is given, use one soft dominant source, warm, with soft shadows."
 )
 ANI_SOZLESME = (
     "RULE ZERO — READ FIRST: this is a narrated first-person memoir explainer, not a character "
@@ -979,7 +999,7 @@ ANI_SOZLESME = (
     "REJECTION MARK — when the narration says something is wasteful, wrong or should be dropped, "
     "draw a single bold hand-drawn red cross over that one object. Only one crossed object per "
     "scene, and never over a person.\n"
-    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI + CEKIM_OLCEGI
 )
 
 ANIMASYON_PROFIL = {
@@ -1630,7 +1650,9 @@ def olcum_isik_prompt(o: dict) -> str:
           "moderately saturated" if d < 100 else "richly saturated")
     kn = ("soft and low-contrast" if k < 35 else
           "clearly contrasted" if k < 55 else "high-contrast and punchy")
-    return (f" LIGHT AND COLOUR MATCH (measured from the reference frames the user supplied — hit "
+    return (f" LIGHT AND COLOUR MATCH — THIS OVERRIDES EVERY EARLIER LIGHTING INSTRUCTION, "
+            f"including any 'one dominant light source', 'directional shadows' or 'lamplit' wording "
+            f"above. Measured from the reference frames the user supplied — hit "
             f"these targets): the overall image should be {ton} (mean brightness about "
             f"{int(p)} out of 255), {dg} (mean saturation about {int(d)}), and {kn} "
             f"(tonal spread about {int(k)}). BRIGHT MUST NOT MEAN WASHED OUT: main objects keep "
@@ -1778,6 +1800,57 @@ SESLER = {
                     "talimat": YASLI_KADIN_TALIMAT, "hiz": 0.92, "dil": "en",
                     "ozet": "Kırılgan, hafif titrek, sakin — tasarruf/anı kanalları için",
                     "ucret": "~$0.03/video"},
+    # ── Yasli Amerikali kadin sesleri (Polat istegi, 4 Agu 2026) ──
+    # Hepsi gpt-4o-mini-tts + talimat: model sesin YASINI ve aksanini tarif etmeye izin
+    # veriyor. edge-tts'te bu imkansiz (322 sesin hicbiri yasli degil).
+    "yasli-guneyli": {"ad": "Yaşlı Kadın · Güneyli (72)", "motor": "openai", "grup": "karakterli",
+                      "ses": "sage", "hiz": 0.90, "dil": "en",
+                      "talimat": ("An American woman of about seventy two from the deep South. Warm "
+                                  "unhurried drawl, softened vowels, a little husky with age. She "
+                                  "tells things like she is sitting on a porch with sweet tea. Kind, "
+                                  "patient, faintly amused."),
+                      "ozet": "Güney aksanı, ağır ağır, sıcak — veranda sohbeti tonu",
+                      "ucret": "~$0.03/video"},
+    "yasli-newyork": {"ad": "Yaşlı Kadın · New York (70)", "motor": "openai", "grup": "karakterli",
+                      "ses": "nova", "hiz": 0.96, "dil": "en",
+                      "talimat": ("A seventy year old woman from New York. Direct, quick, a little "
+                                  "clipped, with the dryness of someone who has heard every excuse. "
+                                  "Age shows in a slight rasp, not in slowness. No sweetness, just "
+                                  "plain truth delivered fast."),
+                      "ozet": "Keskin, hızlı, lafı dolandırmayan — kuru mizah",
+                      "ucret": "~$0.03/video"},
+    "yasli-cok-yasli": {"ad": "Çok Yaşlı Kadın (85)", "motor": "openai", "grup": "karakterli",
+                        "ses": "alloy", "hiz": 0.86, "dil": "en",
+                        "talimat": ("A woman of about eighty five. Thin, papery voice with a real "
+                                    "tremor, short breaths, long pauses between thoughts. Very quiet "
+                                    "and very slow, as if each memory takes a moment to find. Frail "
+                                    "but completely lucid."),
+                        "ozet": "Çok yavaş, titrek, nefes araları — en yaşlı ton",
+                        "ucret": "~$0.03/video"},
+    "yasli-neseli": {"ad": "Yaşlı Kadın · Neşeli (70)", "motor": "openai", "grup": "karakterli",
+                     "ses": "verse", "hiz": 0.98, "dil": "en",
+                     "talimat": ("A lively American woman of seventy who has not slowed down. Bright, "
+                                 "playful, quick to laugh at herself. The voice has age in its texture "
+                                 "but energy in its delivery. Think of a grandmother who still drives "
+                                 "and still argues about politics."),
+                     "ozet": "Enerjik, esprili, kendine gülen — yaşlı ama canlı",
+                     "ucret": "~$0.03/video"},
+    "yasli-ogretmen": {"ad": "Yaşlı Kadın · Öğretmen (74)", "motor": "openai", "grup": "karakterli",
+                       "ses": "fable", "hiz": 0.92, "dil": "en",
+                       "talimat": ("A retired American schoolteacher, about seventy four. Clear, "
+                                   "measured, carefully articulated — every word lands. Patient and "
+                                   "authoritative without being cold. She explains rather than tells, "
+                                   "and pauses to let a point sink in."),
+                       "ozet": "Net, ölçülü, açıklayıcı — emekli öğretmen",
+                       "ucret": "~$0.03/video"},
+    "yasli-kirsal": {"ad": "Yaşlı Kadın · Çiftlik (78)", "motor": "openai", "grup": "karakterli",
+                     "ses": "shimmer", "hiz": 0.88, "dil": "en",
+                     "talimat": ("A seventy eight year old woman from rural America who worked hard "
+                                 "her whole life. Low, weathered, plain-spoken. No decoration, no "
+                                 "performance — she says what happened and lets it stand. A quiet "
+                                 "toughness under the warmth."),
+                     "ozet": "Alçak, yıpranmış, süssüz — çalışmış kadın tonu",
+                     "ucret": "~$0.03/video"},
     "olgun-kadin": {"ad": "Olgun Kadın (68)", "motor": "openai", "grup": "karakterli", "ses": "coral",
                     "talimat": ("Speak as a warm woman in her late sixties. Unhurried and gentle, "
                                 "with the soft dryness and slight breathiness of an older voice. "
@@ -1877,6 +1950,116 @@ TIP_KARAKTERLI = ["A WIDE ESTABLISHING", "B MEDIUM ACTION", "C CLOSE-UP",
 TIP_KARAKTERSIZ = ["I OBJECT MACRO", "J HANDS ONLY", "K MAP ROUTE", "G INFOGRAPHIC",
                    "N SCREEN READOUT", "O OVERHEAD FLATLAY"]
 
+
+# ═══════════════ METIN DERIN ANALIZI → SAHNE BAZINDA EDIT ═══════════════
+# Sorun (Polat, 4 Agu 2026): zoom tek-cift donuyordu, pan sirayla (sag/sol/ust/alt),
+# vurgu sadece hikaye acilisinda. Yani KURGU metnin ne dedigini hic bilmiyordu.
+# Cozum: her satirin ISLEVINI cikar (acilis / liste maddesi / vurgu / donus / sonuc...)
+# ve editorun GERCEKTEN yapabildigi seylere cevir: zoom yonu, pan yonu, vurgu, overlay.
+# Editorun kapasitesi olculdu: zoom(in/out), pan(4 yon), vurgu(derin zoom+push-in),
+# overlay(kinetik yazi), sure. Sahne basina FARKLI GECIS TIPI yok — hepsi crossfade.
+ISLEV_TIPLERI = {
+    "acilis":      "opening hook — the first promise or question",
+    "liste":       "the start of a numbered list item",
+    "vurgu":       "the punch: a shocking number, a reveal, a turn",
+    "aciklama":    "calm explanation or context",
+    "ornek":       "a concrete example or small story",
+    "gecmis":      "a memory or flashback to the past",
+    "karsilastir": "comparing two things",
+    "soru":        "a direct question to the viewer",
+    "sonuc":       "the takeaway or closing line",
+}
+
+
+def metin_islev_analizi(scenes: list) -> list:
+    """Her sahnenin ANLATIM ISLEVINI cikarir. LLM sadece kilitli listeden secebilir;
+    uyduramaz. Basarisiz olursa [] doner ve cagiran eski mekanik atamaya duser —
+    kurgu analizi yuzunden video OLMEZ."""
+    if not scenes:
+        return []
+    satirlar = []
+    for i, sc in enumerate(scenes):
+        vo = (sc.get("voiceover") or "").strip().replace("\n", " ")
+        satirlar.append(f"{i+1}. {vo[:220]}")
+    istek = (
+        "You are a video editor reading a narration script. For EACH numbered line, decide its "
+        "narrative FUNCTION and how the camera should behave. Return STRICT JSON:\n"
+        '{"sahneler": [{"n": <line number>, "islev": <one key below>, '
+        '"yogunluk": <1-5>, "baslik": <short ALL-CAPS title or "">}]}\n'
+        "ALLOWED islev KEYS (use these exact strings, nothing else):\n"
+        + "\n".join(f'  "{k}" = {v}' for k, v in ISLEV_TIPLERI.items()) + "\n"
+        "yogunluk = how much visual energy this moment deserves, 1 (calm) to 5 (peak).\n"
+        "baslik = ONLY when islev is \"liste\" and the line clearly opens a numbered item "
+        "(\"number nine\", \"rule three\", \"the fourth thing\"). Then give the item number and "
+        "its subject as a very short ALL-CAPS title, max 3 words, e.g. \"9 GROCERY BILLS\". "
+        "For every other line baslik MUST be an empty string.\n"
+        "Return one entry for EVERY line, in order. No commentary.\n\n"
+        + "\n".join(satirlar)[:14000]
+    )
+    try:
+        j = oai_chat({"model": "gpt-4.1-mini",
+                      "messages": [{"role": "user", "content": istek}],
+                      "response_format": {"type": "json_object"},
+                      "max_tokens": min(6000, 60 * len(scenes) + 400),
+                      "temperature": 0.2}, timeout=180)
+        ic = json.loads(j["choices"][0]["message"]["content"])
+        ham = {int(x.get("n", 0)): x for x in (ic.get("sahneler") or []) if x.get("n")}
+    except BakiyeHatasi:
+        raise
+    except Exception as e:
+        print(f"  metin_islev_analizi hata (mekanik atamaya dusuluyor): {str(e)[:140]}",
+              file=sys.stderr)
+        return []
+    out = []
+    for i in range(len(scenes)):
+        x = ham.get(i + 1) or {}
+        islev = x.get("islev") if x.get("islev") in ISLEV_TIPLERI else "aciklama"
+        try:
+            yog = max(1, min(5, int(x.get("yogunluk") or 3)))
+        except Exception:
+            yog = 3
+        baslik = str(x.get("baslik") or "").strip().upper()[:24] if islev == "liste" else ""
+        out.append({"islev": islev, "yogunluk": yog, "baslik": baslik})
+    dagilim = {}
+    for o in out:
+        dagilim[o["islev"]] = dagilim.get(o["islev"], 0) + 1
+    print(f"  metin analizi: {dagilim} | vurgu(4-5)={sum(1 for o in out if o['yogunluk']>=4)}"
+          f" | liste basligi={sum(1 for o in out if o['baslik'])}", file=sys.stderr)
+    return out
+
+
+def islev_kurgu(islev: str, yogunluk: int, i: int, onceki: dict = None) -> dict:
+    """Anlatim islevini editorun YAPABILDIGI seylere cevirir.
+    (Olculen kapasite: zoom in/out, pan 4 yon, vurgu bayragi, overlay yazi.)
+
+    ⚠ 4 Agu 2026 DUZELTMESI — ilk surumde 9 islev 2 zoom yonune sikistirilmisti ve
+    en sik cikan iki islev (aciklama %61 + ornek %19) AYNI yone bakiyordu.
+    Sonuc: 132 sahnenin 120'si zoom=out, ard arda ayni zoom orani %84.
+    Gorseller farkli olmasina ragmen kamera hep ayni seyi yapinca video
+    TEKRAR EDIYORMUS gibi hissettiriyordu (Polat bildirdi).
+    Cozum: (1) en sik islevler kendi ICINDE donusumlu, (2) onceki sahneyle
+    ayni kombinasyon cikarsa ZORLA degistirilir.
+    """
+    # Nadir ve anlami net olan islevler sabit yon alir
+    SABIT_ZOOM = {"vurgu": "in", "soru": "in", "acilis": "in",
+                  "gecmis": "out", "sonuc": "out", "karsilastir": "out"}
+    # Sik gorulen islevler kendi icinde donusumlu -> tek yone yigilmaz
+    if islev in SABIT_ZOOM:
+        zoom = SABIT_ZOOM[islev]
+    else:                                   # aciklama / ornek / liste
+        zoom = "in" if (i % 2 == 0) else "out"
+
+    PAN = {"gecmis": "left", "sonuc": "right", "karsilastir": "right", "acilis": "top"}
+    pan = PAN.get(islev) or ("right", "left", "top", "bottom")[i % 4]
+
+    # Ard arda AYNI kombinasyon olmasin — tekrar hissinin asil kaynagi buydu
+    if onceki and onceki.get("zoom") == zoom and onceki.get("pan") == pan:
+        zoom = "out" if zoom == "in" else "in"
+        if onceki.get("zoom") == zoom:       # yine ayniysa pan'i cevir
+            zoom = onceki["zoom"]
+            sira = ["right", "left", "top", "bottom"]
+            pan = sira[(sira.index(pan) + 1) % 4] if pan in sira else "right"
+    return {"zoom": zoom, "pan": pan, "vurgu": yogunluk >= 4}
 
 def sahne_tipi_atamasi(adet: int) -> str:
     """Sahne basina cekim tipi atar: tek indeksler KARAKTERSIZ -> ~%50 oran, ard arda yok."""
@@ -2158,6 +2341,34 @@ def uzun_plan(story: str, prof: dict, sure_dk: float) -> dict:
     return toplam_plan
 
 
+def on_ciz_16x9(yol: str) -> bool:
+    """Uretilen 1536x1024 (3:2) gorseli GERCEK 16:9'a (1536x864) merkezden kirpar.
+
+    Neden (Polat, 4 Agu 2026: "gorseller saginda solundan tutulup uzatilmis gibi"):
+    Render 1920x1080'e objectFit:cover ile basiyordu -> 3:2 gorsel 1.25x buyutulup
+    dikeyden %15.6 kirpiliyordu. Ustune Ken Burns 1.12x zoom binince toplam 1.4x
+    oluyor ve sahne ilerledikce gorselin ~%40'i kare disina tasiyor; kompozisyon
+    sikisiyor, kenardaki nesneler kayboluyor.
+    Cozum: kirpmayi ONCEDEN ve BIR KEZ yap. Boylece render'a giren gorsel zaten
+    16:9 olur, cover hicbir sey yapmaz ve TEK olcekleme Ken Burns kalir — ne kadar
+    kirpildigi tahmin edilebilir olur. Prompt zaten ust/alt %9'u bos biraktiriyor,
+    yani kirpilan bolgede icerik yok.
+    """
+    try:
+        from PIL import Image
+        im = Image.open(yol)
+        g, y = im.size
+        hedef_y = int(round(g * 9 / 16))
+        if y <= hedef_y + 1:
+            return False                      # zaten 16:9 ya da daha genis
+        ust = (y - hedef_y) // 2
+        im.crop((0, ust, g, ust + hedef_y)).save(yol)
+        return True
+    except Exception as e:
+        print(f"  16:9 kirpma atlandi: {str(e)[:120]}", file=sys.stderr)
+        return False
+
+
 def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
                       stil_prompt: str = "", kar_kilit: str = "", stil_yol: str = "",
                       capa_yol: str = "", stil_kilit: str = "", yazi_yasak: bool = True,
@@ -2294,6 +2505,11 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
             b64 = r.json()["data"][0]["b64_json"]
             with open(hedef, "wb") as f:
                 f.write(base64.b64decode(b64))
+            # Sahne kareleri gercek 16:9'a kirpilir. Kanon (tasarim sayfasi) ve kapak
+            # HARIC — onlar 3:2 kalmali (kanon referans olarak gonderiliyor, kapak 16:9
+            # zaten ayri hesaplanacak).
+            if not kanon_modu and not os.path.basename(hedef).startswith(("_kanon", "kapak")):
+                on_ciz_16x9(hedef)
             return True
         except BakiyeHatasi:
             raise            # bakiye/limit: retry etme, yukari firlat (para bosa gitmesin)
@@ -2627,6 +2843,16 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     bildir("Hikaye sahnelere bölünüyor...", 5)
     plan = uzun_plan(story, prof, sure_dk)
     scenes = plan["scenes"]
+    # ── METIN DERIN ANALIZI: her satirin anlatim islevi -> sahne bazinda kurgu ──
+    # Basarisiz olursa bos liste doner ve asagida eski mekanik atamaya dusulur.
+    bildir("Metin kurgu açısından analiz ediliyor...", 6)
+    try:
+        kurgu_analiz = metin_islev_analizi(scenes)
+    except BakiyeHatasi:
+        raise
+    except Exception:
+        kurgu_analiz = []
+
     ses = ses_coz(plan)   # dogrulanmis, dile uygun ses (en-US-on-Turkce ve halusinasyon fix)
     # SES SECIMI: bu videoda secilmediyse kanal profilininki (kanal genelinde ayni anlatici)
     if not ses_secim and kanal:
@@ -2843,6 +3069,8 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             continue
         tts_sonuc[n] = (syol, kelimeler, sure)
 
+    # Ard arda ayni kamera hareketi olmasin diye bir onceki sahnenin kurgusu tutulur
+    _son_kurgu = {}
     # Montaj: orijinal sahne sirasi korunur (paralellik sirayi bozamaz)
     for i, n, s, metin, overlay in islenecek:
         if n not in sonuc_medya or n not in tts_sonuc:
@@ -2851,12 +3079,22 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         syol, kelimeler, sure = tts_sonuc[n]
         props_sahneler.append({
             "tur": tur, "medya": medya, "ses": syol, "sure": round(sure, 3),
-            "zoom": ("in" if i % 2 == 0 else "out") if zoom_acik else "yok",
-            "pan": panlar[i % 4] if zoom_acik else "yok",
-            "overlay": overlay,
+            **({"zoom": "yok", "pan": "yok"} if not zoom_acik else
+               (lambda k: (_son_kurgu.update(k), {"zoom": k["zoom"], "pan": k["pan"]})[1])(
+                   islev_kurgu(kurgu_analiz[i]["islev"], kurgu_analiz[i]["yogunluk"], i,
+                               dict(_son_kurgu))
+                   if i < len(kurgu_analiz) else
+                   {"zoom": "in" if i % 2 == 0 else "out", "pan": panlar[i % 4]})),
+            # Liste maddesi acilisinda basligi kareye yaz ("9 GROCERY BILLS")
+            "overlay": (kurgu_analiz[i]["baslik"] if i < len(kurgu_analiz)
+                        and kurgu_analiz[i].get("baslik") else overlay),
             "altyazi": uretmod.altyazi_parcala(kelimeler, sure),
-            # Hikaye kanali: acilis dakikalarindaki sahneler yogun hareket alir (Video.tsx "vurgu")
-            "vurgu": mod == "hikaye" and kumulatif_sn < acilis_sn,
+            # Vurgu: metin analizi yogunluk>=4 dediyse VEYA hikaye acilisindaysa
+            "vurgu": bool((i < len(kurgu_analiz) and kurgu_analiz[i]["yogunluk"] >= 4)
+                          or (mod == "hikaye" and kumulatif_sn < acilis_sn)),
+            # Anlatim islevi -> Video.tsx GECIS TIPINI buna gore secer
+            # (liste=yandan kayma, gecmis=saat silme, vurgu=keskin silme, digeri=crossfade)
+            "islev": (kurgu_analiz[i]["islev"] if i < len(kurgu_analiz) else "aciklama"),
         })
         kumulatif_sn += sure
 
