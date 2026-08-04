@@ -474,6 +474,26 @@ KARE_CESITLILIGI = (
     "something. Scenes written as 'no character in frame' must not contain any figure at all.\n"
 )
 
+# ── CEKIM OLCEGI DENGESI (Polat, 4 Agu 2026: "cok uzaktan cekilmis gorseller
+# kullanmasin, daha dogal olsun — yakinda olsun uzakta olsun") ──
+# Olculen sorun: cerceve metni "kamerayi yakinlastirma" ve "nesneler dort kenara
+# kadar dolsun" diyordu; bu her kareyi geriye itiyordu. Ustune "orta cekim" bandi
+# %30-50 olarak tanimliydi, ki bu zaten uzak. Gercek kanallarda oran tersine:
+# yakin ve orta agirlikli, genis plan az ve sadece MEKANI TANITMAK icin.
+CEKIM_OLCEGI = (
+    "SHOT DISTANCE — MAKE IT FEEL NATURAL, NOT DISTANT. Vary how close the camera is the way a real "
+    "film does, and lean CLOSER than you think:\n"
+    "  • About 1 scene in 6 is a WIDE establishing shot — use it only when the viewer genuinely "
+    "needs to see where they are, or when the place itself is the point.\n"
+    "  • About half the scenes are MEDIUM: the subject fills 45-70% of the frame height, close "
+    "enough that faces, hands and objects read clearly on a phone.\n"
+    "  • About 1 scene in 3 is CLOSE: a face, a pair of hands, a single object filling 70-95% of "
+    "the frame.\n"
+    "Never place the camera far back just to show off the room. If a scene is about a feeling, a "
+    "decision or a small object, get CLOSE to it. Two consecutive scenes must not use the same "
+    "distance — alternate near and far so the video breathes.\n"
+)
+
 DESTEK_GORSEL = (
     " STORYTELLING FRAME: this is a narrated explainer picture, so the frame must SHOW the idea, not "
     "just the character. Besides the character and the background, clearly render the supporting "
@@ -546,13 +566,13 @@ ANIM_VARSAYILAN_KARAKTER = (
 # Kompozisyon/cerceveleme kurali (referansli_gorsel promptuna eklenir)
 ANIM_CERCEVE = (
     " FRAMING: obey the shot type and character-scale phrase written in the scene description "
-    "exactly; do not pull the camera closer, do not enlarge or centre the character. The ENVIRONMENT "
+    "as a guide; when the moment is intimate you may move CLOSER than the band suggests. The ENVIRONMENT "
     "is the main subject. Build a complete believable place: a foreground object cutting into the "
     "frame, a middle ground where the action happens, and a detailed background with true perspective "
     "and receding depth. Objects, furniture and signage must run to all four edges of the image, and "
     "at least one piece of furniture or foreground object must pass in front of the character and "
-    "partly overlap it — nothing floats in open space, no blank areas. Keep ONE dominant light source "
-    "with a clearly visible direction, casting soft readable shadows that shape the composition."
+    "partly overlap it. In CLOSE shots the background may fall away entirely — that is correct. "
+    "Light the scene to MATCH the measured brightness target given later in this prompt; if no target is given, use one soft dominant source with soft readable shadows."
 )
 
 # ═════════ EXPLAINER STILI (2. referans: "Salt" videosu analizinden) ═════════
@@ -640,7 +660,7 @@ EXP_SOZLESME = (
     "The character is referred to ONLY as \"the hero\" — never restate appearance, clothing or "
     "colours. Do NOT mention camera, lens, lighting, style, texture or medium in scene_prompt; all "
     "styling lives in the global block.\n"
-    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI + CEKIM_OLCEGI
 )
 
 
@@ -681,7 +701,7 @@ ANIM_SOZLESME = (
     "style consistency between scenes.\n"
     "TEXT: at most one short natural in-world sign, under four words, written as: sign reads "
     "\"NEW & IMPROVED\". Never captions, subtitles, watermarks or logos.\n"
-    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI + CEKIM_OLCEGI
 )
 
 # ═════════ HIKAYE / WHAT-IF STILI (3. referans: "You Wake Up 100,000 Years Ago") ═════════
@@ -790,7 +810,7 @@ HIK_SOZLESME = (
     "commas, no punctuation, no plus signs, no chemical symbols, no thousand separators — write "
     "\"100K YEARS\" not \"100,000\". Each infographic label box obeys the same limit. Text never sits "
     "in the top or bottom 9% of the frame.\n"
-    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI + CEKIM_OLCEGI
 )
 
 # ═════════ RENKLI KALEM STILI (6. referans: "Aussie Money With Bruce") ═════════
@@ -820,12 +840,12 @@ KALEM_CERCEVE = (
     " FRAMING for a 16:9 centre crop of this 1536x1024 image: the top 9% and bottom 9% get cut away, "
     "so every face, sign and key silhouette stays inside 10%-90% of frame height and 8% clear of the "
     "left and right edges. Obey the shot type and character-scale band written in the scene text "
-    "exactly; do not pull the camera closer or enlarge the figure. THE PLACE IS THE SUBJECT: build a "
+    "as a guide; when the moment is intimate you may move CLOSER than the band suggests. THE PLACE IS THE SUBJECT: build a "
     "complete believable room or exterior with a foreground object cutting into the frame, a "
     "midground where the action happens and a background with true perspective, and let furniture, "
     "shelves, signage and clutter run to all four edges — nothing floats on blank paper. At least one "
-    "object must pass in front of the figure and partly overlap it. Keep ONE dominant light source "
-    "with a clear direction and soft pencil-shaded shadows. Keep the figure's white head clearly "
+    "object must pass in front of the figure and partly overlap it. "
+    "Light the scene to MATCH the measured brightness target given later in this prompt; if no target is given, use one soft dominant source with soft pencil-shaded shadows. Keep the figure's white head clearly "
     "readable against whatever sits behind it."
 )
 KALEM_SOZLESME = (
@@ -875,7 +895,7 @@ KALEM_SOZLESME = (
     "and 14 characters, ALL CAPS, letters A-Z digits 0-9 spaces and the $ sign only, inside double "
     "quotes. No commas, no thousand separators — write \"12 MILLION\" not \"12,000,000\". Text never "
     "sits in the top or bottom 9% of the frame.\n"
-    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI + CEKIM_OLCEGI
 )
 
 # ═════════ ANI DEFTERI STILI (11. referans: "ThriftyHazel" — 216 kare) ═════════
@@ -911,8 +931,8 @@ ANI_CERCEVE = (
     "speaking directly to camera; a WORLD frame places her (or the objects) inside a fully furnished "
     "room or street with a foreground object cutting into the frame, a midground where the action "
     "happens and a background with real perspective. Never blend the two — a backdrop frame has NO "
-    "scenery, a world frame is completely furnished to all four edges. Keep ONE warm dominant light "
-    "source with a visible direction and soft shadows."
+    "scenery, a world frame is furnished with real depth. "
+    "Light the scene to MATCH the measured brightness target given later in this prompt; if no target is given, use one soft dominant source, warm, with soft shadows."
 )
 ANI_SOZLESME = (
     "RULE ZERO — READ FIRST: this is a narrated first-person memoir explainer, not a character "
@@ -979,7 +999,7 @@ ANI_SOZLESME = (
     "REJECTION MARK — when the narration says something is wasteful, wrong or should be dropped, "
     "draw a single bold hand-drawn red cross over that one object. Only one crossed object per "
     "scene, and never over a person.\n"
-    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI + CEKIM_OLCEGI
 )
 
 ANIMASYON_PROFIL = {
@@ -1630,7 +1650,9 @@ def olcum_isik_prompt(o: dict) -> str:
           "moderately saturated" if d < 100 else "richly saturated")
     kn = ("soft and low-contrast" if k < 35 else
           "clearly contrasted" if k < 55 else "high-contrast and punchy")
-    return (f" LIGHT AND COLOUR MATCH (measured from the reference frames the user supplied — hit "
+    return (f" LIGHT AND COLOUR MATCH — THIS OVERRIDES EVERY EARLIER LIGHTING INSTRUCTION, "
+            f"including any 'one dominant light source', 'directional shadows' or 'lamplit' wording "
+            f"above. Measured from the reference frames the user supplied — hit "
             f"these targets): the overall image should be {ton} (mean brightness about "
             f"{int(p)} out of 255), {dg} (mean saturation about {int(d)}), and {kn} "
             f"(tonal spread about {int(k)}). BRIGHT MUST NOT MEAN WASHED OUT: main objects keep "
