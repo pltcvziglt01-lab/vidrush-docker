@@ -708,8 +708,9 @@ def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom
 
 
 def _isci():
-    """Tek isci: kuyruktan is alir, sirayla uretir (1 vCPU korumasi).
-    Dis try/except: tek isteki beklenmedik hata isciyi OLDURMEZ (kuyruk donmaz)."""
+    """Kuyruk iscisi. ISCI_SAYISI kadar paralel calisir (10 cekirdekli RX-4'te 2 is
+    rahat sigar: gorsel asamasi ag-bekleme, CPU bosta; iki render cakisirsa ikisi de
+    biraz yavaslar ama tamamlanir). Dis try/except: tek isteki hata isciyi OLDURMEZ."""
     while True:
         gorev = is_kuyrugu.get()
         try:
@@ -730,4 +731,7 @@ def _temizlik_dongusu():
 _durumlari_yukle()          # restart'ta eski job state'leri geri yukle (poll 404 vermesin)
 _eski_ciktilari_temizle()   # 14 gunden eski cikti/durum dosyalarini temizle (disk)
 threading.Thread(target=_temizlik_dongusu, daemon=True).start()
-threading.Thread(target=_isci, daemon=True).start()
+# 2 paralel isci (eski 2 vCPU sunucuda 1'di): iki kisi ayni anda video uretebilir.
+# ISCI_SAYISI env ile ayarlanir; render cakismasi kabul edilebilir yavaslatma yaratir.
+for _ in range(max(1, int(os.environ.get("ISCI_SAYISI", "2")))):
+    threading.Thread(target=_isci, daemon=True).start()
