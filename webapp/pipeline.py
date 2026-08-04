@@ -1778,6 +1778,57 @@ SESLER = {
                     "talimat": YASLI_KADIN_TALIMAT, "hiz": 0.92, "dil": "en",
                     "ozet": "Kırılgan, hafif titrek, sakin — tasarruf/anı kanalları için",
                     "ucret": "~$0.03/video"},
+    # ── Yasli Amerikali kadin sesleri (Polat istegi, 4 Agu 2026) ──
+    # Hepsi gpt-4o-mini-tts + talimat: model sesin YASINI ve aksanini tarif etmeye izin
+    # veriyor. edge-tts'te bu imkansiz (322 sesin hicbiri yasli degil).
+    "yasli-guneyli": {"ad": "Yaşlı Kadın · Güneyli (72)", "motor": "openai", "grup": "karakterli",
+                      "ses": "sage", "hiz": 0.90, "dil": "en",
+                      "talimat": ("An American woman of about seventy two from the deep South. Warm "
+                                  "unhurried drawl, softened vowels, a little husky with age. She "
+                                  "tells things like she is sitting on a porch with sweet tea. Kind, "
+                                  "patient, faintly amused."),
+                      "ozet": "Güney aksanı, ağır ağır, sıcak — veranda sohbeti tonu",
+                      "ucret": "~$0.03/video"},
+    "yasli-newyork": {"ad": "Yaşlı Kadın · New York (70)", "motor": "openai", "grup": "karakterli",
+                      "ses": "nova", "hiz": 0.96, "dil": "en",
+                      "talimat": ("A seventy year old woman from New York. Direct, quick, a little "
+                                  "clipped, with the dryness of someone who has heard every excuse. "
+                                  "Age shows in a slight rasp, not in slowness. No sweetness, just "
+                                  "plain truth delivered fast."),
+                      "ozet": "Keskin, hızlı, lafı dolandırmayan — kuru mizah",
+                      "ucret": "~$0.03/video"},
+    "yasli-cok-yasli": {"ad": "Çok Yaşlı Kadın (85)", "motor": "openai", "grup": "karakterli",
+                        "ses": "alloy", "hiz": 0.86, "dil": "en",
+                        "talimat": ("A woman of about eighty five. Thin, papery voice with a real "
+                                    "tremor, short breaths, long pauses between thoughts. Very quiet "
+                                    "and very slow, as if each memory takes a moment to find. Frail "
+                                    "but completely lucid."),
+                        "ozet": "Çok yavaş, titrek, nefes araları — en yaşlı ton",
+                        "ucret": "~$0.03/video"},
+    "yasli-neseli": {"ad": "Yaşlı Kadın · Neşeli (70)", "motor": "openai", "grup": "karakterli",
+                     "ses": "verse", "hiz": 0.98, "dil": "en",
+                     "talimat": ("A lively American woman of seventy who has not slowed down. Bright, "
+                                 "playful, quick to laugh at herself. The voice has age in its texture "
+                                 "but energy in its delivery. Think of a grandmother who still drives "
+                                 "and still argues about politics."),
+                     "ozet": "Enerjik, esprili, kendine gülen — yaşlı ama canlı",
+                     "ucret": "~$0.03/video"},
+    "yasli-ogretmen": {"ad": "Yaşlı Kadın · Öğretmen (74)", "motor": "openai", "grup": "karakterli",
+                       "ses": "fable", "hiz": 0.92, "dil": "en",
+                       "talimat": ("A retired American schoolteacher, about seventy four. Clear, "
+                                   "measured, carefully articulated — every word lands. Patient and "
+                                   "authoritative without being cold. She explains rather than tells, "
+                                   "and pauses to let a point sink in."),
+                       "ozet": "Net, ölçülü, açıklayıcı — emekli öğretmen",
+                       "ucret": "~$0.03/video"},
+    "yasli-kirsal": {"ad": "Yaşlı Kadın · Çiftlik (78)", "motor": "openai", "grup": "karakterli",
+                     "ses": "shimmer", "hiz": 0.88, "dil": "en",
+                     "talimat": ("A seventy eight year old woman from rural America who worked hard "
+                                 "her whole life. Low, weathered, plain-spoken. No decoration, no "
+                                 "performance — she says what happened and lets it stand. A quiet "
+                                 "toughness under the warmth."),
+                     "ozet": "Alçak, yıpranmış, süssüz — çalışmış kadın tonu",
+                     "ucret": "~$0.03/video"},
     "olgun-kadin": {"ad": "Olgun Kadın (68)", "motor": "openai", "grup": "karakterli", "ses": "coral",
                     "talimat": ("Speak as a warm woman in her late sixties. Unhurried and gentle, "
                                 "with the soft dryness and slight breathiness of an older voice. "
