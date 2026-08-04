@@ -291,15 +291,13 @@ const kesmeHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
 
 // blur YOK. Push-in reveal transform ile. fade her sahnede degil -> gecis crossfade yapar (flash yok).
 const anlatiHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
-  const g = Math.max(8, Math.min(16, Math.floor(K / 4)));
-  const girisP = interpolate(frame, [0, g], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-    easing: Easing.out(Easing.cubic),
-  });
-  const girisOlcek = 1.12 - 0.12 * girisP;
+  // ⚠ 4 Agu 2026: giris push-in (1.12 -> 1.0) KALDIRILDI.
+  // Crossfade sirasinda giden sahne zoom sonunda (~1.12), gelen sahne ayni anda
+  // 1.12'den 1.0'a HIZLA kuculuyordu. Iki farkli olcek ust uste karisinca goz
+  // bunu TAKILMA olarak goruyor (Polat bildirdi). Artik tek surekli hareket var:
+  // sadece Ken Burns, sahne boyunca duzgun akiyor, gecis onu bozmuyor.
   const {olcek: kb, tx: kbTx, ty: kbTy} = kbHesap(sahne, frame, K, 1.12, 40);
-  return {transform: `translate(${kbTx}px, ${kbTy}px) scale(${kb * girisOlcek})`};
+  return {transform: `translate(${kbTx}px, ${kbTy}px) scale(${kb})`};
 };
 
 const hizliHesapla = (sahne: Sahne, frame: number, K: number, indeks: number): Gorunum => {
@@ -310,16 +308,12 @@ const hizliHesapla = (sahne: Sahne, frame: number, K: number, indeks: number): G
     extrapolateRight: 'clamp',
     easing: Easing.out(Easing.cubic),
   });
-  const girisOlcek = 1.18 - 0.18 * girisP;
+  // Hizli modda giris(1.18->1.0) + cikis(1.0->1.12) olcegi geciste ust uste
+  // binip zipliyordu. Yanal kayma korundu (o gecisle catismiyor), olcek ziplamasi
+  // kaldirildi — tek surekli Ken Burns kaldi.
   const girisX = (1 - girisP) * yon * 60;
-  const cikisP = interpolate(frame, [K - g, K], [0, 1], {
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-    easing: Easing.in(Easing.cubic),
-  });
-  const cikisOlcek = 1 + cikisP * 0.12;
   const {olcek: kb} = kbHesap(sahne, frame, K, 1.08, 0);
-  return {transform: `translateX(${girisX}px) scale(${kb * girisOlcek * cikisOlcek})`};
+  return {transform: `translateX(${girisX}px) scale(${kb})`};
 };
 
 // Hikaye kanali: ACILIS sahneleri (vurgu=true, ilk ~2.5dk) yogun hareket alir — derin zoom +
@@ -333,7 +327,9 @@ const hikayeHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
       extrapolateRight: 'clamp',
       easing: Easing.out(Easing.cubic),
     });
-    const girisOlcek = 1.2 - 0.2 * girisP; // sert push-in giris
+    // Vurgu sahnesinde push-in KORUNUYOR ama cok daha yumusak (1.2 -> 1.06):
+    // gecisle carpismasin diye. Derin zoom + genis pan zaten hareketi tasiyor.
+    const girisOlcek = 1.06 - 0.06 * girisP;
     // 1.16/48 yetersizdi ("videolasmis" hissi vermiyordu) -> 1.30/110: kamera geziyor hissi
     const {olcek, tx, ty} = kbHesap(sahne, frame, K, 1.3, 110); // derin zoom + genis pan
     return {transform: `translate(${tx}px, ${ty}px) scale(${olcek * girisOlcek})`};

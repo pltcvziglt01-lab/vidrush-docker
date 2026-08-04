@@ -2028,21 +2028,38 @@ def metin_islev_analizi(scenes: list) -> list:
     return out
 
 
-def islev_kurgu(islev: str, yogunluk: int, i: int) -> dict:
+def islev_kurgu(islev: str, yogunluk: int, i: int, onceki: dict = None) -> dict:
     """Anlatim islevini editorun YAPABILDIGI seylere cevirir.
-    (Olculen kapasite: zoom in/out, pan 4 yon, vurgu bayragi, overlay yazi.)"""
-    # zoom: yaklasma = gerilim/odak, uzaklasma = aciklama/baglam
-    ZOOM = {"acilis": "in", "liste": "in", "vurgu": "in", "soru": "in",
-            "aciklama": "out", "ornek": "out", "gecmis": "out",
-            "karsilastir": "out", "sonuc": "out"}
-    # pan: gecmis geriye (sol), sonuc ileriye (sag), karsilastirma yatay, digerleri dengeli
-    PAN = {"gecmis": "left", "sonuc": "right", "karsilastir": "right",
-           "acilis": "top", "sonuc_alt": "bottom"}
-    pan = PAN.get(islev) or ("right", "left", "top", "bottom")[i % 4]
-    return {"zoom": ZOOM.get(islev, "in" if i % 2 == 0 else "out"),
-            "pan": pan,
-            "vurgu": yogunluk >= 4}
+    (Olculen kapasite: zoom in/out, pan 4 yon, vurgu bayragi, overlay yazi.)
 
+    ⚠ 4 Agu 2026 DUZELTMESI — ilk surumde 9 islev 2 zoom yonune sikistirilmisti ve
+    en sik cikan iki islev (aciklama %61 + ornek %19) AYNI yone bakiyordu.
+    Sonuc: 132 sahnenin 120'si zoom=out, ard arda ayni zoom orani %84.
+    Gorseller farkli olmasina ragmen kamera hep ayni seyi yapinca video
+    TEKRAR EDIYORMUS gibi hissettiriyordu (Polat bildirdi).
+    Cozum: (1) en sik islevler kendi ICINDE donusumlu, (2) onceki sahneyle
+    ayni kombinasyon cikarsa ZORLA degistirilir.
+    """
+    # Nadir ve anlami net olan islevler sabit yon alir
+    SABIT_ZOOM = {"vurgu": "in", "soru": "in", "acilis": "in",
+                  "gecmis": "out", "sonuc": "out", "karsilastir": "out"}
+    # Sik gorulen islevler kendi icinde donusumlu -> tek yone yigilmaz
+    if islev in SABIT_ZOOM:
+        zoom = SABIT_ZOOM[islev]
+    else:                                   # aciklama / ornek / liste
+        zoom = "in" if (i % 2 == 0) else "out"
+
+    PAN = {"gecmis": "left", "sonuc": "right", "karsilastir": "right", "acilis": "top"}
+    pan = PAN.get(islev) or ("right", "left", "top", "bottom")[i % 4]
+
+    # Ard arda AYNI kombinasyon olmasin — tekrar hissinin asil kaynagi buydu
+    if onceki and onceki.get("zoom") == zoom and onceki.get("pan") == pan:
+        zoom = "out" if zoom == "in" else "in"
+        if onceki.get("zoom") == zoom:       # yine ayniysa pan'i cevir
+            zoom = onceki["zoom"]
+            sira = ["right", "left", "top", "bottom"]
+            pan = sira[(sira.index(pan) + 1) % 4] if pan in sira else "right"
+    return {"zoom": zoom, "pan": pan, "vurgu": yogunluk >= 4}
 
 def sahne_tipi_atamasi(adet: int) -> str:
     """Sahne basina cekim tipi atar: tek indeksler KARAKTERSIZ -> ~%50 oran, ard arda yok."""
@@ -2324,6 +2341,34 @@ def uzun_plan(story: str, prof: dict, sure_dk: float) -> dict:
     return toplam_plan
 
 
+def on_ciz_16x9(yol: str) -> bool:
+    """Uretilen 1536x1024 (3:2) gorseli GERCEK 16:9'a (1536x864) merkezden kirpar.
+
+    Neden (Polat, 4 Agu 2026: "gorseller saginda solundan tutulup uzatilmis gibi"):
+    Render 1920x1080'e objectFit:cover ile basiyordu -> 3:2 gorsel 1.25x buyutulup
+    dikeyden %15.6 kirpiliyordu. Ustune Ken Burns 1.12x zoom binince toplam 1.4x
+    oluyor ve sahne ilerledikce gorselin ~%40'i kare disina tasiyor; kompozisyon
+    sikisiyor, kenardaki nesneler kayboluyor.
+    Cozum: kirpmayi ONCEDEN ve BIR KEZ yap. Boylece render'a giren gorsel zaten
+    16:9 olur, cover hicbir sey yapmaz ve TEK olcekleme Ken Burns kalir — ne kadar
+    kirpildigi tahmin edilebilir olur. Prompt zaten ust/alt %9'u bos biraktiriyor,
+    yani kirpilan bolgede icerik yok.
+    """
+    try:
+        from PIL import Image
+        im = Image.open(yol)
+        g, y = im.size
+        hedef_y = int(round(g * 9 / 16))
+        if y <= hedef_y + 1:
+            return False                      # zaten 16:9 ya da daha genis
+        ust = (y - hedef_y) // 2
+        im.crop((0, ust, g, ust + hedef_y)).save(yol)
+        return True
+    except Exception as e:
+        print(f"  16:9 kirpma atlandi: {str(e)[:120]}", file=sys.stderr)
+        return False
+
+
 def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
                       stil_prompt: str = "", kar_kilit: str = "", stil_yol: str = "",
                       capa_yol: str = "", stil_kilit: str = "", yazi_yasak: bool = True,
@@ -2460,6 +2505,11 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
             b64 = r.json()["data"][0]["b64_json"]
             with open(hedef, "wb") as f:
                 f.write(base64.b64decode(b64))
+            # Sahne kareleri gercek 16:9'a kirpilir. Kanon (tasarim sayfasi) ve kapak
+            # HARIC — onlar 3:2 kalmali (kanon referans olarak gonderiliyor, kapak 16:9
+            # zaten ayri hesaplanacak).
+            if not kanon_modu and not os.path.basename(hedef).startswith(("_kanon", "kapak")):
+                on_ciz_16x9(hedef)
             return True
         except BakiyeHatasi:
             raise            # bakiye/limit: retry etme, yukari firlat (para bosa gitmesin)
@@ -3019,6 +3069,8 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             continue
         tts_sonuc[n] = (syol, kelimeler, sure)
 
+    # Ard arda ayni kamera hareketi olmasin diye bir onceki sahnenin kurgusu tutulur
+    _son_kurgu = {}
     # Montaj: orijinal sahne sirasi korunur (paralellik sirayi bozamaz)
     for i, n, s, metin, overlay in islenecek:
         if n not in sonuc_medya or n not in tts_sonuc:
@@ -3028,8 +3080,9 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         props_sahneler.append({
             "tur": tur, "medya": medya, "ses": syol, "sure": round(sure, 3),
             **({"zoom": "yok", "pan": "yok"} if not zoom_acik else
-               (lambda k: {"zoom": k["zoom"], "pan": k["pan"]})(
-                   islev_kurgu(kurgu_analiz[i]["islev"], kurgu_analiz[i]["yogunluk"], i)
+               (lambda k: (_son_kurgu.update(k), {"zoom": k["zoom"], "pan": k["pan"]})[1])(
+                   islev_kurgu(kurgu_analiz[i]["islev"], kurgu_analiz[i]["yogunluk"], i,
+                               dict(_son_kurgu))
                    if i < len(kurgu_analiz) else
                    {"zoom": "in" if i % 2 == 0 else "out", "pan": panlar[i % 4]})),
             # Liste maddesi acilisinda basligi kareye yaz ("9 GROCERY BILLS")
