@@ -3017,6 +3017,9 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             # Vurgu: metin analizi yogunluk>=4 dediyse VEYA hikaye acilisindaysa
             "vurgu": bool((i < len(kurgu_analiz) and kurgu_analiz[i]["yogunluk"] >= 4)
                           or (mod == "hikaye" and kumulatif_sn < acilis_sn)),
+            # Anlatim islevi -> Video.tsx GECIS TIPINI buna gore secer
+            # (liste=yandan kayma, gecmis=saat silme, vurgu=keskin silme, digeri=crossfade)
+            "islev": (kurgu_analiz[i]["islev"] if i < len(kurgu_analiz) else "aciklama"),
         })
         kumulatif_sn += sure
 
