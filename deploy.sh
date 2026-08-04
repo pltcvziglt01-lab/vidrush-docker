@@ -24,7 +24,8 @@ echo "== 1/5 Devam eden is var mi (varsa bekle, isi bozma) =="
 # ONEMLI: sadece render'a bakmak YETMEZ — is once ~10-40 dk GORSEL URETIM asamasinda gecirir
 # ve o sirada hicbir remotion/chrome sureci yoktur. Gercek kontrol: durum dosyalari.
 AKTIF=$($SSH "docker exec bedosaho sh -c 'grep -l \"\\\"durum\\\": \\\"uretiliyor\\\"\" /opt/vidrush/webapp/veri/durumlar/*.json 2>/dev/null | wc -l'" 2>/dev/null || echo 0)
-RENDER=$($SSH "docker exec bedosaho sh -c 'ps -eo args|grep -iE \"remotion render|chrome-headless\"|grep -v grep|wc -l'" 2>/dev/null || echo 0)
+# defunct (zombi) surecler CANLI DEGIL — bitmis islerin kalintisi; onlari sayma (yanlis alarm)
+RENDER=$($SSH "docker exec bedosaho sh -c 'ps -eo args|grep -iE \"remotion render|chrome-headless\"|grep -v grep|grep -v defunct|wc -l'" 2>/dev/null || echo 0)
 if [ "${AKTIF:-0}" -gt 0 ] || [ "${RENDER:-0}" -gt 0 ]; then
   echo "⚠️  DEPLOY DURDURULDU — su an bir video uretiliyor (aktif is: $AKTIF, render sureci: $RENDER)."
   echo "   Deploy konteyneri yeniden baslatir ve o isi OLDURUR (harcanan kredi de bosa gider)."
