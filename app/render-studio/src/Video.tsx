@@ -111,9 +111,34 @@ export const hesaplaKareler = (
   return {Ks, gecisler, toplam: Math.max(1, toplam)};
 };
 
-const kbHesap = (sahne: Sahne, frame: number, K: number, buyume: number, panPx: number) => {
+// ⚠ 4 Agu 2026 — KENAR SIYAHLIGI DUZELTMESI (olculdu: 132 karenin 60'inda, %45)
+// transform: translate(tx,ty) scale(k) -> once olcek, SONRA kaydirma uygulanir ve
+// kaydirma mesafesi olcekten ETKILENMEZ. Olcek 1.0'a indiginde gorsel kareyi TAM
+// dolduruyor, tasma payi kalmiyor; ustune panPx kaydirma binince o taraf BOSTA
+// kaliyor ve siyah gorunuyor. Sahnelerin cogu zoom=out oldugu icin bu her sahnenin
+// SONUNDA oluyordu.
+// Cozum: en kucuk olcek, kaydirmayi soguracak kadar buyuk olmali.
+//   yatay pan  -> 1 + (2 * panPx) / kareGenisligi
+//   DIKEY pan  -> 1 + (2 * panPx) / kareYuksekligi   (yukseklik kucuk oldugu icin DAHA BUYUK)
+// ⚠ Ilk duzeltmede her iki eksende de GENISLIK kullanmistim; dikey pan'da yetersiz
+// kaliyordu ve alt/ust kenarda siyahlik suruyordu (render testinde yakalandi).
+const TABAN_OLCEK = (panPx: number, dikey: boolean, kareGen: number, kareYuk: number) =>
+  panPx <= 0 ? 1 : 1 + (2 * panPx) / (dikey ? kareYuk : kareGen) + 0.012;
+
+const kbHesap = (
+  sahne: Sahne,
+  frame: number,
+  K: number,
+  buyume: number,
+  panPx: number,
+  kareGen = 1920,
+  kareYuk = 1080,
+) => {
   if (sahne.zoom === 'yok') return {olcek: 1, tx: 0, ty: 0};
-  const olcek = interpolate(frame, [0, K], sahne.zoom === 'in' ? [1, buyume] : [buyume, 1], {
+  const dikeyPan = sahne.pan === 'top' || sahne.pan === 'bottom';
+  const taban = TABAN_OLCEK(panPx, dikeyPan, kareGen, kareYuk);
+  const tepe = Math.max(buyume, taban + 0.06);   // tepe her zaman tabandan yukarida
+  const olcek = interpolate(frame, [0, K], sahne.zoom === 'in' ? [taban, tepe] : [tepe, taban], {
     extrapolateRight: 'clamp',
     easing: KB_EASING,
   });
