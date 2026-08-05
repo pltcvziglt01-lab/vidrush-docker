@@ -1654,6 +1654,66 @@ def gorsel_olcum(yol: str) -> dict:
         return {}
 
 
+def renk_uydur(yol: str, hedef: dict, ad: str = "") -> bool:
+    """Uretilen kareyi referansin OLCULEN parlaklik/doygunlugua dogru cekiverir.
+
+    Neden gerekli: prompta "ortalama parlaklik 172 olsun" yazmak ISE YARAMIYOR — gorsel
+    modeli sayisal bir hedefi tutturamaz. 5 Agu 2026 olcumu: hedef 172 iken uretim
+    141-168 arasi geldi ve doygunluk hedefin (71) neredeyse iki kati (112-134) cikti;
+    sonuc, referansta olmayan sepya/amber bir yikama.
+
+    Cozum tahmin degil OLCUM: kareyi olc, hedefe oranla, PIL ile duzelt. Bedava, her
+    animasyon stilinde ayni sekilde calisir (kullanicinin "tek tek stil ogretmeyelim"
+    ilkesi). Carpanlar SINIRLI — duzeltme goruntuyu asla bozamaz, sadece yaklastirir.
+    Iki gecis: parlaklik/doygunluk artisi dogrusal degil, ikinci gecis kalani kapatir.
+    """
+    if not hedef or not hedef.get("parlaklik"):
+        return False
+    try:
+        from PIL import Image, ImageEnhance
+    except Exception:
+        return False
+    P_ESIK, D_ESIK = 8.0, 15.0     # bu altindaki fark gozle gorunmez -> dokunma
+    uygulandi = False
+    try:
+        for _ in range(2):
+            o = gorsel_olcum(yol)
+            if not o or not o.get("parlaklik"):
+                break
+            dp = hedef["parlaklik"] - o["parlaklik"]
+            dd = hedef.get("doygunluk", 0) - o.get("doygunluk", 0)
+            if abs(dp) < P_ESIK and abs(dd) < D_ESIK:
+                break
+            b = min(1.25, max(0.85, hedef["parlaklik"] / max(1.0, o["parlaklik"])))
+            # DOYGUNLUK NEDEN TAM ESITLENMEZ: ortalama doygunluk kompozisyona bagli.
+            # Genis planli bir referansta cerceveyi krem duvar doldurur, doygunluk dusuk
+            # olcurur; ayni stildeki YAKIN PLAN portrede yuksek olcurur. 5 Agu 2026'da tam
+            # esitleme denendi -> turuncu kazak grilesti, kare sepyalasti. Bu yuzden
+            # doygunluk sadece YARI YOLA ve en fazla %18 tasinir: asirilik kirpilir,
+            # mesru renk korunur. Parlaklik ise global bir isik ozelligi -> tam duzeltilir.
+            c = 1.0
+            if hedef.get("doygunluk") and o.get("doygunluk"):
+                oran = hedef["doygunluk"] / max(1.0, o["doygunluk"])
+                c = min(1.18, max(0.82, 1 + 0.5 * (oran - 1)))
+            if abs(1 - b) < 0.02 and abs(1 - c) < 0.03:
+                break
+            im = Image.open(yol).convert("RGB")
+            if abs(1 - b) >= 0.02:
+                im = ImageEnhance.Brightness(im).enhance(b)
+            if abs(1 - c) >= 0.03:
+                im = ImageEnhance.Color(im).enhance(c)
+            im.save(yol)
+            uygulandi = True
+        if uygulandi:
+            son = gorsel_olcum(yol)
+            print(f"  renk uydurma{(' ' + ad) if ad else ''}: parlaklik "
+                  f"{son.get('parlaklik')} / hedef {hedef['parlaklik']}, doygunluk "
+                  f"{son.get('doygunluk')} / hedef {hedef.get('doygunluk')}", file=sys.stderr)
+    except Exception as e:
+        print(f"  renk_uydur hata: {str(e)[:120]}", file=sys.stderr)
+    return uygulandi
+
+
 def olcum_isik_prompt(o: dict) -> str:
     """Olculen degerleri HEDEF olarak prompta yaz. Kelimeyle 'aydinlik olsun' demek yerine
     sayi vermek, palet dersinin isiga uygulanmis hali."""
@@ -2836,6 +2896,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         stil_kunye_txt = stil_kunye_txt_on      # sahne referansindan gelen zengin stil tarifi
     # OLCULEN ISIK: hazir kademeden daha kesin -> onun YERINE gecer. (sr burada hazir;
     # yukaridaki cerceve blogunda henuz bos oldugu icin burada uygulaniyor.)
+    olcum_hedef = (sr.get("olcum") or {}) if sr else {}
     if sr and sr.get("olcum"):
         olculen_ek = olcum_isik_prompt(sr["olcum"])
         if olculen_ek:
@@ -3017,6 +3078,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             return None
         if not uretildi:
             return None
+        renk_uydur(gyol_full, olcum_hedef, f"sahne {n}")
         if mag_profil and s.get("hd"):   # OTOMATIK: sadece plan HD isaretlediyse
             kaynak.magnific_upscale(gyol_full, optimized_for=mag_profil, scale="2x")
         # 3) SORA: acilis sahnesiyse gorseli GERCEK videoya cevir (basarisizsa fotografla devam)
