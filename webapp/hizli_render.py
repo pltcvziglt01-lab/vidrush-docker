@@ -169,6 +169,33 @@ def _zoompan_ifadeleri(sahne, gecis, fps, F):
     return z, x, y
 
 
+def _overlay_filtre(sahne, fps, F):
+    """Overlay basligini drawtext ile ciz (4 Agu 2026 — bu eksik oldugu icin overlay'li
+    isler Remotion'a dusuyordu ve 15 dk video 2 saat suruyordu).
+    Remotion'daki gibi kelime kelime yay animasyonu ffmpeg'de yok; onun yerine
+    yumusak fade-in/out + hafif yukari kayma yapilir. Kontur (borderw) her zeminde okunur."""
+    metin = str(sahne.get("overlay") or "").strip()
+    if not metin:
+        return ""
+    # drawtext'te ozel karakterler kacilmali
+    g = (metin.replace("\\", "").replace(":", "\\:").replace("'", "")
+              .replace("%", "\\%").replace(",", ""))
+    gir = min(0.5, F / fps / 6)          # giris suresi
+    kal = max(0.6, F / fps - 2 * gir)    # ekranda kalma
+    font = os.path.join(FONT_DIZIN, "Montserrat-Bold.ttf")
+    fontstr = f"fontfile='{font}':" if os.path.exists(font) else ""
+    # alpha: 0 -> 1 -> 1 -> 0 (yumusak)
+    # ffmpeg filtre ayristiricisi VIRGULU filtre ayraci sayar — ifade icindekiler
+    # tirnak icinde olsa bile kacirilmali (\\,), yoksa "No such filter" hatasi verir.
+    alpha = (f"if(lt(t\\,{gir:.2f})\\,t/{gir:.2f}\\,"
+             f"if(lt(t\\,{gir + kal:.2f})\\,1\\,max(0\\,({gir * 2 + kal:.2f}-t)/{gir:.2f})))")
+    # y: hafif yukari kayma (24 px), giris boyunca
+    yy = f"120+24*(1-min(1\\,t/{gir:.2f}))"
+    return (f",drawtext={fontstr}text='{g}':fontcolor=white:fontsize=64:"
+            f"borderw=5:bordercolor=black@0.9:shadowcolor=black@0.5:shadowx=0:shadowy=3:"
+            f"x=(w-text_w)/2:y='{yy}':alpha='{alpha}'")
+
+
 def _segment_uret(sahne, gecis, fps, crf, seg_yol):
     """Tek sahne segmentini uretir. Gorsel sahne: Ken Burns + kendi sesi.
     VIDEO sahne (Sora klibi / footage): klip 1080p'ye olceklenir, gerekirse dongulenir,
@@ -182,7 +209,7 @@ def _segment_uret(sahne, gecis, fps, crf, seg_yol):
     if sahne.get("tur") == "video":
         # Gercek video: Ken Burns YOK (klibin kendi hareketi var). Kisa klip donguyle uzar.
         vf = (f"scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,"
-              f"fps={fps},format=yuv420p")
+              f"fps={fps}") + _overlay_filtre(sahne, fps, F) + ",format=yuv420p"
         komut = ["ffmpeg", "-y", "-loglevel", "error",
                  "-stream_loop", "-1", "-i", medya, "-i", ses,
                  "-filter_complex", f"[0:v]{vf}[v]",
@@ -207,6 +234,7 @@ def _segment_uret(sahne, gecis, fps, crf, seg_yol):
           f"zoompan=z='{z}':x='{x}':y='{y}':d={F}:s=1920x1080:fps={fps}")
     if gecis in ("anlati", "hizli", "hikaye"):
         vf += ",vignette=angle=PI/5"   # Video.tsx'teki radial-gradient vinyetin karsiligi
+    vf += _overlay_filtre(sahne, fps, F)
     vf += ",format=yuv420p"
     komut = ["ffmpeg", "-y", "-loglevel", "error",
              "-loop", "1", "-i", gorsel, "-i", ses,
@@ -241,10 +269,7 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
         return False
     # KAPSAM KONTROLU: video sahneleri artik DESTEKLI (Sora klipleri/footage segment olur).
     # Sadece overlay basligi olan isler Remotion'a gider (kinetik baslik v1'de yok).
-    for s in sahneler:
-        if str(s.get("overlay") or "").strip():
-            print("  hizli motor: overlay basligi var -> Remotion", file=sys.stderr)
-            return False
+    # Overlay engeli KALDIRILDI (4 Agu 2026): drawtext ile ciziliyor.
 
     fps = int(props.get("fps", 24))
     gecis = str(props.get("gecis", "sinematik"))

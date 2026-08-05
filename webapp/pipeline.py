@@ -494,6 +494,24 @@ CEKIM_OLCEGI = (
     "distance — alternate near and far so the video breathes.\n"
 )
 
+# ── KARAKTERSIZ KARELER DE AYNI ELDEN CIKMALI (4 Agu 2026) ──
+# Olculen sorun: G INFOGRAPHIC / K MAP ROUTE / N SCREEN READOUT tipleri "duz kat plani,
+# noktali cizgi, FRIDGE-STOVE etiketleri" ve "gercekci akilli telefon arayuzu" olarak
+# ciziliyordu. Sicak elle cizilmis mutfakla ayni gorsel dilde DEGIL — video ortasinda
+# baska bir programdan kesilmis gibi duruyor. Sema/ekran kareleri de stil sozlesmesine
+# tabi olmali.
+SEMA_STIL_KILIDI = (
+    "DIAGRAMS, MAPS, SCREENS AND CARDS OBEY THE SAME STYLE. When a scene is an infographic, a "
+    "map, a ledger, a screen or a lettered card, it must still be DRAWN BY THE SAME HAND in the "
+    "same medium as every other frame — same line quality, same palette, same texture, same "
+    "warmth. Never switch to clean software-style vector graphics, never render a realistic "
+    "modern phone or app interface, never use generic UI chrome, flat grey wireframes, dotted "
+    "CAD lines or system fonts. Draw the chart as if someone sketched it on paper in this "
+    "world: a hand-drawn plan on a notepad, a map inked on a card, a list written in a "
+    "notebook, numbers written by hand. Any device shown must belong to the era and setting "
+    "of the rest of the video.\n"
+)
+
 DESTEK_GORSEL = (
     " STORYTELLING FRAME: this is a narrated explainer picture, so the frame must SHOW the idea, not "
     "just the character. Besides the character and the background, clearly render the supporting "
@@ -660,7 +678,7 @@ EXP_SOZLESME = (
     "The character is referred to ONLY as \"the hero\" — never restate appearance, clothing or "
     "colours. Do NOT mention camera, lens, lighting, style, texture or medium in scene_prompt; all "
     "styling lives in the global block.\n"
-    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI + CEKIM_OLCEGI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI + CEKIM_OLCEGI + SEMA_STIL_KILIDI
 )
 
 
@@ -701,7 +719,7 @@ ANIM_SOZLESME = (
     "style consistency between scenes.\n"
     "TEXT: at most one short natural in-world sign, under four words, written as: sign reads "
     "\"NEW & IMPROVED\". Never captions, subtitles, watermarks or logos.\n"
-    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI + CEKIM_OLCEGI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI + CEKIM_OLCEGI + SEMA_STIL_KILIDI
 )
 
 # ═════════ HIKAYE / WHAT-IF STILI (3. referans: "You Wake Up 100,000 Years Ago") ═════════
@@ -810,7 +828,7 @@ HIK_SOZLESME = (
     "commas, no punctuation, no plus signs, no chemical symbols, no thousand separators — write "
     "\"100K YEARS\" not \"100,000\". Each infographic label box obeys the same limit. Text never sits "
     "in the top or bottom 9% of the frame.\n"
-    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI + CEKIM_OLCEGI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI + CEKIM_OLCEGI + SEMA_STIL_KILIDI
 )
 
 # ═════════ RENKLI KALEM STILI (6. referans: "Aussie Money With Bruce") ═════════
@@ -895,7 +913,7 @@ KALEM_SOZLESME = (
     "and 14 characters, ALL CAPS, letters A-Z digits 0-9 spaces and the $ sign only, inside double "
     "quotes. No commas, no thousand separators — write \"12 MILLION\" not \"12,000,000\". Text never "
     "sits in the top or bottom 9% of the frame.\n"
-    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI + CEKIM_OLCEGI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI + CEKIM_OLCEGI + SEMA_STIL_KILIDI
 )
 
 # ═════════ ANI DEFTERI STILI (11. referans: "ThriftyHazel" — 216 kare) ═════════
@@ -999,7 +1017,7 @@ ANI_SOZLESME = (
     "REJECTION MARK — when the narration says something is wasteful, wrong or should be dropped, "
     "draw a single bold hand-drawn red cross over that one object. Only one crossed object per "
     "scene, and never over a person.\n"
-    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI + CEKIM_OLCEGI
+    + KARE_CESITLILIGI + DESTEK_PLANLAYICI + VERI_KARTI_PLAN + MEKAN_SUREKLILIGI + CEKIM_OLCEGI + SEMA_STIL_KILIDI
 )
 
 ANIMASYON_PROFIL = {
@@ -2078,6 +2096,28 @@ def sahne_tipi_atamasi(adet: int) -> str:
             "reorder types; fit the narration to the assigned type.\n" + "; ".join(satir) + "\n")
 
 
+# ── SAHNE TEMPOSU: kelime butcesi SES HIZINA gore (4 Agu 2026) ──
+# Olculen sorun: 132 sahne / 923 sn -> ortalama 7.0 sn (hedef 5), 39 sahne 8 sn'den uzun.
+# Sebep: kelime bandi sabit (14-17) ama okuma hizi sese gore degisiyor.
+#   edge-tts (+%15)      ~178 kelime/dk
+#   OpenAI yasli sesler  speed 0.86-0.98 -> ~130-150
+#   ai33/minimax         ~133 (bu videoda olculdu)
+# Sabit kelime + yavas ses = uzun sahne. Artik butce sesin GERCEK hizindan turetilir.
+def kelime_butcesi(prof, ses_secim: str) -> int:
+    """Hedef sahne suresini tutturacak kelime sayisi."""
+    hedef_sn = float(prof.get("sahne_sn") or 5)
+    v = SESLER.get((ses_secim or "").strip()) or {}
+    motor = v.get("motor", "edge")
+    if motor == "openai":
+        wpm = 165 * float(v.get("hiz", 0.95))      # 0.86-0.98 -> ~142-162
+    elif motor == "ai33" or (ses_secim or "").startswith("ozel:"):
+        wpm = 135                                   # olculdu (minimax, 4 Agu 2026)
+    else:
+        wpm = 178                                   # edge-tts +%15
+    kel = int(round(hedef_sn * wpm / 60))
+    return max(6, min(24, kel))
+
+
 def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
     footage = prof["footage_pct"]
     mag_var = bool(prof.get("mag"))
@@ -2393,7 +2433,11 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
                        "no figure", "hands only", "map route"))
     if karaktersiz:
         prompt += (" This frame contains NO character and no people at all — the object, diagram "
-                   "or lettering itself is the entire subject. Do not add any figure.")
+                   "or lettering itself is the entire subject. Do not add any figure."
+                   " It must still be drawn in EXACTLY the same medium, line quality, palette and "
+                   "texture as the rest of the video — a hand-drawn plan, an inked map, a written "
+                   "list. No clean vector graphics, no realistic phone or app interface, no system "
+                   "fonts, no grey wireframes, no dotted CAD lines.")
     if (kar_var or capa_var) and not karaktersiz:
         # 1) POZ SERBESTLIGI — en kritik cumle. Referans SADECE tasarim kaynagi, poz kaynagi DEGIL.
         prompt += (" THE REFERENCE IMAGE IS A CHARACTER DESIGN SHEET, NOT A POSE REFERENCE. It shows "
@@ -2858,6 +2902,13 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     if not ses_secim and kanal:
         ses_secim = kanal.get("ses", "")
     ses_ayar = ses_ayari(ses_secim, ses)
+    # Kelime butcesini secilen sesin GERCEK okuma hizina gore yeniden hesapla
+    _eski_kel = prof.get("kelime")
+    prof = dict(prof)
+    prof["kelime"] = kelime_butcesi(prof, ses_secim)
+    if prof["kelime"] != _eski_kel:
+        print(f"  kelime butcesi: {_eski_kel} -> {prof['kelime']} "
+              f"(ses={ses_secim or 'otomatik'}, hedef {prof.get('sahne_sn')} sn)", file=sys.stderr)
     if ses_ayar.get("motor") == "openai":
         print(f"  ses: OpenAI {ses_ayar['ses']} ({ses_secim})", file=sys.stderr)
     elif ses_ayar.get("ses"):
@@ -3201,9 +3252,30 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             print(sonuc.stderr[-2000:], file=sys.stderr)
             raise RuntimeError("Remotion render basarisiz")
 
-    bildir("Tamamlanıyor...", 96)
+    bildir("Ses seviyesi ayarlanıyor...", 96)
     son_video = os.path.join(CIKTI_DIR, f"{is_adi}.mp4")
-    shutil.copy(ham, son_video)
+    # ── SES NORMALIZASYONU (4 Agu 2026) ──
+    # Olculdu: cikti -15.80 LUFS, YouTube -14 LUFS'a normalize ediyor -> videomuz
+    # rakiplerden 1.8 dB kisik caliyordu. Tek gecisli loudnorm ile hedefe cekilir.
+    # GORUNTU YENIDEN KODLANMAZ (-c:v copy) -> ek sure ~saniyeler, kalite kaybi yok.
+    # Basarisiz olursa ham dosya oldugu gibi kopyalanir; video ASLA kaybolmaz.
+    ses_ok = False
+    try:
+        r_ses = subprocess.run(
+            ["ffmpeg", "-y", "-loglevel", "error", "-i", ham,
+             "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
+             "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", son_video],
+            capture_output=True, text=True, timeout=1800)
+        ses_ok = (r_ses.returncode == 0 and os.path.exists(son_video)
+                  and os.path.getsize(son_video) > 1024)
+        if not ses_ok:
+            print(f"  loudnorm basarisiz, ham kopyalanacak: {r_ses.stderr[-200:]}", file=sys.stderr)
+    except Exception as e:
+        print(f"  loudnorm atlandi: {str(e)[:140]}", file=sys.stderr)
+    if not ses_ok:
+        shutil.copy(ham, son_video)
+
+    bildir("Tamamlanıyor...", 98)
     son_kapak = None
     if kapak_yolu and os.path.exists(kapak_yolu):
         son_kapak = os.path.join(CIKTI_DIR, f"{is_adi}_kapak.png")
