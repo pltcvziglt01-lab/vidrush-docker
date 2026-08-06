@@ -160,6 +160,46 @@ if not GEMINI_KEY:   # konteyner yeniden yaratmadan kurulum: docker exec ile dos
 # sessizce Gemini'ye donerdi. Artik global saglayici ACIKCA secilir (AI_SAGLAYICI=gemini);
 # anahtarin varligi sadece UNLU MODU gibi is-bazli kullanimlari acar.
 SAGLAYICI = os.environ.get("AI_SAGLAYICI", "openai").lower()
+
+# ── GROK (xAI) — UNLU MODU icin: unlu benzerligine EN toleransli gorsel API ──
+# console.x.ai'den anahtar; OpenAI-uyumlu uc (api.x.ai/v1). NOT: grok gorsel API'si
+# REFERANS GORSEL almaz (text-to-image) -> unlu modunda tutarliligi ismin kendisi saglar.
+XAI_KEY = os.environ.get("XAI_KEY", "")
+if not XAI_KEY:   # konteyner yeniden yaratmadan kurulum
+    try:
+        with open("/opt/vidrush/XAI_KEY") as _f:
+            XAI_KEY = _f.read().strip()
+    except Exception:
+        pass
+
+
+def grok_gorsel(prompt: str, hedef: str, deneme: int = 4) -> bool:
+    """xAI Grok ile text-to-image (unlu modu). Basari: True; hata: False (cagiran atlar)."""
+    if not XAI_KEY:
+        return False
+    for d in range(deneme):
+        try:
+            r = requests.post("https://api.x.ai/v1/images/generations",
+                              headers={"Authorization": f"Bearer {XAI_KEY}"},
+                              json={"model": os.environ.get("GROK_GORSEL_MODEL", "grok-2-image"),
+                                    "prompt": prompt[:1024], "response_format": "b64_json"},
+                              timeout=180)
+            if r.status_code == 429:
+                time.sleep(_retry_after_bekle(r, d)); continue
+            if r.status_code >= 400:
+                print(f"  grok gorsel hata {r.status_code}: {r.text[:200]}", file=sys.stderr)
+                if r.status_code in (401, 402, 403):
+                    return False   # anahtar/kredi sorunu: retry anlamsiz
+                time.sleep(5); continue
+            import base64
+            b64 = r.json()["data"][0]["b64_json"]
+            with open(hedef, "wb") as f:
+                f.write(base64.b64decode(b64))
+            return True
+        except Exception as e:
+            print(f"  grok istisna: {str(e)[:160]}", file=sys.stderr)
+            time.sleep(5)
+    return False
 GEM_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 GEM_METIN_MODEL = os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
 # ORTA kalite + en iyi fiyat: gemini-2.5-flash-image ("Nano Banana") $0.039/gorsel.
@@ -2477,6 +2517,10 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
                    "and never cover the image with words. Single full-bleed illustration: do NOT split "
                    "the image into panels, grids, frames, borders or comic strips.")
 
+    # GROK yolu (unlu modu): referans desteklemez, prompt tek basina gider — unlu ismin
+    # kendisi tutarlilik cipasidir. Basarisizsa asagidaki yollara DUSMEZ (stil karismasin).
+    if saglayici == "grok" and XAI_KEY:
+        return grok_gorsel(prompt, hedef)
     # GEMINI yolu: global saglayici gemini ise VEYA bu is icin acikca istendiyse (unlu modu)
     if (saglayici or SAGLAYICI) == "gemini" and GEMINI_KEY:
         refler = [y for y in (kar_yol if kar_var else None,
@@ -2869,11 +2913,13 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     bildir("Hikaye sahnelere bölünüyor...", 5)
     # UNLU MODU: yalniz hikaye + GEMINI_KEY varken aktif (Gemini benzerlige tolerans).
     # Anahtar yoksa sessizce normal moda duser (OpenAI isimli talebi reddeder cunku).
-    unlu_aktif = bool(unlu_modu and mod == "hikaye" and GEMINI_KEY)
+    unlu_aktif = bool(unlu_modu and mod == "hikaye" and (XAI_KEY or GEMINI_KEY))
+    # Motor onceligi: Grok (benzerlikte en toleransli) > Gemini
+    unlu_motor = "grok" if XAI_KEY else "gemini"
     if unlu_modu and not unlu_aktif:
-        print("  UNLU modu istendi ama GEMINI_KEY yok -> tarif-bazli normal mod", file=sys.stderr)
+        print("  UNLU modu istendi ama XAI/GEMINI anahtari yok -> tarif-bazli normal mod", file=sys.stderr)
     if unlu_aktif:
-        print("  UNLU MODU AKTIF: gercek isimler + Gemini gorsel yolu", file=sys.stderr)
+        print(f"  UNLU MODU AKTIF: gercek isimler + {unlu_motor} gorsel yolu", file=sys.stderr)
     plan = uzun_plan(story, prof, sure_dk, unlu=unlu_aktif)
     scenes = plan["scenes"]
     # ── METIN DERIN ANALIZI: her satirin anlatim islevi -> sahne bazinda kurgu ──
@@ -2993,7 +3039,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                                          kar_kilit=kar_kilit, stil_yol=stil_yol,
                                          capa_yol=capa_yol, stil_kilit=stil_kilit,
                                          model=gorsel_model, cerceve=cerceve_ek,
-                                         saglayici="gemini" if unlu_aktif else "")
+                                         saglayici=unlu_motor if unlu_aktif else "")
         except BakiyeHatasi:
             # Bakiye/limit doldu: DAHA FAZLA PARA HARCAMA; diger isciler de yeni istek acmaz.
             bakiye_bitti = True
@@ -3158,7 +3204,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                              kar_kilit=kar_kilit, stil_yol=stil_yol, capa_yol=capa_yol,
                              stil_kilit=stil_kilit, yazi_yasak=False,
                              model=GORSEL_MODEL_DOC,
-                             saglayici="gemini" if unlu_aktif else ""):   # kapak: en iyi model
+                             saglayici=unlu_motor if unlu_aktif else ""):   # kapak: en iyi model
             if mag_profil:   # kapak: documentary'de her zaman HD (thumbnail kalitesi kritik)
                 kaynak.magnific_upscale(khedef, optimized_for=mag_profil, scale="2x")
             kapak_yolu = khedef

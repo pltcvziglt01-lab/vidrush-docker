@@ -143,6 +143,7 @@ def saglik():
         "magnific": bool(os.environ.get("MAGNIFIC_KEY")),
         "pexels": bool(os.environ.get("PEXELS_KEY")),
         "gemini": bool(pipeline.GEMINI_KEY),
+        "grok": bool(pipeline.XAI_KEY),
     }
 
 

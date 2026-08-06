@@ -1377,14 +1377,14 @@ setInterval(()=>{ const v=$("#view-videolar"); if(v && v.classList.contains("on"
     stSoraAcik=!stSoraAcik; $s("#stSora").classList.toggle("on",stSoraAcik);
   });
   /* UNLU MODU: Gemini anahtari kuruluysa acilabilir; degilse kilitli + aciklama */
-  let stUnluAcik=false, geminiVar=false;
+  let stUnluAcik=false, unluMotorVar=false;
   fetch("api/saglik").then(r=>r.json()).then(h=>{
-    geminiVar=!!h.gemini;
-    if(!geminiVar && $s("#stUnluNot"))
-      $s("#stUnluNot").textContent="Google (Gemini) anahtarı kurulunca açılabilir — şimdilik ünlüler tarif-bazlı benzer karakterle çizilir";
+    unluMotorVar=!!(h.grok||h.gemini);   /* Grok (en toleransli) veya Gemini yeter */
+    if(!unluMotorVar && $s("#stUnluNot"))
+      $s("#stUnluNot").textContent="Grok (xAI) veya Google anahtarı kurulunca açılabilir — şimdilik ünlüler tarif-bazlı benzer karakterle çizilir";
   }).catch(()=>{});
   $s("#stUnlu") && ($s("#stUnlu").onclick=()=>{
-    if(!geminiVar){ $s("#stUnluNot").textContent="⚠ Google (Gemini) anahtarı henüz kurulu değil — anahtar gelince bu mod aktif olacak"; return; }
+    if(!unluMotorVar){ $s("#stUnluNot").textContent="⚠ Grok (xAI) veya Google anahtarı henüz aktif değil — anahtar gelince bu mod açılacak"; return; }
     stUnluAcik=!stUnluAcik; $s("#stUnlu").classList.toggle("on",stUnluAcik);
   });
   $s("#stAcilis") && ($s("#stAcilis").onchange=()=>{
