@@ -511,7 +511,25 @@
       </div>
 
       <div class="ak" id="akAcilis" style="display:none">
-        <div class="akbas"><span class="aknum">🎬</span> Hareketli açılış</div>
+        <div class="akbas"><span class="aknum">🎬</span> Süre &amp; Hareketli açılış</div>
+        <div class="ay" style="max-width:400px;margin-bottom:14px">
+          <span style="font-size:13px;color:var(--txt)">⏱️ Video süresi <b id="stSureLbl" style="color:var(--acc2)">Otomatik</b></span>
+          <select id="stSureSec" style="background:#0e1117;border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font:inherit;font-size:12.5px">
+            <option value="oto" selected>Otomatik — metnin uzunluğuna göre</option>
+            <option value="1">1 dakika</option>
+            <option value="2">2 dakika</option>
+            <option value="3">3 dakika</option>
+            <option value="5">5 dakika</option>
+            <option value="8">8 dakika</option>
+            <option value="10">10 dakika</option>
+            <option value="15">15 dakika</option>
+            <option value="20">20 dakika</option>
+            <option value="30">30 dakika</option>
+            <option value="45">45 dakika</option>
+            <option value="60">60 dakika</option>
+          </select>
+          <span style="font-size:10.5px;color:var(--dim2)">Metinden uzun süre seçersen planlayıcı hikayeyi genişletir; kısa seçersen sıkıştırır.</span>
+        </div>
         <div class="ay" style="max-width:400px">
           <span style="font-size:13px;color:var(--txt)">Açılış süresi <b id="stAcilisLbl" style="color:var(--acc2)">İlk 2,5 dk</b></span>
           <select id="stAcilis" style="background:#0e1117;border:1px solid var(--line);color:var(--txt);border-radius:9px;padding:9px 10px;font:inherit;font-size:12.5px">
@@ -1409,6 +1427,10 @@ setInterval(()=>{ const v=$("#view-videolar"); if(v && v.classList.contains("on"
     const m={"0":"Kapalı","1":"İlk 1 dk","2.5":"İlk 2,5 dk","5":"İlk 5 dk","60":"Tümü"};
     const l=$s("#stAcilisLbl"); if(l) l.textContent=m[$s("#stAcilis").value]||$s("#stAcilis").value;
   });
+  $s("#stSureSec") && ($s("#stSureSec").onchange=()=>{
+    const v=$s("#stSureSec").value;
+    const l=$s("#stSureLbl"); if(l) l.textContent = v==="oto" ? "Otomatik" : (v+" dk");
+  });
   fetch("api/edit-stilleri").then(r=>r.json()).then(list=>{
     const c=$s("#stEdit"); if(!c) return; c.innerHTML="";
     stEditStil = list[0] && list[0].id;
@@ -1678,7 +1700,10 @@ setInterval(()=>{ const v=$("#view-videolar"); if(v && v.classList.contains("on"
     if(stTur==="documentary" && stEditStil) fd.append("edit", stEditStil);
     const kelS=(($s("#stMetin").value||"").trim().match(/\S+/g)||[]).length;
     const tahminDk = Math.max(1, Math.round(kelS/178));
-    fd.append("sure_dk", (stCevaplar.sure_dk||"").replace(/[^0-9.]/g,"") || String(tahminDk));
+    /* Sure onceligi: kullanicinin ACIK secimi (hikaye sure kutusu) > soru cevabi > metin tahmini */
+    const sureSecimi = (stTur==="hikaye" && $s("#stSureSec") && $s("#stSureSec").value!=="oto")
+                       ? $s("#stSureSec").value : "";
+    fd.append("sure_dk", sureSecimi || (stCevaplar.sure_dk||"").replace(/[^0-9.]/g,"") || String(tahminDk));
     fd.append("gecis","1"); fd.append("zoom","1");
     if((stCevaplar.altyazi||"").match(/olsun|evet|aç|var/i)) fd.append("altyazi","1");
     if(stSes && stSes!=="otomatik") fd.append("ses", stSes);
