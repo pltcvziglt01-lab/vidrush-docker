@@ -142,6 +142,7 @@ def saglik():
         "openai": bool(os.environ.get("OPENAI_KEY")),
         "magnific": bool(os.environ.get("MAGNIFIC_KEY")),
         "pexels": bool(os.environ.get("PEXELS_KEY")),
+        "gemini": bool(pipeline.GEMINI_KEY),
     }
 
 
@@ -490,6 +491,7 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
                       palet_ozel: str = Form(""),
                       acilis: str = Form(""),
                       sora: str = Form(""),
+                      unlu: str = Form(""),
                       arkaplan: str = Form(""),
                       ses: str = Form(""),
                       isik: str = Form(""),
@@ -585,7 +587,7 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
                     arkaplan.strip() if arkaplan.strip() in pipeline.ARKA_PLANLAR else "",
                     _ses_secimi(ses),
                     isik.strip() if isik.strip() in pipeline.ISIK_DUZEYLERI else "",
-                    acilis_dk, sref, _bayrak(sora), gorsel_model.strip()))
+                    acilis_dk, sref, _bayrak(sora), gorsel_model.strip(), _bayrak(unlu)))
     return {"job_id": is_id, "kuyruk": is_kuyrugu.qsize(), "tur": mod, "edit": edit_id,
             "profil": profil.strip()}
 
@@ -664,7 +666,7 @@ def cikti(dosya: str):
 def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom_acik,
             profil_id="", altyazi="", altyazi_sablon="", palet="", palet_ozel="",
             arkaplan="", ses_secim="", isik="", acilis_dk=None, sahne_ref=None,
-            sora_acik=False, gorsel_model_secim=""):
+            sora_acik=False, gorsel_model_secim="", unlu_modu=False):
     d = isler.get(is_id)
     if not d:
         return
@@ -685,7 +687,8 @@ def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom
                                           ses_secim=ses_secim, isik=isik,
                                           acilis_dk=acilis_dk, sahne_ref=sahne_ref,
                                           sora_acik=sora_acik,
-                                          gorsel_model_secim=gorsel_model_secim))
+                                          gorsel_model_secim=gorsel_model_secim,
+                                          unlu_modu=unlu_modu))
         d.update({"durum": "bitti", "ilerleme": 100, "mesaj": "Hazir!",
                   "video": "ciktilar/" + sonuc["video"],
                   "kapak": ("ciktilar/" + sonuc["kapak"]) if sonuc.get("kapak") else None,

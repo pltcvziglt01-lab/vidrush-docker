@@ -522,6 +522,10 @@
           <span class="tr"></span>
           <span>🎬 Gerçek video açılış (Sora)<small>açılış sahneleri AI ile GERÇEK videoya dönüşür (yağmur yağar, karakter kıpırdar) · sahne başı ~$0.80 ek maliyet</small></span>
         </div>
+        <div class="switch" id="stUnlu" style="margin-top:12px">
+          <span class="tr"></span>
+          <span>🌟 Ünlü hikayesi<small id="stUnluNot">hikaye gerçek bir ünlü hakkındaysa aç — sahneler o kişinin gerçek görünümüyle üretilir (Google görsel motoru)</small></span>
+        </div>
       </div>
 
       <div class="ak" id="ak3" style="display:none">
@@ -1372,6 +1376,17 @@ setInterval(()=>{ const v=$("#view-videolar"); if(v && v.classList.contains("on"
   $s("#stSora") && ($s("#stSora").onclick=()=>{
     stSoraAcik=!stSoraAcik; $s("#stSora").classList.toggle("on",stSoraAcik);
   });
+  /* UNLU MODU: Gemini anahtari kuruluysa acilabilir; degilse kilitli + aciklama */
+  let stUnluAcik=false, geminiVar=false;
+  fetch("api/saglik").then(r=>r.json()).then(h=>{
+    geminiVar=!!h.gemini;
+    if(!geminiVar && $s("#stUnluNot"))
+      $s("#stUnluNot").textContent="Google (Gemini) anahtarı kurulunca açılabilir — şimdilik ünlüler tarif-bazlı benzer karakterle çizilir";
+  }).catch(()=>{});
+  $s("#stUnlu") && ($s("#stUnlu").onclick=()=>{
+    if(!geminiVar){ $s("#stUnluNot").textContent="⚠ Google (Gemini) anahtarı henüz kurulu değil — anahtar gelince bu mod aktif olacak"; return; }
+    stUnluAcik=!stUnluAcik; $s("#stUnlu").classList.toggle("on",stUnluAcik);
+  });
   $s("#stAcilis") && ($s("#stAcilis").onchange=()=>{
     const m={"0":"Kapalı","1":"İlk 1 dk","2.5":"İlk 2,5 dk","5":"İlk 5 dk","60":"Tümü"};
     const l=$s("#stAcilisLbl"); if(l) l.textContent=m[$s("#stAcilis").value]||$s("#stAcilis").value;
@@ -1653,6 +1668,7 @@ setInterval(()=>{ const v=$("#view-videolar"); if(v && v.classList.contains("on"
     if(stTur==="hikaye"){
       const a=$s("#stAcilis"); if(a) fd.append("acilis", a.value);
       fd.append("sora", stSoraAcik?"1":"0");
+      fd.append("unlu", stUnluAcik?"1":"0");
     }
     stFiles.forEach(f=>fd.append("sahne_ref",f));   /* analizin AYNI kareleri üretime de gider */
     try{
