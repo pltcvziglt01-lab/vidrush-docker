@@ -189,7 +189,10 @@ def grok_gorsel(prompt: str, hedef: str, deneme: int = 4) -> bool:
             if r.status_code >= 400:
                 print(f"  grok gorsel hata {r.status_code}: {r.text[:200]}", file=sys.stderr)
                 if r.status_code in (401, 402, 403):
-                    return False   # anahtar/kredi sorunu: retry anlamsiz
+                    # Kredi/anahtar bitti: TUM uretimi durdur (OpenAI bakiye kurtarmasi devreye
+                    # girer, eldeki sahnelerle video tamamlanir — bosa deneme = bosa bekleme yok)
+                    raise BakiyeHatasi("Grok (xAI) kredisi/yetkisi doldu — console.x.ai'den "
+                                       "bakiye yukleyin.")
                 time.sleep(5); continue
             import base64
             b64 = r.json()["data"][0]["b64_json"]
