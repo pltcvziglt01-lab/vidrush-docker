@@ -276,6 +276,10 @@
               <span class="tr"></span>
               <span>🎬 Gerçek video açılış (Sora)<small>açılış sahneleri AI ile GERÇEK videoya dönüşür (yağmur yağar, karakter kıpırdar) · sahne başı ~$0.80 ek maliyet</small></span>
             </div>
+            <div class="switch" id="swUnlu" style="margin-top:11px">
+              <span class="tr"></span>
+              <span>🌟 Ünlü hikayesi<small id="swUnluNot">hikaye gerçek bir ünlü hakkındaysa aç — sahneler o kişinin gerçek görünümüyle üretilir (Grok motoru)</small></span>
+            </div>
           </div>
           <div class="durum" style="margin-top:10px;font-size:11px">📖 Hazır hikaye metnini yapıştır. Seçtiğin açılış süresi boyunca <b>yoğun hareket</b> (derin zoom + kayma — izleyiciyi tutmak için), sonrası sakin sinematik kareler.<br>🧍 <b>Karakter</b>: yukarıya görsel yüklersen her sahnede birebir o; <b>yüklemesen de</b> karakter baştan sona otomatik aynı tutulur.<br>🎨 <b>Görsel tarzı</b>: yukarıdaki "Stil görseli" alanına örnek bir fotoğraf yüklersen bütün sahneler <b>o fotoğrafın tarzında</b> üretilir (yüklemezsen sinematik film karesi stili).</div>
         </div>
@@ -1200,6 +1204,19 @@ $("#swSora") && ($("#swSora").onclick=()=>{
   $("#swSora").classList.toggle("on",soraAcik);
 });
 
+/* hikaye: UNLU modu (Yeni Video ekrani) — Grok/Gemini anahtari varsa acilabilir */
+let unluAcik=false, unluMotorVar2=false;
+fetch("api/saglik").then(r=>r.json()).then(h=>{
+  unluMotorVar2=!!(h.grok||h.gemini);
+  if(!unluMotorVar2 && $("#swUnluNot"))
+    $("#swUnluNot").textContent="Grok (xAI) veya Google anahtarı kurulunca açılabilir";
+}).catch(()=>{});
+$("#swUnlu") && ($("#swUnlu").onclick=()=>{
+  if(!unluMotorVar2){ $("#swUnluNot").textContent="⚠ Grok/Google anahtarı henüz aktif değil"; return; }
+  unluAcik=!unluAcik;
+  $("#swUnlu").classList.toggle("on",unluAcik);
+});
+
 /* krediler */
 function krediYukle(){
   fetch("api/saglik").then(r=>r.json()).then(h=>{
@@ -1241,6 +1258,7 @@ $("#btnUret").onclick=async()=>{
   if(videoTur==="hikaye"){
     const a=$("#acilisSec"); if(a) fd.append("acilis", a.value);
     fd.append("sora", soraAcik?"1":"0");
+    fd.append("unlu", unluAcik?"1":"0");
   }
   if(seciliProfil) fd.append("profil", seciliProfil);
   if(seciliPalet && seciliPalet!=="otomatik"){
