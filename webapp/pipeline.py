@@ -2168,6 +2168,18 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet="", unlu=False)
         sahne_kural = prof["sahne_sozlesme"]
         if prof.get("tip_atamasi", True):
             sahne_kural = sahne_tipi_atamasi(hedef) + sahne_kural
+    # UNLU MODU EZMESI: hikaye sozlesmesi "the main character" ifadesini SART kosuyor,
+    # unlu kurali ise gercek isim istiyor — model sozlesmeye uyup ismi YAZMIYORDU.
+    # Sonuc (4 Agu Marley testi): her sahnede FARKLI rastgele insan. Ezme kurali en sona
+    # eklenir ki sozlesmeyi acikca gecersiz kilsin.
+    if unlu:
+        sahne_kural += (
+            "\nCELEBRITY OVERRIDE (this beats every rule above): do NOT use the phrase 'the "
+            "main character' anywhere. In EVERY scene_prompt and in thumbnail.prompt write the "
+            "real person's actual NAME as the subject (e.g. 'Bob Marley'). The name itself "
+            "guarantees identity consistency across scenes; never invent appearance details "
+            "that contradict the real person, and keep every frame strictly photorealistic "
+            "live-action — never cartoon, illustration or 3D-render style.")
     else:
         sahne_kural = (
             "IMPORTANT: give scene_prompt for EVERY scene = a vivid 16:9 ENGLISH description of the "
@@ -2523,7 +2535,11 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
     # GROK yolu (unlu modu): referans desteklemez, prompt tek basina gider — unlu ismin
     # kendisi tutarlilik cipasidir. Basarisizsa asagidaki yollara DUSMEZ (stil karismasin).
     if saglayici == "grok" and XAI_KEY:
-        return grok_gorsel(prompt, hedef)
+        # Grok'un varsayilan estetigi stilize/oyun-sanati kaciyor; uzun promptta gercekcilik
+        # kilidi eriyebiliyor -> EN SONA sert ve kisa bir kilit daha (son talimat agir basar).
+        return grok_gorsel(prompt + " ULTRA-REALISTIC PHOTOGRAPH: this must look like a real "
+                           "photo taken by a real camera — absolutely NOT illustration, NOT "
+                           "3D render, NOT game art, NOT stylized.", hedef)
     # GEMINI yolu: global saglayici gemini ise VEYA bu is icin acikca istendiyse (unlu modu)
     if (saglayici or SAGLAYICI) == "gemini" and GEMINI_KEY:
         refler = [y for y in (kar_yol if kar_var else None,
