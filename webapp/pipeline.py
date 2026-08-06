@@ -2629,6 +2629,66 @@ def capa_uret(ref_yol: str, hedef: str, kimlik: str, stil: str, stil_yol: str = 
                              kanon_modu=True)
 
 
+def grok_klip(gorsel_yol: str, scene_prompt: str, hedef_mp4: str) -> bool:
+    """GROK (xAI) image-to-video: Sora'nin YARI fiyatina ($0.05/sn) + unlu yuzune toleransli.
+    Dogrulanmis akis (4 Agu testi): data-URI gorsel -> request_id -> poll -> video.url indir.
+    402/403 -> BakiyeHatasi (uretim temiz durur); diger hatalar -> False (Sora'ya dusulur)."""
+    if not XAI_KEY:
+        return False
+    try:
+        saniye = int(os.environ.get("GROK_VIDEO_SN", "8"))
+        import base64
+        with open(gorsel_yol, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+        prompt = ((scene_prompt or "").strip()[:900] +
+                  " Cinematic live-action: natural motion of the elements and characters, "
+                  "subtle camera drift, photorealistic film look, no on-screen text.")
+        r = requests.post("https://api.x.ai/v1/videos/generations",
+                          headers={"Authorization": f"Bearer {XAI_KEY}"},
+                          json={"model": os.environ.get("GROK_VIDEO_MODEL", "grok-imagine-video"),
+                                "prompt": prompt,
+                                "image": {"url": f"data:image/png;base64,{b64}"},
+                                "duration": saniye}, timeout=120)
+        if r.status_code in (401, 402, 403):
+            raise BakiyeHatasi("Grok (xAI) kredisi/yetkisi doldu — console.x.ai'den bakiye yukleyin.")
+        if r.status_code >= 400:
+            print(f"  grok video hata {r.status_code}: {r.text[:200]}", file=sys.stderr)
+            return False
+        rid = r.json().get("request_id")
+        if not rid:
+            return False
+        bas = time.time()
+        url = ""
+        while time.time() - bas < 420:
+            time.sleep(8)
+            try:
+                d = requests.get(f"https://api.x.ai/v1/videos/{rid}",
+                                 headers={"Authorization": f"Bearer {XAI_KEY}"}, timeout=30).json()
+            except Exception:
+                continue
+            st = d.get("status", "")
+            if st == "done":
+                url = (d.get("video") or {}).get("url", "")
+                break
+            if st in ("failed", "error", "rejected"):
+                print(f"  grok video basarisiz: {json.dumps(d)[:200]}", file=sys.stderr)
+                return False
+        if not url:
+            print("  grok video zaman asimi", file=sys.stderr)
+            return False
+        c = requests.get(url, timeout=300)
+        if c.status_code >= 400 or len(c.content) < 50000:
+            return False
+        with open(hedef_mp4, "wb") as f:
+            f.write(c.content)
+        return True
+    except BakiyeHatasi:
+        raise
+    except Exception as e:
+        print(f"  grok video istisna: {str(e)[:160]}", file=sys.stderr)
+        return False
+
+
 def sora_klip(gorsel_yol: str, scene_prompt: str, hedef_mp4: str) -> bool:
     """GERCEK VIDEOLASTIRMA: uretilmis sahne gorselini OpenAI Sora'ya referans verip
     gercek video klibe cevirir (yagmur yagar, karakter kipirdar, kamera suzulur).
@@ -3051,13 +3111,23 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             return None
         if mag_profil and s.get("hd"):   # OTOMATIK: sadece plan HD isaretlediyse
             kaynak.magnific_upscale(gyol_full, optimized_for=mag_profil, scale="2x")
-        # 3) SORA: acilis sahnesiyse gorseli GERCEK videoya cevir (basarisizsa fotografla devam)
+        # 3) GERCEK VIDEO: acilis sahnesiyse gorseli canlandir. Motor zinciri:
+        #    GROK once ($0.40/8sn — Sora'nin yarisi + unlu toleransli) -> SORA ($0.80) -> efekt.
+        #    VIDEO_MOTOR=sora ile Grok atlanabilir.
         if n in sora_adaylari and not bakiye_bitti and not uretim_durdu:
             svyol = os.path.join(PUBLIC, "isler", is_adi, f"sahne_{n}_sora.mp4")
-            if sora_klip(gyol_full, sp, svyol):
+            klip_ok = False
+            if XAI_KEY and os.environ.get("VIDEO_MOTOR", "grok") != "sora":
+                try:
+                    klip_ok = grok_klip(gyol_full, sp, svyol)
+                except BakiyeHatasi:
+                    print("  grok kredisi bitti -> bu sahne icin Sora denenecek", file=sys.stderr)
+            if not klip_ok:
+                klip_ok = sora_klip(gyol_full, sp, svyol)
+            if klip_ok:
                 time.sleep(gorsel_bekle)
                 return ("video", f"isler/{is_adi}/sahne_{n}_sora.mp4")
-            print(f"  sahne {n}: sora klip olmadi, efektli fotografla devam", file=sys.stderr)
+            print(f"  sahne {n}: video klip olmadi, efektli fotografla devam", file=sys.stderr)
         # Hiz limiti: her ISCI kendi isteginden sonra bekler (toplam hiz = paralel/(uretim+bekleme))
         time.sleep(gorsel_bekle)
         return ("image", f"isler/{is_adi}/sahne_{n}.png")
