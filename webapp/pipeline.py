@@ -181,7 +181,7 @@ def grok_gorsel(prompt: str, hedef: str, deneme: int = 4) -> bool:
         try:
             r = requests.post("https://api.x.ai/v1/images/generations",
                               headers={"Authorization": f"Bearer {XAI_KEY}"},
-                              json={"model": os.environ.get("GROK_GORSEL_MODEL", "grok-2-image"),
+                              json={"model": os.environ.get("GROK_GORSEL_MODEL", "grok-imagine-image"),
                                     "prompt": prompt[:1024], "response_format": "b64_json"},
                               timeout=180)
             if r.status_code == 429:
