@@ -362,7 +362,13 @@ HKANAL_STIL = (
     "cinematic photorealistic film still, shot on 35mm anamorphic cinema lenses, shallow depth "
     "of field, dramatic motivated lighting, moody filmic color grade, subtle film grain, high "
     "dynamic range, realistic skin and fabric texture, professional movie production value, "
-    "absolutely no text, no captions, no watermark, no logo, no illustration, no 3D render"
+    "absolutely no text, no captions, no watermark, no logo. "
+    # SERT GERCEKCILIK KILIDI: mini/animasyon egilimli ciktilarda tema karismasi goruldu —
+    # tek bir sahnenin bile cizim/anime gorunmesi tum kanali amatorlestirir.
+    "STRICTLY LIVE-ACTION REALISM: this frame must look like real footage captured by a real "
+    "cinema camera. NEVER cartoon, NEVER anime, NEVER illustration, NEVER painting, NEVER "
+    "comic, NEVER 3D render or CGI look, NEVER stylized or flat art of any kind — if in doubt, "
+    "make it MORE photographic, not less"
 )
 # Karakter yuklenmezse: gorunusu SABITLEMEZ (hikayeye gore model secer), ayni kalmasini SART kosar.
 HKANAL_VARSAYILAN_KARAKTER = (
@@ -2729,10 +2735,16 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     footage_acik = prof.get("footage_pct", 0) > 0
     # Maliyet/kalite: animasyon (duz vektor) ucuz mini, documentary (foto-gercekci) gpt-image-2
     gorsel_model = GORSEL_MODEL_ANIM if mod == "animasyon" else GORSEL_MODEL_DOC
-    # Kullanici Studyo'dan kalite sectiyse o kazanir (Standart=mini / Yuksek=gpt-image-2)
-    if gorsel_model_secim in ("gpt-image-1-mini", "gpt-image-2", "gpt-image-1"):
+    # Kullanici Studyo'dan kalite sectiyse o kazanir (Standart=mini / Yuksek=gpt-image-2).
+    # ISTISNA — HIKAYE: mini model ANIMASYON icin ayarli; gercekci hikaye sahnelerine cizim/
+    # animasyon gorunumu sizdiriyor (4 Agu testinde yer yer karisik tema cikti). Hikaye HER
+    # ZAMAN foto-gercekci modelle calisir, kalite secimi yok sayilir.
+    if mod != "hikaye" and gorsel_model_secim in ("gpt-image-1-mini", "gpt-image-2", "gpt-image-1"):
         gorsel_model = gorsel_model_secim
         print(f"  gorsel modeli (kullanici secimi): {gorsel_model}", file=sys.stderr)
+    elif mod == "hikaye" and gorsel_model_secim and gorsel_model_secim != GORSEL_MODEL_DOC:
+        print(f"  hikaye modu: '{gorsel_model_secim}' yok sayildi -> {GORSEL_MODEL_DOC} "
+              "(gercekcilik korunur)", file=sys.stderr)
     yt_once = True
     # Sure tavani: hikaye kanali 60 dk (uzun hikaye formati), diger turler 14 dk.
     # 60 dk hikaye (8sn sahne, paralel gorsel, 10 cekirdek render) ~2-2.5 saat, ~$40 gorsel.

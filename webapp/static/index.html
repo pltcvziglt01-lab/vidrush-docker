@@ -1364,6 +1364,8 @@ setInterval(()=>{ const v=$("#view-videolar"); if(v && v.classList.contains("on"
     /* hareketli acilis + Sora yalniz HIKAYE turunde anlamli */
     const aA=$s("#akAcilis"); if(aA) aA.style.display = (t==="hikaye")?"":"none";
     if(!refZorunlu()){ goster("#akSes"); goster("#akKalite"); goster("#ak3"); sayacGuncelle(); }
+    /* HIKAYE: kalite secimi YOK — her zaman foto-gercekci model (mini animasyon sizdiriyordu) */
+    const kK=$s("#akKalite"); if(kK && t==="hikaye") kK.style.display="none";
   };
   /* acilis etiketi + Sora anahtari (studyo yerel durumu) */
   let stSoraAcik=false;
