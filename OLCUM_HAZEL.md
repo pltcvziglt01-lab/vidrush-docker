@@ -60,4 +60,7 @@ plan**: bizde %0, referansta %17. Düzeltme yakınlaştırmak değil, orta plan�
 ## Maliyet etkisi
 
 Sahne 5 → 12 sn: 11 dk'lık bir ani-defteri videosu ~130 görsel yerine **~55 görsel**.
-Görsel başına $0.048 → video başına **~$6.2 yerine ~$2.6**.
+
+Animasyon stilleri `GORSEL_MODEL_ANIM = gpt-image-1-mini` kullanıyor → **$0.013/görsel**
+(belgesel tarafındaki `gpt-image-2` $0.048 DEĞİL — ilk yazımda bunu karıştırmıştım).
+Yani görsel maliyeti **~$1.69 yerine ~$0.72**.

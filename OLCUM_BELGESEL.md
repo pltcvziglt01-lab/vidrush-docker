@@ -107,3 +107,33 @@ ayda ~200 büyütme ≈ 16 video. Ayda 16 videonun altında API pay-per-use daha
   `GORSEL_PARALEL=8` bunu yarıya indirir (footage ağ-bağımlı, API limitine takılmaz).
 - Vision dağılım analizi (kamera açısı/konu oranları) bakiye gelince çalıştırılacak:
   `~/Desktop/belgesel-referans/belgesel_vision.py`
+
+## 30 dakikalık video maliyeti (kodun gerçek değerleriyle)
+
+Fiyatlar: `gpt-image-2` $0.048 · `gpt-image-1-mini` $0.013 · `gpt-4o-mini-tts` $0.015/dk ·
+`whisper-1` $0.006/dk · Magnific 2K ~$0.08. KDV %20 (yurtdışı dijital hizmet).
+
+| Kalem | Seyahat Belgeseli (144 sahne) | Animasyon (150 sahne) |
+|---|---|---|
+| AI görsel | $0.58 (12 ad, gpt-image-2) | $1.95 (150 ad, mini) |
+| Kapak | $0.05 | $0.01 |
+| Magnific | $0.56 (7 büyütme) | $0 (profilde kapalı) |
+| Footage | $0 (132 klip CC+stok) | — |
+| Planlama + analiz | $0.08 | $0.10 |
+| Seslendirme (OpenAI) | $0.45 | $0.45 |
+| Whisper hizalama | $0.18 | $0.18 |
+| **Toplam** | **$1.89** | **$2.69** |
+| **+ KDV** | **$2.27** | **$3.23** |
+| edge-tts ile (KDV dahil) | $1.52 | $2.48 |
+
+**Neden belgesel daha ucuz:** sahnelerin %92'si footage, yani $0. Animasyonda her sahne
+AI görsel. Belgesel pahalı modeli (`gpt-image-2`) kullanmasına rağmen 12 görsel çiziyor,
+animasyon ucuz modelle 150 görsel çiziyor.
+
+`sahne_sn = 12.5` (ölçülen ORTALAMA çekim) sahne sayısını belirler; çift-modlu bant
+dağılımı medyanı 6-7 sn'ye getirir. Doğrulama: ağırlıklı ortalama 12.4 sn / hedef 12.5 sn,
+30 dk hedef → 29.9 dk çıktı, sahnelerin %58'i 8 sn altı (referans: %58).
+
+**Süre (para değil, ama darboğaz):** footage 132 klip × 26 sn ÷ 4 paralel ≈ 14 dk;
+hızlı ffmpeg motoru 30 dk videoyu ~12 dk'da render eder (Remotion ~4 saat).
+`GORSEL_PARALEL=8` footage aşamasını yarıya indirir.

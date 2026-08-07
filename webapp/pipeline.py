@@ -351,7 +351,10 @@ EDIT_STILLERI = {
     "seyahat-belgeseli": {
         "ad": "Seyahat Belgeseli (4K)",
         "ozet": "ImpossibleTravel — gerçek drone + yer görüntüsü derlemesi, yavaş anlatı, arşiv",
-        "sahne_sn": 6, "kelime": 15, "footage_pct": 92, "overlay": "yok",
+        # sahne_sn = olculen ORTALAMA cekim (12.5 sn), medyan (6.5 sn) DEGIL: sahne sayisi
+        # hedef_sure/sahne_sn ile bulundugu icin burada ortalama dogru olcu. Medyani cift-modlu
+        # bant dagilimi zaten 6-7 sn'ye getiriyor (%58'i 8 sn'nin altinda).
+        "sahne_sn": 12.5, "kelime": 15, "footage_pct": 92, "overlay": "yok",
         "altyazi": "yok", "motion": "sinematik", "mag": "films_n_photography",
         "tempo": "cift-modlu",   # olculen dagilim: %33 kisa / %26 orta / %29 uzun
         "gorsel_ek": ("photorealistic 4K travel documentary frame that must be indistinguishable "
@@ -2207,17 +2210,22 @@ def sahne_tipi_atamasi(adet: int) -> str:
 #   OpenAI yasli sesler  speed 0.86-0.98 -> ~130-150
 #   ai33/minimax         ~133 (bu videoda olculdu)
 # Sabit kelime + yavas ses = uzun sahne. Artik butce sesin GERCEK hizindan turetilir.
-def kelime_butcesi(prof, ses_secim: str) -> int:
-    """Hedef sahne suresini tutturacak kelime sayisi."""
-    hedef_sn = float(prof.get("sahne_sn") or 5)
+def ses_wpm(ses_secim: str) -> float:
+    """Secili sesin GERCEK konusma hizi (kelime/dakika). Olculdu, tahmin degil."""
     v = SESLER.get((ses_secim or "").strip()) or {}
     motor = v.get("motor", "edge")
     if motor == "openai":
-        wpm = 165 * float(v.get("hiz", 0.95))      # 0.86-0.98 -> ~142-162
-    elif motor == "ai33" or (ses_secim or "").startswith("ozel:"):
-        wpm = 135                                   # olculdu (minimax, 4 Agu 2026)
-    else:
-        wpm = 178                                   # edge-tts +%15
+        return 165 * float(v.get("hiz", 0.95))      # 0.86-0.98 -> ~142-162
+    if motor == "ai33" or (ses_secim or "").startswith("ozel:"):
+        return 135                                  # olculdu (minimax, 4 Agu 2026)
+    return 178                                      # edge-tts +%15
+
+
+def kelime_butcesi(prof, ses_secim: str) -> int:
+    """Hedef sahne suresini tutturacak kelime sayisi."""
+    hedef_sn = float(prof.get("sahne_sn") or 5)
+    wpm = ses_wpm(ses_secim)
+    prof["_wpm"] = wpm          # plan_sistem cift-modlu bantlari bundan hesaplar
     kel = int(round(hedef_sn * wpm / 60))
     return max(6, min(24, kel))
 
@@ -2255,22 +2263,32 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
     # Dar kelime bandi (kelime..kelime+3) her sahneyi ayni uzunlukta yapiyordu; belgeselde
     # bu "metronom" hissi veriyor. tempo="cift-modlu" profillerde ritim bilincli degisir.
     if prof.get("tempo") == "cift-modlu":
-        kis, orta_a, orta_b, uzun_a, uzun_b = (
-            max(5, int(prof["kelime"] * 0.35)),
-            max(7, int(prof["kelime"] * 0.7)), prof["kelime"] + 2,
-            int(prof["kelime"] * 1.9), int(prof["kelime"] * 2.8))
+        # Bantlar OLCULEN dagilimdan turetilir ve AGIRLIKLI ORTALAMASI 1.0 x sahne_sn'dir.
+        # Bu sart: sahne sayisi = hedef_sure / sahne_sn oldugu icin bantlarin ortalamasi
+        # sahne_sn'i asarsa video hedeflenen sureden UZUN cikar (ilk yazimda %23 asiyordu).
+        # Olculen (referans #12, 2147 cekim): %32 <4sn | %26 4-8sn | %14 8-12sn | %29 12sn+
+        # ortalama 12.5 sn, medyan 6.5 sn. Agirlikli kontrol:
+        #   .32*0.20 + .26*0.48 + .14*0.80 + .29*2.40 = 1.00  ✓
+        wpm = float(prof.get("_wpm") or 150)
+        sn = float(prof["sahne_sn"])
+        def _k(carpan):        # saniye -> kelime
+            return max(4, int(round(sn * carpan * wpm / 60)))
+        k1, k2, k3, k4 = _k(0.20), _k(0.48), _k(0.80), _k(2.40)
         kelime_kural = (
             f"2) Produce EXACTLY {hedef} sequential scenes. Scene LENGTH MUST VARY — this is a "
-            "documentary, not a metronome. Measured from the reference channel, split the scenes "
-            "into three classes and mix them:\n"
-            f"   SHORT (about a third of scenes): {kis}-{orta_a - 1} words — a single hard beat.\n"
-            f"   MEDIUM (about a third): {orta_a}-{orta_b} words.\n"
-            f"   LONG (about a third): {uzun_a}-{uzun_b} words — two or three sentences that hold "
-            "on one shot while the narration develops a thought.\n"
-            "Never put two SHORT scenes back to back and never three of the same class in a row. "
-            "Alternate so the video breathes. If the source text is short, EXPAND it by adding "
-            "MORE SCENES, never by padding one line past its class ceiling. The voiceover fields "
-            "together form continuous narration in the ORIGINAL language.\n")
+            "documentary, not a metronome. These proportions were measured shot by shot from the "
+            "reference channel, so hit them:\n"
+            f"   ~32% VERY SHORT: about {k1} words (max {k2 - 1}) — one hard beat, a single "
+            "short sentence.\n"
+            f"   ~26% SHORT: about {k2} words.\n"
+            f"   ~14% MEDIUM: about {k3} words.\n"
+            f"   ~29% LONG: about {k4} words (range {int(k4*0.7)}-{int(k4*1.3)}) — three or four "
+            "sentences that hold on ONE shot while the narration develops a whole thought. These "
+            "long holds are the backbone of the style; do not shy away from them.\n"
+            "Never put two VERY SHORT scenes back to back and never three scenes of the same "
+            "class in a row. Alternate so the video breathes. If the source text is short, EXPAND "
+            "it by adding MORE SCENES, never by pushing a line past its class range. The "
+            "voiceover fields together form continuous narration in the ORIGINAL language.\n")
     else:
         kelime_kural = (
             f"2) Produce EXACTLY {hedef} sequential scenes. Every voiceover line must be "
