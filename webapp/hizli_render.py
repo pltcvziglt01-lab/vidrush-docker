@@ -312,6 +312,14 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
     # KAPSAM KONTROLU: video sahneleri artik DESTEKLI (Sora klipleri/footage segment olur).
     # Sadece overlay basligi olan isler Remotion'a gider (kinetik baslik v1'de yok).
     # Overlay engeli KALDIRILDI (4 Agu 2026): drawtext ile ciziliyor.
+    # EDIT PAKETI engeli DURUYOR (5 Agu 2026): beyaz-tuval/olcu/alinti/metin/harita
+    # sablonlari React+SVG ile ciziliyor (EditPaketi.tsx). ffmpeg'de karsiligi yok —
+    # drawtext'le taklidi yarim kalir ve iki motor ayni videoda farkli gorunur.
+    # Bu yuzden grafikli is Remotion'a duser (yavas ama DOGRU).
+    for s in sahneler:
+        if isinstance(s.get("grafik"), dict) and s["grafik"].get("tur"):
+            print("  hizli motor: edit paketi grafigi var -> Remotion", file=sys.stderr)
+            return False
 
     fps = int(props.get("fps", 24))
     gecis = str(props.get("gecis", "sinematik"))

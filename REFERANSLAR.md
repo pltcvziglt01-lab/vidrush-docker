@@ -231,3 +231,56 @@ makro detay → hava/fırtına → arşiv.
 `footage_getir` YouTube'u cookie olmadan hiç denemiyordu (footage komple ölüydü) ve
 `youtube_ara` lisans filtresi yapmıyordu (telif ihtarı riski). İkisi de düzeltildi;
 artık sadece Creative Commons aranıyor ve indirmeden önce lisans tek tek doğrulanıyor.
+
+## 13. Neu — "The Broken Economics of Oil Tankers" (edit paketi referansı)
+
+`youtube.com/watch?v=uMZ9CkmzYMc` · 9.5 dk · 62K izlenme.
+Kullanıcının "after effects kalitesinde tam paket edit" olarak gösterdiği referans.
+
+### Diğer 12 referanstan TEMEL farkı: kesme yok, sürekli animasyon var
+ffmpeg sahne-kesme eşik 0.28'de **571 saniyede sadece 2 sert kesme** buldu. Video kesmeyle
+değil animasyonla ilerliyor. 143 karede zemin analizi:
+
+| Zemin | Oran |
+|---|---|
+| Beyaz tuval (grafik/etiket/serif metin) | **%41** |
+| Tam kare footage | %43 |
+| Karışık / kısmi beyaz | %16 |
+
+Yani stilin yarısı bizde hiç olmayan bir şeydi: **beyaz zeminde veri grafiği.**
+
+### Ürettiği kurallar
+
+**A. GEÇİŞ DEĞİL, KATMAN** — bu bir geçiş meselesi değil. Yeni bir anlatım katmanı gerekti:
+`EditPaketi.tsx`, 5 şablon (beyaz-tuval / ölçü / alıntı / metin / harita).
+
+**B. İŞARETLEYİCİ** — sayılar sarı fosforlu kalemle işaretli, başlıklar turuncu.
+Yazının arkasına soldan sağa büyüyen bant olarak çizildi (gerçek kalem hissi).
+
+**C. ÖLÇÜ OKU** — nesnenin boyunu gösteren çizgi + iki uçta dik serif + ortada etiket
+("375 METERS"). Çizgi soldan sağa çiziliyor, sonra etiket işaretleniyor.
+
+**D. SERIF TİPOGRAFİ** — gövde metni serif, beyaz zeminde ortalı, satır satır açılıyor.
+
+**E. YALITILMIŞ NESNE** — beyaz tuval sahnelerinde konu katalog gibi kesilip beyaza
+oturtulmuş. Bu yüzden görsel promptuna "pure white background, product-catalogue
+isolation" zorunlu eklendi; yoksa beyaz zemine tam kare fotoğraf konur ve stil olmaz.
+
+### Bilinçli olarak YAPMADIĞIM şey
+Referansta gerçek gazete/makale ekran görüntüleri var. Onun taklidini üretmek, olmayan bir
+habere gerçek gibi görünen bir belge üretmek olur. Yerine `alinti` şablonu açıkça **alıntı
+kartı** gibi durur ve kaynağı yazar; aynı görsel etkiyi verir, uydurma belge üretmez.
+Plan promptu da açıkça "kaynak uydurma, senaryoda kaynak adı yoksa bu şablonu kullanma"
+diyor ve her etiketteki sayının anlatım metninden gelmesini şart koşuyor.
+
+### Motora eklenenler
+- `EditPaketi.tsx` — 5 şablon, koordinatlar 0-1 oranı (çözünürlükten bağımsız)
+- Yeni edit stili `veri-anlatisi` — "Veri Anlatısı (Neu)": sahne 9 sn, footage %45,
+  grafik %41, `edit_paketi: True`
+- Plan promptuna GRAPHIC LAYER kuralı (yalnızca `edit_paketi` stillerinde; diğer 4 stile
+  sızmadığı testle doğrulandı)
+- Beyaz-tuval sahnelerine zorunlu "pure white background" görsel promptu
+- Hızlı ffmpeg motoru grafikli işi reddedip Remotion'a düşürüyor (ffmpeg'de karşılığı yok;
+  yarım taklit iki motoru farklı gösterirdi)
+- `@remotion/lottie` kuruldu: tasarımcının After Effects'te yaptığı animasyon (Lottie/
+  Bodymovin dışa aktarımı) sahneye `ae` alanı ile birebir oynar

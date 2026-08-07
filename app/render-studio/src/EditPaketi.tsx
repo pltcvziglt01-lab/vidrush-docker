@@ -1,0 +1,419 @@
+/**
+ * EDIT PAKETI — referans #13 (@Neu, "The Broken Economics of Oil Tankers") edit dili.
+ *
+ * NEDEN AYRI DOSYA: bu bir GECIS meselesi degil, ayri bir anlatim katmani. Referans
+ * videoda 10 dakikada sadece 2 sert kesme var (ffmpeg sahne-kesme ile olculdu) — video
+ * kesmeyle degil SUREKLI ANIMASYONLA ilerliyor. Kare olcumu:
+ *   %41 beyaz tuval (grafik/etiket/metin)  |  %43 tam kare footage  |  %16 karisik
+ * Yani stilin yarisi, bizde hic olmayan bir sey: beyaz zeminde veri grafigi.
+ *
+ * BU DOSYADAKI SABLONLAR
+ *   beyaz-tuval : beyaz zemin + yalitilmis konu gorseli + isaretlenmis etiketler
+ *   olcu        : iki nokta arasi olcu oku + etiket ("375 METERS")
+ *   alinti      : kaynak alinti karti (serif govde + isaretli baslik + KAYNAK ADI)
+ *   metin       : beyaz zeminde serif metin blogu, satir satir aciliyor
+ *   harita      : harita gorseli + animasyonlu daire/rota isareti
+ *
+ * ONEMLI — SAHTE EKRAN GORUNTUSU URETMIYORUZ. Referansta gerçek gazete/makale ekran
+ * goruntuleri var. Onun taklidini uretmek, olmayan bir habere gercek gibi gorunen bir
+ * gorsel uretmek olur. Bunun yerine "alinti" sablonu acikca ALINTI KARTI gibi durur ve
+ * kaynagi yazar; ayni gorsel etkiyi verir, uydurma belge uretmez.
+ *
+ * KOORDINATLAR 0-1 ARASI ORANDIR (kare boyutundan bagimsiz).
+ */
+import React from 'react';
+import {AbsoluteFill, Easing, Img, interpolate, spring, useCurrentFrame, useVideoConfig} from 'remotion';
+import {fontAilesi} from './fontlar';
+
+const SERIF = 'Georgia, "Times New Roman", "Liberation Serif", serif';
+
+/** Referanstan olculen isaretleyici sarisi ve baslik turuncusu. */
+const VURGU_SARI = '#F5E14B';
+const VURGU_TURUNCU = '#E8873A';
+const MUREKKEP = '#141414';
+
+export type GrafikEtiket = {
+  metin: string;
+  x: number;          // 0-1
+  y: number;          // 0-1
+  vurgu?: boolean;    // arkasina isaretleyici cizgisi
+  buyuk?: boolean;
+};
+
+export type Grafik =
+  | {tur: 'beyaz-tuval'; etiketler?: GrafikEtiket[]}
+  | {tur: 'olcu'; metin: string; x1: number; y1: number; x2: number; y2: number}
+  | {tur: 'alinti'; baslik?: string; metin: string; kaynak: string}
+  | {tur: 'metin'; satirlar: string[]}
+  | {tur: 'harita'; noktalar?: GrafikEtiket[]; rota?: boolean};
+
+/** Sablon beyaz zemin mi istiyor (gorselin ustune mi ciziliyor)? */
+export const beyazZeminMi = (g?: Grafik): boolean =>
+  !!g && (g.tur === 'beyaz-tuval' || g.tur === 'alinti' || g.tur === 'metin');
+
+/* ─────────────────────── ortak yardimcilar ─────────────────────── */
+
+/** 0 -> 1 yumusak giris; gecikme kare cinsinden. */
+const gir = (frame: number, fps: number, gecikme = 0, sn = 0.55) =>
+  interpolate(frame, [gecikme, gecikme + Math.round(fps * sn)], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: Easing.out(Easing.cubic),
+  });
+
+/** Sahne sonunda blok halinde sonum (gecisle catismasin diye kisa). */
+const cikisSonum = (frame: number, K: number, fps: number) =>
+  interpolate(frame, [K - Math.round(fps * 0.45), K], [1, 0], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+
+/* ─────────────────────── isaretleyici (highlighter) ─────────────────────── */
+
+/**
+ * Referanstaki sari isaretleyici. Yazinin ARKASINA soldan saga buyuyen bir bant cizer —
+ * gercek bir fosforlu kalem gibi. CSS background-size animasyonu yerine ayri katman:
+ * yazinin genisligini bilmeden de dogru calisir.
+ */
+const Isaretleyici: React.FC<{ilerleme: number; renk?: string}> = ({ilerleme, renk = VURGU_SARI}) => (
+  <span
+    style={{
+      position: 'absolute',
+      left: -6,
+      right: -6,
+      bottom: '0.08em',
+      height: '0.62em',
+      backgroundColor: renk,
+      transformOrigin: 'left center',
+      transform: `scaleX(${ilerleme})`,
+      zIndex: 0,
+      borderRadius: 2,
+    }}
+  />
+);
+
+const Etiket: React.FC<{e: GrafikEtiket; frame: number; fps: number; gecikme: number}> = ({
+  e,
+  frame,
+  fps,
+  gecikme,
+}) => {
+  const p = gir(frame, fps, gecikme, 0.4);
+  const isaret = gir(frame, fps, gecikme + Math.round(fps * 0.28), 0.45);
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: `${e.x * 100}%`,
+        top: `${e.y * 100}%`,
+        transform: `translate(-50%, -50%) translateY(${(1 - p) * 14}px)`,
+        opacity: p,
+        fontFamily: SERIF,
+        fontWeight: 700,
+        fontSize: e.buyuk ? 54 : 38,
+        color: MUREKKEP,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <span style={{position: 'relative', display: 'inline-block'}}>
+        {e.vurgu !== false ? <Isaretleyici ilerleme={isaret} /> : null}
+        <span style={{position: 'relative', zIndex: 1}}>{e.metin}</span>
+      </span>
+    </div>
+  );
+};
+
+/* ─────────────────────── olcu oku ─────────────────────── */
+
+/**
+ * Iki nokta arasi olcu oku: cizgi soldan saga cizilir, iki ucta dik serif, ortada etiket.
+ * Referansta gemi boyunu gosteren "375 METERS" oku bu.
+ */
+const OlcuOku: React.FC<{g: Extract<Grafik, {tur: 'olcu'}>; frame: number; fps: number}> = ({
+  g,
+  frame,
+  fps,
+}) => {
+  const {width: W, height: H} = useVideoConfig();
+  const p = gir(frame, fps, Math.round(fps * 0.2), 0.7);
+  const x1 = g.x1 * W;
+  const y1 = g.y1 * H;
+  const x2 = g.x2 * W;
+  const y2 = g.y2 * H;
+  const ux = x1 + (x2 - x1) * p;
+  const uy = y1 + (y2 - y1) * p;
+  const aci = Math.atan2(y2 - y1, x2 - x1);
+  const dik = aci + Math.PI / 2;
+  const u = 16;
+  const serif = (cx: number, cy: number) => ({
+    x1: cx + Math.cos(dik) * u,
+    y1: cy + Math.sin(dik) * u,
+    x2: cx - Math.cos(dik) * u,
+    y2: cy - Math.sin(dik) * u,
+  });
+  const s1 = serif(x1, y1);
+  const s2 = serif(x2, y2);
+  return (
+    <AbsoluteFill>
+      <svg width={W} height={H} style={{position: 'absolute', inset: 0}}>
+        <line x1={x1} y1={y1} x2={ux} y2={uy} stroke={MUREKKEP} strokeWidth={3} />
+        <line {...s1} stroke={MUREKKEP} strokeWidth={3} />
+        {p > 0.985 ? <line {...s2} stroke={MUREKKEP} strokeWidth={3} /> : null}
+      </svg>
+      <Etiket
+        e={{
+          metin: g.metin,
+          x: (g.x1 + g.x2) / 2,
+          y: (g.y1 + g.y2) / 2 - 0.055,
+          vurgu: true,
+        }}
+        frame={frame}
+        fps={fps}
+        gecikme={Math.round(fps * 0.75)}
+      />
+    </AbsoluteFill>
+  );
+};
+
+/* ─────────────────────── alinti karti ─────────────────────── */
+
+const AlintiKarti: React.FC<{g: Extract<Grafik, {tur: 'alinti'}>; frame: number; fps: number}> = ({
+  g,
+  frame,
+  fps,
+}) => {
+  const p = gir(frame, fps, 0, 0.6);
+  const isaret = gir(frame, fps, Math.round(fps * 0.5), 0.5);
+  return (
+    <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', padding: '7% 12%'}}>
+      <div
+        style={{
+          opacity: p,
+          transform: `translateY(${(1 - p) * 18}px)`,
+          maxWidth: '86%',
+          backgroundColor: '#FFFFFF',
+          border: '1px solid #DCDCDC',
+          boxShadow: '0 18px 60px rgba(0,0,0,0.10)',
+          padding: '64px 78px',
+        }}
+      >
+        {g.baslik ? (
+          <div
+            style={{
+              fontFamily: SERIF,
+              fontWeight: 700,
+              fontSize: 46,
+              lineHeight: 1.24,
+              marginBottom: 32,
+              color: MUREKKEP,
+            }}
+          >
+            <span style={{position: 'relative', display: 'inline'}}>
+              <Isaretleyici ilerleme={isaret} renk={VURGU_TURUNCU} />
+              <span style={{position: 'relative', zIndex: 1}}>{g.baslik}</span>
+            </span>
+          </div>
+        ) : null}
+        <div
+          style={{
+            fontFamily: SERIF,
+            fontSize: 34,
+            lineHeight: 1.58,
+            color: '#232323',
+            textAlign: 'justify',
+          }}
+        >
+          {g.metin}
+        </div>
+        <div
+          style={{
+            marginTop: 30,
+            paddingTop: 18,
+            borderTop: '1px solid #E4E4E4',
+            fontFamily: fontAilesi('montserrat'),
+            fontSize: 22,
+            letterSpacing: 1.6,
+            textTransform: 'uppercase',
+            color: '#7A7A7A',
+          }}
+        >
+          Kaynak: {g.kaynak}
+        </div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+/* ─────────────────────── serif metin blogu ─────────────────────── */
+
+const MetinBloku: React.FC<{g: Extract<Grafik, {tur: 'metin'}>; frame: number; fps: number}> = ({
+  g,
+  frame,
+  fps,
+}) => (
+  <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center', padding: '8% 14%'}}>
+    <div style={{maxWidth: '80%'}}>
+      {g.satirlar.map((satir, i) => {
+        const p = gir(frame, fps, i * Math.round(fps * 0.22), 0.5);
+        return (
+          <div
+            key={i}
+            style={{
+              opacity: p,
+              transform: `translateY(${(1 - p) * 12}px)`,
+              fontFamily: SERIF,
+              fontSize: 40,
+              lineHeight: 1.68,
+              color: MUREKKEP,
+              textAlign: 'center',
+              marginBottom: 14,
+            }}
+          >
+            {satir}
+          </div>
+        );
+      })}
+    </div>
+  </AbsoluteFill>
+);
+
+/* ─────────────────────── harita isareti ─────────────────────── */
+
+const HaritaIsareti: React.FC<{
+  g: Extract<Grafik, {tur: 'harita'}>;
+  frame: number;
+  fps: number;
+}> = ({g, frame, fps}) => {
+  const {width: W, height: H} = useVideoConfig();
+  const noktalar = g.noktalar || [];
+  return (
+    <AbsoluteFill>
+      <svg width={W} height={H} style={{position: 'absolute', inset: 0}}>
+        {g.rota && noktalar.length >= 2
+          ? noktalar.slice(1).map((n, i) => {
+              const a = noktalar[i];
+              const p = gir(frame, fps, Math.round(fps * (0.6 + i * 0.5)), 0.8);
+              return (
+                <line
+                  key={i}
+                  x1={a.x * W}
+                  y1={a.y * H}
+                  x2={a.x * W + (n.x - a.x) * W * p}
+                  y2={a.y * H + (n.y - a.y) * H * p}
+                  stroke="#D03A2C"
+                  strokeWidth={7}
+                  strokeDasharray="20 14"
+                />
+              );
+            })
+          : null}
+        {noktalar.map((n, i) => {
+          const p = gir(frame, fps, Math.round(fps * (0.25 + i * 0.45)), 0.5);
+          return (
+            <circle
+              key={i}
+              cx={n.x * W}
+              cy={n.y * H}
+              r={44 * p}
+              fill="none"
+              stroke="#D03A2C"
+              strokeWidth={7}
+              opacity={p}
+            />
+          );
+        })}
+      </svg>
+      {noktalar
+        .filter((n) => n.metin)
+        .map((n, i) => (
+          <Etiket
+            key={i}
+            e={{...n, y: n.y - 0.085, vurgu: true}}   // daireyle cakismasin
+            frame={frame}
+            fps={fps}
+            gecikme={Math.round(fps * (0.45 + i * 0.45))}
+          />
+        ))}
+    </AbsoluteFill>
+  );
+};
+
+/* ─────────────────────── beyaz tuval ─────────────────────── */
+
+/**
+ * Beyaz zeminde yalitilmis konu gorseli. Gorsel BEYAZ ZEMINLE uretilmis olmali
+ * (prompt tarafi bunu soyluyor); burada sadece yerlestirilir ve hafifce olceklenir —
+ * referansta nesne durur, kamera cok yavas yaklasir.
+ */
+const BeyazTuval: React.FC<{
+  medya?: string;
+  g: Extract<Grafik, {tur: 'beyaz-tuval'}>;
+  frame: number;
+  fps: number;
+  K: number;
+}> = ({medya, g, frame, fps, K}) => {
+  const yay = spring({frame, fps, config: {damping: 24, stiffness: 90, mass: 0.9}});
+  const olcek = 0.94 + 0.06 * yay + (frame / Math.max(1, K)) * 0.03;
+  return (
+    <AbsoluteFill style={{backgroundColor: '#FFFFFF'}}>
+      {medya ? (
+        <AbsoluteFill style={{justifyContent: 'center', alignItems: 'center'}}>
+          {/* Sabit olculu kap + objectFit:contain. Sadece maxWidth/maxHeight vermek
+              YETMIYOR: kaynak gorsel hedeften kucukse (or. 640 px'lik bir onizleme)
+              max-* onu BUYUTMEZ ve nesne karenin ortasinda minicik kalir. Olculu kap
+              her iki yonde de dogru boyutu garanti eder. */}
+          <div
+            style={{
+              width: '74%',
+              height: '70%',
+              opacity: gir(frame, fps, 0, 0.5),
+              transform: `scale(${olcek})`,
+            }}
+          >
+            <Img
+              src={medya}
+              style={{width: '100%', height: '100%', objectFit: 'contain'}}
+            />
+          </div>
+        </AbsoluteFill>
+      ) : null}
+      {(g.etiketler || []).map((e, i) => (
+        <Etiket key={i} e={e} frame={frame} fps={fps} gecikme={Math.round(fps * (0.35 + i * 0.4))} />
+      ))}
+    </AbsoluteFill>
+  );
+};
+
+/* ─────────────────────── dis kapi ─────────────────────── */
+
+export const EditGrafigi: React.FC<{
+  grafik?: Grafik;
+  medya?: string;
+  kareSayisi: number;
+}> = ({grafik, medya, kareSayisi}) => {
+  const frame = useCurrentFrame();
+  const {fps} = useVideoConfig();
+  if (!grafik) return null;
+  const sonum = cikisSonum(frame, kareSayisi, fps);
+  let ic: React.ReactNode = null;
+  switch (grafik.tur) {
+    case 'beyaz-tuval':
+      ic = <BeyazTuval medya={medya} g={grafik} frame={frame} fps={fps} K={kareSayisi} />;
+      break;
+    case 'olcu':
+      ic = <OlcuOku g={grafik} frame={frame} fps={fps} />;
+      break;
+    case 'alinti':
+      ic = <AlintiKarti g={grafik} frame={frame} fps={fps} />;
+      break;
+    case 'metin':
+      ic = <MetinBloku g={grafik} frame={frame} fps={fps} />;
+      break;
+    case 'harita':
+      ic = <HaritaIsareti g={grafik} frame={frame} fps={fps} />;
+      break;
+    default:
+      ic = null;
+  }
+  return <AbsoluteFill style={{opacity: sonum}}>{ic}</AbsoluteFill>;
+};

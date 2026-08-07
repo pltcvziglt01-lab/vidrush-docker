@@ -365,6 +365,22 @@ EDIT_STILLERI = {
                       "lens depth of field and slight motion blur. Absolutely no illustration, "
                       "no 3D render, no text, no graphics, no map overlay"),
     },
+    # ── VERI ANLATISI (5 Agu 2026, referans #13: @Neu "Broken Economics of Oil Tankers") ──
+    # Olcum: 571 sn'lik videoda ffmpeg sahne-kesme esik 0.28'de SADECE 2 sert kesme buldu.
+    # Yani video kesmeyle degil surekli animasyonla ilerliyor. 143 karede zemin analizi:
+    #   %41 beyaz tuval (grafik/etiket/serif metin) | %43 tam kare footage | %16 karisik
+    # Bu yuzden bu stilin ayirt edici ozelligi footage orani degil, GRAFIK KATMANI.
+    "veri-anlatisi": {
+        "ad": "Veri Anlatısı (Neu)",
+        "ozet": "Beyaz tuvalde işaretli veri etiketleri, ölçü okları, alıntı kartları + gerçek footage",
+        "sahne_sn": 9, "kelime": 22, "footage_pct": 45, "overlay": "yok",
+        "altyazi": "yok", "motion": "sinematik", "mag": "films_n_photography",
+        "edit_paketi": True,      # plan 'grafik' alani uretir (EditPaketi.tsx sablonlari)
+        "grafik_pct": 41,         # olculen beyaz-tuval orani
+        "gorsel_ek": ("photorealistic editorial documentary frame, natural light, restrained "
+                      "colour grade, real lens depth of field, absolutely no text, no captions, "
+                      "no graphics, no illustration"),
+    },
     "hizli-explainer": {
         "ad": "Hızlı Explainer",
         "ozet": "Vox / Insider — 1.5-3sn hızlı kesme, sürekli kinetik metin, flat grafik",
@@ -2250,6 +2266,37 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
             "place/action better shown with real video must be REAL FOOTAGE (set kaynak='footage' "
             "and footage_sorgu = a specific ENGLISH stock-footage query, e.g. 'aerial drone "
             "rainforest canopy'); scenes centered on the character/abstract ideas set kaynak='ai'.")
+    # ── EDIT PAKETI (grafik katmani) ──
+    # Sadece edit_paketi=True stillerde istenir. Diger stillerde alan hic gecmez, yani
+    # eski isler etkilenmez. Sayilar olculdu: referansin karelerinin %41'i beyaz tuval.
+    if prof.get("edit_paketi"):
+        gp = int(prof.get("grafik_pct") or 40)
+        grafik_kural = (
+            f"9) GRAPHIC LAYER — about {gp}% of scenes must carry a \"grafik\" object. This is "
+            "the signature of the style: measured frame by frame, that share of the reference "
+            "channel's frames are graphics on a white canvas, not photography. Choose the "
+            "template that fits what the line is SAYING:\n"
+            '   {"tur":"beyaz-tuval","etiketler":[{"metin":"458.5 M","x":0.3,"y":0.2,'
+            '"buyuk":true}]} — the subject isolated on white with measured values called out. '
+            "x/y are 0-1 fractions of the frame. Use when the line states dimensions, capacity "
+            "or a comparison of sizes.\n"
+            '   {"tur":"olcu","metin":"375 METERS","x1":0.16,"y1":0.72,"x2":0.84,"y2":0.72} — '
+            "a dimension arrow across the subject. Use when the line states ONE length/distance.\n"
+            '   {"tur":"alinti","baslik":"<headline>","metin":"<2-4 sentence quote>",'
+            '"kaynak":"<publication or institution>"} — a source citation card. Use ONLY when the '
+            "narration actually attributes a claim to a named source. NEVER invent a source or a "
+            "quote: if the script does not name one, do not use this template.\n"
+            '   {"tur":"metin","satirlar":["line one","line two","line three"]} — serif text on '
+            "white, revealed line by line. Use for a definition or the thesis of the video.\n"
+            '   {"tur":"harita","rota":true,"noktalar":[{"metin":"SUEZ","x":0.5,"y":0.35}]} — '
+            "map annotation with circles and a dashed route. Use for routes and places.\n"
+            "RULES: every number that appears in a grafik MUST come from the narration text you "
+            "wrote for that scene — never make up a statistic to fill a label. Do not put a "
+            "grafik on two consecutive scenes of the same tur. Scenes without a grafik leave the "
+            "field out entirely.\n")
+    else:
+        grafik_kural = ""
+
     # 7) HD (Magnific) karari OTOMATIK: sadece close-up/kilit detay AI sahnelerinde.
     hd_kural = (
         "7) hd (HD upscale need): set hd=true ONLY for AI scenes that are close-ups or key detail "
@@ -2344,6 +2391,7 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
         "6) Thumbnail: object with text = a punchy 2-5 word hook in the ORIGINAL language ALL CAPS, "
         "and prompt = a dramatic 16:9 scene featuring the character, strong emotion, high contrast.\n"
         f"{hd_kural}\n"
+        f"{grafik_kural}"
         # Gorsel API'leri gercek kisi tasvirini ISIMLE isteyince 400 basiyor (policy).
         # Isimsiz ama iyi tarif edilirse uretiyor -> planlayici ismi degil gorunusu yazsin.
         "REAL PEOPLE: NEVER write a real person's name inside scene_prompt or thumbnail.prompt "
@@ -2354,7 +2402,8 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
         "Respond ONLY valid JSON: {\"language\":\"en\",\"voice\":\"...\",\"ozet\":\"...\","
         "\"thumbnail\":{\"text\":\"...\",\"prompt\":\"...\"},"
         "\"scenes\":[{\"n\":1,\"voiceover\":\"...\",\"kaynak\":\"ai|footage\","
-        "\"scene_prompt\":\"...\",\"footage_sorgu\":\"...\",\"overlay\":\"...\",\"hd\":false}]}"
+        "\"scene_prompt\":\"...\",\"footage_sorgu\":\"...\",\"overlay\":\"...\",\"hd\":false"
+        + (",\"grafik\":{...}" if prof.get("edit_paketi") else "") + "}]}"
     )
 
 
@@ -3155,6 +3204,16 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                 return ("video", f"isler/{is_adi}/sahne_{n}.mp4")
         # 2) AI gorsel (footage yoksa/basarisizsa)
         sp = str(s.get("scene_prompt", "")).strip() or str(s.get("footage_sorgu", "")).strip()
+        # BEYAZ TUVAL sahnesi: gorsel, beyaz zemine YALITILMIS konu olarak uretilmeli.
+        # Aksi halde EditPaketi beyaz zemine tam kare fotograf yerlestirir ve referansin
+        # ayirt edici gorunumu (nesne + olcu etiketleri) hic olusmaz.
+        _gr = s.get("grafik") if isinstance(s.get("grafik"), dict) else {}
+        if _gr.get("tur") == "beyaz-tuval":
+            sp += (". CRITICAL FRAMING: the subject is CUT OUT and isolated on a COMPLETELY "
+                   "PLAIN PURE WHITE background (#FFFFFF) with nothing else in frame — no room, "
+                   "no ground, no sky, no props, no shadow on the floor, only a very soft contact "
+                   "shadow directly under the subject. Product-catalogue isolation, subject "
+                   "centred with generous white margin on all four sides. No text of any kind.")
         gyol_full = os.path.join(PUBLIC, "isler", is_adi, f"sahne_{n}.png")
         try:
             uretildi = referansli_gorsel(sp, kar_yol, gyol_full, stil_prompt=gorsel_ek,
@@ -3297,6 +3356,9 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             # Anlatim islevi -> Video.tsx GECIS TIPINI buna gore secer
             # (liste=yandan kayma, gecmis=saat silme, vurgu=keskin silme, digeri=crossfade)
             "islev": (kurgu_analiz[i]["islev"] if i < len(kurgu_analiz) else "aciklama"),
+            # Edit paketi grafigi (EditPaketi.tsx sablonlari). Plan uretmediyse alan hic
+            # gecmez -> Video.tsx tarafinda katman cizilmez, eski davranis aynen korunur.
+            **({"grafik": s["grafik"]} if isinstance(s.get("grafik"), dict) else {}),
         })
         kumulatif_sn += sure
 

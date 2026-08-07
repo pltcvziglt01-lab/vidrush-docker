@@ -1,5 +1,6 @@
 import React from 'react';
 import {Lottie} from '@remotion/lottie';
+import {EditGrafigi, beyazZeminMi, type Grafik} from './EditPaketi';
 import {
   AbsoluteFill,
   Audio,
@@ -33,6 +34,7 @@ export type Sahne = {
   pan: 'right' | 'left' | 'top' | 'bottom' | 'yok';
   overlay?: string;
   ae?: string;          // After Effects (Lottie) katmani: public altindaki .json yolu
+  grafik?: Grafik;      // Edit paketi sablonu (beyaz-tuval / olcu / alinti / metin / harita)
   altyazi: AltyaziParcasi[];
   vurgu?: boolean; // hikaye kanalı açılış sahnesi: yoğun hareket (derin zoom + push-in + paralaks)
   // Metin derin analizinden gelen anlatım işlevi — geçiş tipini o belirler.
@@ -486,12 +488,19 @@ const SahneGorunumu: React.FC<{
     transform: g.transform,
   };
 
+  // Edit paketi: beyaz-tuval/alinti/metin sablonlari BEYAZ zemin ister. O durumda
+  // fotografi tam kare cizmek zemini yok eder -> foto sablonun icinde yalitilmis
+  // olarak yerlestirilir, vinyet de kapatilir (beyaz zeminde vinyet kir gibi durur).
+  const beyaz = beyazZeminMi(sahne.grafik);
+  const vinyet =
+    !beyaz && (motion === 'anlati' || motion === 'hizli' || motion === 'hikaye');
+
   return (
-    <AbsoluteFill style={{backgroundColor: 'black'}}>
-      <GuvenliGorsel sahne={sahne} stil={gorselStil} />
+    <AbsoluteFill style={{backgroundColor: beyaz ? '#FFFFFF' : 'black'}}>
+      {beyaz ? null : <GuvenliGorsel sahne={sahne} stil={gorselStil} />}
       {/* Vinyet (anlati/hizli/hikaye): tek radial-gradient, per-frame maliyet yok.
           Hikayede film-karesi hissi verir. */}
-      {motion === 'anlati' || motion === 'hizli' || motion === 'hikaye' ? (
+      {vinyet ? (
         <AbsoluteFill
           style={{
             background:
@@ -499,6 +508,11 @@ const SahneGorunumu: React.FC<{
           }}
         />
       ) : null}
+      <EditGrafigi
+        grafik={sahne.grafik}
+        medya={sahne.medya ? kaynakCoz(sahne.medya) : undefined}
+        kareSayisi={K}
+      />
       <AEKatmani yol={sahne.ae} kareSayisi={K} />
       <GeriSayimRozeti metin={sahne.overlay || ''} kareSayisi={K} />
       <OverlayBaslik metin={sahne.overlay || ''} motion={motion} kareSayisi={K} />
