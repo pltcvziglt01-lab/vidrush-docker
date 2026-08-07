@@ -170,6 +170,32 @@ def _zoompan_ifadeleri(sahne, gecis, fps, F):
     return z, x, y
 
 
+# ── GECIS DAGARCIGI (5 Agu 2026) ──
+# ffmpeg 5.1'de xfade'in 46 gecisi var; biz hepsinde sadece "fade" kullaniyorduk.
+# Video.tsx tarafinda anlati islevine gore gecis seciliyor (liste->slide, gecmis->clockWipe,
+# vurgu->wipe); hizli motor onu taklit etmiyordu, yani iki motor ayni videoda farkli
+# gorunuyordu. Artik ayni kural burada da var.
+# Secim KASITLI olarak sakin: belgesel/anlati isinde gosterisli gecis (pixelize, radial)
+# amatör durur — referans kanallarda yok.
+ISLEV_GECIS = {
+    "liste":      "slideleft",     # yeni madde: yandan girer
+    "gecmis":     "fadegrays",     # gecmise donus: renk cekilir
+    "vurgu":      "wipeleft",      # vurgu: sert supurme
+    "karsilastir": "hlslice",      # karsilastirma: dikey dilim
+    "soru":       "smoothleft",
+    "sonuc":      "fadeblack",     # kapanis: siyaha
+}
+GECIS_VARSAYILAN = "fade"
+
+
+def _gecis_sec(sahne, onceki_gecis=""):
+    """Sahnenin anlati islevine gore xfade gecisi. Ayni gecis iki kez ust uste gelmez."""
+    g = ISLEV_GECIS.get(str(sahne.get("islev") or ""), GECIS_VARSAYILAN)
+    if g == onceki_gecis and g != GECIS_VARSAYILAN:
+        return GECIS_VARSAYILAN        # tekrari kir
+    return g
+
+
 def _overlay_filtre(sahne, fps, F):
     """Overlay basligini drawtext ile ciz (4 Agu 2026 — bu eksik oldugu icin overlay'li
     isler Remotion'a dusuyordu ve 15 dk video 2 saat suruyordu).
@@ -339,8 +365,9 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
             except Exception:
                 return 0.0
 
-        def _xfade_zincir(yollar, cikti):
-            """Verilen segmentleri xfade ile birlestirir. Tek segment ise kopyalar."""
+        def _xfade_zincir(yollar, cikti, sahne_dilimi=None):
+            """Verilen segmentleri xfade ile birlestirir. Tek segment ise kopyalar.
+            sahne_dilimi verilirse gecis TURU her sahnenin anlati islevinden secilir."""
             if len(yollar) == 1:
                 shutil.copy(yollar[0], cikti)
                 return True
@@ -349,13 +376,18 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
                 return False
             girdi, filt, offset = [], [], 0.0
             son_v, son_a = "0:v", "0:a"
+            onceki = ""
             for i, y in enumerate(yollar):
                 girdi += ["-i", y]
             for i in range(1, len(yollar)):
                 g = min(GECIS_SN, sureler[i - 1] / 2, sureler[i] / 2)
                 offset = (offset + sureler[i - 1] - g) if i > 1 else (sureler[0] - g)
                 vo, ao = f"v{i}", f"a{i}"
-                filt.append(f"[{son_v}][{i}:v]xfade=transition=fade:duration={g:.3f}:"
+                # GELEN sahnenin islevi gecisi belirler (Video.tsx ile ayni kural)
+                tur = (_gecis_sec(sahne_dilimi[i], onceki)
+                       if sahne_dilimi and i < len(sahne_dilimi) else GECIS_VARSAYILAN)
+                onceki = tur
+                filt.append(f"[{son_v}][{i}:v]xfade=transition={tur}:duration={g:.3f}:"
                             f"offset={offset:.3f}[{vo}]")
                 filt.append(f"[{son_a}][{i}:a]acrossfade=d={g:.3f}[{ao}]")
                 son_v, son_a = vo, ao
@@ -375,16 +407,19 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
         OBEK = max(2, int(os.environ.get("HIZLI_OBEK", "12")))
         bildir("Hızlı render: geçişler ekleniyor...", 90)
         if len(sirali) <= OBEK:
-            ok_birlestir = _xfade_zincir(sirali, birlesik)
+            ok_birlestir = _xfade_zincir(sirali, birlesik, sahneler)
         else:
             obekler = []
             for k in range(0, len(sirali), OBEK):
                 oy = os.path.join(tmp, f"obek_{k // OBEK:03d}.mp4")
-                if not _xfade_zincir(sirali[k:k + OBEK], oy):
+                # obek icindeki gecisler o obegin sahnelerinden secilir
+                if not _xfade_zincir(sirali[k:k + OBEK], oy, sahneler[k:k + OBEK]):
                     ok_birlestir = False
                     break
                 obekler.append(oy)
             else:
+                # obek SINIRLARI: burada anlati islevi bilinmiyor (obek ortalamasi anlamsiz)
+                # -> sade fade. Obek sinirlari 12 sahnede bir, yani nadir.
                 ok_birlestir = _xfade_zincir(obekler, birlesik)
         if not ok_birlestir:
             print("  hizli motor: xfade basarisiz -> Remotion", file=sys.stderr)

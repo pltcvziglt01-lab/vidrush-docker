@@ -1,4 +1,5 @@
 import React from 'react';
+import {Lottie} from '@remotion/lottie';
 import {
   AbsoluteFill,
   Audio,
@@ -31,6 +32,7 @@ export type Sahne = {
   zoom: 'in' | 'out' | 'yok';
   pan: 'right' | 'left' | 'top' | 'bottom' | 'yok';
   overlay?: string;
+  ae?: string;          // After Effects (Lottie) katmani: public altindaki .json yolu
   altyazi: AltyaziParcasi[];
   vurgu?: boolean; // hikaye kanalı açılış sahnesi: yoğun hareket (derin zoom + push-in + paralaks)
   // Metin derin analizinden gelen anlatım işlevi — geçiş tipini o belirler.
@@ -149,6 +151,35 @@ const kbHesap = (
   const tx = sahne.pan === 'right' ? -kayma : sahne.pan === 'left' ? kayma : 0;
   const ty = sahne.pan === 'bottom' ? -kayma : sahne.pan === 'top' ? kayma : 0;
   return {olcek, tx, ty};
+};
+
+// ── AFTER EFFECTS KATMANI (Lottie, 5 Agu 2026) ──
+// Lottie = After Effects'in Bodymovin ile disa aktarilmis animasyon formati. Yani bir
+// tasarimcinin AE'de yaptigi alt-band/baslik/gecis animasyonu BIREBIR burada oynar;
+// biz onu React'te yeniden yazmiyoruz.
+// Kullanim: sahne'ye "ae" alani konur -> public altindaki .json yolu. Alan bossa katman
+// hic cizilmez, yani mevcut isler etkilenmez.
+// NOT: dosya yoksa/bozuksa TUM render cokmesin diye try/catch + hata durumunda null.
+const AEKatmani: React.FC<{yol?: string; kareSayisi: number}> = ({yol}) => {
+  const [veri, setVeri] = React.useState<Record<string, unknown> | null>(null);
+  const [hata, setHata] = React.useState(false);
+  React.useEffect(() => {
+    if (!yol) return;
+    let iptal = false;
+    fetch(kaynakCoz(yol))
+      .then((r) => r.json())
+      .then((j) => !iptal && setVeri(j))
+      .catch(() => !iptal && setHata(true));
+    return () => {
+      iptal = true;
+    };
+  }, [yol]);
+  if (!yol || hata || !veri) return null;
+  return (
+    <AbsoluteFill style={{pointerEvents: 'none'}}>
+      <Lottie animationData={veri as never} loop={false} />
+    </AbsoluteFill>
+  );
 };
 
 // ── GERI SAYIM ROZETI (5 Agu 2026 olcumu) ──
@@ -468,6 +499,7 @@ const SahneGorunumu: React.FC<{
           }}
         />
       ) : null}
+      <AEKatmani yol={sahne.ae} kareSayisi={K} />
       <GeriSayimRozeti metin={sahne.overlay || ''} kareSayisi={K} />
       <OverlayBaslik metin={sahne.overlay || ''} motion={motion} kareSayisi={K} />
       <Altyazi
