@@ -199,3 +199,35 @@ Eski-yeni karşılaştırması TEK karede.
    (özellikle: karaktersiz kareler, yazı/grafik kareleri, duygusal anlar)
 3. **Video dosyası** → en iyisi; kare kare + tempo + ses analizi yapabilirim
 4. Beğendiğin/beğenmediğin noktayı söyle → "şu kare iyi, şu kötü" en hızlı düzeltmeyi sağlar
+
+## 12. ImpossibleTravel (4K seyahat belgeseli) — 10 video, 2147 çekim, 260 kare
+
+`@ImpossibleTravel38` · 20 video · "How People Live in X" kalıbı · 30-70 dk · en iyisi 1.4M.
+Tam ölçüm: [OLCUM_BELGESEL.md](OLCUM_BELGESEL.md)
+
+### Diğer 11 referanstan TEMEL farkı: hiç AI görsel yok
+Kareler tamamen gerçek kamera görüntüsü — drone hava çekimi + yer seviyesi elde çekim +
+makro detay + arşiv fotoğrafı. Bu bir GÖRÜNTÜ DERLEMESİ belgeseli.
+
+### Ürettiği kurallar
+
+**A. RİTİM ÇİFT MODLU** — medyan çekim 6.5 sn ama %32'si 4 sn altı, %29'u 12 sn üstü.
+Dar kelime bandı bunu öldürüyordu → `tempo: "cift-modlu"` bayrağı eklendi
+(kısa 6-11 / orta 12-20 / uzun 34-50 kelime, aynı sınıf 3 kez üst üste gelmez).
+
+**B. footage_pct 92** — motorun en yükseği. AI görsel sadece görüntü bulunamayan sahneler
+(tarihi an, soyut kavram) için.
+
+**C. LOŞ VE AZ DOYGUN** — parlaklık 116, doygunluk 40, kontrast 50. Animasyon
+referansı (162/52/51) ile karıştırılmamalı.
+
+**D. YAZI YOK** — gömülü altyazı yok, alt-band konum yazısı yok, harita grafiği yok.
+Sadece sağ üstte kalıcı kanal filigranı.
+
+**E. KONU DÖNGÜSÜ** — kıyı/resif hava çekimi → liman/yerleşim → yerel insanlar →
+makro detay → hava/fırtına → arşiv.
+
+### Yan kazanç: iki tıkanıklık kapandı
+`footage_getir` YouTube'u cookie olmadan hiç denemiyordu (footage komple ölüydü) ve
+`youtube_ara` lisans filtresi yapmıyordu (telif ihtarı riski). İkisi de düzeltildi;
+artık sadece Creative Commons aranıyor ve indirmeden önce lisans tek tek doğrulanıyor.

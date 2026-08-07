@@ -17,6 +17,7 @@ ACMA/KAPAMA: env RENDER_MOTOR=ffmpeg  VEYA  /opt/vidrush/RENDER_MOTOR dosyasina
 "ffmpeg" yaz (docker exec ile, konteyner yeniden yaratmadan acilir/kapanir).
 """
 import os
+import re
 import sys
 import json
 import math
@@ -181,7 +182,11 @@ def _overlay_filtre(sahne, fps, F):
     g = (metin.replace("\\", "").replace(":", "\\:").replace("'", "")
               .replace("%", "\\%").replace(",", ""))
     gir = min(0.5, F / fps / 6)          # giris suresi
-    kal = max(0.6, F / fps - 2 * gir)    # ekranda kalma
+    # Ekranda kalma SINIRLI. 5 Agu 2026: 12 sn'lik sahnede baslik 11 sn boyunca duruyordu;
+    # Remotion tarafinda ayni baslik ~2.7 sn sonra soluyor. Iki motor ayni videoda
+    # karisabildigi icin davranis birebir ayni olmali. Rozet zaten sahne boyunca duruyor,
+    # baslik onunla yarismasin.
+    kal = max(0.6, min(2.6, F / fps - 2 * gir))
     font = os.path.join(FONT_DIZIN, "Montserrat-Bold.ttf")
     fontstr = f"fontfile='{font}':" if os.path.exists(font) else ""
     # alpha: 0 -> 1 -> 1 -> 0 (yumusak)
@@ -191,9 +196,20 @@ def _overlay_filtre(sahne, fps, F):
              f"if(lt(t\\,{gir + kal:.2f})\\,1\\,max(0\\,({gir * 2 + kal:.2f}-t)/{gir:.2f})))")
     # y: hafif yukari kayma (24 px), giris boyunca
     yy = f"120+24*(1-min(1\\,t/{gir:.2f}))"
-    return (f",drawtext={fontstr}text='{g}':fontcolor=white:fontsize=64:"
-            f"borderw=5:bordercolor=black@0.9:shadowcolor=black@0.5:shadowx=0:shadowy=3:"
-            f"x=(w-text_w)/2:y='{yy}':alpha='{alpha}'")
+    f = (f",drawtext={fontstr}text='{g}':fontcolor=white:fontsize=64:"
+         f"borderw=5:bordercolor=black@0.9:shadowcolor=black@0.5:shadowx=0:shadowy=3:"
+         f"x=(w-text_w)/2:y='{yy}':alpha='{alpha}'")
+    # GERI SAYIM ROZETI: Video.tsx'teki GeriSayimRozeti'nin ffmpeg karsiligi.
+    # Baslik bir sayiyla basliyorsa (or. "11 PAPER TOWELS") o sayi sol ustte SAHNE
+    # BOYUNCA durur — referans kanalin liste videolarindaki omurga (olcum: %35 kare).
+    m = re.match(r"^(\d{1,2})\b", metin.strip())
+    if m:
+        rfont = os.path.join(FONT_DIZIN, "Anton-Regular.ttf")
+        rfontstr = f"fontfile='{rfont}':" if os.path.exists(rfont) else fontstr
+        f += (f",drawtext={rfontstr}text='{m.group(1)}':fontcolor=white:fontsize=132:"
+              f"borderw=7:bordercolor=black:shadowcolor=black@0.45:shadowx=0:shadowy=6:"
+              f"x=56:y=48")
+    return f
 
 
 def _segment_uret(sahne, gecis, fps, crf, seg_yol):

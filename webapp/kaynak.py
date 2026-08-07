@@ -33,15 +33,50 @@ def _yt_cookie_opts(opts: dict) -> dict:
 
 # ─────────────────────────── YouTube (yt-dlp) ───────────────────────────
 
-def youtube_ara(sorgu: str, adet: int = 6):
-    """yt-dlp ile YouTube araması. [{baslik,url,sure,kanal}] döner."""
+# YouTube arama filtresi: "Creative Commons lisansi" (yeniden kullanima izinli).
+# Bu, arama URL'sindeki sp= parametresinin CC degeri. Filtresiz arama STANDART
+# YouTube lisansli videolari da getirir; onlari videoya koymak telif talebi/ihtar
+# demektir — yani dogrudan para kaybi ve kanal riski. Bu yuzden footage aramasi
+# VARSAYILAN OLARAK sadece CC arar.
+YT_CC_FILTRE = "EgIwAQ%3D%3D"
+
+
+def _lisans_cc_mi(url: str) -> bool:
+    """Videonun lisansini TEK TEK dogrular. Arama filtresi bazen sizdirir; indirmeden
+    once bunu kontrol etmek tek guvenli yol."""
+    import yt_dlp
+    # player_client=android_vr ZORUNLU. Duz istemci YouTube bot kontrolune takilip
+    # "Requested format is not available" veriyor; o zaman lisans okunamiyor ve guvenli
+    # taraf secildigi icin HER aday atlaniyordu — yani footage hic inmiyordu.
+    opts = _yt_cookie_opts({"quiet": True, "skip_download": True, "no_warnings": True,
+                            "noplaylist": True, "socket_timeout": 25, "retries": 1,
+                            "extractor_args": {"youtube": {"player_client": ["android_vr"]}}})
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            b = ydl.extract_info(url, download=False) or {}
+    except Exception as e:
+        print(f"  lisans okunamadi ({str(e)[:80]}) -> guvenli tarafta kal, atla", file=sys.stderr)
+        return False
+    lis = str(b.get("license") or "")
+    return "creative commons" in lis.lower()
+
+
+def youtube_ara(sorgu: str, adet: int = 6, sadece_cc: bool = True):
+    """yt-dlp ile YouTube araması. [{baslik,url,sure,kanal}] döner.
+    sadece_cc=True (varsayilan): yalnizca Creative Commons lisansli sonuclar."""
     import yt_dlp
     opts = _yt_cookie_opts({"quiet": True, "skip_download": True, "extract_flat": True,
                             "noplaylist": True, "no_warnings": True,
-                            "socket_timeout": 30, "retries": 1})   # hang koruması
+                            "socket_timeout": 30, "retries": 1,    # hang koruması
+                            "extractor_args": {"youtube": {"player_client": ["android_vr"]}}})
+    if sadece_cc:
+        hedef = ("https://www.youtube.com/results?search_query="
+                 + requests.utils.quote(sorgu) + "&sp=" + YT_CC_FILTRE)
+    else:
+        hedef = f"ytsearch{adet}:{sorgu}"
     try:
         with yt_dlp.YoutubeDL(opts) as ydl:
-            r = ydl.extract_info(f"ytsearch{adet}:{sorgu}", download=False)
+            r = ydl.extract_info(hedef, download=False)
     except Exception as e:
         print(f"  youtube_ara hata: {str(e)[:160]}", file=sys.stderr)
         return []
@@ -54,7 +89,7 @@ def youtube_ara(sorgu: str, adet: int = 6):
             "sure": e.get("duration"),
             "kanal": e.get("channel") or e.get("uploader") or "",
         })
-    return [o for o in out if o["url"]]
+    return [o for o in out if o["url"]][:adet]
 
 
 def youtube_indir(url: str, hedef: str, maks_sure: int = 60) -> bool:
@@ -73,6 +108,11 @@ def youtube_indir(url: str, hedef: str, maks_sure: int = 60) -> bool:
         "postprocessors": [{"key": "FFmpegVideoConvertor", "preferedformat": "mp4"}],
         "retries": 2,
         "socket_timeout": 30,
+        # player_client=android_vr: YouTube bot kontrolunu cookie OLMADAN geciyor.
+        # 5 Agu 2026'da olculdu: duz istemci "Requested format is not available" veriyor,
+        # android_vr ayni videoyu sorunsuz indiriyor. Cookie hala destekleniyor (varsa
+        # eklenir) ama artik SART DEGIL.
+        "extractor_args": {"youtube": {"player_client": ["android_vr"]}},
     }
     _yt_cookie_opts(opts)
     if maks_sure:
@@ -114,11 +154,17 @@ def youtube_indir(url: str, hedef: str, maks_sure: int = 60) -> bool:
     return os.path.exists(son) and os.path.getsize(son) > 10000
 
 
-def youtube_sahne(sorgu: str, hedef: str, maks_sure: int = 25) -> bool:
-    """Sorgudan ilk uygun videoyu bul ve indir. Basarili ise True."""
-    for aday in youtube_ara(sorgu, adet=5):
+def youtube_sahne(sorgu: str, hedef: str, maks_sure: int = 25,
+                  lisans_dogrula: bool = True) -> bool:
+    """Sorgudan ilk uygun videoyu bul ve indir. Basarili ise True.
+    lisans_dogrula=True: indirmeden ONCE lisans tek tek kontrol edilir; CC olmayan
+    aday atlanir (telif talebi = para kaybi, o yuzden varsayilan acik)."""
+    for aday in youtube_ara(sorgu, adet=6):
         s = aday.get("sure")
         if s and s > 3600:      # 1 saatten uzun canli/podcast'leri atla
+            continue
+        if lisans_dogrula and not _lisans_cc_mi(aday["url"]):
+            print(f"  CC degil, atlandi: {aday['baslik'][:60]}", file=sys.stderr)
             continue
         if youtube_indir(aday["url"], hedef, maks_sure=maks_sure):
             return True
@@ -288,8 +334,13 @@ def footage_getir(sorgu: str, hedef: str, yt_once: bool = True) -> bool:
     Her katman kendi timeout'una sahip; biri patlarsa digerine gecer; hicbiri yoksa
     False -> caller AI gorsele duser."""
     kaynaklar = [pexels_video, pixabay_video, freepik_video]
-    if yt_once and YT_COOKIES and os.path.exists(YT_COOKIES):
-        kaynaklar.append(youtube_sahne)   # cookie varsa YT'yi de dene (en sona)
+    if yt_once:
+        # 5 Agu 2026: eskiden bu satir "YT_COOKIES varsa" diye kosulluydu. Cookie dosyasi
+        # olmayan sunucuda YouTube HIC denenmiyordu; Pexels/Pixabay anahtari da bos olunca
+        # footage zinciri komple bosa duser, her sahne AI gorsele kacardi. Seyahat belgeseli
+        # gibi %92 footage'li bir stil bu haliyle calismaz. android_vr istemcisi cookie
+        # gerektirmedigi icin kosul kaldirildi.
+        kaynaklar.append(youtube_sahne)   # en sona: ucretsiz stok once denenir
     for fn in kaynaklar:
         try:
             if fn(sorgu, hedef):

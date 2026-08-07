@@ -341,6 +341,27 @@ EDIT_STILLERI = {
                       "grain and light leaks, tactile analog texture (old paper / wood grain), "
                       "archival photo aesthetic, cinematic depth, muted vintage color grade"),
     },
+    # ── SEYAHAT BELGESELI (5 Agu 2026, referans #12: @ImpossibleTravel38) ──
+    # Olcum: 10 videodan 3'u kare kare olculdu (~1000 cekim). Medyan cekim 4.5-7.5 sn,
+    # ortalama 7.5-12.7 sn — yani cok kisa kesmelerle uzun duran planlar karisik.
+    # Diger 3 edit stilinden TEMEL farki: bu bir GORUNTU DERLEMESI. Karelerin tamami
+    # gercek kamera goruntusu (drone hava cekimi + yer + makro) ve arsiv fotografi;
+    # AI illustrasyon yok. O yuzden footage_pct 92 — motorun en yuksek degeri.
+    # AI gorsel sadece goruntu bulunamayan sahneler icin (tarihi an, soyut kavram).
+    "seyahat-belgeseli": {
+        "ad": "Seyahat Belgeseli (4K)",
+        "ozet": "ImpossibleTravel — gerçek drone + yer görüntüsü derlemesi, yavaş anlatı, arşiv",
+        "sahne_sn": 6, "kelime": 15, "footage_pct": 92, "overlay": "yok",
+        "altyazi": "yok", "motion": "sinematik", "mag": "films_n_photography",
+        "tempo": "cift-modlu",   # olculen dagilim: %33 kisa / %26 orta / %29 uzun
+        "gorsel_ek": ("photorealistic 4K travel documentary frame that must be indistinguishable "
+                      "from real camera footage: either a high aerial drone view of coastline, "
+                      "reef and settlement, or a ground-level handheld shot of local people at "
+                      "work, or an extreme macro detail (sand, shells, hands, tools). Bright "
+                      "tropical daylight, deep turquoise water, natural colour grade, real "
+                      "lens depth of field and slight motion blur. Absolutely no illustration, "
+                      "no 3D render, no text, no graphics, no map overlay"),
+    },
     "hizli-explainer": {
         "ad": "Hızlı Explainer",
         "ozet": "Vox / Insider — 1.5-3sn hızlı kesme, sürekli kinetik metin, flat grafik",
@@ -481,17 +502,18 @@ KARE_CESITLILIGI = (
 # %30-50 olarak tanimliydi, ki bu zaten uzak. Gercek kanallarda oran tersine:
 # yakin ve orta agirlikli, genis plan az ve sadece MEKANI TANITMAK icin.
 CEKIM_OLCEGI = (
-    "SHOT DISTANCE — MAKE IT FEEL NATURAL, NOT DISTANT. Vary how close the camera is the way a real "
-    "film does, and lean CLOSER than you think:\n"
-    "  • About 1 scene in 6 is a WIDE establishing shot — use it only when the viewer genuinely "
-    "needs to see where they are, or when the place itself is the point.\n"
-    "  • About half the scenes are MEDIUM: the subject fills 45-70% of the frame height, close "
-    "enough that faces, hands and objects read clearly on a phone.\n"
-    "  • About 1 scene in 3 is CLOSE: a face, a pair of hands, a single object filling 70-95% of "
-    "the frame.\n"
-    "Never place the camera far back just to show off the room. If a scene is about a feeling, a "
-    "decision or a small object, get CLOSE to it. Two consecutive scenes must not use the same "
-    "distance — alternate near and far so the video breathes.\n"
+    "SHOT DISTANCE — MATCH THIS MEASURED DISTRIBUTION. These percentages were measured frame by "
+    "frame from the reference channel (60 sampled frames), so they are the target, not a "
+    "suggestion. Across the whole video aim for roughly:\n"
+    "  • 20% MEDIUM — the subject from the waist up, filling 45-70% of the frame height. This is "
+    "the band that is most often missing: if in doubt, make the scene MEDIUM.\n"
+    "  • 45% WIDE — the person full length with the room around them, room and person both read.\n"
+    "  • 20% VERY WIDE — the room or place dominates and the person is small in it.\n"
+    "  • 10% CLOSE — head and shoulders, or a pair of hands, or one object filling the frame.\n"
+    "  • 5% VERY CLOSE — a face filling almost the whole frame, used only for the single "
+    "strongest emotional beat.\n"
+    "Two consecutive scenes must not use the same distance. Never repeat VERY WIDE twice in a "
+    "row — that is what makes a video feel like it was shot from across the street.\n"
 )
 
 # ── KARAKTERSIZ KARELER DE AYNI ELDEN CIKMALI (4 Agu 2026) ──
@@ -1023,11 +1045,12 @@ ANI_SOZLESME = (
 ANIMASYON_PROFIL = {
     "ad": "Animasyon (Anlatı)",
     "ozet": "Elle çizilmiş editorial-karikatür anlatı animasyonu; detaylı ortamlar, sinematik çekimler",
-    # MALIYET/TEMPO: referans video ~3.5sn kullaniyor. 5sn = 8dk'da ~96 gorsel (~$1.20/video,
-    # 3 video/gun ~5.000 TL/ay). Daha ucuz: ANIM_SAHNE_SN=6 veya 7. Referans temposu: 4.
-    "sahne_sn": float(os.environ.get("ANIM_SAHNE_SN", "5")), "kelime": 14,
+    # MALIYET/TEMPO: 9 sn = 11 dk'da ~73 gorsel (~$0.95/video). Asagidaki olcum notuna bak —
+    # bu stil icin referans temposu olculmedi, yavas (12 sn) ve hizli (5 sn) uclarin ortasi
+    # secildi. Daha ucuz istersen ANIM_SAHNE_SN=12.
+    "sahne_sn": float(os.environ.get("ANIM_SAHNE_SN", "9")), "kelime": 14,
     "footage_pct": 0, "overlay": "yok",
-    "altyazi": "yok", "motion": "sinematik", "mag": None,  # yazi YOK + blur YOK (1080p render hizli)
+    "altyazi": "orta", "motion": "sinematik", "mag": None,  # yazi YOK + blur YOK (1080p render hizli)
     "gorsel_ek": ANIM_STIL,
     "varsayilan_karakter": ANIM_VARSAYILAN_KARAKTER,
     "cerceve": ANIM_CERCEVE,
@@ -1038,9 +1061,9 @@ ANIMASYON_PROFIL = {
 EXPLAINER_PROFIL = {
     "ad": "Animasyon (Eğitici)",
     "ozet": "Kalın konturlu explainer; canlı renkler + beyaz diyagram kartları, etiket ve oklar",
-    "sahne_sn": float(os.environ.get("ANIM_SAHNE_SN", "5")), "kelime": 14,
+    "sahne_sn": float(os.environ.get("EXPLAINER_SAHNE_SN", "5")), "kelime": 14,
     "footage_pct": 0, "overlay": "yok",
-    "altyazi": "yok", "motion": "sinematik", "mag": None,
+    "altyazi": "orta", "motion": "sinematik", "mag": None,
     "gorsel_ek": EXP_STIL,
     "varsayilan_karakter": EXP_VARSAYILAN_KARAKTER,
     "cerceve": EXP_CERCEVE,
@@ -1050,9 +1073,9 @@ EXPLAINER_PROFIL = {
 HIKAYE_PROFIL = {
     "ad": "Animasyon (Hikaye)",
     "ozet": "Sade beyaz stickman + zengin boyalı sinematik dünya; macera/what-if anlatımı",
-    "sahne_sn": float(os.environ.get("ANIM_SAHNE_SN", "5")), "kelime": 14,
+    "sahne_sn": float(os.environ.get("HIKAYE_ANIM_SAHNE_SN", "9")), "kelime": 14,
     "footage_pct": 0, "overlay": "yok",
-    "altyazi": "yok", "motion": "sinematik", "mag": None,
+    "altyazi": "orta", "motion": "sinematik", "mag": None,
     "gorsel_ek": HIK_STIL,
     "varsayilan_karakter": HIK_VARSAYILAN_KARAKTER,
     "cerceve": HIK_CERCEVE,
@@ -1062,9 +1085,9 @@ HIKAYE_PROFIL = {
 KALEM_PROFIL = {
     "ad": "Animasyon (Renkli Kalem)",
     "ozet": "Kremli kâğıda renkli kurşun kalem; sıcak gündelik mekânlar, imza aksesuarlı stickman",
-    "sahne_sn": float(os.environ.get("ANIM_SAHNE_SN", "5")), "kelime": 14,
+    "sahne_sn": float(os.environ.get("KALEM_SAHNE_SN", "12")), "kelime": 14,
     "footage_pct": 0, "overlay": "yok",
-    "altyazi": "yok", "motion": "sinematik", "mag": None,
+    "altyazi": "orta", "motion": "sinematik", "mag": None,
     "gorsel_ek": KALEM_STIL,
     "varsayilan_karakter": KALEM_VARSAYILAN_KARAKTER,
     "cerceve": KALEM_CERCEVE,
@@ -1075,7 +1098,7 @@ KALEM_PROFIL = {
 ANI_PROFIL = {
     "ad": "Animasyon (Anı Defteri)",
     "ozet": "Sıcak nostaljik illüstrasyon; gerçekçi anlatıcı, geçmiş/bugün karşıtlığı, ev içi",
-    "sahne_sn": float(os.environ.get("ANIM_SAHNE_SN", "5")), "kelime": 14,
+    "sahne_sn": float(os.environ.get("ANI_SAHNE_SN", "12")), "kelime": 14,
     "footage_pct": 0, "overlay": "yok",
     "altyazi": "orta", "motion": "sinematik", "mag": None,   # referans kanal altyazi KULLANIYOR
     "gorsel_ek": ANI_STIL,
@@ -1086,6 +1109,16 @@ ANI_PROFIL = {
     "gerisayim": True,   # "N sey" listelerinde kose rozeti
 }
 
+# ── SAHNE TEMPOSU NEDEN STIL BASINA AYRI (5 Agu 2026 olcumu) ──
+# Referans kanallarin videolari ffmpeg sahne-kesme ile kare kare olculdu (592 sahne):
+#   ThriftyHazel (ani-defteri)      medyan 12.8 sn   sahnelerin %90'i 8 sn'den uzun
+#   Aussie Bruce (renkli-kalem)     medyan 11.9 sn   %98'i 8 sn'den uzun
+#   Paint Explainer                 medyan  5.0 sn   iki modlu (hizli liste + yavas anlati)
+#   Simple Explainer                medyan  2.8 sn   %53'u 3 sn'den kisa
+# Hepsi tek bir ANIM_SAHNE_SN=5 sabitine baglanmisti; yani yavas anlati stilleri 2.5 kat
+# hizli, hizli explainer ise 2 kat yavas kurgulaniyordu. Artik her stil kendi olcusunu
+# kullanir. MALIYET: sahne uzadikca ayni dakika icin daha AZ gorsel uretilir — 11 dk'lik
+# bir ani-defteri videosu ~130 gorsel yerine ~55 gorselle biter.
 # Animasyon ALT-STILLERI (documentary'deki 3 edit stili gibi)
 ANIMASYON_STILLERI = {
     "anlati-deneme": ANIMASYON_PROFIL,
@@ -1673,7 +1706,7 @@ def renk_uydur(yol: str, hedef: dict, ad: str = "") -> bool:
         from PIL import Image, ImageEnhance
     except Exception:
         return False
-    P_ESIK, D_ESIK = 8.0, 15.0     # bu altindaki fark gozle gorunmez -> dokunma
+    P_ESIK, D_ESIK, K_ESIK = 8.0, 15.0, 6.0   # bu altindaki fark gozle gorunmez -> dokunma
     uygulandi = False
     try:
         for _ in range(2):
@@ -1682,7 +1715,8 @@ def renk_uydur(yol: str, hedef: dict, ad: str = "") -> bool:
                 break
             dp = hedef["parlaklik"] - o["parlaklik"]
             dd = hedef.get("doygunluk", 0) - o.get("doygunluk", 0)
-            if abs(dp) < P_ESIK and abs(dd) < D_ESIK:
+            dk = hedef.get("kontrast", 0) - o.get("kontrast", 0)
+            if abs(dp) < P_ESIK and abs(dd) < D_ESIK and abs(dk) < K_ESIK:
                 break
             b = min(1.25, max(0.85, hedef["parlaklik"] / max(1.0, o["parlaklik"])))
             # DOYGUNLUK NEDEN TAM ESITLENMEZ: ortalama doygunluk kompozisyona bagli.
@@ -1695,20 +1729,30 @@ def renk_uydur(yol: str, hedef: dict, ad: str = "") -> bool:
             if hedef.get("doygunluk") and o.get("doygunluk"):
                 oran = hedef["doygunluk"] / max(1.0, o["doygunluk"])
                 c = min(1.18, max(0.82, 1 + 0.5 * (oran - 1)))
-            if abs(1 - b) < 0.02 and abs(1 - c) < 0.03:
+            # KONTRAST da yari yolda: 5 Agu 2026 olcumu bizim video 42, Hazel 51 —
+            # bizimki daha yumusak/pusluydu. Doygunluk gibi kompozisyona bagli oldugu
+            # icin tam esitlenmez.
+            kn = 1.0
+            if hedef.get("kontrast") and o.get("kontrast"):
+                oran_k = hedef["kontrast"] / max(1.0, o["kontrast"])
+                kn = min(1.15, max(0.87, 1 + 0.5 * (oran_k - 1)))
+            if abs(1 - b) < 0.02 and abs(1 - c) < 0.03 and abs(1 - kn) < 0.03:
                 break
             im = Image.open(yol).convert("RGB")
             if abs(1 - b) >= 0.02:
                 im = ImageEnhance.Brightness(im).enhance(b)
             if abs(1 - c) >= 0.03:
                 im = ImageEnhance.Color(im).enhance(c)
+            if abs(1 - kn) >= 0.03:
+                im = ImageEnhance.Contrast(im).enhance(kn)
             im.save(yol)
             uygulandi = True
         if uygulandi:
             son = gorsel_olcum(yol)
             print(f"  renk uydurma{(' ' + ad) if ad else ''}: parlaklik "
                   f"{son.get('parlaklik')} / hedef {hedef['parlaklik']}, doygunluk "
-                  f"{son.get('doygunluk')} / hedef {hedef.get('doygunluk')}", file=sys.stderr)
+                  f"{son.get('doygunluk')} / hedef {hedef.get('doygunluk')}, kontrast "
+                  f"{son.get('kontrast')} / hedef {hedef.get('kontrast')}", file=sys.stderr)
     except Exception as e:
         print(f"  renk_uydur hata: {str(e)[:120]}", file=sys.stderr)
     return uygulandi
@@ -2205,6 +2249,41 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
         if mag_var else
         "7) Set hd=false for every scene.")
     hedef = hedef_sahne or 40
+    # ── SAHNE UZUNLUGU: TEK BANT MI, CIFT MODLU MU (5 Agu 2026 olcumu) ──
+    # Referans #12 (@ImpossibleTravel38) 8 videoda 1699 cekim olculdu: medyan 6.4 sn ama
+    # dagilim CIFT MODLU — %33'u 4 sn'den kisa, %29'u 12 sn'den uzun (p10 1.7 sn, p90 28.1 sn).
+    # Dar kelime bandi (kelime..kelime+3) her sahneyi ayni uzunlukta yapiyordu; belgeselde
+    # bu "metronom" hissi veriyor. tempo="cift-modlu" profillerde ritim bilincli degisir.
+    if prof.get("tempo") == "cift-modlu":
+        kis, orta_a, orta_b, uzun_a, uzun_b = (
+            max(5, int(prof["kelime"] * 0.35)),
+            max(7, int(prof["kelime"] * 0.7)), prof["kelime"] + 2,
+            int(prof["kelime"] * 1.9), int(prof["kelime"] * 2.8))
+        kelime_kural = (
+            f"2) Produce EXACTLY {hedef} sequential scenes. Scene LENGTH MUST VARY — this is a "
+            "documentary, not a metronome. Measured from the reference channel, split the scenes "
+            "into three classes and mix them:\n"
+            f"   SHORT (about a third of scenes): {kis}-{orta_a - 1} words — a single hard beat.\n"
+            f"   MEDIUM (about a third): {orta_a}-{orta_b} words.\n"
+            f"   LONG (about a third): {uzun_a}-{uzun_b} words — two or three sentences that hold "
+            "on one shot while the narration develops a thought.\n"
+            "Never put two SHORT scenes back to back and never three of the same class in a row. "
+            "Alternate so the video breathes. If the source text is short, EXPAND it by adding "
+            "MORE SCENES, never by padding one line past its class ceiling. The voiceover fields "
+            "together form continuous narration in the ORIGINAL language.\n")
+    else:
+        kelime_kural = (
+            f"2) Produce EXACTLY {hedef} sequential scenes. Every voiceover line must be "
+            f"{prof['kelime']}-{prof['kelime'] + 3} words long — this is the TARGET BAND, land "
+            f"inside it; the absolute ceiling is {prof['kelime'] + 4} words and lines shorter than "
+            f"{prof['kelime']} words are too thin. Count the words before writing the next scene. A "
+            f"scene is {prof['sahne_sn']} seconds of speech and a longer line breaks the edit rhythm "
+            "and the requested video length. Write short, punchy sentences; split any longer thought "
+            "across two consecutive scenes instead of writing one long line. If the source text is "
+            "short, EXPAND it by adding MORE SCENES worth of detail — never by making individual "
+            "lines longer. The voiceover fields together form continuous narration in the ORIGINAL "
+            "language.\n")
+
     # Profilin kendi sahne SOZLESMESI varsa onu kullan (animasyon alt-stilleri), yoksa genel kural.
     if prof.get("sahne_sozlesme"):
         sahne_kural = prof["sahne_sozlesme"]
@@ -2236,15 +2315,7 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
         f"{devam_kural}\n"
         "Rules:\n"
         "1) Detect the language of the story.\n"
-        f"2) Produce EXACTLY {hedef} sequential scenes. Every voiceover line must be "
-        f"{prof['kelime']}-{prof['kelime'] + 3} words long — this is the TARGET BAND, land inside it; "
-        f"the absolute ceiling is {prof['kelime'] + 4} words and lines shorter than {prof['kelime']} "
-        f"words are too thin. Count the words before writing the next scene. A "
-        f"scene is {prof['sahne_sn']} seconds of speech and a longer line breaks the edit rhythm and "
-        "the requested video length. Write short, punchy sentences; split any longer thought across "
-        "two consecutive scenes instead of writing one long line. If the source text is short, EXPAND "
-        "it by adding MORE SCENES worth of detail — never by making individual lines longer. The "
-        "voiceover fields together form continuous narration in the ORIGINAL language.\n"
+        + kelime_kural +
         "8) Also return \"ozet\": a 2-sentence summary (in the story's language) of what THIS part "
         "covered, for continuity.\n"
         f"{footage_kural} {sahne_kural}"

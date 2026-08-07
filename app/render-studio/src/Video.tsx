@@ -151,6 +151,48 @@ const kbHesap = (
   return {olcek, tx, ty};
 };
 
+// ── GERI SAYIM ROZETI (5 Agu 2026 olcumu) ──
+// Olcum: referans kanalin karelerinin %35'inde gorselin USTUNDE buyuk bir baslik/sayi var;
+// bizim bitmis videomuzda bu oran %5'ti. Sebep: bizim overlay basligimiz sahnenin sadece
+// ilk saniyelerinde gorunup soluyordu; referansta ise madde numarasi kosede SAHNE BOYUNCA
+// duruyor (REFERANSLAR.md #11-B: "10 videoda da var, liste videolarinin omurgasi").
+// Bu yuzden rozet ayri bir katman: overlay yazisi girer-cikar, rozet sabit kalir.
+const GeriSayimRozeti: React.FC<{metin: string; kareSayisi: number}> = ({metin, kareSayisi}) => {
+  const frame = useCurrentFrame();
+  const {fps} = useVideoConfig();
+  const m = /^(\d{1,2})\b/.exec((metin || '').trim());
+  if (!m) return null;                       // sadece numarali liste maddelerinde
+  const gir = interpolate(frame, [0, Math.round(fps * 0.4)], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: Easing.out(Easing.cubic),
+  });
+  const cik = interpolate(frame, [kareSayisi - Math.round(fps * 0.4), kareSayisi], [1, 0], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  return (
+    <AbsoluteFill style={{justifyContent: 'flex-start', alignItems: 'flex-start'}}>
+      <div
+        style={{
+          opacity: gir * cik,
+          transform: `translateY(${(1 - gir) * -24}px)`,
+          margin: '48px 0 0 56px',
+          fontFamily: fontAilesi('anton'),
+          fontSize: 132,
+          lineHeight: 1,
+          color: '#ffffff',
+          WebkitTextStroke: '7px #000000',
+          paintOrder: 'stroke fill',
+          textShadow: '0 6px 26px rgba(0,0,0,0.45)',
+        }}
+      >
+        {m[1]}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
 const OverlayBaslik: React.FC<{metin: string; motion: string; kareSayisi: number}> = ({
   metin,
   motion,
@@ -304,28 +346,37 @@ const Altyazi: React.FC<{
 
 type Gorunum = {transform: string};
 
-const sinematikHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
-  const {olcek, tx, ty} = kbHesap(sahne, frame, K, 1.06, 22);
+// ── ZOOM MIKTARI SABIT DEGIL, SURE ILE BUYUR (5 Agu 2026 olcumu) ──
+// Referans kanallarda ayni sahnede 8 sn arayla alinan kareler olcek eslestirmesiyle
+// karsilastirildi: medyan zoom hizi %2.5/sn, 12 sn'lik bir sahnede toplam ~1.30x.
+// Bizde sabit 1.06-1.08 vardi = %1.2/sn — referansin yarisi. Sahne suresi 5 sn'den
+// 12 sn'ye cikinca bu sabit zoom "donmus goruntu" haline gelirdi.
+// Ust sinir 1.26: kaynak gorsel 1536 px genisliginde, daha derin zoom yumusakliga yol acar.
+const SURE_ZOOM = (K: number, fps: number, oran = 0.022, tavan = 1.26) =>
+  Math.min(tavan, 1 + oran * (K / Math.max(1, fps)));
+
+const sinematikHesapla = (sahne: Sahne, frame: number, K: number, fps: number): Gorunum => {
+  const {olcek, tx, ty} = kbHesap(sahne, frame, K, SURE_ZOOM(K, fps), 22);
   return {transform: `scale(${olcek}) translate(${tx}px, ${ty}px)`};
 };
 
-const kesmeHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
-  const {olcek, tx, ty} = kbHesap(sahne, frame, K, 1.06, 20);
+const kesmeHesapla = (sahne: Sahne, frame: number, K: number, fps: number): Gorunum => {
+  const {olcek, tx, ty} = kbHesap(sahne, frame, K, SURE_ZOOM(K, fps), 20);
   return {transform: `scale(${olcek}) translate(${tx}px, ${ty}px)`};
 };
 
 // blur YOK. Push-in reveal transform ile. fade her sahnede degil -> gecis crossfade yapar (flash yok).
-const anlatiHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
+const anlatiHesapla = (sahne: Sahne, frame: number, K: number, fps: number): Gorunum => {
   // ⚠ 4 Agu 2026: giris push-in (1.12 -> 1.0) KALDIRILDI.
   // Crossfade sirasinda giden sahne zoom sonunda (~1.12), gelen sahne ayni anda
   // 1.12'den 1.0'a HIZLA kuculuyordu. Iki farkli olcek ust uste karisinca goz
   // bunu TAKILMA olarak goruyor (Polat bildirdi). Artik tek surekli hareket var:
   // sadece Ken Burns, sahne boyunca duzgun akiyor, gecis onu bozmuyor.
-  const {olcek: kb, tx: kbTx, ty: kbTy} = kbHesap(sahne, frame, K, 1.12, 40);
+  const {olcek: kb, tx: kbTx, ty: kbTy} = kbHesap(sahne, frame, K, SURE_ZOOM(K, fps, 0.026, 1.30), 40);
   return {transform: `translate(${kbTx}px, ${kbTy}px) scale(${kb})`};
 };
 
-const hizliHesapla = (sahne: Sahne, frame: number, K: number, indeks: number): Gorunum => {
+const hizliHesapla = (sahne: Sahne, frame: number, K: number, indeks: number, fps: number): Gorunum => {
   const yon = indeks % 2 === 0 ? 1 : -1;
   const g = Math.max(4, Math.min(9, Math.floor(K / 4)));
   const girisP = interpolate(frame, [0, g], [0, 1], {
@@ -337,14 +388,14 @@ const hizliHesapla = (sahne: Sahne, frame: number, K: number, indeks: number): G
   // binip zipliyordu. Yanal kayma korundu (o gecisle catismiyor), olcek ziplamasi
   // kaldirildi — tek surekli Ken Burns kaldi.
   const girisX = (1 - girisP) * yon * 60;
-  const {olcek: kb} = kbHesap(sahne, frame, K, 1.08, 0);
+  const {olcek: kb} = kbHesap(sahne, frame, K, SURE_ZOOM(K, fps, 0.026, 1.30), 0);
   return {transform: `translateX(${girisX}px) scale(${kb})`};
 };
 
 // Hikaye kanali: ACILIS sahneleri (vurgu=true, ilk ~2.5dk) yogun hareket alir — derin zoom +
 // push-in giris + genis paralaks pan (izleyici tutma). Sonraki sahneler sakin sinematik Ken Burns.
 // Hepsi transform-only: render maliyetine etkisi yok.
-const hikayeHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
+const hikayeHesapla = (sahne: Sahne, frame: number, K: number, fps: number): Gorunum => {
   if (sahne.vurgu) {
     const g = Math.max(6, Math.min(14, Math.floor(K / 4)));
     const girisP = interpolate(frame, [0, g], [0, 1], {
@@ -359,7 +410,7 @@ const hikayeHesapla = (sahne: Sahne, frame: number, K: number): Gorunum => {
     const {olcek, tx, ty} = kbHesap(sahne, frame, K, 1.3, 110); // derin zoom + genis pan
     return {transform: `translate(${tx}px, ${ty}px) scale(${olcek * girisOlcek})`};
   }
-  const {olcek, tx, ty} = kbHesap(sahne, frame, K, 1.07, 26); // sakin bolum: standart Ken Burns
+  const {olcek, tx, ty} = kbHesap(sahne, frame, K, SURE_ZOOM(K, fps), 26); // sakin bolum
   return {transform: `scale(${olcek}) translate(${tx}px, ${ty}px)`};
 };
 
@@ -388,14 +439,14 @@ const SahneGorunumu: React.FC<{
 
   const g =
     motion === 'anlati'
-      ? anlatiHesapla(sahne, frame, K)
+      ? anlatiHesapla(sahne, frame, K, fps)
       : motion === 'hizli'
-      ? hizliHesapla(sahne, frame, K, indeks)
+      ? hizliHesapla(sahne, frame, K, indeks, fps)
       : motion === 'kesme'
-      ? kesmeHesapla(sahne, frame, K)
+      ? kesmeHesapla(sahne, frame, K, fps)
       : motion === 'hikaye'
-      ? hikayeHesapla(sahne, frame, K)
-      : sinematikHesapla(sahne, frame, K);
+      ? hikayeHesapla(sahne, frame, K, fps)
+      : sinematikHesapla(sahne, frame, K, fps);
 
   const gorselStil: React.CSSProperties = {
     width: '100%',
@@ -417,6 +468,7 @@ const SahneGorunumu: React.FC<{
           }}
         />
       ) : null}
+      <GeriSayimRozeti metin={sahne.overlay || ''} kareSayisi={K} />
       <OverlayBaslik metin={sahne.overlay || ''} motion={motion} kareSayisi={K} />
       <Altyazi
         parcalar={sahne.altyazi}
