@@ -57,14 +57,30 @@ Kareler elle incelendi (vision analizi OpenAI bakiyesi bittiği için çalışma
 **Yeni edit stili `seyahat-belgeseli` — "Seyahat Belgeseli (4K)"**
 
 ```
-sahne_sn 6 | kelime 15 | footage_pct 92 (motorun en yükseği)
+sahne_sn 12.5 | footage_pct 92 (motorun en yükseği)
 overlay yok | altyazı yok | motion sinematik | mag films_n_photography
 tempo "cift-modlu"
 ```
 
-`tempo: cift-modlu` plan promptunu değiştirir: kısa 6-11 / orta 12-20 / uzun 34-50
-kelime sınıfları, aynı sınıf üç kez üst üste gelmez. Diğer 3 edit stili eski dar bant
-davranışını korur.
+`sahne_sn` = ölçülen **ortalama** çekim (12.5 sn), medyan (6.5 sn) değil: sahne sayısı
+`hedef_sure / sahne_sn` ile bulunduğu için burada ortalama doğru ölçü. Medyanı çift-modlu
+bant dağılımı 6-7 sn'ye getiriyor.
+
+`tempo: cift-modlu` plan promptunu değiştirir. Bantlar ölçülen dağılımdan türetilir ve
+**ağırlıklı ortalaması 1.0 × sahne_sn** olur (bu şart olmadan video hedeflenen süreden
+uzun çıkar — ilk yazımda %23 aşıyordu):
+
+| Bant | Pay | Çarpan | edge-tts'te (178 wpm) |
+|---|---|---|---|
+| ÇOK KISA | %32 | 0.20 | ~7 kelime |
+| KISA | %26 | 0.48 | ~18 kelime |
+| ORTA | %14 | 0.80 | ~30 kelime |
+| UZUN | %29 | 2.40 | ~89 kelime |
+
+`.32×0.20 + .26×0.48 + .14×0.80 + .29×2.40 = 1.00` ✓
+
+Aynı sınıf üç kez üst üste gelmez, iki ÇOK KISA yan yana konmaz. Diğer 3 edit stili eski
+dar bant davranışını korur (canlı testle doğrulandı).
 
 ## Bu stilin ortaya çıkardığı iki tıkanıklık
 
@@ -83,27 +99,23 @@ Not: lisans okuması `player_client=android_vr` ZORUNLU. Düz istemci
 "Requested format is not available" veriyor, o zaman lisans okunamıyor ve güvenli taraf
 seçildiği için her aday atlanıyordu — footage komple durmuş olurdu.
 
-## Magnific maliyeti (30 dk video)
+## Magnific maliyeti
 
 Bu stilde Magnific en küçük kalem, çünkü sahnelerin %92'si video ve Magnific yalnızca
-görsel büyütüyor.
-
-| Kalem | Adet | Tutar |
-|---|---|---|
-| Footage klip | ~258 | $0 |
-| AI görsel (footage bulunamayan) | ~22 | ~$1.06 |
-| Magnific 2K (`hd=true` + kapak) | ~12 | ~$0.96 |
-| Magnific 4K alternatifi | ~12 | ~$1.90 |
+görsel büyütüyor. 30 dk video = 144 sahne → ~12 AI görsel → `hd=true` işaretlenenler +
+kapak ≈ **7 büyütme ≈ $0.56** (2K). 4K yapılırsa ~$1.12.
 
 Abonelik karşılaştırması: Pro $39/ay = 2.500 token, etkin ~$0.18-0.20/büyütme →
-ayda ~200 büyütme ≈ 16 video. Ayda 16 videonun altında API pay-per-use daha ucuz.
+ayda ~200 büyütme ≈ **28 video**. Ayda 28 videonun altında API pay-per-use daha ucuz.
+
+Tam maliyet dökümü için aşağıdaki tabloya bak.
 
 ## Açık kalanlar
 
 - **OpenAI bakiyesi bitti** → şu an hiç video üretilemez. Gemini anahtarı var ama boş
   yanıt dönüyor (fatura açık değil), yani yedek yok.
 - **Pexels + Pixabay anahtarı yok** (ikisi de ücretsiz). Footage tek kaynaktan geliyor;
-  klip başına 26 sn, 30 dk video için 4 paralel ile ~30 dk sadece footage indirme.
+  klip başına 26 sn, 30 dk video için (132 klip) 4 paralel ile ~14 dk sadece footage indirme.
   `GORSEL_PARALEL=8` bunu yarıya indirir (footage ağ-bağımlı, API limitine takılmaz).
 - Vision dağılım analizi (kamera açısı/konu oranları) bakiye gelince çalıştırılacak:
   `~/Desktop/belgesel-referans/belgesel_vision.py`
