@@ -10,10 +10,89 @@ import os
 import sys
 import time
 import base64
+import hashlib
+import json
+import threading
 
 import requests
 
 MAGNIFIC_KEY = os.environ.get("MAGNIFIC_KEY", "")
+
+# ── COKLU FREEPIK ANAHTARI + GUNLUK KOTA TAKIBI (5 Agu 2026) ──
+# Neden: Freepik API'sinde stok indirme Premium/Premium+/Pro planlarda KREDI HARCAMAZ ama
+# GUNDE 100 ile sinirli (resmi belge). 40 dk'lik bir belgesel ~177 klip istiyor, yani tek
+# anahtarla bir gunde bitmiyor. Ayrica tek anahtar iptal olursa / servis 5xx verirse is
+# yarida kaliyordu.
+# FREEPIK_KEYS = "anahtar1,anahtar2,anahtar3"  (MAGNIFIC_KEY geriye donuk calismaya devam eder)
+# Sayac DISKTE tutulur: konteyner yeniden baslayinca kota sifirlanmis gibi davranmaz.
+FREEPIK_KEYS = [k.strip() for k in os.environ.get("FREEPIK_KEYS", "").split(",") if k.strip()]
+if not FREEPIK_KEYS and MAGNIFIC_KEY:
+    FREEPIK_KEYS = [MAGNIFIC_KEY]
+FP_GUNLUK_TAVAN = int(os.environ.get("FREEPIK_GUNLUK_TAVAN", "100"))
+FP_KOTA_DOSYA = os.environ.get("FREEPIK_KOTA_DOSYA",
+                               "/opt/vidrush/webapp/veri/freepik_kota.json")
+_fp_kilit = threading.Lock()      # gorseller 4-8 paralel uretiliyor, sayac yarissiz olmali
+
+
+def _fp_etiket(anahtar: str) -> str:
+    """Anahtari dosyaya YAZMADAN kimliklendir (ilk 6 karakterin hash'i yeter)."""
+    return hashlib.sha256(anahtar.encode()).hexdigest()[:10]
+
+
+def _fp_kota_oku() -> dict:
+    try:
+        with open(FP_KOTA_DOSYA) as f:
+            d = json.load(f)
+    except Exception:
+        return {}
+    bugun = time.strftime("%Y-%m-%d")
+    return d.get(bugun, {}) if isinstance(d, dict) else {}
+
+
+def _fp_kota_yaz(sayaclar: dict) -> None:
+    bugun = time.strftime("%Y-%m-%d")
+    try:
+        os.makedirs(os.path.dirname(FP_KOTA_DOSYA), exist_ok=True)
+        # Sadece BUGUNU sakla: dosya suresiz buyumesin
+        with open(FP_KOTA_DOSYA, "w") as f:
+            json.dump({bugun: sayaclar}, f)
+    except Exception as e:
+        print(f"  freepik kota yazilamadi: {str(e)[:90]}", file=sys.stderr)
+
+
+def freepik_anahtar_sec():
+    """Bugun kotasi DOLMAMIS ilk anahtari dondurur. Hepsi doluysa None."""
+    with _fp_kilit:
+        sayac = _fp_kota_oku()
+        for a in FREEPIK_KEYS:
+            if sayac.get(_fp_etiket(a), 0) < FP_GUNLUK_TAVAN:
+                return a
+    return None
+
+
+def freepik_sayac_artir(anahtar: str, adet: int = 1) -> None:
+    """BASARILI indirmeden sonra cagrilir (basarisiz istek kota yemez)."""
+    with _fp_kilit:
+        sayac = _fp_kota_oku()
+        e = _fp_etiket(anahtar)
+        sayac[e] = sayac.get(e, 0) + adet
+        _fp_kota_yaz(sayac)
+
+
+def freepik_anahtar_doldu(anahtar: str) -> None:
+    """Saglayici 'limit asildi' dediyse: bizim sayac ne derse desin bu anahtari bugun kapat.
+    (Bizim sayacimiz web arayuzunden yapilan indirmeleri gormez, kayabilir.)"""
+    with _fp_kilit:
+        sayac = _fp_kota_oku()
+        sayac[_fp_etiket(anahtar)] = FP_GUNLUK_TAVAN
+        _fp_kota_yaz(sayac)
+
+
+def freepik_kota_durum() -> list:
+    """[(anahtar_etiketi, kullanilan, tavan)] — arayuz/log icin."""
+    sayac = _fp_kota_oku()
+    return [(_fp_etiket(a)[:6], sayac.get(_fp_etiket(a), 0), FP_GUNLUK_TAVAN)
+            for a in FREEPIK_KEYS]
 PEXELS_KEY = os.environ.get("PEXELS_KEY", "")
 PIXABAY_KEY = os.environ.get("PIXABAY_KEY", "")
 # 5 Agu 2026: api.magnific.com OLDU. Magnific, Freepik'e katildi ve API tek cati altinda
@@ -304,32 +383,62 @@ def pixabay_video(sorgu: str, hedef: str) -> bool:
 
 # ────────────── Freepik stok video (opsiyonel — arama bedava, indirme kredi ister) ──────────────
 
+def _fp_kota_hatasi_mi(r) -> bool:
+    """Saglayici gunluk indirme tavanini soyluyor mu? 429 ya da govdede limit ifadesi."""
+    if r.status_code == 429:
+        return True
+    g = (r.text or "").lower()
+    return any(k in g for k in ("daily", "limit", "quota", "exceeded"))
+
+
 def freepik_video(sorgu: str, hedef: str) -> bool:
-    if not MAGNIFIC_KEY:
-        return False
-    h = {"x-freepik-api-key": MAGNIFIC_KEY, "Accept": "application/json"}
-    try:
-        r = requests.get("https://api.freepik.com/v1/videos", headers=h,
-                         params={"term": sorgu, "per_page": 8}, timeout=30)
-        if r.status_code in (401, 402, 403):
+    """Freepik stok videosu indir. COKLU ANAHTAR: kotasi dolan anahtardan sonrakine gecer.
+    Kota takibi disktedir (gunluk), yani konteyner yeniden baslasa da kayip olmaz."""
+    denenen = set()
+    while True:
+        anahtar = freepik_anahtar_sec()
+        if not anahtar or anahtar in denenen:
+            if not anahtar:
+                print("  freepik: TUM anahtarlarin gunluk kotasi dolu", file=sys.stderr)
             return False
-        r.raise_for_status()
-        for item in (r.json().get("data") or []):
-            vid = item.get("id")
-            if not vid:
+        denenen.add(anahtar)
+        h = {"x-freepik-api-key": anahtar, "Accept": "application/json"}
+        try:
+            r = requests.get("https://api.freepik.com/v1/videos", headers=h,
+                             params={"term": sorgu, "per_page": 8}, timeout=30)
+            if r.status_code in (401, 402, 403):
+                # Bu anahtar yetkisiz/kredisiz: bugun bir daha denemeyelim, sonrakine gec
+                print(f"  freepik anahtar {_fp_etiket(anahtar)[:6]} yetkisiz "
+                      f"({r.status_code}) -> sonraki anahtar", file=sys.stderr)
+                freepik_anahtar_doldu(anahtar)
                 continue
-            dr = requests.get(f"https://api.freepik.com/v1/videos/{vid}/download",
-                              headers=h, timeout=30)
-            if dr.status_code in (402, 403):
-                return False   # kredi yok -> sonraki id'ler de ayni, hemen cik
-            if dr.status_code >= 400:
+            if _fp_kota_hatasi_mi(r):
+                freepik_anahtar_doldu(anahtar)
                 continue
-            url = (dr.json().get("data") or {}).get("url")
-            if url and _indir_ve_hazirla(url, hedef):
-                return True
-    except Exception as e:
-        print(f"  freepik hata: {str(e)[:140]}", file=sys.stderr)
-    return False
+            r.raise_for_status()
+            for item in (r.json().get("data") or []):
+                vid = item.get("id")
+                if not vid:
+                    continue
+                dr = requests.get(f"https://api.freepik.com/v1/videos/{vid}/download",
+                                  headers=h, timeout=30)
+                if _fp_kota_hatasi_mi(dr):
+                    freepik_anahtar_doldu(anahtar)
+                    break          # bu anahtar bitti -> while donsun, sonrakini alsin
+                if dr.status_code in (402, 403):
+                    freepik_anahtar_doldu(anahtar)
+                    break
+                if dr.status_code >= 400:
+                    continue
+                url = (dr.json().get("data") or {}).get("url")
+                if url and _indir_ve_hazirla(url, hedef):
+                    freepik_sayac_artir(anahtar)   # SADECE basarili indirme kota yer
+                    return True
+            else:
+                return False       # aramada sonuc vardi ama hicbiri inmedi: anahtar sorunu degil
+        except Exception as e:
+            print(f"  freepik hata ({_fp_etiket(anahtar)[:6]}): {str(e)[:120]}", file=sys.stderr)
+            return False
 
 
 def footage_getir(sorgu: str, hedef: str, yt_once: bool = True) -> bool:
@@ -368,12 +477,16 @@ def magnific_upscale(gorsel_yolu: str, optimized_for: str = "films_n_photography
     """Gorseli Magnific ile upscale eder; yerinde uzerine yazar. Basarili ise True.
     Async: POST -> task_id -> GET poll -> COMPLETED URL indir."""
     global _MAG_KAPALI, _MAG_5XX
-    if _MAG_KAPALI or not MAGNIFIC_KEY or not os.path.exists(gorsel_yolu):
+    if _MAG_KAPALI or not FREEPIK_KEYS or not os.path.exists(gorsel_yolu):
         return False
+    # Buyutme KREDI harcar (stok indirme gibi bedava degil), o yuzden gunluk indirme
+    # sayacina bakmadan sirayla ilk anahtari kullanir; kredisiz olan 402/403 verir ve
+    # cagiran zinciri kapatir.
+    anahtar = freepik_anahtar_sec() or FREEPIK_KEYS[0]
     try:
         with open(gorsel_yolu, "rb") as f:
             b64 = base64.b64encode(f.read()).decode()
-        h = {"x-freepik-api-key": MAGNIFIC_KEY}   # Freepik cati anahtari (eski: x-magnific-*)
+        h = {"x-freepik-api-key": anahtar}   # Freepik cati anahtari (eski: x-magnific-*)
         body = {"image": b64, "scale_factor": scale,
                 "optimized_for": optimized_for, "engine": "automatic"}
         r = requests.post(MAG_BASE, headers=h, json=body, timeout=90)

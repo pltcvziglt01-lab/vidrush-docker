@@ -138,10 +138,30 @@ def anasayfa():
 @app.get("/api/saglik")
 def saglik():
     """Hangi servislerin anahtari kurulu (deger DONMEZ, sadece var/yok)."""
+    import kaynak
     return {
         "openai": bool(os.environ.get("OPENAI_KEY")),
         "magnific": bool(os.environ.get("MAGNIFIC_KEY")),
         "pexels": bool(os.environ.get("PEXELS_KEY")),
+        "pixabay": bool(os.environ.get("PIXABAY_KEY")),
+        "gemini": bool(os.environ.get("GEMINI_KEY")),
+        "freepik_anahtar_sayisi": len(kaynak.FREEPIK_KEYS),
+    }
+
+
+@app.get("/api/freepik-kota")
+def freepik_kota():
+    """Bugun her Freepik anahtarinda kac indirme kaldi.
+    Freepik API'sinde stok indirme Premium'da gunde 100 ile sinirli; birden fazla anahtar
+    varsa motor kotasi dolan anahtardan sonrakine geciyor. Bu uc o durumu gosterir.
+    Anahtarin KENDISI donmez — sadece kisa bir kimlik etiketi."""
+    import kaynak
+    durum = kaynak.freepik_kota_durum()
+    return {
+        "tavan": kaynak.FP_GUNLUK_TAVAN,
+        "anahtarlar": [{"etiket": e, "kullanilan": k, "kalan": max(0, t - k)}
+                       for e, k, t in durum],
+        "toplam_kalan": sum(max(0, t - k) for _, k, t in durum),
     }
 
 
