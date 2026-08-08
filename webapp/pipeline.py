@@ -327,6 +327,7 @@ EDIT_STILLERI = {
         "ozet": "BBC Earth / Nat Geo — yavaş, hard-cut, gerçek footage, orkestral",
         "sahne_sn": 7, "kelime": 17, "footage_pct": 85, "overlay": "yok",
         "altyazi": "orta", "motion": "sinematik", "mag": "films_n_photography",
+        "bolumler": True,   # bolum basligi + bolum bazli anlatim
         "gorsel_ek": ("cinematic wildlife/nature documentary still, shot on a cinema camera, "
                       "85mm telephoto, shallow depth of field, natural golden-hour light, high "
                       "dynamic range, rich saturated greens and blues, deep shadows, "
@@ -337,6 +338,7 @@ EDIT_STILLERI = {
         "ozet": "Johnny Harris / Vox Atlas — Ken Burns 2.0 push-in, analog texture, kinetik başlık",
         "sahne_sn": 4, "kelime": 11, "footage_pct": 55, "overlay": "yogun",
         "altyazi": "orta", "motion": "anlati", "mag": "films_n_photography",
+        "bolumler": True,   # bolum basligi + bolum bazli anlatim
         "gorsel_ek": ("photojournalistic documentary frame, warm faded film tones, subtle film "
                       "grain and light leaks, tactile analog texture (old paper / wood grain), "
                       "archival photo aesthetic, cinematic depth, muted vintage color grade"),
@@ -357,6 +359,7 @@ EDIT_STILLERI = {
         "sahne_sn": 12.5, "kelime": 15, "footage_pct": 92, "overlay": "yok",
         "altyazi": "yok", "motion": "sinematik", "mag": "films_n_photography",
         "tempo": "cift-modlu",   # olculen dagilim: %33 kisa / %26 orta / %29 uzun
+        "bolumler": True,   # bolum basligi + bolum bazli anlatim
         "gorsel_ek": ("photorealistic 4K travel documentary frame that must be indistinguishable "
                       "from real camera footage: either a high aerial drone view of coastline, "
                       "reef and settlement, or a ground-level handheld shot of local people at "
@@ -377,6 +380,7 @@ EDIT_STILLERI = {
         "altyazi": "yok", "motion": "sinematik", "mag": "films_n_photography",
         "edit_paketi": True,      # plan 'grafik' alani uretir (EditPaketi.tsx sablonlari)
         "grafik_pct": 41,         # olculen beyaz-tuval orani
+        "bolumler": True,   # bolum basligi + bolum bazli anlatim
         "gorsel_ek": ("photorealistic editorial documentary frame, natural light, restrained "
                       "colour grade, real lens depth of field, absolutely no text, no captions, "
                       "no graphics, no illustration"),
@@ -2304,6 +2308,37 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
         if mag_var else
         "7) Set hd=false for every scene.")
     hedef = hedef_sahne or 40
+
+    # ── BOLUM YAPISI (5 Agu 2026, referans #12'nin bolum baslikliari) ──
+    # Referans videolar duz bir sahne dizisi DEGIL: 5-8 bolume ayrilmis ve her bolumun
+    # kendi basligi + kendi anlatim yayi var. Bizim plan tek duz liste uretiyordu, o yuzden
+    # 40 dakika boyunca ayni tonda akip gidiyordu.
+    # Bolum sayisi: ~5 dakikada bir bolum (kullanicinin gosterdigi referansta bu orandaydi).
+    if prof.get("bolumler"):
+        bolum_adet = max(3, min(10, int(round(hedef * float(prof["sahne_sn"]) / 300))))
+        bolum_kural = (
+            f"10) CHAPTERS — split the video into EXACTLY {bolum_adet} chapters. This is how the "
+            "reference channel is built: not one flat narration, but chapters that each have "
+            "their own title and their own arc.\n"
+            "   Each chapter must work as a small self-contained piece: it opens with a line "
+            "that raises a specific question, develops ONE idea, and closes with a line that "
+            "hands over to the next chapter. Do not let two chapters cover the same ground.\n"
+            "   On the FIRST scene of each chapter set \"bolum\" to that chapter's title, and "
+            "\"bolum_yeri\" to either \"orta\" or \"ust\":\n"
+            "     \"orta\" = a big centred chapter card, written as a THEME "
+            "(e.g. \"Preserving Madeira's identity between tradition and the modern world\"). "
+            "Use this for the chapter that opens a major new part of the story.\n"
+            "     \"ust\" = a smaller top-left label, written as a descriptive phrase "
+            "(e.g. \"A tourist paradise and the contradictions behind it\"). Use this for the "
+            "rest.\n"
+            "   Roughly one chapter in three uses \"orta\", the others \"ust\". Never put two "
+            "\"orta\" chapters back to back.\n"
+            "   Titles are 5-12 words, in the story's language, no numbering, no colon, and they "
+            "must NOT repeat the video title.\n"
+            "   EVERY OTHER scene leaves \"bolum\" out entirely.\n")
+    else:
+        bolum_kural = ""
+
     # ── SAHNE UZUNLUGU: TEK BANT MI, CIFT MODLU MU (5 Agu 2026 olcumu) ──
     # Referans #12 (@ImpossibleTravel38) 8 videoda 1699 cekim olculdu: medyan 6.4 sn ama
     # dagilim CIFT MODLU — %33'u 4 sn'den kisa, %29'u 12 sn'den uzun (p10 1.7 sn, p90 28.1 sn).
@@ -2392,6 +2427,7 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
         "and prompt = a dramatic 16:9 scene featuring the character, strong emotion, high contrast.\n"
         f"{hd_kural}\n"
         f"{grafik_kural}"
+        f"{bolum_kural}"
         # Gorsel API'leri gercek kisi tasvirini ISIMLE isteyince 400 basiyor (policy).
         # Isimsiz ama iyi tarif edilirse uretiyor -> planlayici ismi degil gorunusu yazsin.
         "REAL PEOPLE: NEVER write a real person's name inside scene_prompt or thumbnail.prompt "
@@ -2403,7 +2439,9 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
         "\"thumbnail\":{\"text\":\"...\",\"prompt\":\"...\"},"
         "\"scenes\":[{\"n\":1,\"voiceover\":\"...\",\"kaynak\":\"ai|footage\","
         "\"scene_prompt\":\"...\",\"footage_sorgu\":\"...\",\"overlay\":\"...\",\"hd\":false"
-        + (",\"grafik\":{...}" if prof.get("edit_paketi") else "") + "}]}"
+        + (",\"grafik\":{...}" if prof.get("edit_paketi") else "")
+        + (",\"bolum\":\"\",\"bolum_yeri\":\"orta|ust\"" if prof.get("bolumler") else "")
+        + "}]}"
     )
 
 
@@ -3359,6 +3397,10 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             # Edit paketi grafigi (EditPaketi.tsx sablonlari). Plan uretmediyse alan hic
             # gecmez -> Video.tsx tarafinda katman cizilmez, eski davranis aynen korunur.
             **({"grafik": s["grafik"]} if isinstance(s.get("grafik"), dict) else {}),
+            # Bolum basligi: plan sadece bolumun ILK sahnesine koyar, digerlerinde bos
+            **({"bolum": str(s["bolum"]).strip(),
+                "bolumYeri": ("ust" if str(s.get("bolum_yeri")) == "ust" else "orta")}
+               if str(s.get("bolum") or "").strip() else {}),
         })
         kumulatif_sn += sure
 

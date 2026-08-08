@@ -284,3 +284,40 @@ diyor ve her etiketteki sayının anlatım metninden gelmesini şart koşuyor.
   yarım taklit iki motoru farklı gösterirdi)
 - `@remotion/lottie` kuruldu: tasarımcının After Effects'te yaptığı animasyon (Lottie/
   Bodymovin dışa aktarımı) sahneye `ae` alanı ile birebir oynar
+
+### #12 EK — BÖLÜM BAŞLIKLARI (7 Ağu 2026, kullanıcının gönderdiği 2 kare)
+
+**İlk ölçümüm eksikti.** Video başına 26 kare (90 sn aralık) almıştım ve "gömülü yazı yok"
+demiştim. Bölüm başlıkları videoda sadece 5-8 kez, bölüm geçişlerinde göründüğü için o
+örnekleme onları kaçırmış. Kullanıcı iki ekran görüntüsüyle gösterdi.
+
+Otomatik tespit denedim (parlak piksel + koyu kontur = yazı sezgisi, 2 sn'de bir kare,
+2043 kare tarandı) — **işe yaramadı**, parlak su ve gökyüzünü yazı sanıyor, 6 güçlü adayın
+altısı boş çıktı. Ölçüm kullanıcının gönderdiği iki kareden yapıldı.
+
+**İKİ VARYANT var, aynı videoda ikisi de kullanılıyor:**
+
+| | `ust` | `orta` |
+|---|---|---|
+| Konum | sol üst (x %3.2, y %4.4) | ortalı, y ~%55 |
+| Yazı düzeni | Cümle düzeni | TAMAMI BÜYÜK HARF |
+| Boyut | 46 px @1080p | 68 px @1080p |
+| Kalınlık | 800 | 900 |
+| Satır | tek satır (genişliğin ~%65'i) | 2-3 satır sarabilir |
+
+Boyut karakter genişliğinden hesaplandı: referansta 50 karakterlik başlık tek satırda
+genişliğin %65'ini kaplıyor → ~46 px Montserrat ExtraBold. Önce 52, sonra 58 denedim;
+58'de yazı ikinci satıra taştı, referansta tek satır. 46 doğrusu.
+
+**Hareket:** spring (damping 22, stiffness 95) ile aşağıdan süzülme + fade, harf aralığı
+hafifçe oturuyor. 4.5 sn ekranda kalıp 0.7 sn'de sönüyor. Blur YOK — 1080p'de ucuz durur.
+
+**Okunurluk:** parlak footage üzerinde beyaz yazı kayboluyordu → `orta` varyantta 3px
+siyah kontur + iki katmanlı derin gölge.
+
+### Bölüm bazlı anlatım
+Referans düz bir sahne dizisi değil: 5-8 bölüme ayrılmış, her bölümün kendi başlığı ve
+kendi anlatım yayı var. Motorda `bolumler: True` bayrağı 4 belgesel stiline eklendi;
+plan promptu videoyu ~5 dakikada bir bölüme ayırıyor (40 dk → 8 bölüm, 30 dk → 6),
+her bölüm kendi sorusunu açıp tek bir fikri geliştirip sonraki bölüme devrediyor.
+Başlık sadece bölümün İLK sahnesine yazılıyor; üçte biri `orta`, gerisi `ust`.

@@ -384,6 +384,104 @@ const BeyazTuval: React.FC<{
   );
 };
 
+/* ─────────────────────── BOLUM BASLIGI ─────────────────────── */
+
+/**
+ * Referans #12'nin bolum basliklari (kullanicinin gonderdigi iki kareden olculdu).
+ * IKI VARYANT var ve ayni videoda ikisi de kullaniliyor:
+ *
+ *   "ust"  — sol ust kose, cumle duzeni (Sentence case), orta boy.
+ *            or. "A Tourist Paradise and the Contradictions Behind It"
+ *            Olculen: x %3.2, y %7.4, yazi yuksekligi kare yuksekliginin ~%3.6'si
+ *
+ *   "orta" — kare ortasi, TAMAMI BUYUK HARF, cok kalin, iki satira sarabilir.
+ *            or. "PRESERVING MADEIRA'S IDENTITY BETWEEN TRADITION AND THE MODERN WORLD"
+ *            Olculen: yatayda ortali, y ~%55, satir yuksekligi ~%4.9
+ *
+ * NOT: ilk olcumumde "gomulu yazi yok" demistim. O olcumde video basina 26 kare
+ * (90 sn araliklarla) almistim; bolum baslikleri sadece bolum GECISLERINDE (videoda
+ * 5-8 kez) gorundugu icin ornekleme onlari kacirmis. Duzeltildi.
+ *
+ * HAREKET: "smooth" istegi -> spring ile asagidan yukari suzulme + fade, harf araligi
+ * hafifce oturur. Blur YOK (1080p'de ucuz durur ve render'i yavaslatir).
+ */
+export type BolumYeri = 'ust' | 'orta';
+
+export const BolumBasligi: React.FC<{
+  metin?: string;
+  yer?: BolumYeri;
+  kareSayisi: number;
+}> = ({metin, yer = 'orta', kareSayisi}) => {
+  const frame = useCurrentFrame();
+  const {fps} = useVideoConfig();
+  if (!metin) return null;
+
+  const yay = spring({frame, fps, config: {damping: 22, stiffness: 95, mass: 0.85}});
+  // Ekranda kalma: 4.5 sn, sonra 0.7 sn'de sonum. Sahne kisaysa sahneye sigdir.
+  const tut = Math.min(Math.round(fps * 4.5), Math.max(1, kareSayisi - Math.round(fps * 0.7)));
+  const cik = interpolate(frame, [tut, tut + Math.round(fps * 0.7)], [1, 0], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: Easing.in(Easing.cubic),
+  });
+  const opak = yay * cik;
+  const kayma = (1 - yay) * (yer === 'orta' ? 26 : 18);
+  const harfAralik = (1 - yay) * (yer === 'orta' ? 3 : 1.5);
+
+  const ustStil: React.CSSProperties = {
+    position: 'absolute',
+    left: '3.2%',
+    top: '4.4%',
+    // OLCUM: referans karede baslik TEK SATIR ve kare genisliginin ~%65'ini kapliyor.
+    // 50 karakter icin bu ~46px Montserrat ExtraBold demek. 58'e cikarmak fazlaydi —
+    // yazi ikinci satira tasiyordu ("...behind / it"), referansta tek satir.
+    maxWidth: '92%',
+    fontSize: 46,
+    fontWeight: 800,
+    lineHeight: 1.2,
+    textAlign: 'left',
+  };
+  const ortaStil: React.CSSProperties = {
+    maxWidth: '84%',
+    fontSize: 68,
+    fontWeight: 900,
+    lineHeight: 1.14,
+    textAlign: 'center',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  };
+
+  return (
+    <AbsoluteFill
+      style={
+        yer === 'orta'
+          ? {justifyContent: 'center', alignItems: 'center', padding: '5% 6% 0'}   // ~%55
+          : {}
+      }
+    >
+      <div
+        style={{
+          ...(yer === 'orta' ? ortaStil : ustStil),
+          opacity: opak,
+          transform: `translateY(${kayma}px)`,
+          letterSpacing: `${(yer === 'orta' ? 0.5 : 0) + harfAralik}px`,
+          fontFamily: fontAilesi('montserrat'),
+          color: '#FFFFFF',
+          // Referansta yazi hem koyu hem acik zeminlerde okunuyor: kontur + golge birlikte.
+          WebkitTextStroke: yer === 'orta' ? '3px rgba(0,0,0,0.62)' : '0px',
+          paintOrder: 'stroke fill',
+          textShadow:
+            yer === 'orta'
+              ? '0 6px 30px rgba(0,0,0,0.85), 0 2px 6px rgba(0,0,0,0.95)'
+              : '0 4px 20px rgba(0,0,0,0.8), 0 1px 3px rgba(0,0,0,0.9)',
+        }}
+      >
+        {metin}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
 /* ─────────────────────── dis kapi ─────────────────────── */
 
 export const EditGrafigi: React.FC<{

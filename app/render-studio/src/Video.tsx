@@ -1,6 +1,6 @@
 import React from 'react';
 import {Lottie} from '@remotion/lottie';
-import {EditGrafigi, beyazZeminMi, type Grafik} from './EditPaketi';
+import {BolumBasligi, EditGrafigi, beyazZeminMi, type BolumYeri, type Grafik} from './EditPaketi';
 import {
   AbsoluteFill,
   Audio,
@@ -35,6 +35,8 @@ export type Sahne = {
   overlay?: string;
   ae?: string;          // After Effects (Lottie) katmani: public altindaki .json yolu
   grafik?: Grafik;      // Edit paketi sablonu (beyaz-tuval / olcu / alinti / metin / harita)
+  bolum?: string;       // Bolum basligi — SADECE bolumun ilk sahnesinde dolu
+  bolumYeri?: BolumYeri;// 'ust' (sol ust, cumle duzeni) | 'orta' (ortada, BUYUK HARF)
   altyazi: AltyaziParcasi[];
   vurgu?: boolean; // hikaye kanalı açılış sahnesi: yoğun hareket (derin zoom + push-in + paralaks)
   // Metin derin analizinden gelen anlatım işlevi — geçiş tipini o belirler.
@@ -514,6 +516,7 @@ const SahneGorunumu: React.FC<{
         kareSayisi={K}
       />
       <AEKatmani yol={sahne.ae} kareSayisi={K} />
+      <BolumBasligi metin={sahne.bolum} yer={sahne.bolumYeri} kareSayisi={K} />
       <GeriSayimRozeti metin={sahne.overlay || ''} kareSayisi={K} />
       <OverlayBaslik metin={sahne.overlay || ''} motion={motion} kareSayisi={K} />
       <Altyazi
