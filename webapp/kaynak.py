@@ -16,7 +16,11 @@ import requests
 MAGNIFIC_KEY = os.environ.get("MAGNIFIC_KEY", "")
 PEXELS_KEY = os.environ.get("PEXELS_KEY", "")
 PIXABAY_KEY = os.environ.get("PIXABAY_KEY", "")
-MAG_BASE = "https://api.magnific.com/v1/ai/image-upscaler"
+# 5 Agu 2026: api.magnific.com OLDU. Magnific, Freepik'e katildi ve API tek cati altinda
+# toplandi. Eski adres 502 + Ispanyolca HTML hata sayfasi donuyordu — yani upscale HIC
+# calismiyordu ve videolarda hicbir gorsel buyutulmemis. Dogru adres api.freepik.com;
+# oradan gelen yanit yapilandirilmis JSON ("Error consuming credits" = kredi yok).
+MAG_BASE = os.environ.get("MAG_BASE", "https://api.freepik.com/v1/ai/image-upscaler")
 _MAG_KAPALI = False   # 402/401 gorulunce oturum boyunca kapat (bosa cagri yok)
 _MAG_5XX = 0          # ust uste 5xx sayaci: servis coktuyse (or. 502) her sahnede bosuna deneme
 
@@ -369,7 +373,7 @@ def magnific_upscale(gorsel_yolu: str, optimized_for: str = "films_n_photography
     try:
         with open(gorsel_yolu, "rb") as f:
             b64 = base64.b64encode(f.read()).decode()
-        h = {"x-magnific-api-key": MAGNIFIC_KEY}
+        h = {"x-freepik-api-key": MAGNIFIC_KEY}   # Freepik cati anahtari (eski: x-magnific-*)
         body = {"image": b64, "scale_factor": scale,
                 "optimized_for": optimized_for, "engine": "automatic"}
         r = requests.post(MAG_BASE, headers=h, json=body, timeout=90)
@@ -377,6 +381,12 @@ def magnific_upscale(gorsel_yolu: str, optimized_for: str = "films_n_photography
             print(f"  magnific POST {r.status_code}: {r.text[:160]}", file=sys.stderr)
             if r.status_code in (401, 402, 403):
                 _MAG_KAPALI = True   # kredi/yetki bitti -> bu is boyunca bir daha deneme
+            elif r.status_code >= 500 and "consuming credits" in (r.text or "").lower():
+                # Freepik kredi bitince 502 + "Error consuming credits" donuyor. Bu KALICI
+                # bir durum; gecici 5xx gibi 3 kez denemek her sahnede bosa cagri demek.
+                print("  magnific: kredi yok (Freepik) -> bu is boyunca devre disi",
+                      file=sys.stderr)
+                _MAG_KAPALI = True
             elif r.status_code >= 500:
                 _MAG_5XX += 1        # servis tarafi coktu (or. 502 Bad Gateway)
                 if _MAG_5XX >= 3:    # ust uste 3 kez -> bu is boyunca kapat, sahne basina bosa deneme olmasin

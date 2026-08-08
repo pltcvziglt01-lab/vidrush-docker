@@ -129,7 +129,7 @@ Fiyatlar: `gpt-image-2` $0.048 · `gpt-image-1-mini` $0.013 · `gpt-4o-mini-tts`
 |---|---|---|
 | AI görsel | $0.58 (12 ad, gpt-image-2) | $1.95 (150 ad, mini) |
 | Kapak | $0.05 | $0.01 |
-| Magnific | $0.56 (7 büyütme) | $0 (profilde kapalı) |
+| Magnific | $0.56 (7 büyütme) — **bugün $0, aşağıya bak** | $0 (profilde kapalı) |
 | Footage | $0 (132 klip CC+stok) | — |
 | Planlama + analiz | $0.08 | $0.10 |
 | Seslendirme (OpenAI) | $0.45 | $0.45 |
@@ -137,6 +137,14 @@ Fiyatlar: `gpt-image-2` $0.048 · `gpt-image-1-mini` $0.013 · `gpt-4o-mini-tts`
 | **Toplam** | **$1.89** | **$2.69** |
 | **+ KDV** | **$2.27** | **$3.23** |
 | edge-tts ile (KDV dahil) | $1.52 | $2.48 |
+
+> **Magnific bugün çalışmıyor (5 Ağu 2026 tespiti).** Üç ayrı uç test edildi:
+> upscaler `api.magnific.com` → 502 + HTML hata sayfası (adres ölü, Magnific Freepik'e
+> katıldı); doğru adres `api.freepik.com` → 502 `"Error consuming credits"`; AI görsel
+> üretimi (Mystic/Flux) → 422 `"Account not found"`; stok indirme → 422 `"Tool not found"`.
+> **Yalnızca stok ARAMA çalışıyor** (50 sonuç, 4K premium klipler görünüyor).
+> Yani bugüne kadar üretilen videolarda hiçbir görsel büyütülmemiş ve Magnific satırı
+> gerçekte $0. Kod artık doğru adrese gidiyor; kredi yüklenince çalışacak.
 
 **Neden belgesel daha ucuz:** sahnelerin %92'si footage, yani $0. Animasyonda her sahne
 AI görsel. Belgesel pahalı modeli (`gpt-image-2`) kullanmasına rağmen 12 görsel çiziyor,
