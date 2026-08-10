@@ -16,6 +16,27 @@ import threading
 
 import requests
 
+# ── ANAHTAR OKUMA: ortam degiskeni VEYA dosya ──
+# Neden dosya secenegi: mevcut anahtarlar konteynerin Config.Env'ine gomulu. Yeni bir
+# ortam degiskeni eklemek konteyneri YENIDEN YARATMAYI gerektirir; bu, uzerinde calisan
+# isi oldurur ve imaja islenmis durumu riske atar. Dosyadan okumak ise deploy'un
+# docker commit'i sayesinde kalici olur ve yeniden baslatmaya dayanir.
+#   Ekleme:  docker exec bedosaho sh -c 'echo ANAHTAR > /opt/vidrush/webapp/veri/coverr_key.txt'
+ANAHTAR_DIZIN = os.environ.get("ANAHTAR_DIZIN", "/opt/vidrush/webapp/veri")
+
+
+def _anahtar_oku(env_ad: str, dosya_ad: str) -> str:
+    """Once ortam degiskeni, yoksa veri/<dosya_ad>. Ikisi de yoksa bos."""
+    d = os.environ.get(env_ad, "").strip()
+    if d:
+        return d
+    try:
+        with open(os.path.join(ANAHTAR_DIZIN, dosya_ad)) as f:
+            return f.read().strip()
+    except Exception:
+        return ""
+
+
 MAGNIFIC_KEY = os.environ.get("MAGNIFIC_KEY", "")
 
 # ── COKLU FREEPIK ANAHTARI + GUNLUK KOTA TAKIBI (5 Agu 2026) ──
@@ -93,8 +114,9 @@ def freepik_kota_durum() -> list:
     sayac = _fp_kota_oku()
     return [(_fp_etiket(a)[:6], sayac.get(_fp_etiket(a), 0), FP_GUNLUK_TAVAN)
             for a in FREEPIK_KEYS]
-PEXELS_KEY = os.environ.get("PEXELS_KEY", "")
-PIXABAY_KEY = os.environ.get("PIXABAY_KEY", "")
+PEXELS_KEY = _anahtar_oku("PEXELS_KEY", "pexels_key.txt")
+COVERR_KEY = _anahtar_oku("COVERR_KEY", "coverr_key.txt")
+PIXABAY_KEY = _anahtar_oku("PIXABAY_KEY", "pixabay_key.txt")
 # 5 Agu 2026: api.magnific.com OLDU. Magnific, Freepik'e katildi ve API tek cati altinda
 # toplandi. Eski adres 502 + Ispanyolca HTML hata sayfasi donuyordu — yani upscale HIC
 # calismiyordu ve videolarda hicbir gorsel buyutulmemis. Dogru adres api.freepik.com;
@@ -324,6 +346,135 @@ def _indir_ve_hazirla(url: str, hedef: str, zaman_asimi: int = 120) -> bool:
 
 # ─────────────────────────── Pexels (ucretsiz stok) ───────────────────────────
 
+def _coverr_sorgular(sorgu: str):
+    """Coverr'in kutuphanesi kucuk ve anahtar kelimeleri AND'liyor: 7 Agu 2026 olcumu ->
+      "aerial drone remote pacific island village" = 0 sonuc
+      "aerial drone island village"                = 1
+      "island village"                             = 1
+      "island"                                     = 132
+      "aerial island"                              = 84
+    Yani plan'in uzun betimleyici footage_sorgu'sunu oldugu gibi yollamak bos donuyor.
+    Cozum: sorguyu kademeli kisalt, sonuc CIKAN ilk varyantta dur."""
+    kel = [k for k in sorgu.replace(",", " ").split() if len(k) > 2]
+    varyant, gorulen = [], set()
+    for n in (len(kel), 4, 3, 2):
+        if n < 1:
+            continue
+        v = " ".join(kel[:n]).strip()
+        if v and v not in gorulen:
+            gorulen.add(v)
+            varyant.append(v)
+    # Son care: en ayirt edici tek kelime (en uzun olan) — genis ama bos donmez
+    if kel:
+        tek = max(kel, key=len)
+        if tek not in gorulen:
+            varyant.append(tek)
+    return varyant
+
+
+# Kamera/genel kelimeler: bunlar KONUYU anlatmiyor, sadece cekimi tarif ediyor.
+# Alaka kontrolunde sayilmazlar, yoksa "aerial" kelimesi her hava cekimini "alakali"
+# gosterir ve konu tamamen kayar.
+_COVERR_KAMERA_KELIME = {
+    "aerial", "drone", "close", "closeup", "view", "shot", "footage", "video", "clip",
+    "scene", "background", "top", "wide", "slow", "motion", "time", "lapse", "pan",
+    "zoom", "shots", "views", "camera", "flying", "flyover", "overhead", "detail",
+}
+
+
+def _coverr_alakali(h: dict, sorgu: str) -> bool:
+    """Klip GERCEKTEN sorgunun konusuyla ilgili mi?
+
+    7 Agu 2026'da olculdu: kademeli kisaltma sonuc buluyor AMA konu kayiyor —
+      "aerial drone remote pacific island village" -> "Lush Green Mountain Pathway"
+      "close up hands weaving basket"              -> "A man using his smartphone"
+    Belgeselde alakasiz klip, klip olmamasindan KOTU: anlatici Pasifik adasindan
+    bahsederken daglik bir yol goruntusu izleyiciyi aninda kaybettirir.
+    Bu yuzden adayin basligi/etiketleri, sorgunun KONU kelimelerinden en az birini
+    icermek zorunda. Gecemezse zincir Pexels/YouTube CC/AI gorsele duser."""
+    konu = [k.lower() for k in sorgu.replace(",", " ").split()
+            if len(k) > 3 and k.lower() not in _COVERR_KAMERA_KELIME]
+    if not konu:
+        return True          # sorgu tamamen kamera kelimesiyse alaka aranamaz
+    # ETIKETLER KULLANILMIYOR. 7 Agu 2026'da olculdu: Coverr'in etiketleri cok comert —
+    # "Sunset Aerial of Rugged Cliffs" klibinin etiketleri arasinda "remote", "travel",
+    # "nature" gibi genel kelimeler var; etiketle eslesme "dag yolu = Pasifik ada koyu"
+    # gibi sonuclar uretiyordu. Baslik ve aciklama insan yazimi ve spesifik.
+    havuz = (str(h.get("title") or "") + " " + str(h.get("description") or "")).lower()
+    for k in konu:
+        # basit kok eslesme: "islands" ~ "island", "villages" ~ "village"
+        if k in havuz or k.rstrip("s") in havuz:
+            return True
+    return False
+
+
+def _coverr_mp4(h: dict) -> str:
+    """Indirme URL'si. DIKKAT: urls.mp4 ARAMA sonucunda GELMIYOR (7 Agu 2026'da olculdu:
+    arama hit'lerinde urls yok, /videos/{id} ucunda var). base_filename'den kurmak hem
+    dogru hem ekstra istek gerektirmiyor:
+      https://cdn.coverr.co/videos/<base_filename>/1080p.mp4"""
+    u = (h.get("urls") or {}).get("mp4")
+    if u:
+        return u
+    bf = str(h.get("base_filename") or "").strip()
+    return f"https://cdn.coverr.co/videos/{bf}/1080p.mp4" if bf else ""
+
+
+def coverr_video(sorgu: str, hedef: str) -> bool:
+    """Coverr stok videosu (ucretsiz, gunluk tavan yok). 7 Agu 2026'da eklendi.
+
+    Coverr'in ayirt edici avantaji: arama sonucunda su alanlar geliyor ->
+      is_ai_generated : AI uretimi mi (BELGESELDE ISTEMIYORUZ — gercek kamera lazim)
+      is_vertical     : dikey mi (16:9 kurguda dikey klip asiri kirpilir)
+      max_width/height, fps
+    Bu yuzden burada saglam bir filtre kurulabiliyor: gercek + yatay + en az 1080p.
+    Olculdu: filtre AI uretimi 1280x720 bir klibi dogru sekilde eledi.
+    """
+    if not COVERR_KEY:
+        return False
+    for q in _coverr_sorgular(sorgu):
+        try:
+            r = requests.get("https://api.coverr.co/videos",
+                             params={"query": q, "page_size": 16, "api_key": COVERR_KEY},
+                             timeout=30)
+            if r.status_code in (401, 402, 403):
+                print(f"  coverr {r.status_code}: anahtar gecersiz/yetkisiz", file=sys.stderr)
+                return False
+            r.raise_for_status()
+            adaylar = r.json().get("hits") or []
+        except Exception as e:
+            print(f"  coverr arama hata: {str(e)[:120]}", file=sys.stderr)
+            return False
+        if not adaylar:
+            continue                       # bu varyant bos -> daha kisa sorguyu dene
+
+        def uygun(h):
+            if h.get("is_ai_generated"):
+                return False               # belgeselde AI goruntusu istemiyoruz
+            if h.get("is_vertical"):
+                return False               # 16:9 kurgu
+            try:
+                if int(h.get("max_height") or 0) < 1080:
+                    return False           # HD alti klip 1080p kurguda yumusak durur
+            except Exception:
+                return False
+            if not _coverr_alakali(h, sorgu):
+                return False               # konu kaymasi: alakasiz klip kullanilmaz
+            return bool(_coverr_mp4(h))
+
+        secilmis = sorted([h for h in adaylar if uygun(h)],
+                          key=lambda h: -(h.get("downloads") or 0))
+        if not secilmis:
+            continue
+        for h in secilmis[:4]:
+            if _indir_ve_hazirla(_coverr_mp4(h), hedef):
+                print(f"  coverr OK [{q}]: {str(h.get('title'))[:40]} "
+                      f"({h.get('max_width')}x{h.get('max_height')})", file=sys.stderr)
+                return True
+    print(f"  coverr: uygun klip yok ({sorgu[:44]})", file=sys.stderr)
+    return False
+
+
 def pexels_video(sorgu: str, hedef: str) -> bool:
     """Pexels'ten yatay 1080p stok video. Ucretsiz API anahtari yeter (PEXELS_KEY)."""
     if not PEXELS_KEY:
@@ -443,10 +594,12 @@ def freepik_video(sorgu: str, hedef: str) -> bool:
 
 def footage_getir(sorgu: str, hedef: str, yt_once: bool = True) -> bool:
     """Sahne footage'i getir. Oncelik GERCEK+UCRETSIZ stok video:
-       Pexels -> Pixabay -> Freepik(kredi varsa) -> YouTube(cookie varsa).
+       Coverr -> Pexels -> Pixabay -> Freepik(kredi varsa) -> YouTube(CC).
     Her katman kendi timeout'una sahip; biri patlarsa digerine gecer; hicbiri yoksa
     False -> caller AI gorsele duser."""
-    kaynaklar = [pexels_video, pixabay_video, freepik_video]
+    # Coverr EN BASTA: ucretsiz, gunluk tavan yok, ve gercek/yatay/HD filtresi
+    # uygulanabiliyor (is_ai_generated + is_vertical + max_height alanlari sayesinde).
+    kaynaklar = [coverr_video, pexels_video, pixabay_video, freepik_video]
     if yt_once:
         # 5 Agu 2026: eskiden bu satir "YT_COOKIES varsa" diye kosulluydu. Cookie dosyasi
         # olmayan sunucuda YouTube HIC denenmiyordu; Pexels/Pixabay anahtari da bos olunca
