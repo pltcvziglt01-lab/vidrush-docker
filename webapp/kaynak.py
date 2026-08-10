@@ -364,11 +364,13 @@ def _coverr_sorgular(sorgu: str):
         if v and v not in gorulen:
             gorulen.add(v)
             varyant.append(v)
-    # Son care: en ayirt edici tek kelime (en uzun olan) — genis ama bos donmez
-    if kel:
-        tek = max(kel, key=len)
-        if tek not in gorulen:
-            varyant.append(tek)
+    # TEK KELIMEYE INMIYORUZ (7 Agu 2026, canli iste yakalandi).
+    # Eskiden son care olarak en uzun tek kelime deneniyordu ve su oldu:
+    #   "boat arriving after six day journey" -> "arriving" -> Coverr "Train arriving"
+    # Uzak bir Atlantik adasi belgeselinde TREN goruntusu. Alaka kapisi da gecirdi cunku
+    # "arriving" basliкta gercekten vardi — ama kelime konuyu tasimiyor.
+    # Iki kelimenin altinda anlam kalmiyor; bulunamazsa Coverr False donsun ve zincir
+    # Pexels/Pixabay/YouTube CC'ye dussun. Alakasiz klip, klipsizlikten kotudur.
     return varyant
 
 
@@ -379,6 +381,11 @@ _COVERR_KAMERA_KELIME = {
     "aerial", "drone", "close", "closeup", "view", "shot", "footage", "video", "clip",
     "scene", "background", "top", "wide", "slow", "motion", "time", "lapse", "pan",
     "zoom", "shots", "views", "camera", "flying", "flyover", "overhead", "detail",
+    # Eylem/genel kelimeler: bunlar da konuyu tasimiyor ve alaka kapisini yaniltiyor
+    # ("arriving" -> "Train arriving" gibi).
+    "arriving", "leaving", "moving", "walking", "standing", "looking", "waiting",
+    "struggling", "working", "going", "coming", "sitting", "holding", "using",
+    "after", "before", "during", "through", "around", "between", "toward",
 }
 
 
