@@ -384,6 +384,155 @@ const BeyazTuval: React.FC<{
   );
 };
 
+/* ─────────────────────── SAHA ETIKETI + CERCEVE VURGUSU ─────────────────────── */
+
+/**
+ * OLCUM (7 Agu 2026, 20 referans video / 196 kare vision ile etiketlendi):
+ *
+ *   kanal          yazi var   baskın tur              grafik var  baskın
+ *   NextGen          %57      kucuk etiket %50           %14      cerceve %7
+ *   ZeroReports      %57      etiket %39, buyuk %11      %36      cerceve %18
+ *   MadeVision       %46      kucuk etiket %43           %7
+ *   NavyDecoded      %32                                 %29
+ *   ECHOES           %29                                 %4
+ *   Auralis          %25      etiket %18                 %7
+ *   Atrium           %11                                 %25      cerceve %11, harita %7
+ *   BEDOSAHO (biz)   %0       —                          %0       —
+ *
+ * En cok kullanilan teknik BUYUK BASLIK DEGIL, KUCUK ETIKET: bir yeri/nesneyi/kisiyi/
+ * sayiyi karenin uzerine yazmak. En iyi kanallarda karelerin %39-50'sinde var, bizde %0'di.
+ * Ikinci teknik: goruntunun bir bolgesini kutu/daire ile isaretlemek (%7-18).
+ *
+ * Ikisi de DETERMINISTIK grafik — ek AI maliyeti yok.
+ */
+export type SahaEtiketi = {
+  metin: string;
+  x: number;              // 0-1
+  y: number;              // 0-1
+  yon?: 'sol' | 'sag';    // cizgi hangi yone uzasin (varsayilan: x<0.5 ise sag)
+  gecikme?: number;       // saniye
+};
+
+export type VurguKutu = {
+  x: number;              // 0-1, sol
+  y: number;              // 0-1, ust
+  w: number;              // 0-1
+  h: number;              // 0-1
+  daire?: boolean;
+  gecikme?: number;
+};
+
+/** Kucuk saha etiketi: nokta + kisa cizgi + BUYUK HARF kisa yazi. */
+export const SahaEtiketleri: React.FC<{
+  etiketler?: SahaEtiketi[];
+  kareSayisi: number;
+}> = ({etiketler, kareSayisi}) => {
+  const frame = useCurrentFrame();
+  const {fps, width: W, height: H} = useVideoConfig();
+  if (!etiketler || !etiketler.length) return null;
+  return (
+    <AbsoluteFill style={{pointerEvents: 'none'}}>
+      {etiketler.slice(0, 3).map((e, i) => {
+        const gec = Math.round(fps * (e.gecikme ?? 0.35 + i * 0.5));
+        const p = interpolate(frame, [gec, gec + Math.round(fps * 0.42)], [0, 1], {
+          extrapolateLeft: 'clamp',
+          extrapolateRight: 'clamp',
+          easing: Easing.out(Easing.cubic),
+        });
+        const cik = interpolate(frame, [kareSayisi - Math.round(fps * 0.4), kareSayisi],
+          [1, 0], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
+        const opak = p * cik;
+        const saga = e.yon ? e.yon === 'sag' : e.x < 0.5;
+        const cizgi = 78 * p;                    // cizgi soldan saga uzar
+        const px = e.x * W;
+        const py = e.y * H;
+        return (
+          <React.Fragment key={i}>
+            <svg width={W} height={H} style={{position: 'absolute', inset: 0, opacity: opak}}>
+              <circle cx={px} cy={py} r={7} fill="#FFFFFF" stroke="rgba(0,0,0,0.55)"
+                      strokeWidth={2} />
+              <line x1={px} y1={py} x2={px + (saga ? cizgi : -cizgi)} y2={py}
+                    stroke="#FFFFFF" strokeWidth={3} strokeOpacity={0.95} />
+            </svg>
+            <div
+              style={{
+                position: 'absolute',
+                left: saga ? px + cizgi + 14 : undefined,
+                right: saga ? undefined : W - (px - cizgi) + 14,
+                top: py,
+                transform: `translateY(-50%) translateX(${(1 - p) * (saga ? -10 : 10)}px)`,
+                opacity: opak,
+                fontFamily: fontAilesi('montserrat'),
+                fontWeight: 800,
+                fontSize: 30,
+                letterSpacing: 1.1,
+                textTransform: 'uppercase',
+                color: '#FFFFFF',
+                whiteSpace: 'nowrap',
+                textShadow: '0 2px 10px rgba(0,0,0,0.85), 0 1px 2px rgba(0,0,0,0.95)',
+              }}
+            >
+              {e.metin}
+            </div>
+          </React.Fragment>
+        );
+      })}
+    </AbsoluteFill>
+  );
+};
+
+/** Cerceve vurgusu: goruntunun bir bolgesini kutu ya da daire ile isaretler. */
+export const CerceveVurgusu: React.FC<{kutu?: VurguKutu; kareSayisi: number}> = ({
+  kutu,
+  kareSayisi,
+}) => {
+  const frame = useCurrentFrame();
+  const {fps, width: W, height: H} = useVideoConfig();
+  if (!kutu) return null;
+  const gec = Math.round(fps * (kutu.gecikme ?? 0.5));
+  const p = interpolate(frame, [gec, gec + Math.round(fps * 0.5)], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: Easing.out(Easing.cubic),
+  });
+  const cik = interpolate(frame, [kareSayisi - Math.round(fps * 0.4), kareSayisi], [1, 0],
+    {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
+  const opak = p * cik;
+  const x = kutu.x * W;
+  const y = kutu.y * H;
+  const w = kutu.w * W;
+  const h = kutu.h * H;
+  // Kutu MERKEZDEN acilir: 0.85 -> 1.0 olcek, gozu rahatsiz etmeyen kisa bir hareket
+  const olcek = 0.85 + 0.15 * p;
+  const kose = Math.min(w, h) * 0.28;   // kose parcalari (tam cerceve yerine kose isareti)
+  return (
+    <AbsoluteFill style={{opacity: opak, pointerEvents: 'none'}}>
+      <svg width={W} height={H} style={{position: 'absolute', inset: 0}}>
+        <g transform={`translate(${x + w / 2} ${y + h / 2}) scale(${olcek}) translate(${-(x + w / 2)} ${-(y + h / 2)})`}>
+          {kutu.daire ? (
+            <ellipse cx={x + w / 2} cy={y + h / 2} rx={w / 2} ry={h / 2}
+                     fill="none" stroke="#FFFFFF" strokeWidth={4}
+                     strokeDasharray={`${Math.PI * (w + h) / 2}`}
+                     strokeDashoffset={`${(1 - p) * Math.PI * (w + h) / 2}`} />
+          ) : (
+            <>
+              {/* Kose isaretleri: tam cerceve goruntuyu bogar, referansta koseler var */}
+              <path d={`M${x} ${y + kose} L${x} ${y} L${x + kose} ${y}`} fill="none"
+                    stroke="#FFFFFF" strokeWidth={4} />
+              <path d={`M${x + w - kose} ${y} L${x + w} ${y} L${x + w} ${y + kose}`} fill="none"
+                    stroke="#FFFFFF" strokeWidth={4} />
+              <path d={`M${x + w} ${y + h - kose} L${x + w} ${y + h} L${x + w - kose} ${y + h}`}
+                    fill="none" stroke="#FFFFFF" strokeWidth={4} />
+              <path d={`M${x + kose} ${y + h} L${x} ${y + h} L${x} ${y + h - kose}`} fill="none"
+                    stroke="#FFFFFF" strokeWidth={4} />
+            </>
+          )}
+        </g>
+      </svg>
+    </AbsoluteFill>
+  );
+};
+
 /* ─────────────────────── BOLUM BASLIGI ─────────────────────── */
 
 /**

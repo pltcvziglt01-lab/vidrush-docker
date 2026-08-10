@@ -327,6 +327,7 @@ EDIT_STILLERI = {
         "ozet": "BBC Earth / Nat Geo — yavaş, hard-cut, gerçek footage, orkestral",
         "sahne_sn": 7, "kelime": 17, "footage_pct": 85, "overlay": "yok",
         "altyazi": "orta", "motion": "sinematik", "mag": "films_n_photography",
+        "saha_etiketi": True, "etiket_pct": 40,
         "bolumler": True,   # bolum basligi + bolum bazli anlatim
         "gorsel_ek": ("cinematic wildlife/nature documentary still, shot on a cinema camera, "
                       "85mm telephoto, shallow depth of field, natural golden-hour light, high "
@@ -338,6 +339,7 @@ EDIT_STILLERI = {
         "ozet": "Johnny Harris / Vox Atlas — Ken Burns 2.0 push-in, analog texture, kinetik başlık",
         "sahne_sn": 4, "kelime": 11, "footage_pct": 55, "overlay": "yogun",
         "altyazi": "orta", "motion": "anlati", "mag": "films_n_photography",
+        "saha_etiketi": True, "etiket_pct": 50,
         "bolumler": True,   # bolum basligi + bolum bazli anlatim
         "gorsel_ek": ("photojournalistic documentary frame, warm faded film tones, subtle film "
                       "grain and light leaks, tactile analog texture (old paper / wood grain), "
@@ -361,6 +363,7 @@ EDIT_STILLERI = {
         "sahne_sn": 5.5, "maks_sahne_sn": 8, "kelime": 15, "footage_pct": 92, "overlay": "yok",
         "altyazi": "yok", "motion": "sinematik", "mag": "films_n_photography",
         "tempo": "cift-modlu",   # olculen dagilim: %33 kisa / %26 orta / %29 uzun
+        "saha_etiketi": True, "etiket_pct": 40,
         "bolumler": True,   # bolum basligi + bolum bazli anlatim
         "gorsel_ek": ("photorealistic 4K travel documentary frame that must be indistinguishable "
                       "from real camera footage: either a high aerial drone view of coastline, "
@@ -382,6 +385,7 @@ EDIT_STILLERI = {
         "altyazi": "yok", "motion": "sinematik", "mag": "films_n_photography",
         "edit_paketi": True,      # plan 'grafik' alani uretir (EditPaketi.tsx sablonlari)
         "grafik_pct": 41,         # olculen beyaz-tuval orani
+        "saha_etiketi": True, "etiket_pct": 45,
         "bolumler": True,   # bolum basligi + bolum bazli anlatim
         "gorsel_ek": ("photorealistic editorial documentary frame, natural light, restrained "
                       "colour grade, real lens depth of field, absolutely no text, no captions, "
@@ -2303,6 +2307,36 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
     else:
         grafik_kural = ""
 
+    # ── SAHA ETIKETI + CERCEVE VURGUSU (7 Agu 2026, 20 video / 196 kare olcumu) ──
+    # Olculen: en iyi kanallarin karelerinin %39-57'sinde EKRANDA YAZI var ve baskin tur
+    # BUYUK BASLIK DEGIL, KUCUK ETIKET (yer/nesne/kisi/sayi adi). Bizim ciktida %0'di —
+    # "edit minimum" hissinin birinci sebebi bu. Ikinci teknik: goruntunun bir bolgesini
+    # kutu/daire ile isaretlemek (%7-18).
+    #   NextGen %57 (etiket %50) | ZeroReports %57 (etiket %39) | MadeVision %46 (etiket %43)
+    #   NavyDecoded %32 | ECHOES %29 | Auralis %25 | Atrium %11
+    if prof.get("saha_etiketi"):
+        oran = int(prof.get("etiket_pct") or 40)
+        etiket_kural = (
+            f"11) ON-SCREEN LABELS — about {oran}% of scenes must carry \"etiketler\": small "
+            "labels drawn ON the footage. This is the most-used technique in the reference "
+            "channels (measured frame by frame) and the single biggest thing missing from a "
+            "bare edit. Each label is a dot + short line + 1-4 WORDS in caps:\n"
+            '     "etiketler":[{"metin":"RAS TANURA","x":0.34,"y":0.58}]\n'
+            "   x/y are 0-1 fractions marking WHAT the label points at. Max 3 per scene.\n"
+            "   Label only things the narration actually names: a place, a vessel, a building, "
+            "a person's role, a measured number. NEVER invent a name or a figure — if the "
+            "narration does not state it, do not label it.\n"
+            "   Put the label where the thing plausibly is in frame (a ship low-centre, a "
+            "coastline left, a person's face upper-third). Avoid the bottom 12% (subtitles).\n"
+            "   Scenes with no nameable subject leave \"etiketler\" out.\n"
+            '12) HIGHLIGHT — in about 10% of scenes add "vurgu_kutu": a corner-marked box (or '
+            'circle) around the part of the frame the narration is pointing to:\n'
+            '     "vurgu_kutu":{"x":0.30,"y":0.28,"w":0.34,"h":0.30}\n'
+            '     add "daire":true for a circle. Use it when the line says "here", "this '
+            'section", "at the centre" — not decoratively.\n')
+    else:
+        etiket_kural = ""
+
     # 7) HD (Magnific) karari OTOMATIK: sadece close-up/kilit detay AI sahnelerinde.
     hd_kural = (
         "7) hd (HD upscale need): set hd=true ONLY for AI scenes that are close-ups or key detail "
@@ -2453,6 +2487,7 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
         f"{hd_kural}\n"
         f"{grafik_kural}"
         f"{bolum_kural}"
+        f"{etiket_kural}"
         # Gorsel API'leri gercek kisi tasvirini ISIMLE isteyince 400 basiyor (policy).
         # Isimsiz ama iyi tarif edilirse uretiyor -> planlayici ismi degil gorunusu yazsin.
         "REAL PEOPLE: NEVER write a real person's name inside scene_prompt or thumbnail.prompt "
@@ -2466,6 +2501,7 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
         "\"scene_prompt\":\"...\",\"footage_sorgu\":\"...\",\"overlay\":\"...\",\"hd\":false"
         + (",\"grafik\":{...}" if prof.get("edit_paketi") else "")
         + (",\"bolum\":\"\",\"bolum_yeri\":\"orta|ust\"" if prof.get("bolumler") else "")
+        + (",\"etiketler\":[],\"vurgu_kutu\":{}" if prof.get("saha_etiketi") else "")
         + "}]}"
     )
 
@@ -2593,6 +2629,46 @@ def _uzun_plan_sirali(story: str, prof: dict, hedef_sahne: int, parca=40) -> dic
     if len(scenes) < hedef_sahne * 0.85:
         toplam_plan["_eksik_oran"] = round(len(scenes) / hedef_sahne, 2)
     return toplam_plan
+
+
+def _etiket_props(s: dict) -> dict:
+    """Plan'in urettigi etiket/vurgu alanlarini DOGRULAYIP props'a cevirir.
+    Model bazen koordinati 0-100 olarak ya da metni cok uzun veriyor; kare disina
+    tasan ya da okunmayan etiket, etiket olmamasindan kotudur."""
+    cik = {}
+    et = []
+    for e in (s.get("etiketler") or [])[:3]:
+        if not isinstance(e, dict):
+            continue
+        m = " ".join(str(e.get("metin") or "").split())[:26].strip()
+        if not m:
+            continue
+        try:
+            x, y = float(e.get("x")), float(e.get("y"))
+        except Exception:
+            continue
+        if x > 1 or y > 1:            # 0-100 verilmis -> orana cevir
+            x, y = x / 100.0, y / 100.0
+        if not (0.04 <= x <= 0.96 and 0.06 <= y <= 0.86):
+            continue                  # kare disi / altyazi bandi
+        et.append({"metin": m.upper(), "x": round(x, 3), "y": round(y, 3)})
+    if et:
+        cik["etiketler"] = et
+    k = s.get("vurgu_kutu")
+    if isinstance(k, dict) and k:
+        try:
+            x, y, w, h = (float(k.get("x")), float(k.get("y")),
+                          float(k.get("w")), float(k.get("h")))
+            if max(x, y, w, h) > 1:
+                x, y, w, h = x / 100.0, y / 100.0, w / 100.0, h / 100.0
+            if (0 <= x < 1 and 0 <= y < 1 and 0.08 <= w <= 0.9 and 0.08 <= h <= 0.9
+                    and x + w <= 1.0 and y + h <= 1.0):
+                cik["vurguKutu"] = {"x": round(x, 3), "y": round(y, 3),
+                                    "w": round(w, 3), "h": round(h, 3),
+                                    **({"daire": True} if k.get("daire") else {})}
+        except Exception:
+            pass
+    return cik
 
 
 def _plan_kelime(plan: dict) -> int:
@@ -3480,6 +3556,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             # gecmez -> Video.tsx tarafinda katman cizilmez, eski davranis aynen korunur.
             **({"grafik": s["grafik"]} if isinstance(s.get("grafik"), dict) else {}),
             # Bolum basligi: plan sadece bolumun ILK sahnesine koyar, digerlerinde bos
+            **_etiket_props(s),
             **({"bolum": str(s["bolum"]).strip(),
                 "bolumYeri": ("ust" if str(s.get("bolum_yeri")) == "ust" else "orta")}
                if str(s.get("bolum") or "").strip() else {}),

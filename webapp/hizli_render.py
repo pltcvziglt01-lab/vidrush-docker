@@ -328,6 +328,12 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
         if str(s.get("bolum") or "").strip():
             print("  hizli motor: bolum basligi var -> Remotion", file=sys.stderr)
             return False
+        # Saha etiketi / cerceve vurgusu da SVG+React ile ciziliyor (nokta+cizgi+yazi,
+        # kose isaretli kutu, dash-offset ile cizilen daire). ffmpeg drawtext/drawbox ile
+        # taklidi yarim kalir; engel olmazsa etiketler SESSIZCE kaybolur.
+        if s.get("etiketler") or s.get("vurguKutu"):
+            print("  hizli motor: saha etiketi/vurgu var -> Remotion", file=sys.stderr)
+            return False
 
     fps = int(props.get("fps", 24))
     gecis = str(props.get("gecis", "sinematik"))

@@ -1,6 +1,9 @@
 import React from 'react';
 import {Lottie} from '@remotion/lottie';
-import {BolumBasligi, EditGrafigi, beyazZeminMi, type BolumYeri, type Grafik} from './EditPaketi';
+import {EfektKatmanlari, Glitch, Hologram, KanalFiltreleri, Kromatik, YonluBlur,
+  efektHesapla, type Efekt} from './Efektler';
+import {BolumBasligi, CerceveVurgusu, EditGrafigi, SahaEtiketleri, beyazZeminMi,
+  type BolumYeri, type Grafik, type SahaEtiketi, type VurguKutu} from './EditPaketi';
 import {
   AbsoluteFill,
   Audio,
@@ -37,6 +40,9 @@ export type Sahne = {
   grafik?: Grafik;      // Edit paketi sablonu (beyaz-tuval / olcu / alinti / metin / harita)
   bolum?: string;       // Bolum basligi — SADECE bolumun ilk sahnesinde dolu
   bolumYeri?: BolumYeri;// 'ust' (sol ust, cumle duzeni) | 'orta' (ortada, BUYUK HARF)
+  etiketler?: SahaEtiketi[];  // kucuk saha etiketleri (yer/nesne/sayi adi)
+  vurguKutu?: VurguKutu;      // goruntunun bir bolgesini isaretleyen cerceve/daire
+  efektler?: Efekt[];         // Efektler.tsx: sarsinti, grain, glitch, hologram, grade...
   altyazi: AltyaziParcasi[];
   vurgu?: boolean; // hikaye kanalı açılış sahnesi: yoğun hareket (derin zoom + push-in + paralaks)
   // Metin derin analizinden gelen anlatım işlevi — geçiş tipini o belirler.
@@ -483,11 +489,26 @@ const SahneGorunumu: React.FC<{
       ? hikayeHesapla(sahne, frame, K, fps)
       : sinematikHesapla(sahne, frame, K, fps);
 
+  // Efekt yigini: transform (sarsinti/dolly/3d donme) + filter (grade/bw/glow)
+  const ef = efektHesapla(sahne.efektler, frame, fps, K, `s${indeks}`);
   const gorselStil: React.CSSProperties = {
     width: '100%',
     height: '100%',
     objectFit: 'cover',
-    transform: g.transform,
+    transform: `${g.transform}${ef.transform ? ' ' + ef.transform : ''}`,
+    ...(ef.filter !== 'none' ? {filter: ef.filter} : {}),
+  };
+  const efAd = (sahne.efektler || []).map((e) => e.ad);
+  // Sarmalayici efektler: goruntuyu KOPYALAYARAK calisirlar (kanal ayirma, blur yonu)
+  const sarmala = (ic: React.ReactNode): React.ReactNode => {
+    let c = ic;
+    if (efAd.includes('glitch')) c = <Glitch tohum={`g${indeks}`}>{c}</Glitch>;
+    if (efAd.includes('hologram')) c = <Hologram>{c}</Hologram>;
+    if (efAd.includes('kromatik')) c = <Kromatik>{c}</Kromatik>;
+    if (efAd.includes('yon-blur') || efAd.includes('hareket-blur')) {
+      c = <YonluBlur siddet={1.2} aci={efAd.includes('hareket-blur') ? 90 : 0}>{c}</YonluBlur>;
+    }
+    return c;
   };
 
   // Edit paketi: beyaz-tuval/alinti/metin sablonlari BEYAZ zemin ister. O durumda
@@ -499,7 +520,8 @@ const SahneGorunumu: React.FC<{
 
   return (
     <AbsoluteFill style={{backgroundColor: beyaz ? '#FFFFFF' : 'black'}}>
-      {beyaz ? null : <GuvenliGorsel sahne={sahne} stil={gorselStil} />}
+      {efAd.length ? <KanalFiltreleri /> : null}
+      {beyaz ? null : sarmala(<GuvenliGorsel sahne={sahne} stil={gorselStil} />)}
       {/* Vinyet (anlati/hizli/hikaye): tek radial-gradient, per-frame maliyet yok.
           Hikayede film-karesi hissi verir. */}
       {vinyet ? (
@@ -516,6 +538,9 @@ const SahneGorunumu: React.FC<{
         kareSayisi={K}
       />
       <AEKatmani yol={sahne.ae} kareSayisi={K} />
+      <EfektKatmanlari efektler={sahne.efektler} kareSayisi={K} tohum={`e${indeks}`} />
+      <CerceveVurgusu kutu={sahne.vurguKutu} kareSayisi={K} />
+      <SahaEtiketleri etiketler={sahne.etiketler} kareSayisi={K} />
       <BolumBasligi metin={sahne.bolum} yer={sahne.bolumYeri} kareSayisi={K} />
       <GeriSayimRozeti metin={sahne.overlay || ''} kareSayisi={K} />
       <OverlayBaslik metin={sahne.overlay || ''} motion={motion} kareSayisi={K} />
