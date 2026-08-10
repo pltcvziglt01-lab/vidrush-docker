@@ -353,10 +353,12 @@ EDIT_STILLERI = {
     "seyahat-belgeseli": {
         "ad": "Seyahat Belgeseli (4K)",
         "ozet": "ImpossibleTravel — gerçek drone + yer görüntüsü derlemesi, yavaş anlatı, arşiv",
-        # sahne_sn = olculen ORTALAMA cekim (12.5 sn), medyan (6.5 sn) DEGIL: sahne sayisi
-        # hedef_sure/sahne_sn ile bulundugu icin burada ortalama dogru olcu. Medyani cift-modlu
-        # bant dagilimi zaten 6-7 sn'ye getiriyor (%58'i 8 sn'nin altinda).
-        "sahne_sn": 12.5, "kelime": 15, "footage_pct": 92, "overlay": "yok",
+        # KULLANICI KARARI (7 Agu 2026): hicbir gorsel/video 8 sn'den fazla ekranda kalmasin.
+        # Bu, olculen referansi GECERSIZ KILIYOR — referansin ortalama cekimi 12.5 sn ve
+        # %29'u 12 sn'den uzun. Talep uzerine uygulandi.
+        # 8 sn tavani altinda tutulabilen en yuksek ortalama 5.5 sn (bant dagilimi asagida):
+        # bantlar 3.0 / 5.0 / 6.5 / 8.0 sn, agirliklar %32/%26/%14/%29 -> ortalama 5.5 sn.
+        "sahne_sn": 5.5, "maks_sahne_sn": 8, "kelime": 15, "footage_pct": 92, "overlay": "yok",
         "altyazi": "yok", "motion": "sinematik", "mag": "films_n_photography",
         "tempo": "cift-modlu",   # olculen dagilim: %33 kisa / %26 orta / %29 uzun
         "bolumler": True,   # bolum basligi + bolum bazli anlatim
@@ -376,7 +378,7 @@ EDIT_STILLERI = {
     "veri-anlatisi": {
         "ad": "Veri Anlatısı (Neu)",
         "ozet": "Beyaz tuvalde işaretli veri etiketleri, ölçü okları, alıntı kartları + gerçek footage",
-        "sahne_sn": 9, "kelime": 22, "footage_pct": 45, "overlay": "yok",
+        "sahne_sn": 7, "maks_sahne_sn": 8, "kelime": 22, "footage_pct": 45, "overlay": "yok",
         "altyazi": "yok", "motion": "sinematik", "mag": "films_n_photography",
         "edit_paketi": True,      # plan 'grafik' alani uretir (EditPaketi.tsx sablonlari)
         "grafik_pct": 41,         # olculen beyaz-tuval orani
@@ -2362,9 +2364,21 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
         #   .32*0.20 + .26*0.48 + .14*0.80 + .29*2.40 = 1.00  ✓
         wpm = float(prof.get("_wpm") or 150)
         sn = float(prof["sahne_sn"])
-        def _k(carpan):        # saniye -> kelime
-            return max(4, int(round(sn * carpan * wpm / 60)))
-        k1, k2, k3, k4 = _k(0.20), _k(0.48), _k(0.80), _k(2.40)
+        tavan = float(prof.get("maks_sahne_sn") or 0)
+        # Carpanlarin AGIRLIKLI ORTALAMASI 1.0 olmali (yoksa video hedef sureyi kacirir):
+        #   .32*0.55 + .26*0.91 + .14*1.18 + .29*1.45 = 0.998  ✓
+        # maks_sahne_sn varsa carpanlar bu daha DAR sete gecer: en uzun bant tavana oturur
+        # (1.45 x 5.5 = 8.0 sn), boylece hicbir sahne tavani gecmez.
+        # 1.45 -> 1.42: kelime->saniye yuvarlamasi en uzun banti 8.1 sn'ye cikariyordu.
+        carpanlar = (0.55, 0.91, 1.18, 1.42) if tavan else (0.20, 0.48, 0.80, 2.40)
+
+        def _sn(c):
+            v = sn * c
+            return min(v, tavan) if tavan else v
+
+        def _k(c):             # saniye -> kelime
+            return max(4, int(round(_sn(c) * wpm / 60)))
+        k1, k2, k3, k4 = (_k(c) for c in carpanlar)
         kelime_kural = (
             f"2) Produce EXACTLY {hedef} sequential scenes. Scene LENGTH MUST VARY — this is a "
             "documentary, not a metronome. These proportions were measured shot by shot from the "
@@ -2373,10 +2387,12 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
             "short sentence.\n"
             f"   ~26% SHORT: about {k2} words.\n"
             f"   ~14% MEDIUM: about {k3} words.\n"
-            f"   ~29% LONG: about {k4} words (range {int(k4*0.7)}-{int(k4*1.3)}) — three or four "
-            "sentences that hold on ONE shot while the narration develops a whole thought. These "
-            "long holds are the backbone of the style; do not shy away from them.\n"
-            "Never put two VERY SHORT scenes back to back and never three scenes of the same "
+            f"   ~29% LONG: about {k4} words"
+            + (f" — HARD CEILING {k4} words, never more: no shot may stay on screen longer "
+               f"than {int(prof['maks_sahne_sn'])} seconds.\n" if tavan else
+               f" (range {int(k4*0.7)}-{int(k4*1.3)}) — three or four sentences that hold on ONE "
+               "shot while the narration develops a whole thought.\n")
+            + "Never put two VERY SHORT scenes back to back and never three scenes of the same "
             "class in a row. Alternate so the video breathes. If the source text is short, EXPAND "
             "it by adding MORE SCENES, never by pushing a line past its class range. The "
             "voiceover fields together form continuous narration in the ORIGINAL language.\n")
