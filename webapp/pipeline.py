@@ -26,6 +26,69 @@ import kaynak  # YT/Pexels footage + Magnific upscale
 OPENAI_KEY = os.environ.get("OPENAI_KEY", "")
 STUDYO = "/opt/vidrush/render-studio"
 PUBLIC = os.path.join(STUDYO, "public")
+SFX_DIR = os.environ.get("SFX_DIR", "/opt/vidrush/sfx")
+
+# Anlatim islevi -> hangi ses efekti. Bos = o islevde ses yok (cogu sahne sessiz kalir).
+SFX_ISLEV = {
+    "vurgu": "impact",
+    "liste": "whoosh-kisa",
+    "gecmis": "projektor",
+    "sonuc": "riser",
+    "soru": "ui",
+    "karsilastir": "whoosh-hizli",
+}
+SFX_SEYREKLIK = float(os.environ.get("SFX_SEYREKLIK", "0.75"))   # ayni islevde bile hepsine degil
+
+
+def sfx_bindir(video: str, sahneler: list, is_dizini: str) -> str:
+    """Sahne baslangiclarina ses efekti bindirir. Basarisiz olursa GIRDIYI aynen dondurur
+    (video asla kaybolmaz).
+
+    Neden seyrek: olculen referans kanallarda her kesmede ses yok; her kesmeye ses koymak
+    "tik-tak" eden amatör bir is cikarir. Islev eslesen sahnelerin %75'ine, ve ust uste
+    iki sahneye konmaz.
+    """
+    if not sahneler:
+        return video
+    parcalar, t, onceki_var = [], 0.0, False
+    for i, sh in enumerate(sahneler):
+        islev = str(sh.get("islev") or "")
+        ad = SFX_ISLEV.get(islev, "")
+        yol = os.path.join(SFX_DIR, f"{ad}.wav") if ad else ""
+        # Ilk sahneye ses koymuyoruz (video sesle acilmaz), ust uste iki sahneye de.
+        if (ad and i > 0 and not onceki_var and os.path.exists(yol)
+                and (i * 7919 % 100) / 100.0 < SFX_SEYREKLIK):
+            parcalar.append((t, yol))
+            onceki_var = True
+        else:
+            onceki_var = False
+        t += float(sh.get("sure") or 0)
+    if not parcalar:
+        return video
+    parcalar = parcalar[:40]        # filter_complex girdi sinirini asmamak icin
+    girdi = ["-i", video]
+    for _, y in parcalar:
+        girdi += ["-i", y]
+    filt = []
+    etiketler = []
+    for n, (bas, _) in enumerate(parcalar, start=1):
+        etiketler.append(f"[s{n}]")
+        filt.append(f"[{n}:a]adelay={int(bas * 1000)}|{int(bas * 1000)},volume=0.8[s{n}]")
+    filt.append(f"[0:a]{''.join(etiketler)}amix=inputs={len(parcalar) + 1}"
+                f":duration=first:dropout_transition=0:normalize=0[mix]")
+    cikti = os.path.join(is_dizini, "sesli.mp4")
+    r = subprocess.run(
+        ["ffmpeg", "-y", "-loglevel", "error"] + girdi
+        + ["-filter_complex", ";".join(filt), "-map", "0:v", "-map", "[mix]",
+           "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", cikti],
+        capture_output=True, text=True, timeout=1800)
+    if r.returncode != 0 or not os.path.exists(cikti) or os.path.getsize(cikti) < 1024:
+        print(f"  sfx bindirme basarisiz: {r.stderr[-200:]}", file=sys.stderr)
+        return video
+    print(f"  ses efekti: {len(parcalar)} nokta bindirildi", file=sys.stderr)
+    return cikti
+
+
 CIKTI_DIR = "/opt/vidrush/webapp/ciktilar"
 os.makedirs(CIKTI_DIR, exist_ok=True)
 
@@ -3666,6 +3729,19 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             print(sonuc.stderr[-2000:], file=sys.stderr)
             raise RuntimeError("Remotion render basarisiz")
 
+    # ── SES EFEKTLERI (7 Agu 2026, "Ultimate 500 Preset Pack" bonusundan) ──
+    # Pakette 18 ses efekti vardi; belgesele UYMAYAN oyun sesleri (minecraft, kilic,
+    # para sayaci) atildi, kalan 13'u -18 LUFS mono 48 kHz'e normalize edilip
+    # /opt/vidrush/sfx altina konuldu. -18 LUFS bilincli: anlati -14'te, efekt onun
+    # ALTINDA kalmali; ustune cikarsa amatör durur.
+    # Efekt HER kesmeye konmaz — referans kanallarda da yok. Anlatim islevine bagli
+    # ve seyrek: vurgu -> impact, liste -> kisa whoosh, gecmis -> projektor, sonuc -> riser.
+    if os.path.isdir(SFX_DIR):
+        try:
+            ham = sfx_bindir(ham, props_sahneler, is_dizini)
+        except Exception as e:
+            print(f"  sfx atlandi: {str(e)[:150]}", file=sys.stderr)
+
     bildir("Ses seviyesi ayarlanıyor...", 96)
     son_video = os.path.join(CIKTI_DIR, f"{is_adi}.mp4")
     # ── SES NORMALIZASYONU (4 Agu 2026) ──
@@ -3677,7 +3753,13 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     try:
         r_ses = subprocess.run(
             ["ffmpeg", "-y", "-loglevel", "error", "-i", ham,
-             "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
+             # ZINCIR (preset paketindeki ses presetlerinin ffmpeg karsiligi):
+             #   highpass 80 Hz  = "Anti Mic Rumble" (TTS'te de dusuk frekans cop var)
+             #   deesser         = "DeEsser" (s/ş sesleri tizde bicak gibi ciktigi icin)
+             #   loudnorm -14    = YouTube hedefi
+             #   alimiter        = "Hard Limiter" (tepe noktalari kirpilmadan tutulur)
+             "-af", ("highpass=f=80,deesser=i=0.35:m=0.5:f=0.18,"
+                     "loudnorm=I=-14:TP=-1.5:LRA=11,alimiter=limit=0.95:level=disabled"),
              "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", son_video],
             capture_output=True, text=True, timeout=1800)
         ses_ok = (r_ses.returncode == 0 and os.path.exists(son_video)
