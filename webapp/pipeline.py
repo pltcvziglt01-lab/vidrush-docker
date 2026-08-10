@@ -75,6 +75,27 @@ def efekt_ata(edit_id: str, islev: str, indeks: int) -> list:
     return temel
 
 
+# ── GECIS IMZASI (7 Agu 2026, 786 kesme olcumu) ──
+# Olculen: sert-kesme %79.9. Susulu gecisler pratikte yok. Kanal imzalari:
+#   ZeroReports karartma %23.1 | NavyDecoded flash %10.3 + whip %6.2 | Auralis %97.5 saf kesme
+# Stil basina: (imza, oran). Oran kadar sahneye imza konur, gerisi SERT KESME.
+GECIS_IMZASI = {
+    "seyahat-belgeseli":  ("karartma", 0.08),
+    "veri-anlatisi":      ("flash", 0.10),
+    "sinematik-belgesel": ("karartma", 0.20),   # ZeroReports modeli (karanlik/gizemli)
+    "anlati-video-essay": ("karartma", 0.12),
+    "hizli-explainer":    ("flash", 0.10),
+}
+
+
+def gecis_imza_sec(edit_id: str, indeks: int) -> str:
+    """Bu sahneye gecis imzasi konacak mi? Deterministik — ayni sahne her uretimde ayni."""
+    imza, oran = GECIS_IMZASI.get(edit_id, ("", 0.0))
+    if not imza or oran <= 0:
+        return ""
+    return imza if (indeks * 4177 % 1000) / 1000.0 < oran else ""
+
+
 SFX_DIR = os.environ.get("SFX_DIR", "/opt/vidrush/sfx")
 
 # Anlatim islevi -> hangi ses efekti. Bos = o islevde ses yok (cogu sahne sessiz kalir).
@@ -439,7 +460,7 @@ EDIT_STILLERI = {
         "ozet": "BBC Earth / Nat Geo — yavaş, hard-cut, gerçek footage, orkestral",
         "sahne_sn": 7, "kelime": 17, "footage_pct": 85, "overlay": "yok",
         "altyazi": "orta", "motion": "sinematik", "mag": "films_n_photography",
-        "saha_etiketi": True, "etiket_pct": 40,
+        "saha_etiketi": True, "etiket_pct": 24,
         "bolumler": True,   # bolum basligi + bolum bazli anlatim
         "gorsel_ek": ("cinematic wildlife/nature documentary still, shot on a cinema camera, "
                       "85mm telephoto, shallow depth of field, natural golden-hour light, high "
@@ -451,7 +472,7 @@ EDIT_STILLERI = {
         "ozet": "Johnny Harris / Vox Atlas — Ken Burns 2.0 push-in, analog texture, kinetik başlık",
         "sahne_sn": 4, "kelime": 11, "footage_pct": 55, "overlay": "yogun",
         "altyazi": "orta", "motion": "anlati", "mag": "films_n_photography",
-        "saha_etiketi": True, "etiket_pct": 50,
+        "saha_etiketi": True, "etiket_pct": 28,
         "bolumler": True,   # bolum basligi + bolum bazli anlatim
         "gorsel_ek": ("photojournalistic documentary frame, warm faded film tones, subtle film "
                       "grain and light leaks, tactile analog texture (old paper / wood grain), "
@@ -475,7 +496,7 @@ EDIT_STILLERI = {
         "sahne_sn": 5.5, "maks_sahne_sn": 8, "kelime": 15, "footage_pct": 92, "overlay": "yok",
         "altyazi": "yok", "motion": "sinematik", "mag": "films_n_photography",
         "tempo": "cift-modlu",   # olculen dagilim: %33 kisa / %26 orta / %29 uzun
-        "saha_etiketi": True, "etiket_pct": 40,
+        "saha_etiketi": True, "etiket_pct": 25,
         "bolumler": True,   # bolum basligi + bolum bazli anlatim
         "gorsel_ek": ("photorealistic 4K travel documentary frame that must be indistinguishable "
                       "from real camera footage: either a high aerial drone view of coastline, "
@@ -497,7 +518,7 @@ EDIT_STILLERI = {
         "altyazi": "yok", "motion": "sinematik", "mag": "films_n_photography",
         "edit_paketi": True,      # plan 'grafik' alani uretir (EditPaketi.tsx sablonlari)
         "grafik_pct": 41,         # olculen beyaz-tuval orani
-        "saha_etiketi": True, "etiket_pct": 45,
+        "saha_etiketi": True, "etiket_pct": 28,
         "bolumler": True,   # bolum basligi + bolum bazli anlatim
         "gorsel_ek": ("photorealistic editorial documentary frame, natural light, restrained "
                       "colour grade, real lens depth of field, absolutely no text, no captions, "
@@ -2303,14 +2324,28 @@ def islev_kurgu(islev: str, yogunluk: int, i: int, onceki: dict = None) -> dict:
     Cozum: (1) en sik islevler kendi ICINDE donusumlu, (2) onceki sahneyle
     ayni kombinasyon cikarsa ZORLA degistirilir.
     """
-    # Nadir ve anlami net olan islevler sabit yon alir
-    SABIT_ZOOM = {"vurgu": "in", "soru": "in", "acilis": "in",
-                  "gecmis": "out", "sonuc": "out", "karsilastir": "out"}
-    # Sik gorulen islevler kendi icinde donusumlu -> tek yone yigilmaz
+    # ── 7 Agu 2026 OLCUMU ILE IKINCI DUZELTME ──
+    # 246 referans cekimi olculdu (piksel eslestirme): zoom'lu cekimlerin
+    #   %78'i ZOOM-IN, %22'si zoom-out. Gorsel agirlikli kanallarda daha da uc:
+    #   ZeroReports %93 in, Auralis %85, Atrium %77.
+    # 4 Agu'daki duzeltmem sik islevleri "i % 2" ile 50/50 alternatiflemisti —
+    # tekrar hissini cozdu ama orani BOZDU: referans 78/22, bizde 50/50 oldu.
+    # Ayrica referansta cekimlerin %18-20'sinde kamera DURGUN. Bizde her sahnede
+    # zoom vardi. Ama onlarin durgun cekimi CANLI footage; bizde durgun = donmus kare
+    # (referansta o sadece %2). Bu yuzden %20 degil %12 hedeflenir.
+    # karsilastir "out"tan "in"e cevrildi: 3 islevi zorla out yapmak toplam orani
+    # %69/31'e cekiyordu, hedef %78/22. Karsilastirmada ice dogru yaklasmak da dogru
+    # (izleyici ayrintiya bakar), disari acilmak degil.
+    SABIT_ZOOM = {"vurgu": "in", "soru": "in", "acilis": "in", "karsilastir": "in",
+                  "gecmis": "out", "sonuc": "out"}
     if islev in SABIT_ZOOM:
         zoom = SABIT_ZOOM[islev]
     else:                                   # aciklama / ornek / liste
-        zoom = "in" if (i % 2 == 0) else "out"
+        # 78/22 in-out: her 9 sahnede 2'si out (deterministik, indeks tabanli)
+        zoom = "out" if (i * 3571 % 12) < 2 else "in"   # olculen dagilimda %78/22'a oturur
+    # %12 durgun kare: uzun sahnelerde ve sadece sik islevlerde (vurgu/acilis durgun olmaz)
+    if islev not in SABIT_ZOOM and (i * 6113 % 100) < 14:   # olculen dagilimda ~%12
+        zoom = "yok"
 
     PAN = {"gecmis": "left", "sonuc": "right", "karsilastir": "right", "acilis": "top"}
     pan = PAN.get(islev) or ("right", "left", "top", "bottom")[i % 4]
@@ -2427,25 +2462,28 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
     #   NextGen %57 (etiket %50) | ZeroReports %57 (etiket %39) | MadeVision %46 (etiket %43)
     #   NavyDecoded %32 | ECHOES %29 | Auralis %25 | Atrium %11
     if prof.get("saha_etiketi"):
-        oran = int(prof.get("etiket_pct") or 40)
+        oran = int(prof.get("etiket_pct") or 25)
         etiket_kural = (
-            f"11) ON-SCREEN LABELS — about {oran}% of scenes must carry \"etiketler\": small "
-            "labels drawn ON the footage. This is the most-used technique in the reference "
-            "channels (measured frame by frame) and the single biggest thing missing from a "
-            "bare edit. Each label is a dot + short line + 1-4 WORDS in caps:\n"
-            '     "etiketler":[{"metin":"RAS TANURA","x":0.34,"y":0.58}]\n'
-            "   x/y are 0-1 fractions marking WHAT the label points at. Max 3 per scene.\n"
-            "   Label only things the narration actually names: a place, a vessel, a building, "
-            "a person's role, a measured number. NEVER invent a name or a figure — if the "
-            "narration does not state it, do not label it.\n"
-            "   Put the label where the thing plausibly is in frame (a ship low-centre, a "
-            "coastline left, a person's face upper-third). Avoid the bottom 12% (subtitles).\n"
-            "   Scenes with no nameable subject leave \"etiketler\" out.\n"
-            '12) HIGHLIGHT — in about 10% of scenes add "vurgu_kutu": a corner-marked box (or '
-            'circle) around the part of the frame the narration is pointing to:\n'
-            '     "vurgu_kutu":{"x":0.30,"y":0.28,"w":0.34,"h":0.30}\n'
-            '     add "daire":true for a circle. Use it when the line says "here", "this '
-            'section", "at the centre" — not decoratively.\n')
+            f"11) ON-SCREEN TEXT — about {oran}% of scenes carry text. MEASURED from 935 frames "
+            "across 7 reference channels; the split INSIDE text-bearing frames is:\n"
+            "   alt-band (lower third) 33% | big title 28% | small label 20% | data number 12%\n"
+            "   Give the fields that apply; leave them out otherwise.\n"
+            '   "alt_band":{"baslik":"RAS TANURA","alt":"SAUDI ARABIA"} — the MOST used type. '
+            "A name/place/role in the lower left. baslik 1-4 words, alt is optional context.\n"
+            '   "etiketler":[{"metin":"400,000 DWT","x":0.34,"y":0.58}] — small label pinned to '
+            "a THING in frame. x/y are 0-1 fractions. Max 2 per scene (measured lifetime is only "
+            "1.8 s, so they are quick call-outs, not signage).\n"
+            "   Label only what the narration actually names — a place, a vessel, a role, a "
+            "measured number. NEVER invent a name or a figure.\n"
+            "   Avoid the bottom 12% (subtitle band) and do not put alt_band and etiketler on the "
+            "same scene.\n"
+            '12) HIGHLIGHT — about 15% of scenes get "vurgu_kutu": a corner-marked box (or circle) '
+            "around the part of the frame the narration points at:\n"
+            '     "vurgu_kutu":{"x":0.30,"y":0.28,"w":0.34,"h":0.30}   (add "daire":true for a circle)\n'
+            "   MEASURED RULE: a highlight almost never appears without text (72% of graphic "
+            "frames also carry text). So whenever you add vurgu_kutu, also add an alt_band or a "
+            "label naming what is highlighted.\n"
+            "   Do NOT produce timelines or split screens — measured 0% and 1% in the references.\n")
     else:
         etiket_kural = ""
 
@@ -2613,7 +2651,8 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
         "\"scene_prompt\":\"...\",\"footage_sorgu\":\"...\",\"overlay\":\"...\",\"hd\":false"
         + (",\"grafik\":{...}" if prof.get("edit_paketi") else "")
         + (",\"bolum\":\"\",\"bolum_yeri\":\"orta|ust\"" if prof.get("bolumler") else "")
-        + (",\"etiketler\":[],\"vurgu_kutu\":{}" if prof.get("saha_etiketi") else "")
+        + (",\"alt_band\":{},\"etiketler\":[],\"vurgu_kutu\":{}"
+           if prof.get("saha_etiketi") else "")
         + "}]}"
     )
 
@@ -2743,13 +2782,26 @@ def _uzun_plan_sirali(story: str, prof: dict, hedef_sahne: int, parca=40) -> dic
     return toplam_plan
 
 
+def _alt_band_props(s: dict) -> dict:
+    """Alt band (lower third) — OLCULEN en yaygin yazi turu (%33).
+    baslik 1-4 kelime, alt satir opsiyonel baglam."""
+    ab = s.get("alt_band")
+    if not isinstance(ab, dict):
+        return {}
+    b = " ".join(str(ab.get("baslik") or "").split())[:34].strip()
+    if not b:
+        return {}
+    a = " ".join(str(ab.get("alt") or "").split())[:40].strip()
+    return {"altBand": {"baslik": b, **({"alt": a} if a else {})}}
+
+
 def _etiket_props(s: dict) -> dict:
     """Plan'in urettigi etiket/vurgu alanlarini DOGRULAYIP props'a cevirir.
     Model bazen koordinati 0-100 olarak ya da metni cok uzun veriyor; kare disina
     tasan ya da okunmayan etiket, etiket olmamasindan kotudur."""
     cik = {}
     et = []
-    for e in (s.get("etiketler") or [])[:3]:
+    for e in (s.get("etiketler") or [])[:2]:   # olculen omur 1.8 sn — 3 etiket kalabalik
         if not isinstance(e, dict):
             continue
         m = " ".join(str(e.get("metin") or "").split())[:26].strip()
@@ -3669,7 +3721,9 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             **({"grafik": s["grafik"]} if isinstance(s.get("grafik"), dict) else {}),
             # Bolum basligi: plan sadece bolumun ILK sahnesine koyar, digerlerinde bos
             **_etiket_props(s),
+            **_alt_band_props(s),
             # Efekt atamasi: stil temeli + islev vurgusu (deterministik, LLM'e sorulmaz)
+            **({"gecisImza": _gi} if (_gi := gecis_imza_sec(edit_id, i)) else {}),
             **({"efektler": _ef} if (_ef := efekt_ata(
                 edit_id, kurgu_analiz[i]["islev"] if i < len(kurgu_analiz) else "aciklama", i))
                else {}),

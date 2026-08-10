@@ -170,30 +170,26 @@ def _zoompan_ifadeleri(sahne, gecis, fps, F):
     return z, x, y
 
 
-# ── GECIS DAGARCIGI (5 Agu 2026) ──
-# ffmpeg 5.1'de xfade'in 46 gecisi var; biz hepsinde sadece "fade" kullaniyorduk.
-# Video.tsx tarafinda anlati islevine gore gecis seciliyor (liste->slide, gecmis->clockWipe,
-# vurgu->wipe); hizli motor onu taklit etmiyordu, yani iki motor ayni videoda farkli
-# gorunuyordu. Artik ayni kural burada da var.
-# Secim KASITLI olarak sakin: belgesel/anlati isinde gosterisli gecis (pixelize, radial)
-# amatör durur — referans kanallarda yok.
-ISLEV_GECIS = {
-    "liste":      "slideleft",     # yeni madde: yandan girer
-    "gecmis":     "fadegrays",     # gecmise donus: renk cekilir
-    "vurgu":      "wipeleft",      # vurgu: sert supurme
-    "karsilastir": "hlslice",      # karsilastirma: dikey dilim
-    "soru":       "smoothleft",
-    "sonuc":      "fadeblack",     # kapanis: siyaha
+# ── GECIS SECIMI — OLCULEN DAGILIM (7 Agu 2026 duzeltmesi) ──
+# 20 referans videodan 786 kesme etiketlendi (kare cifti vision + piksel dogrulamasi):
+#   sert-kesme %79.9 | karartma %7.6 | beyaz-flash %4.1 | whip-pan %3.3
+#   crossfade %2.2 | wipe %1.1 | zoom-through %1.0 | match-cut %0.3
+# Yani bu niste GECIS = SERT KESME. Susulu gecislerin toplami %2.4, pratikte yok.
+#
+# 5 Agu'daki halim YANLISTI: anlatim islevine 6 farkli gecis baglamistim
+# (liste->slideleft, gecmis->fadegrays, vurgu->wipeleft, karsilastir->hlslice,
+# soru->smoothleft, sonuc->fadeblack). Bu, kesmelerin neredeyse TAMAMINA efekt
+# koyuyordu — referansin tam tersi. Simdi varsayilan SERT KESME.
+#
+# Kanal imzalari (olculdu, genel ortalamaya gore kat):
+#   ZeroReports  karartma %23.1 (x3.0)  -> karanlik/gizemli ton
+#   NavyDecoded  flash %10.3 (x2.5) + zoom-through %4.8 (x4.7) + whip %6.2 (x1.9)
+#   Auralis      %97.5 saf sert kesme   -> sakin anlati
+GECIS_IMZA_FFMPEG = {
+    "karartma": "fadeblack",
+    "flash": "fadewhite",
+    "whip": "slideleft",
 }
-GECIS_VARSAYILAN = "fade"
-
-
-def _gecis_sec(sahne, onceki_gecis=""):
-    """Sahnenin anlati islevine gore xfade gecisi. Ayni gecis iki kez ust uste gelmez."""
-    g = ISLEV_GECIS.get(str(sahne.get("islev") or ""), GECIS_VARSAYILAN)
-    if g == onceki_gecis and g != GECIS_VARSAYILAN:
-        return GECIS_VARSAYILAN        # tekrari kir
-    return g
 
 
 def _overlay_filtre(sahne, fps, F):
@@ -405,9 +401,13 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
                 g = min(GECIS_SN, sureler[i - 1] / 2, sureler[i] / 2)
                 offset = (offset + sureler[i - 1] - g) if i > 1 else (sureler[0] - g)
                 vo, ao = f"v{i}", f"a{i}"
-                # GELEN sahnenin islevi gecisi belirler (Video.tsx ile ayni kural)
-                tur = (_gecis_sec(sahne_dilimi[i], onceki)
-                       if sahne_dilimi and i < len(sahne_dilimi) else GECIS_VARSAYILAN)
+                # GELEN sahnenin IMZASI varsa efekt, yoksa cok kisa fade = sert kesme
+                # (xfade zincirinde 0 sureli gecis kurulamaz; 1 kare fade sert kesmedir)
+                imza = (str((sahne_dilimi[i] or {}).get("gecisImza") or "")
+                        if sahne_dilimi and i < len(sahne_dilimi) else "")
+                tur = GECIS_IMZA_FFMPEG.get(imza, "fade")
+                if not imza:
+                    g = min(g, 1.0 / max(1, fps) * 2)   # 2 kare = gozle sert kesme
                 onceki = tur
                 filt.append(f"[{son_v}][{i}:v]xfade=transition={tur}:duration={g:.3f}:"
                             f"offset={offset:.3f}[{vo}]")

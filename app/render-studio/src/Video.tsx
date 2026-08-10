@@ -2,7 +2,8 @@ import React from 'react';
 import {Lottie} from '@remotion/lottie';
 import {EfektKatmanlari, Glitch, Hologram, KanalFiltreleri, Kromatik, YonluBlur,
   efektHesapla, type Efekt} from './Efektler';
-import {BolumBasligi, CerceveVurgusu, EditGrafigi, SahaEtiketleri, beyazZeminMi,
+import {AltBand, BolumBasligi, CerceveVurgusu, EditGrafigi, KaliciLogo,
+  SahaEtiketleri, beyazZeminMi,
   type BolumYeri, type Grafik, type SahaEtiketi, type VurguKutu} from './EditPaketi';
 import {
   AbsoluteFill,
@@ -22,8 +23,6 @@ import {fade} from '@remotion/transitions/fade';
 // AE tarzi gecisler: kutuphane zaten kurulu (@remotion/transitions 4.0.410),
 // sadece fade() kullaniliyordu. Anlatim islevine gore sahne basina secilir.
 import {slide} from '@remotion/transitions/slide';
-import {wipe} from '@remotion/transitions/wipe';
-import {clockWipe} from '@remotion/transitions/clock-wipe';
 import {fontlariYukle, fontAilesi, ayarCoz, FontAdi, AltyaziAyar} from './fontlar';
 
 export type AltyaziParcasi = {t0: number; t1: number; metin: string};
@@ -43,6 +42,8 @@ export type Sahne = {
   etiketler?: SahaEtiketi[];  // kucuk saha etiketleri (yer/nesne/sayi adi)
   vurguKutu?: VurguKutu;      // goruntunun bir bolgesini isaretleyen cerceve/daire
   efektler?: Efekt[];         // Efektler.tsx: sarsinti, grain, glitch, hologram, grade...
+  gecisImza?: string;         // 'karartma' | 'flash' | 'whip' — BOSSA sert kesme (olculen %80)
+  altBand?: {baslik: string; alt?: string};   // en cok kullanilan yazi turu (olculen %33)
   altyazi: AltyaziParcasi[];
   vurgu?: boolean; // hikaye kanalı açılış sahnesi: yoğun hareket (derin zoom + push-in + paralaks)
   // Metin derin analizinden gelen anlatım işlevi — geçiş tipini o belirler.
@@ -59,6 +60,7 @@ export type VideoProps = {
   yukseklik: number;
   gecis?: Motion;
   altyaziStil?: AltyaziStil;
+  logo?: string;              // kalici kose filigrani (kanal adi); bos = filigran yok
   altyaziAyar?: Partial<AltyaziAyar> | string;   // sablon adi VEYA tam ayar nesnesi
   sahneler: Sahne[];
 };
@@ -97,7 +99,14 @@ export const normMotion = (m?: Motion): NormMotion => {
 };
 
 // PREMIUM: eased Ken Burns egrisi (lineer degil -> yumusak ivme; bedava, sadece egri)
-const KB_EASING = Easing.bezier(0.33, 0, 0.2, 1);
+// ── KEN BURNS EASING (7 Agu 2026 olcumu ile duzeltildi) ──
+// 20 referans videodan 134 temiz cekimde zoom RAMPASI olculdu:
+//   1. ceyrek %1.22/sn | 2. ceyrek %1.14/sn | 3. ceyrek %1.26/sn
+//   son/ilk = 1.03  ->  yani SABIT HIZ, LINEER. Referansta rampa YOK.
+// Eski egrimiz bezier(0.33,0,0.2,1) hareketin buyuk kismini ilk ceyrege yigiyordu
+// (yaklasik 7:1 on yuklemeli) — referansin tersi. Cok hafif bir yumusatma birakildi
+// (baslangic/bitis sertligini kirmak icin), gerisi lineer.
+const KB_EASING = Easing.bezier(0.42, 0.32, 0.58, 0.68);
 
 const sahneKare = (sure: number, fps: number) => Math.max(1, Math.round(sure * fps));
 
@@ -393,27 +402,56 @@ type Gorunum = {transform: string};
 // Bizde sabit 1.06-1.08 vardi = %1.2/sn — referansin yarisi. Sahne suresi 5 sn'den
 // 12 sn'ye cikinca bu sabit zoom "donmus goruntu" haline gelirdi.
 // Ust sinir 1.26: kaynak gorsel 1536 px genisliginde, daha derin zoom yumusakliga yol acar.
-const SURE_ZOOM = (K: number, fps: number, oran = 0.022, tavan = 1.26) =>
+// ── ZOOM HIZI (7 Agu 2026 olcumu) ──
+// 246 cekim olculdu (piksel eslestirme, NCC). Gorsel/AI agirlikli 5 kanalda:
+//   medyan %1.57/sn  (bizim eski 0.022 = %2.2/sn, medyanin %40 ustunde)
+//   12 sn+ cekimlerde toplam zoom 1.32-1.47 -> eski tavan 1.26 uzun sahneyi kisitliyordu
+// ASIL BULGU: hiz TEK BIR DEGER DEGIL, dagilim:
+//   %34 ihmal edilebilir (<0.5%/sn) | %39 sakin (0.5-2) | %14 belirgin (2-5) | %12 agresif (>5)
+// Bizim motor her sahneye AYNI hizi veriyordu -> "hep ayni kamera" hissi.
+// Artik sahne indeksinden deterministik kova secilir.
+const ZOOM_KOVA: {oran: number; pay: number}[] = [
+  {oran: 0.004, pay: 0.34},   // ihmal edilebilir
+  {oran: 0.014, pay: 0.39},   // sakin
+  {oran: 0.032, pay: 0.14},   // belirgin
+  {oran: 0.062, pay: 0.13},   // agresif
+];
+
+/** Sahne indeksine gore zoom hizi kovasi (deterministik, her uretimde ayni). */
+const zoomOrani = (indeks: number): number => {
+  const r = ((indeks * 2749) % 1000) / 1000;
+  let birikim = 0;
+  for (const k of ZOOM_KOVA) {
+    birikim += k.pay;
+    if (r < birikim) return k.oran;
+  }
+  return ZOOM_KOVA[1].oran;
+};
+
+const SURE_ZOOM = (K: number, fps: number, oran = 0.018, tavan = 1.38) =>
   Math.min(tavan, 1 + oran * (K / Math.max(1, fps)));
 
-const sinematikHesapla = (sahne: Sahne, frame: number, K: number, fps: number): Gorunum => {
-  const {olcek, tx, ty} = kbHesap(sahne, frame, K, SURE_ZOOM(K, fps), 22);
+const sinematikHesapla = (sahne: Sahne, frame: number, K: number, fps: number,
+  indeks = 0): Gorunum => {
+  const {olcek, tx, ty} = kbHesap(sahne, frame, K, SURE_ZOOM(K, fps, zoomOrani(indeks)), 22);
   return {transform: `scale(${olcek}) translate(${tx}px, ${ty}px)`};
 };
 
-const kesmeHesapla = (sahne: Sahne, frame: number, K: number, fps: number): Gorunum => {
-  const {olcek, tx, ty} = kbHesap(sahne, frame, K, SURE_ZOOM(K, fps), 20);
+const kesmeHesapla = (sahne: Sahne, frame: number, K: number, fps: number,
+  indeks = 0): Gorunum => {
+  const {olcek, tx, ty} = kbHesap(sahne, frame, K, SURE_ZOOM(K, fps, zoomOrani(indeks)), 20);
   return {transform: `scale(${olcek}) translate(${tx}px, ${ty}px)`};
 };
 
 // blur YOK. Push-in reveal transform ile. fade her sahnede degil -> gecis crossfade yapar (flash yok).
-const anlatiHesapla = (sahne: Sahne, frame: number, K: number, fps: number): Gorunum => {
+const anlatiHesapla = (sahne: Sahne, frame: number, K: number, fps: number,
+  indeks = 0): Gorunum => {
   // ⚠ 4 Agu 2026: giris push-in (1.12 -> 1.0) KALDIRILDI.
   // Crossfade sirasinda giden sahne zoom sonunda (~1.12), gelen sahne ayni anda
   // 1.12'den 1.0'a HIZLA kuculuyordu. Iki farkli olcek ust uste karisinca goz
   // bunu TAKILMA olarak goruyor (Polat bildirdi). Artik tek surekli hareket var:
   // sadece Ken Burns, sahne boyunca duzgun akiyor, gecis onu bozmuyor.
-  const {olcek: kb, tx: kbTx, ty: kbTy} = kbHesap(sahne, frame, K, SURE_ZOOM(K, fps, 0.026, 1.30), 40);
+  const {olcek: kb, tx: kbTx, ty: kbTy} = kbHesap(sahne, frame, K, SURE_ZOOM(K, fps, zoomOrani(indeks) * 1.2, 1.42), 40);
   return {transform: `translate(${kbTx}px, ${kbTy}px) scale(${kb})`};
 };
 
@@ -429,14 +467,15 @@ const hizliHesapla = (sahne: Sahne, frame: number, K: number, indeks: number, fp
   // binip zipliyordu. Yanal kayma korundu (o gecisle catismiyor), olcek ziplamasi
   // kaldirildi — tek surekli Ken Burns kaldi.
   const girisX = (1 - girisP) * yon * 60;
-  const {olcek: kb} = kbHesap(sahne, frame, K, SURE_ZOOM(K, fps, 0.026, 1.30), 0);
+  const {olcek: kb} = kbHesap(sahne, frame, K, SURE_ZOOM(K, fps, zoomOrani(indeks) * 1.2, 1.42), 0);
   return {transform: `translateX(${girisX}px) scale(${kb})`};
 };
 
 // Hikaye kanali: ACILIS sahneleri (vurgu=true, ilk ~2.5dk) yogun hareket alir — derin zoom +
 // push-in giris + genis paralaks pan (izleyici tutma). Sonraki sahneler sakin sinematik Ken Burns.
 // Hepsi transform-only: render maliyetine etkisi yok.
-const hikayeHesapla = (sahne: Sahne, frame: number, K: number, fps: number): Gorunum => {
+const hikayeHesapla = (sahne: Sahne, frame: number, K: number, fps: number,
+  indeks = 0): Gorunum => {
   if (sahne.vurgu) {
     const g = Math.max(6, Math.min(14, Math.floor(K / 4)));
     const girisP = interpolate(frame, [0, g], [0, 1], {
@@ -451,7 +490,7 @@ const hikayeHesapla = (sahne: Sahne, frame: number, K: number, fps: number): Gor
     const {olcek, tx, ty} = kbHesap(sahne, frame, K, 1.3, 110); // derin zoom + genis pan
     return {transform: `translate(${tx}px, ${ty}px) scale(${olcek * girisOlcek})`};
   }
-  const {olcek, tx, ty} = kbHesap(sahne, frame, K, SURE_ZOOM(K, fps), 26); // sakin bolum
+  const {olcek, tx, ty} = kbHesap(sahne, frame, K, SURE_ZOOM(K, fps, zoomOrani(indeks)), 26);
   return {transform: `scale(${olcek}) translate(${tx}px, ${ty}px)`};
 };
 
@@ -480,14 +519,14 @@ const SahneGorunumu: React.FC<{
 
   const g =
     motion === 'anlati'
-      ? anlatiHesapla(sahne, frame, K, fps)
+      ? anlatiHesapla(sahne, frame, K, fps, indeks)
       : motion === 'hizli'
       ? hizliHesapla(sahne, frame, K, indeks, fps)
       : motion === 'kesme'
-      ? kesmeHesapla(sahne, frame, K, fps)
+      ? kesmeHesapla(sahne, frame, K, fps, indeks)
       : motion === 'hikaye'
-      ? hikayeHesapla(sahne, frame, K, fps)
-      : sinematikHesapla(sahne, frame, K, fps);
+      ? hikayeHesapla(sahne, frame, K, fps, indeks)
+      : sinematikHesapla(sahne, frame, K, fps, indeks);
 
   // Efekt yigini: transform (sarsinti/dolly/3d donme) + filter (grade/bw/glow)
   const ef = efektHesapla(sahne.efektler, frame, fps, K, `s${indeks}`);
@@ -541,6 +580,7 @@ const SahneGorunumu: React.FC<{
       <EfektKatmanlari efektler={sahne.efektler} kareSayisi={K} tohum={`e${indeks}`} />
       <CerceveVurgusu kutu={sahne.vurguKutu} kareSayisi={K} />
       <SahaEtiketleri etiketler={sahne.etiketler} kareSayisi={K} />
+      <AltBand baslik={sahne.altBand?.baslik} alt={sahne.altBand?.alt} kareSayisi={K} />
       <BolumBasligi metin={sahne.bolum} yer={sahne.bolumYeri} kareSayisi={K} />
       <GeriSayimRozeti metin={sahne.overlay || ''} kareSayisi={K} />
       <OverlayBaslik metin={sahne.overlay || ''} motion={motion} kareSayisi={K} />
@@ -556,10 +596,10 @@ const SahneGorunumu: React.FC<{
 };
 
 export const VidrushVideo: React.FC<VideoProps> = ({
-  fps, gecis, altyaziStil, altyaziAyar, sahneler,
+  fps, gecis, altyaziStil, altyaziAyar, sahneler, logo,
 }) => {
   fontlariYukle();   // gomulu altyazi fontlarini enjekte et + yuklenene kadar render'i beklet
-  const {width, height} = useVideoConfig();   // clockWipe gecisi boyut ister
+  const {width, height} = useVideoConfig();
   const motion = normMotion(gecis);
   const alt: AltyaziStil = altyaziStil ?? 'orta';   // yalnizca undefined/null -> 'orta' ('yok' korunur)
   const {Ks, gecisler} = hesaplaKareler(sahneler, fps, motion);
@@ -578,35 +618,49 @@ export const VidrushVideo: React.FC<VideoProps> = ({
         />
       </TransitionSeries.Sequence>,
     );
+    // ── GECIS SECIMI — OLCULEN DAGILIMA GORE (7 Agu 2026) ──
+    // 20 referans videodan 786 kesme etiketlendi (kare cifti + piksel dogrulamasi):
+    //   sert-kesme %79.9 | karartma %7.6 | beyaz-flash %4.1 | whip-pan %3.3
+    //   crossfade %2.2 | wipe %1.1 | zoom-through %1.0 | match-cut %0.3
+    // Yani bu niste gecis DEMEK SERT KESME. Susulu gecislerin toplami %2.4 — pratikte yok.
+    // ONCEKI HALIM YANLISTI: 6 farkli gecisi anlatim islevine baglamistim (liste->slide,
+    // gecmis->clockWipe, vurgu->wipe, digeri->crossfade). Bu, karelerin neredeyse
+    // TAMAMINA efekt koyuyordu ve referanslardan UZAKLASTIRIYORDU.
+    // Artik: varsayilan SERT KESME (gecis yok), ve sadece stilin OLCULEN imzasi kadar efekt.
+    // Kanal imzalari (olculdu):
+    //   ZeroReports  karartma %23.1 (genelin 3 kati) — karanlik/gizemli ton
+    //   NavyDecoded  flash %10.3 + zoom-through %4.8 + whip %6.2 — enerjik ton
+    //   Auralis      %97.5 saf sert kesme — sakin anlati
     if (i < sahneler.length - 1 && gecisler[i] > 0) {
-      // Geçiş tipi SONRAKİ sahnenin işlevine göre — o sahneye nasıl giriliyor?
-      //   liste  -> yeni madde: sayfa çevirir gibi yandan kayma
-      //   gecmis -> geçmişe dönüş: saat yönünde silme (zaman hissi)
-      //   vurgu  -> vuruş: keskin silme
-      //   diğer  -> yumuşak crossfade (varsayılan, siyah flaş yok)
-      const sonraki = sahneler[i + 1]?.islev;
+      const sonraki = sahneler[i + 1];
+      const imza = String(sonraki?.gecisImza || '');
       const sure = gecisler[i];
-      const sunum =
-        sonraki === 'liste'
-          ? (slide({direction: 'from-right'}) as unknown as TransitionPresentation<Record<string, unknown>>)
-          : sonraki === 'gecmis'
-            ? (clockWipe({width, height}) as unknown as TransitionPresentation<Record<string, unknown>>)
-            : sonraki === 'vurgu'
-              ? (wipe({direction: 'from-left'}) as unknown as TransitionPresentation<Record<string, unknown>>)
+      // Imza yoksa GECIS EKLENMEZ -> sert kesme (referanstaki %80'lik pay)
+      if (imza) {
+        const sunum =
+          imza === 'karartma'
+            ? (fade({shouldFadeOutExitingScene: true, enterStyle: {}}) as unknown as TransitionPresentation<Record<string, unknown>>)
+            : imza === 'whip'
+              ? (slide({direction: 'from-right'}) as unknown as TransitionPresentation<Record<string, unknown>>)
               : (fade() as unknown as TransitionPresentation<Record<string, unknown>>);
-      cocuklar.push(
-        <TransitionSeries.Transition
-          key={`t${i}`}
-          presentation={sunum}
-          timing={linearTiming({durationInFrames: sure})}
-        />,
-      );
+        cocuklar.push(
+          <TransitionSeries.Transition
+            key={`t${i}`}
+            presentation={sunum}
+            timing={linearTiming({durationInFrames: sure})}
+          />,
+        );
+      }
     }
   });
 
   return (
     <AbsoluteFill style={{backgroundColor: 'black'}}>
       <TransitionSeries>{cocuklar}</TransitionSeries>
+      {/* Kalici kose logosu VIDEO seviyesinde: olculdu, 7 kanaldan 2'si videonun
+          tamaminda filigran tasiyor ve hic kapanmiyor. Sahne seviyesinde olsa gecislerde
+          yanip sonerdi. */}
+      <KaliciLogo metin={logo} kose="sag-ust" />
     </AbsoluteFill>
   );
 };

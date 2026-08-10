@@ -384,6 +384,122 @@ const BeyazTuval: React.FC<{
   );
 };
 
+/* ─────────────────────── ALT BAND + KALICI LOGO ─────────────────────── */
+
+/**
+ * OLCUM DUZELTMESI (7 Agu 2026, 935 kare / 7 kanal — onceki 196 karelik olcumu CURUTTU).
+ *
+ * Onceki sonucum: "kucuk etiket %39-50, baskin tur bu". YANLISTI. O olcumde MadeVision ve
+ * NextGen'in KALICI KANAL FILIGRANINI (kose logosu) "kucuk etiket" saymisim. Filigran
+ * ayrilinca NextGen'in gercek bilgi yazisi %0, MadeVision %15 cikiyor.
+ *
+ * GERCEK dagilim (yazili karelerin ICINDE, n=254):
+ *   alt-band %33 | buyuk-baslik %28 | kucuk-etiket %20 | veri-sayi %12 | altyazi %5 | bolum %2
+ * Yani en cok kullanilan tur ALT BAND (lower third), kucuk etiket ucuncu sirada.
+ *
+ * OLCULEN SURELER (tur bazli, motor icin asil kural):
+ *   kucuk-etiket 1.8 sn (medyan 1) | alt-band 4.7 sn (max 10) | veri-sayi 2.9 sn
+ *   buyuk-baslik 9.0 sn (medyan 16) | bolum-karti 3.0 sn
+ *   Yeni yazi tempo: 8-10 sn'de bir. Yazi kapandiktan sonra en az 3 sn temiz.
+ *
+ * GIRIS ANIMASYONU: 382 yazili karenin sadece %1.8'i yariyolda yakalandi -> referans
+ * animasyonlari 0.5 sn'nin ALTINDA. 1 sn'lik fade koyarsak ayni olcumde %15-25 cikar,
+ * yani gozle "yavas/amatör" gorunur. Bu yuzden tum yazi girisleri <= 0.3 sn.
+ */
+const GIRIS_SN = 0.28;          // olculen tavan: referanslarda animasyon <0.5 sn
+
+/** Alt band (lower third): en cok kullanilan yazi turu. Baslik + opsiyonel alt satir. */
+export const AltBand: React.FC<{
+  baslik?: string;
+  alt?: string;
+  kareSayisi: number;
+  gecikme?: number;
+}> = ({baslik, alt, kareSayisi, gecikme = 0.3}) => {
+  const frame = useCurrentFrame();
+  const {fps} = useVideoConfig();
+  if (!baslik) return null;
+  const g = Math.round(fps * gecikme);
+  const p = interpolate(frame, [g, g + Math.round(fps * GIRIS_SN)], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+    easing: Easing.out(Easing.cubic),
+  });
+  // Olculen omur: ortalama 4.7 sn, max 10. Sahne kisaysa sahneye sigdir.
+  const tut = Math.min(Math.round(fps * 4.7), Math.max(1, kareSayisi - Math.round(fps * 0.3)));
+  const cik = interpolate(frame, [tut, tut + Math.round(fps * GIRIS_SN)], [1, 0], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  const opak = p * cik;
+  return (
+    <AbsoluteFill style={{pointerEvents: 'none'}}>
+      <div
+        style={{
+          position: 'absolute',
+          left: '5.5%',
+          bottom: '13%',
+          opacity: opak,
+          transform: `translateX(${(1 - p) * -18}px)`,
+        }}
+      >
+        {/* Sol kenarda dikey vurgu cubugu — alt bandin standart isareti */}
+        <div style={{display: 'flex', alignItems: 'stretch', gap: 16}}>
+          <div style={{width: 6, backgroundColor: '#F5E14B', borderRadius: 3,
+            transform: `scaleY(${p})`, transformOrigin: 'top center'}} />
+          <div>
+            <div style={{
+              fontFamily: fontAilesi('montserrat'), fontWeight: 800, fontSize: 44,
+              lineHeight: 1.1, color: '#FFFFFF', letterSpacing: 0.3,
+              textShadow: '0 3px 14px rgba(0,0,0,0.85), 0 1px 3px rgba(0,0,0,0.95)',
+            }}>{baslik}</div>
+            {alt ? (
+              <div style={{
+                marginTop: 6, fontFamily: fontAilesi('montserrat'), fontWeight: 600,
+                fontSize: 26, color: 'rgba(255,255,255,0.86)', letterSpacing: 1.1,
+                textTransform: 'uppercase',
+                textShadow: '0 2px 10px rgba(0,0,0,0.85)',
+              }}>{alt}</div>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+/**
+ * Kalici kose logosu. Olculdu: 7 kanaldan 2'si (MadeVision, NextGen) videonun TAMAMINDA
+ * filigran tasiyor, hic kapanmiyor. Bu yazi butcesinden SAYILMAZ — ayri katman.
+ */
+export const KaliciLogo: React.FC<{
+  metin?: string;
+  kose?: 'sag-ust' | 'sol-ust' | 'sag-alt' | 'sol-alt';
+}> = ({metin, kose = 'sag-ust'}) => {
+  if (!metin) return null;
+  const [dy, dx] = kose.split('-') as [string, string];
+  return (
+    <AbsoluteFill style={{pointerEvents: 'none'}}>
+      <div
+        style={{
+          position: 'absolute',
+          [dy === 'sag' ? 'right' : 'left']: '3%',
+          [dx === 'ust' ? 'top' : 'bottom']: '4.5%',
+          opacity: 0.78,
+          fontFamily: fontAilesi('montserrat'),
+          fontWeight: 800,
+          fontSize: 24,
+          letterSpacing: 2.2,
+          textTransform: 'uppercase',
+          color: '#FFFFFF',
+          textShadow: '0 2px 10px rgba(0,0,0,0.8)',
+        } as React.CSSProperties}
+      >
+        {metin}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
 /* ─────────────────────── SAHA ETIKETI + CERCEVE VURGUSU ─────────────────────── */
 
 /**
@@ -434,13 +550,16 @@ export const SahaEtiketleri: React.FC<{
     <AbsoluteFill style={{pointerEvents: 'none'}}>
       {etiketler.slice(0, 3).map((e, i) => {
         const gec = Math.round(fps * (e.gecikme ?? 0.35 + i * 0.5));
-        const p = interpolate(frame, [gec, gec + Math.round(fps * 0.42)], [0, 1], {
+        const p = interpolate(frame, [gec, gec + Math.round(fps * GIRIS_SN)], [0, 1], {
           extrapolateLeft: 'clamp',
           extrapolateRight: 'clamp',
           easing: Easing.out(Easing.cubic),
         });
-        const cik = interpolate(frame, [kareSayisi - Math.round(fps * 0.4), kareSayisi],
-          [1, 0], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
+        // OLCULEN OMUR: kucuk etiket ortalama 1.8 sn, medyan 1 sn (935 kare olcumu).
+        // Eskiden sahne sonuna kadar duruyordu — referanstan 3-4 kat uzun.
+        const tut = gec + Math.round(fps * 1.8);
+        const cik = interpolate(frame, [tut, tut + Math.round(fps * GIRIS_SN)], [1, 0],
+          {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'});
         const opak = p * cik;
         const saga = e.yon ? e.yon === 'sag' : e.x < 0.5;
         const cizgi = 78 * p;                    // cizgi soldan saga uzar
