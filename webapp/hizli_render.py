@@ -320,6 +320,14 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
         if isinstance(s.get("grafik"), dict) and s["grafik"].get("tur"):
             print("  hizli motor: edit paketi grafigi var -> Remotion", file=sys.stderr)
             return False
+        # BOLUM BASLIGI da Remotion'a ait (7 Agu 2026). BolumBasligi React bileseni
+        # spring animasyonu + kontur + iki katmanli golge kullaniyor; ffmpeg drawtext'te
+        # karsiligi yok. Engel OLMAZSA bu isler hizli motorda render edilir ve basliklar
+        # SESSIZCE KAYBOLUR — RENDER_MOTOR=ffmpeg varsayilan oldugu icin bu durum
+        # belgesel islerinin cogunda yasanirdi.
+        if str(s.get("bolum") or "").strip():
+            print("  hizli motor: bolum basligi var -> Remotion", file=sys.stderr)
+            return False
 
     fps = int(props.get("fps", 24))
     gecis = str(props.get("gecis", "sinematik"))
