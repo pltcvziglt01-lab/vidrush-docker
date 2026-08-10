@@ -259,6 +259,46 @@ def youtube_indir(url: str, hedef: str, maks_sure: int = 60) -> bool:
     return os.path.exists(son) and os.path.getsize(son) > 10000
 
 
+# ── YOUTUBE ADAY FILTRESI (7 Agu 2026, canli videoda REKLAM cikti) ──
+# Teslim edilen 37 sn'lik belgeselin son 5 saniyesi bir MOBIL OYUN REKLAMI oldu
+# ("HardCore Realm" oyun arayuzu + "Everything you need to know about" yazisi).
+# Sebep: oyun/uygulama tanitim videolari cogu zaman CC lisansli ve genel sorgularla
+# eslesiyor; ustune biz videonun BASINDAN indiriyoruz ve baslarda tam da tanitim/logo/
+# arayuz kismi oluyor. Monetize kanalda bu hem utanc hem politika riski.
+_YT_YASAK_KELIME = {
+    # oyun / uygulama tanitimi
+    "gameplay", "game", "gaming", "roblox", "minecraft", "fortnite", "mod", "modded",
+    "update", "patch", "server", "server", "noob", "pro", "hack", "cheat", "glitch",
+    "tycoon", "simulator", "codes", "code", "script", "afk", "grind", "loadout",
+    # tanitim / cagri
+    "trailer", "teaser", "subscribe", "giveaway", "promo", "advert", "advertisement",
+    "sponsored", "download", "install", "app", "review", "unboxing", "tutorial",
+    "how to get", "click", "link in", "discount", "coupon", "sale",
+    # ekran kaydi
+    "screen recording", "screencast", "walkthrough", "lets play", "let's play",
+    "stream", "livestream", "vod", "reaction",
+}
+
+
+def _yt_aday_uygun(aday: dict, sorgu: str) -> bool:
+    """Adayin BASLIGI reklam/oyun/ekran-kaydi isaretleri tasiyor mu, ve sorguyla
+    alakali mi? Coverr'daki mantigin aynisi: alakasiz klip, klipsizlikten kotudur."""
+    baslik = str(aday.get("baslik") or "").lower()
+    if not baslik:
+        return False
+    for y in _YT_YASAK_KELIME:
+        if y in baslik:
+            print(f"  YT atlandi (reklam/oyun isareti '{y}'): {baslik[:56]}", file=sys.stderr)
+            return False
+    # Alaka: sorgunun KONU kelimelerinden en az biri baslikta olmali
+    konu = [k.lower() for k in sorgu.replace(",", " ").split()
+            if len(k) > 3 and k.lower() not in _COVERR_KAMERA_KELIME]
+    if konu and not any(k in baslik or k.rstrip("s") in baslik for k in konu):
+        print(f"  YT atlandi (sorguyla alakasiz): {baslik[:56]}", file=sys.stderr)
+        return False
+    return True
+
+
 def youtube_sahne(sorgu: str, hedef: str, maks_sure: int = 25,
                   lisans_dogrula: bool = True) -> bool:
     """Sorgudan ilk uygun videoyu bul ve indir. Basarili ise True.
@@ -267,6 +307,8 @@ def youtube_sahne(sorgu: str, hedef: str, maks_sure: int = 25,
     for aday in youtube_ara(sorgu, adet=6):
         s = aday.get("sure")
         if s and s > 3600:      # 1 saatten uzun canli/podcast'leri atla
+            continue
+        if not _yt_aday_uygun(aday, sorgu):
             continue
         if lisans_dogrula and not _lisans_cc_mi(aday["url"]):
             print(f"  CC degil, atlandi: {aday['baslik'][:60]}", file=sys.stderr)

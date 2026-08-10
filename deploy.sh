@@ -118,7 +118,16 @@ fi
 echo "  ✓ 8 uc nokta 200"
 
 echo "== 5/5 Durumu imaja bas (kalici) =="
+# ⚠ HER commit YENI bir 5+ GB imaj katmani yaratir ve eskisi <none> (dangling) olarak
+# diskte kalir. 7 Agu 2026'da bu birikim sunucu diskini DOLDURDU: 75 dangling imaj,
+# 125 GB, disk %100 -> video uretimi cikti yazamaz hale gelirdi. Bu yuzden commit'ten
+# hemen sonra dangling imajlar temizlenir. Calisan konteynerin imaji ETIKETLI oldugu
+# icin prune ona dokunmaz.
 $SSH "docker commit bedosaho bedosaho:latest >/dev/null && docker tag bedosaho:latest bedosaho && echo '  ✓ kalici'"
+GERI=$($SSH "docker image prune -f 2>/dev/null | tail -1")
+echo "  ✓ eski imaj katmanlari temizlendi (${GERI:-0})"
+BOS=$($SSH "df -h / | tail -1 | awk '{print \$4\" bos (\"\$5\" dolu)\"}'")
+echo "  disk: $BOS"
 
 echo ""
 echo "✅ DEPLOY TAMAM.  Site: http://$IP/"
