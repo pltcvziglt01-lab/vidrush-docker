@@ -2314,10 +2314,19 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
     # kendi basligi + kendi anlatim yayi var. Bizim plan tek duz liste uretiyordu, o yuzden
     # 40 dakika boyunca ayni tonda akip gidiyordu.
     # Bolum sayisi: ~5 dakikada bir bolum (kullanicinin gosterdigi referansta bu orandaydi).
+    # Bolum sayisi: ~5 dakikada bir bolum. TABAN 3 DEGIL 1 (7 Agu 2026 duzeltmesi):
+    # eski taban 3'tu ve 1 dakikalik bir testte 4 sahneye 3 bolum dusuyordu — neredeyse
+    # her sahnede bir bolum basligi, yani sacma. 2 dakikanin altinda bolum yapisi zaten
+    # anlamsiz: tek bolum basligi (acilis) kalir.
     if prof.get("bolumler"):
-        bolum_adet = max(3, min(10, int(round(hedef * float(prof["sahne_sn"]) / 300))))
+        toplam_dk = hedef * float(prof["sahne_sn"]) / 60.0
+        bolum_adet = max(1, min(10, int(round(toplam_dk / 5.0))))
         bolum_kural = (
-            f"10) CHAPTERS — split the video into EXACTLY {bolum_adet} chapters. This is how the "
+            (f"10) CHAPTERS — this video is short, so it has ONE chapter: put a single "
+             "chapter title on the FIRST scene only and leave \"bolum\" out of every other "
+             "scene. Use \"bolum_yeri\":\"orta\".\n"
+             if bolum_adet == 1 else
+             f"10) CHAPTERS — split the video into EXACTLY {bolum_adet} chapters. This is how the "
             "reference channel is built: not one flat narration, but chapters that each have "
             "their own title and their own arc.\n"
             "   Each chapter must work as a small self-contained piece: it opens with a line "
@@ -2335,7 +2344,7 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
             "\"orta\" chapters back to back.\n"
             "   Titles are 5-12 words, in the story's language, no numbering, no colon, and they "
             "must NOT repeat the video title.\n"
-            "   EVERY OTHER scene leaves \"bolum\" out entirely.\n")
+            "   EVERY OTHER scene leaves \"bolum\" out entirely.\n"))
     else:
         bolum_kural = ""
 
