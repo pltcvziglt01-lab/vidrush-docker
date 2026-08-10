@@ -26,6 +26,55 @@ import kaynak  # YT/Pexels footage + Magnific upscale
 OPENAI_KEY = os.environ.get("OPENAI_KEY", "")
 STUDYO = "/opt/vidrush/render-studio"
 PUBLIC = os.path.join(STUDYO, "public")
+# ═══════════ EFEKT ATAMASI (7 Agu 2026) ═══════════
+# Efektler.tsx kutuphanesi vardi ama motor KULLANMIYORDU. Atama LLM'e sorulmuyor:
+#   (a) her sahne icin efekt sormak plan promptunu sisirir ve tutarsiz secim uretir
+#   (b) deterministik atama BEDAVA ve tekrar uretilebilir
+#
+# Iki katman:
+#   TEMEL  — stilin kimligi, HER sahnede acik. Olculen kanal profillerinden:
+#            ZeroReports %86 koyu kare -> koyu grade + vinyet + grain
+#            Atrium %61 koyu, %71 3D    -> grade + letterbox
+#            NextGen/MadeVision parlak  -> agir grade YOK, sadece hafif grain
+#            Auralis yavas/parlak       -> cok hafif grain
+#   VURGU  — anlatim islevine gore SEYREK aksan (her sahnede degil).
+EFEKT_TEMEL = {
+    "seyahat-belgeseli": [{"ad": "grain", "siddet": 0.7}, {"ad": "vinyet", "siddet": 0.8}],
+    "veri-anlatisi":     [{"ad": "grain", "siddet": 0.5}],
+    "sinematik-belgesel": [{"ad": "grain", "siddet": 0.9}, {"ad": "vinyet", "siddet": 1.0},
+                           {"ad": "kontrast-grade", "siddet": 1.1}],
+    "anlati-video-essay": [{"ad": "grain", "siddet": 1.1}, {"ad": "vinyet", "siddet": 0.9},
+                           {"ad": "sicak-grade", "siddet": 0.8}],
+    "hizli-explainer":   [],
+}
+# Islev -> vurgu efekti. Bos olan islevlerde efekt YOK.
+EFEKT_ISLEV = {
+    "vurgu":       [{"ad": "sarsinti", "siddet": 1.1}],
+    "gecmis":      [{"ad": "siyah-beyaz", "siddet": 0.85}, {"ad": "grain", "siddet": 1.4}],
+    "karsilastir": [{"ad": "yon-blur", "siddet": 0.9}],
+    "sonuc":       [{"ad": "yumusak-zoom", "siddet": 1.0}],
+}
+EFEKT_SEYREKLIK = float(os.environ.get("EFEKT_SEYREKLIK", "0.7"))
+
+
+def efekt_ata(edit_id: str, islev: str, indeks: int) -> list:
+    """Sahnenin efekt listesi: stil temeli + (seyrek) islev vurgusu.
+    Ayni sahne her uretimde AYNI efekti alir (indeks tabanli, rastgelelik yok)."""
+    temel = [dict(e) for e in EFEKT_TEMEL.get(edit_id, [])]
+    vurgu = EFEKT_ISLEV.get(islev or "", [])
+    # Seyreklik: islev eslesse bile hepsine degil (surekli efekt yorucu olur)
+    if vurgu and (indeks * 6151 % 100) / 100.0 < EFEKT_SEYREKLIK:
+        adlar = {e["ad"] for e in temel}
+        for e in vurgu:
+            if e["ad"] in adlar:          # ayni efekt iki kez girmesin; siddeti yukselt
+                for t in temel:
+                    if t["ad"] == e["ad"]:
+                        t["siddet"] = max(t.get("siddet", 1), e.get("siddet", 1))
+            else:
+                temel.append(dict(e))
+    return temel
+
+
 SFX_DIR = os.environ.get("SFX_DIR", "/opt/vidrush/sfx")
 
 # Anlatim islevi -> hangi ses efekti. Bos = o islevde ses yok (cogu sahne sessiz kalir).
@@ -3620,6 +3669,10 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             **({"grafik": s["grafik"]} if isinstance(s.get("grafik"), dict) else {}),
             # Bolum basligi: plan sadece bolumun ILK sahnesine koyar, digerlerinde bos
             **_etiket_props(s),
+            # Efekt atamasi: stil temeli + islev vurgusu (deterministik, LLM'e sorulmaz)
+            **({"efektler": _ef} if (_ef := efekt_ata(
+                edit_id, kurgu_analiz[i]["islev"] if i < len(kurgu_analiz) else "aciklama", i))
+               else {}),
             **({"bolum": str(s["bolum"]).strip(),
                 "bolumYeri": ("ust" if str(s.get("bolum_yeri")) == "ust" else "orta")}
                if str(s.get("bolum") or "").strip() else {}),

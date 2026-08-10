@@ -24,7 +24,8 @@
  * TOHUMLU (sahne indeksinden), yoksa her render farkli cikar ve tekrar uretilemez.
  */
 import React from 'react';
-import {AbsoluteFill, Easing, interpolate, random, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, Easing, interpolate, random, spring, useCurrentFrame,
+  useVideoConfig} from 'remotion';
 import {fontAilesi} from './fontlar';
 
 /* ═══════════════════════ ortak yardimcilar ═══════════════════════ */
@@ -51,7 +52,10 @@ export type EfektAdi =
   | 'soguk-grade' | 'sicak-grade' | 'kontrast-grade' | 'yon-blur' | 'hareket-blur'
   | 'keskinlestir' | 'letterbox' | 'yuvarlak-kose' | 'kenarlik'
   // ozel
-  | 'hologram' | 'glitch';
+  | 'hologram' | 'glitch'
+  // preset aileleri (416 presetten)
+  | 'whip-pan' | 'slide' | 'pop-in' | 'stretch' | 'shine' | 'tv-bantlari' | 'bulge'
+  | 'yukleme-cubugu';
 
 export type Efekt = {ad: EfektAdi; siddet?: number; gecikme?: number};
 
@@ -184,11 +188,13 @@ export const Kromatik: React.FC<{siddet?: number; children: React.ReactNode}> = 
   siddet = 1, children,
 }) => (
   <AbsoluteFill>
-    <AbsoluteFill style={{transform: `translateX(${-1.2 * siddet}px)`,
-      filter: 'url(#kanal-r)', opacity: 0.55, mixBlendMode: 'screen'}}>{children}</AbsoluteFill>
-    <AbsoluteFill style={{transform: `translateX(${1.2 * siddet}px)`,
-      filter: 'url(#kanal-b)', opacity: 0.55, mixBlendMode: 'screen'}}>{children}</AbsoluteFill>
-    <AbsoluteFill style={{opacity: 0.9}}>{children}</AbsoluteFill>
+    {/* Kayma 1.2 -> 2.6 px: acik zeminli karelerde 1.2 px gozle gorulmuyordu.
+        Taban katman ONCE cizilir, kanallar UZERINE screen ile biner. */}
+    <AbsoluteFill>{children}</AbsoluteFill>
+    <AbsoluteFill style={{transform: `translateX(${-2.6 * siddet}px)`,
+      filter: 'url(#kanal-r)', opacity: 0.42, mixBlendMode: 'screen'}}>{children}</AbsoluteFill>
+    <AbsoluteFill style={{transform: `translateX(${2.6 * siddet}px)`,
+      filter: 'url(#kanal-b)', opacity: 0.42, mixBlendMode: 'screen'}}>{children}</AbsoluteFill>
   </AbsoluteFill>
 );
 
@@ -308,10 +314,18 @@ export const Hologram: React.FC<{siddet?: number; children: React.ReactNode}> = 
   const titre = 0.82 + Math.sin(frame * 0.9) * 0.06 + random(`h${Math.floor(frame / 3)}`) * 0.05;
   return (
     <AbsoluteFill>
+      {/* Render testinde (7 Agu) hologram fazla soluk cikti: opaklik 0.55-0.80 arasi
+          kaliyor ve goruntu kayboluyordu. Taban 0.82'ye cikarildi, doygunluk 0.4 -> 0.62
+          (tamamen renksiz kalinca "bozuk video" gibi duruyordu), blur yarilandi. */}
       <AbsoluteFill style={{
-        opacity: titre * (0.55 + 0.25 * (1 - siddet / 3)),
-        filter: `saturate(0.4) hue-rotate(-160deg) brightness(1.25) blur(${0.4 * siddet}px)`,
+        opacity: titre * (0.82 + 0.08 * (1 - siddet / 3)),
+        filter: `saturate(0.62) hue-rotate(-150deg) brightness(1.16) blur(${0.2 * siddet}px)`,
       }}>{children}</AbsoluteFill>
+      {/* Mavi tonlama ayri katmanda: filtre ile yapinca goruntuyu oldururyor */}
+      <AbsoluteFill style={{
+        backgroundColor: 'rgba(90,190,255,0.16)', mixBlendMode: 'overlay',
+        pointerEvents: 'none',
+      }} />
       {/* tarama cizgileri: yukari kayan yatay desen */}
       <AbsoluteFill style={{
         background: 'repeating-linear-gradient(0deg, rgba(120,220,255,0.10) 0px, '
@@ -502,6 +516,152 @@ export const IkonParlamasi: React.FC<{periyot?: number}> = ({periyot = 3}) => {
       mixBlendMode: 'screen', pointerEvents: 'none',
     }} />
   );
+};
+
+/* ═══════════════════════ PRESET AILELERI (416 presetten eksik kalanlar) ═══════════════════════ */
+
+/** Whip pan: hizli yatay/dikey supurme + yon blur'u. 4 yon. */
+export const whipPan = (
+  frame: number, fps: number, yon: 'sol' | 'sag' | 'ust' | 'alt' = 'sol', siddet = 1,
+) => {
+  const u = Math.round(fps * 0.28);
+  const p = interpolate(frame, [0, u], [1, 0], {
+    extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.out(Easing.quad),
+  });
+  const d = 260 * siddet * p;
+  const tr = yon === 'sol' ? `translateX(${d}px)`
+    : yon === 'sag' ? `translateX(${-d}px)`
+    : yon === 'ust' ? `translateY(${d}px)` : `translateY(${-d}px)`;
+  const bulanik = (p * 9 * siddet).toFixed(2);
+  return {transform: tr, filter: p > 0.02 ? `blur(${bulanik}px)` : 'none'};
+};
+
+/** Slide in/out: 8 yon (4 duz + 4 diyagonal), yumusak easing. */
+export const slide = (
+  frame: number, fps: number,
+  yon: 'sol' | 'sag' | 'ust' | 'alt' | 'sol-ust' | 'sag-ust' | 'sol-alt' | 'sag-alt' = 'sol',
+  cikis = false, siddet = 1,
+) => {
+  const u = Math.round(fps * 0.5);
+  const p = cikis
+    ? interpolate(frame, [0, u], [0, 1], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp',
+      easing: Easing.in(Easing.cubic)})
+    : interpolate(frame, [0, u], [1, 0], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp',
+      easing: Easing.out(Easing.cubic)});
+  const d = 100 * siddet * p;
+  const [sx, sy] = {
+    sol: [d, 0], sag: [-d, 0], ust: [0, d], alt: [0, -d],
+    'sol-ust': [d, d], 'sag-ust': [-d, d], 'sol-alt': [d, -d], 'sag-alt': [-d, -d],
+  }[yon] as [number, number];
+  return {transform: `translate(${sx.toFixed(1)}%, ${sy.toFixed(1)}%)`};
+};
+
+/** Pop in: yay ile buyuyerek girer. 6 kademe (kucuk/orta/buyuk x normal/zipli). */
+export const popIn = (
+  frame: number, fps: number, kademe: 1 | 2 | 3 = 2, zipli = false,
+) => {
+  const bas = [0.86, 0.78, 0.66][kademe - 1];
+  const y = spring({frame, fps, config: zipli
+    ? {damping: 9, stiffness: 170, mass: 0.7}      // zipli: geri sekme var
+    : {damping: 20, stiffness: 130, mass: 0.8}});   // normal: oturur
+  return {transform: `scale(${(bas + (1 - bas) * y).toFixed(4)})`, opacity: Math.min(1, y * 1.6)};
+};
+
+/** Stretch: yatay ya da dikey gerilme (bounce'lu ya da duz). */
+export const stretch = (
+  frame: number, fps: number, eksen: 'yatay' | 'dikey' = 'yatay', siddet = 1, zipli = false,
+) => {
+  const y = spring({frame, fps, config: zipli
+    ? {damping: 8, stiffness: 190, mass: 0.6} : {damping: 22, stiffness: 140, mass: 0.8}});
+  const g = 1 + 0.3 * siddet * (1 - y);
+  return {transform: eksen === 'yatay'
+    ? `scaleX(${g.toFixed(4)}) scaleY(${(1 / Math.sqrt(g)).toFixed(4)})`
+    : `scaleY(${g.toFixed(4)}) scaleX(${(1 / Math.sqrt(g)).toFixed(4)})`};
+};
+
+/** Yuvarlak kose: 8 kademe (kucuk 1-5x, orta 1-3x). */
+export const YuvarlakKose: React.FC<{
+  kademe?: number; children: React.ReactNode;
+}> = ({kademe = 3, children}) => (
+  <AbsoluteFill style={{borderRadius: Math.max(0, kademe) * 9, overflow: 'hidden'}}>
+    {children}
+  </AbsoluteFill>
+);
+
+/** Kenarlik: kare cevresine cerceve (Premiere "Borders"). */
+export const Kenarlik: React.FC<{kalinlik?: number; renk?: string}> = ({
+  kalinlik = 10, renk = '#FFFFFF',
+}) => (
+  <AbsoluteFill style={{
+    border: `${kalinlik}px solid ${renk}`, boxSizing: 'border-box', pointerEvents: 'none',
+  }} />
+);
+
+/** Shine: 4 yonde egik isik seridi (Premiere "Shine Effect"). */
+export const Shine: React.FC<{
+  yon?: 'sol-ust' | 'sag-ust' | 'sol-alt' | 'sag-alt'; periyot?: number;
+}> = ({yon = 'sol-ust', periyot = 2.6}) => {
+  const frame = useCurrentFrame();
+  const {fps} = useVideoConfig();
+  const d = Math.max(1, Math.round(fps * periyot));
+  const p = (frame % d) / d;
+  const aci = {'sol-ust': 105, 'sag-ust': 75, 'sol-alt': -105, 'sag-alt': -75}[yon];
+  const yon_isareti = yon.startsWith('sag') ? -1 : 1;
+  return (
+    <AbsoluteFill style={{
+      background: `linear-gradient(${aci}deg, rgba(255,255,255,0) 40%, `
+        + 'rgba(255,255,255,0.30) 50%, rgba(255,255,255,0) 60%)',
+      transform: `translateX(${(yon_isareti * (-130 + p * 260)).toFixed(1)}%)`,
+      mixBlendMode: 'screen', pointerEvents: 'none',
+    }} />
+  );
+};
+
+/** Loading bar: soldan saga (ya da tersi) dolan cubuk. */
+export const YuklemeCubugu: React.FC<{
+  y?: number; ters?: boolean; renk?: string; sure?: number;
+}> = ({y = 0.86, ters, renk = '#F5E14B', sure = 2.2}) => {
+  const frame = useCurrentFrame();
+  const {fps} = useVideoConfig();
+  const p = interpolate(frame, [Math.round(fps * 0.3), Math.round(fps * (0.3 + sure))], [0, 1],
+    {extrapolateLeft: 'clamp', extrapolateRight: 'clamp', easing: Easing.inOut(Easing.cubic)});
+  return (
+    <AbsoluteFill style={{pointerEvents: 'none'}}>
+      <div style={{position: 'absolute', left: '10%', right: '10%', top: `${y * 100}%`,
+        height: 12, backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 6, overflow: 'hidden'}}>
+        <div style={{height: '100%', width: `${(p * 100).toFixed(1)}%`,
+          backgroundColor: renk, borderRadius: 6,
+          transformOrigin: ters ? 'right center' : 'left center',
+          marginLeft: ters ? 'auto' : 0}} />
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+/** TV displacement lines: yatay kayan bozulma bantlari (3 siddet). */
+export const TVBantlari: React.FC<{siddet?: number}> = ({siddet = 1}) => {
+  const frame = useCurrentFrame();
+  const {fps} = useVideoConfig();
+  const y = ((frame / Math.max(1, fps)) * 0.35) % 1;
+  return (
+    <AbsoluteFill style={{pointerEvents: 'none', opacity: 0.10 + 0.12 * siddet}}>
+      <div style={{position: 'absolute', left: 0, right: 0, top: `${y * 100}%`,
+        height: `${3 + 5 * siddet}%`,
+        background: 'linear-gradient(0deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.5) 50%, '
+          + 'rgba(255,255,255,0) 100%)', mixBlendMode: 'overlay'}} />
+      <AbsoluteFill style={{
+        background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.16) 0px, '
+          + 'rgba(0,0,0,0.16) 1px, rgba(0,0,0,0) 3px)',
+      }} />
+    </AbsoluteFill>
+  );
+};
+
+/** Bulge: merkeze dogru sisme/cokme (Premiere "Bulge Screen"). */
+export const bulge = (frame: number, fps: number, disa = true, siddet = 1) => {
+  const y = spring({frame, fps, config: {damping: 18, stiffness: 110, mass: 0.9}});
+  const k = (disa ? 1 : -1) * 0.10 * siddet * (1 - y);
+  return {transform: `perspective(900px) scale(${(1 + k).toFixed(4)})`};
 };
 
 /* ═══════════════════════ GECIS EFEKTLERI ═══════════════════════ */
