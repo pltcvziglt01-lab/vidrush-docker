@@ -2595,10 +2595,66 @@ def _uzun_plan_sirali(story: str, prof: dict, hedef_sahne: int, parca=40) -> dic
     return toplam_plan
 
 
-def uzun_plan(story: str, prof: dict, sure_dk: float) -> dict:
+def _plan_kelime(plan: dict) -> int:
+    return sum(len(str(sc.get("voiceover") or "").split())
+               for sc in (plan.get("scenes") or []))
+
+
+def sure_tamamla(plan: dict, story: str, prof: dict, sure_dk: float,
+                 bildir=None) -> dict:
+    """Plan hedef SUREYI tutuyor mu? Tutmuyorsa sahne EKLEYEREK tamamlar.
+
+    NEDEN GEREKLI (7 Agu 2026, canli iste olculdu): 1 dakika istenen bir belgesel
+    37.8 saniye cikti — %37 kisa. Sahne SAYISI dogruydu (10/10) ama plan her satiri
+    bant hedefinden kisa yazdi (~112 kelime, butce 178). Sahne suresi seslendirme
+    sesinin uzunlugundan geldigi icin kisa satir = kisa video, ve arada hicbir kontrol
+    yoktu. Sahne sayisi kontrolu (_eksik_oran) bunu YAKALAMAZ: sayi tamdi.
+
+    Butce = hedef saniye x sesin gercek WPM'i / 60. Eksik kaldiysa eksigi kapatacak
+    kadar EK SAHNE istenir (en fazla 2 tur; her tur ~1 kurus'luk gpt-4.1-mini cagrisi).
+    """
+    wpm = float(prof.get("_wpm") or 150)
+    butce = sure_dk * 60 * wpm / 60.0
+    kel_sahne = max(4, float(prof.get("kelime") or 15))
+    for tur in range(2):
+        mevcut = _plan_kelime(plan)
+        if mevcut >= butce * 0.92:
+            break
+        eksik = butce - mevcut
+        ek_sahne = int(min(60, max(1, round(eksik / kel_sahne))))
+        tahmini = mevcut / wpm * 60
+        mesaj = (f"Plan {tahmini:.0f} sn'lik ({mevcut} kelime / butce {butce:.0f}); "
+                 f"{ek_sahne} sahne daha isteniyor")
+        print(f"  sure tamamlama tur {tur+1}: {mesaj}", file=sys.stderr)
+        if bildir:
+            bildir("Süre tamamlanıyor (plan kısa kaldı)...", None)
+        ozet = str(plan.get("ozet") or "")[:700]
+        yon = ("The video is still SHORT of its target length. Continue the SAME video with "
+               f"{ek_sahne} additional scenes that add NEW detail — new examples, numbers, "
+               "consequences, or a closing section. Do NOT repeat anything already covered "
+               "and do NOT summarise. Keep the same language and tone.")
+        try:
+            ek = plan_uret(story, prof, hedef_sahne=ek_sahne, devam=True,
+                           onceki_ozet=ozet, bolum_yonergesi=yon)
+        except Exception as e:
+            print(f"  sure tamamlama basarisiz: {str(e)[:140]}", file=sys.stderr)
+            break
+        yeni = ek.get("scenes") or []
+        if not yeni:
+            break
+        plan["scenes"] = (plan.get("scenes") or []) + yeni
+    son = _plan_kelime(plan)
+    print(f"  PLAN SURESI: {son} kelime -> ~{son / wpm * 60:.0f} sn "
+          f"(hedef {sure_dk * 60:.0f} sn, {len(plan.get('scenes') or [])} sahne)",
+          file=sys.stderr)
+    return plan
+
+
+def uzun_plan(story: str, prof: dict, sure_dk: float, bildir=None) -> dict:
     hedef_sahne = int(min(MAKS_SAHNE, max(1, (sure_dk * 60) / prof["sahne_sn"])))
     if hedef_sahne <= 55:
-        return plan_uret(story, prof, hedef_sahne=hedef_sahne)
+        return sure_tamamla(plan_uret(story, prof, hedef_sahne=hedef_sahne),
+                            story, prof, sure_dk, bildir)
     # ── PARALEL PLANLAMA ──
     # Eskiden parcalar SIRALI yaziliyordu (her biri oncekinin ozetini bekler; 30 dk video
     # ~8-10 dk plan). Simdi: 1 ucuz cagriyla hikaye ISKELETI (bolum ozetleri) cikar, sonra
@@ -2639,7 +2695,8 @@ def uzun_plan(story: str, prof: dict, sure_dk: float) -> dict:
     toplam_plan["scenes"] = scenes[:hedef_sahne]
     if len(scenes) < hedef_sahne * 0.85:
         toplam_plan["_eksik_oran"] = round(len(scenes) / hedef_sahne, 2)
-    return toplam_plan
+    # Uzun (paralel) yolda da SURE denetimi: parcalar kisa yazdiysa eksik kapatilir
+    return sure_tamamla(toplam_plan, story, prof, sure_dk, bildir)
 
 
 def on_ciz_16x9(yol: str) -> bool:
