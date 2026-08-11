@@ -449,16 +449,23 @@ export const VeriGrafigi: React.FC<{spec: MotionSpec; fps: number}> = ({spec, fp
   const cizimSn = sayi(spec.parametre.cizim_sn, Math.max(0.8, sure * 0.5));
   const t = ilerleme(frame, bas * fps, cizimSn * fps, spec);
   const sayacDeger = Math.round(veri[0] * t);
-  // Cizim bittikten sonra kare DONMASIN: harita gibi tum sure boyunca cok
-  // yavas bir zoom. (11 Agu: veri sahnesi 20.0'da donmus blok verdi.)
+  // Cizim bittikten sonra kare DONMASIN: harita gibi tum sure boyunca yavas
+  // hareket. (11 Agu: veri sahnesi 20.0'da donmus blok verdi.)
+  //
+  // ⚠ IKINCI OLCUM (Faz E): %2 sabit sürüklenme UZUN sahnede yetmedi —
+  // 6.1 sn'lik tek cubuklu grafik 43.6'da yine donmus blok verdi (%0.33/sn,
+  // freezedetect esiginin altinda). Suruklenme artik SUREYE BAGLI: uzun sahne
+  // daha cok hareket alir, boylece hiz (%/sn) sabit kalir.
   const surukle = ilerleme(frame, bas * fps, sure * fps, spec);
-  const tamOlcek = 1 + 0.02 * surukle;
+  const oran = Math.max(0.03, Math.min(0.075, 0.011 * sure));
+  const tamOlcek = 1 + oran * surukle;
+  const kayY = -oran * 120 * surukle;
   return (
     <AbsoluteFill
       style={{
         opacity: op,
         pointerEvents: 'none',
-        transform: `scale(${tamOlcek})`,
+        transform: `scale(${tamOlcek}) translateY(${kayY}px)`,
         transformOrigin: '30% 50%',
       }}
     >
@@ -510,7 +517,10 @@ export const VeriGrafigi: React.FC<{spec: MotionSpec; fps: number}> = ({spec, fp
               key={i}
               style={{
                 width: 84,
-                height: `${(d / enBuyuk) * 100 * ti}%`,
+                // Cizim bitince nefes: deterministik (frame tabanli), her
+                // cubuk farkli fazda ki mekanik gorunmesin
+                height: `${(d / enBuyuk) * 100 * ti *
+                  (1 + 0.02 * Math.sin(frame / 17 + i * 1.3))}%`,
                 background: i === 0 ? RENK.veriCubuk : 'rgba(245,225,75,0.35)',
                 borderTop: `3px solid ${RENK.vurgu}`,
               }}

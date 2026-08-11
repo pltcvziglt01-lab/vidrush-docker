@@ -136,6 +136,51 @@ def dogrula(remotion_props: dict, matris: Optional[dict] = None) -> dict:
                 _ekle("V2-EASING", "warn", sid, bid, ad,
                       "easing_bezier 4 elemanli olmali; lineere dusulecek")
 
+    # ══════════ SES KAPISI (Faz E) ══════════
+    # ⚠ Faz D'de `scene.ses` props'ta tasiniyor ama hicbir <Audio> yoktu; video
+    # sessiz cikiyordu ve kimse fark etmiyordu. Kural: BEYAN EDILEN ses kaybolursa
+    # FAIL, hic ses beyan edilmediyse durustce WARN.
+    # props_hazirla'nin tuttugu kayip defteri: BEYAN EDILEN ama kopyalanamayan
+    # her varlik FAIL. Bu, "props'ta vardi videoda yoktu" durumunun tek gercek
+    # tespiti — bos string'e bakmak yetmiyor (bos deger zaten kaybin sonucu).
+    for k in remotion_props.get("_kayip_varliklar") or []:
+        etiket = str(k.get("etiket") or "")
+        _ekle("V2-SES-KAYIP" if ".ses" in etiket or etiket.startswith("ses.")
+              else "V2-MEDYA-KAYIP",
+              "fail", "", "", etiket,
+              f"beyan edildi ama kullanilamadi: {k.get('kaynak')} "
+              f"({k.get('sebep')})")
+
+    ses = remotion_props.get("ses") or {}
+    ses_katman = 0
+    if isinstance(ses, dict):
+        for alan in ("anlatim", "muzik"):
+            if str(ses.get(alan) or "").strip():
+                ses_katman += 1
+        ses_katman += len([a for a in (ses.get("ambans") or [])
+                           if str(a or "").strip()])
+
+    sahne_sesli = 0
+    for i, sh in enumerate(sahneler):
+        sid = sh.get("scene_id") or f"#{i}"
+        bid = sh.get("beat_id") or f"#{i}"
+        if sh.get("ses"):
+            sahne_sesli += 1
+        # J/L cut isaretli ama ses yok -> zamanlama uygulanamaz, sessiz kayip
+        if (sh.get("j_cut") or sh.get("l_cut")) and not sh.get("ses"):
+            _ekle("V2-JL-SESSIZ", "warn", sid, bid, "",
+                  "j_cut/l_cut isaretli ama sahnede ses yok; zamanlama uygulanamaz")
+
+    if ses_katman == 0 and sahne_sesli == 0:
+        _ekle("V2-ANLATIM-YOK", "warn", "", "", "",
+              "ne master anlatim ne sahne sesi var — video SESSIZ render edilecek")
+    if isinstance(ses, dict) and ses.get("yapay_ses"):
+        _ekle("V2-YAPAY-SES", "bilgi", "", "", "",
+              "anlatim yapay/deneme sesle uretildi — icerik kalitesi iddiasinda belirtilmeli")
+
+    say["ses_katman"] = ses_katman
+    say["sahne_sesli"] = sahne_sesli
+
     durum = ("FAIL" if any(s["seviye"] == "fail" for s in sorunlar)
              else "WARN" if any(s["seviye"] == "warn" for s in sorunlar)
              else "PASS")
@@ -160,8 +205,57 @@ def props_hazirla(remotion_props: dict, *, calisma_dizin: str,
     goreli_kok = os.path.relpath(hedef_dizin, os.path.join(STUDIO, "public"))
 
     props = json.loads(json.dumps(remotion_props))   # derin kopya
+
+    kayiplar: list = []
+
+    def _kopyala(kaynak: str, ad_on: str, *, etiket: str = "") -> str:
+        """Tek dosyayi public/ altina kopyala, goreli yolu don.
+
+        ⚠ Kopyalanamazsa bos donuyor AMA kaybi `kayiplar`a YAZIYOR. Ilk surumde
+        yalnizca bos donuyordu; `if ses.get(alan)` False oldugu icin kapi
+        "beyan edildi ama kayip" durumunu goremiyordu — engellemeye calistigimiz
+        sessiz kaybin aynisi.
+        """
+        if not kaynak:
+            return ""
+        if kaynak.startswith(("http://", "https://", "data:")):
+            return kaynak
+        if not os.path.exists(kaynak):
+            kayiplar.append({"etiket": etiket or ad_on, "kaynak": kaynak,
+                             "sebep": "dosya yok"})
+            return ""
+        ad = f"{ad_on}{os.path.splitext(kaynak)[1] or '.bin'}"
+        hedef = os.path.join(hedef_dizin, ad)
+        try:
+            if (not os.path.exists(hedef)
+                    or os.path.getsize(hedef) != os.path.getsize(kaynak)):
+                shutil.copy(kaynak, hedef)
+        except Exception as e:
+            kayiplar.append({"etiket": etiket or ad_on, "kaynak": kaynak,
+                             "sebep": f"kopyalanamadi: {str(e)[:80]}"})
+            return ""
+        return f"{goreli_kok}/{ad}".replace(os.sep, "/")
+
+    # ── SES KATMANLARI (Faz E) ──
+    # ⚠ Ses de medya gibi public/ altinda olmak zorunda; disaridaki mutlak yol
+    # tarayicida 404 verir ve video SESSIZ cikar (Faz D'de goruntude yasandi).
+    ses = props.get("ses")
+    if isinstance(ses, dict):
+        if ses.get("anlatim"):
+            ses["anlatim"] = _kopyala(ses["anlatim"], "anlatim",
+                                      etiket="ses.anlatim")
+        if ses.get("muzik"):
+            ses["muzik"] = _kopyala(ses["muzik"], "muzik", etiket="ses.muzik")
+        if ses.get("ambans"):
+            ses["ambans"] = [
+                y for y in (_kopyala(a, f"ambans{i}", etiket=f"ses.ambans[{i}]")
+                            for i, a in enumerate(ses["ambans"])) if y]
+
     for sh in props.get("sahneler") or []:
         aid = sh.get("asset_id") or ""
+        if sh.get("ses"):
+            sh["ses"] = _kopyala(sh["ses"], f"ses_{aid or sh.get('beat_id')}",
+                                 etiket=f"sahne[{sh.get('scene_id') or aid}].ses")
         kaynak = varlik_haritasi.get(aid) or sh.get("medya") or ""
         if kaynak and os.path.exists(kaynak):
             ad = f"{aid or sh.get('beat_id')}{os.path.splitext(kaynak)[1] or '.jpg'}"
@@ -170,6 +264,10 @@ def props_hazirla(remotion_props: dict, *, calisma_dizin: str,
                 shutil.copy(kaynak, hedef)
             sh["medya"] = f"{goreli_kok}/{ad}".replace(os.sep, "/")
         else:
+            if kaynak:
+                kayiplar.append({
+                    "etiket": f"sahne[{sh.get('scene_id') or aid}].medya",
+                    "kaynak": kaynak, "sebep": "dosya yok"})
             sh["medya"] = ""
         kat = parallax_haritasi.get(aid) or []
         if kat:
@@ -184,6 +282,10 @@ def props_hazirla(remotion_props: dict, *, calisma_dizin: str,
                 yollar.append(f"{goreli_kok}/{ad}".replace(os.sep, "/"))
             if yollar:
                 sh["parallax_katmanlari"] = yollar
+
+    # Kapinin okuyacagi kayip defteri. Bos olsa bile YAZILIYOR ki "props_hazirla
+    # kosmadi" ile "kosdu ve kayip yok" ayirt edilebilsin.
+    props["_kayip_varliklar"] = kayiplar
     return props
 
 

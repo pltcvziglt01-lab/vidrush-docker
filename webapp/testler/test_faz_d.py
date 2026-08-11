@@ -196,14 +196,26 @@ kontrol("renderer degerleri gecerli",
         all(sp["renderer"] in ("ffmpeg", "remotion") for sp in _rsahne["motion"]))
 
 # TS arayuzunde tanimli alan adlari Python cikisiyla ORTUSUYOR mu
-_ts_sahne_blok = _ts[_ts.find("export interface EditorSahne"):
-                     _ts.find("export interface EditorV2Props")]
-_ts_alanlar = set(re.findall(r"^\s{2}(\w+)\??:", _ts_sahne_blok, re.M))
-_py_alanlar = set(_rsahne.keys()) - {"premium_gerekce", "parallax_katmanlari"}
-_ts_fazla = sorted(_ts_alanlar - set(_rsahne.keys())
-                   - {"premium_gerekce", "parallax_katmanlari"})
+# ⚠ IKI HATA DUZELTILDI (Faz E'de yakalandi):
+# 1) Blok sonu "export interface EditorV2Props" ile bulunuyordu. Faz E arada
+#    `SesAyari` arayuzunu ekleyince onun alanlari da EditorSahne sayildi.
+#    Artik blok KENDI kapanis suslu parantezinde bitiyor.
+# 2) Opsiyonel alanlar elle listeleniyordu (premium_gerekce, parallax_...).
+#    Yeni opsiyonel alan eklenince test kiriliyordu. Artik `alan?:` yazimi
+#    OPSIYONEL olarak taniniyor — asil kural bu.
+_i = _ts.find("export interface EditorSahne")
+_ts_sahne_blok = _ts[_i:_ts.find("\n}", _i)]
+_ts_zorunlu = set(re.findall(r"^\s{2}(\w+):", _ts_sahne_blok, re.M))
+_ts_opsiyonel = set(re.findall(r"^\s{2}(\w+)\?:", _ts_sahne_blok, re.M))
+kontrol("EditorSahne blogu dogru ayrildi (SesAyari sizmadi)",
+        "anlatim" not in _ts_zorunlu | _ts_opsiyonel,
+        f"zorunlu={sorted(_ts_zorunlu)[:6]}")
+_ts_fazla = sorted(_ts_zorunlu - set(_rsahne.keys()))
 kontrol("TS'de Python'un uretmedigi ZORUNLU alan yok", not _ts_fazla,
         f"TS'de var Python'da yok: {_ts_fazla}")
+kontrol("ses alanlari OPSIYONEL olarak tanimli",
+        {"ses_bas_sn", "ses_seviye", "j_cut_sn", "l_cut_sn"} <= _ts_opsiyonel,
+        f"opsiyonel={sorted(_ts_opsiyonel)}")
 
 # ═══════════ 4) UYGULANAN / ATLANAN SAYIMI ═══════════
 blok("uygulanan/atlanan spec sayimi")

@@ -51,8 +51,13 @@ def _kelime_kumesi(metin: str) -> set:
 
 def semantik_puan(aday, varliklar: dict, iddia_metni: str = "") -> tuple[float, dict]:
     """Adayin metadata'si iddianin varliklariyla ne kadar ortusuyor?"""
+    # ⚠ 11 Agu (Faz E canli kosusu): havuza `aday.sorgu` DAHILDI. O metin
+    # BIZIM sorgumuz, saglayicinin verdigi kanit degil. Sonuc: her aday kendi
+    # sorgumuzla eslesip konu/yer puani topluyordu; "MAJESTIC 12 Files" ve
+    # "Aryan Christ" gibi Apollo ile ilgisiz arsiv ogeleri secildi.
+    # Kanit YALNIZCA saglayici metadata'si olabilir.
     havuz = _kelime_kumesi(
-        f"{aday.baslik} {aday.aciklama} {aday.konum} {aday.tarih} {aday.sorgu}")
+        f"{aday.baslik} {aday.aciklama} {aday.konum} {aday.tarih}")
     detay: dict = {}
     puan = 0.0
 
@@ -165,6 +170,91 @@ def ceza_puan(aday, gorulen_hashler: set) -> tuple[float, list]:
     return round(ceza, 1), neden
 
 
+# Sorgu/iddia metninden zorunlu terim cikarirken atlanacak kelimeler.
+ALAKA_DURAK = frozenset({
+    "the", "and", "for", "from", "with", "during", "into", "over", "near",
+    "seen", "view", "image", "photo", "photograph", "picture", "footage",
+    "video", "detail", "close", "shot", "scene", "page", "document",
+})
+
+
+def alaka_terimleri(varliklar: dict, iddia_metni: str = "") -> list:
+    """Adayin metadata'sinda GECMESI ZORUNLU terimler.
+
+    Once cikarilan varliklar (yer/kisi/kurum/konu). Hicbiri yoksa iddia
+    metninin ayirt edici kelimelerine DUSULUR — ilk surumde varlik cikmayinca
+    hicbir zorunluluk kalmiyordu ve her sey notr puanla geciyordu.
+    """
+    terimler: list = []
+    for ad in ("yerler", "kisiler", "kurumlar", "konu_kelimeleri"):
+        for x in (varliklar.get(ad) or []):
+            t = str(x).strip().lower()
+            if len(t) >= 3:
+                terimler.append(t)
+    if not terimler:
+        for k in re.findall(r"[A-Za-z0-9À-ÿĞÜŞİÖÇğüşıöç]{3,}",
+                            str(iddia_metni or "").lower()):
+            if k not in ALAKA_DURAK:
+                terimler.append(k)
+    # Tekrarsiz, sirali
+    out, gorulen = [], set()
+    for t in terimler:
+        if t not in gorulen:
+            gorulen.add(t)
+            out.append(t)
+    return out
+
+
+def alaka_kapisi(aday, varliklar: dict, iddia_metni: str = "") -> tuple:
+    """SERT KAPI: aday konuyla gercekten ilgili mi? (ok, sebep)
+
+    ⚠ Faz E canli kosusunda olculdu: archive_org tam-metin aramasi
+    "Landscape with Saint John the Baptist", "MAJESTIC 12 Files", "Aryan Christ"
+    gibi ogeleri dondurdu ve hepsi SECILDI. Puanlama yumusak oldugu icin
+    (varlik cikmayinca notr puan) ilgisiz oge esigi geciyordu. Kullanicinin
+    kurali net: "alakasiz stok yok". Bu yuzden puan degil KAPI.
+
+    Kural: saglayici metadata'sinda zorunlu terimlerden EN AZ BIRI gecmeli.
+    Metadata bosca gelirse kapi de gecilemez — bilinmeyen icerik kullanilmaz.
+    """
+    metadata = f"{aday.baslik} {aday.aciklama} {getattr(aday, 'konum', '')}".lower()
+    if not metadata.strip():
+        return False, "saglayici metadata'si bos — icerik dogrulanamiyor"
+    terimler = alaka_terimleri(varliklar, iddia_metni)
+    if not terimler:
+        return True, "zorunlu terim uretilemedi (kapi uygulanamaz)"
+
+    # KELIME SINIRI: alt dizi eslemesi "11"i "1911" icinde buluyordu
+    tutan = [t for t in terimler
+             if re.search(rf"(?<![0-9a-zà-ÿğüşıöç]){re.escape(t)}"
+                          rf"(?![0-9a-zà-ÿğüşıöç])", metadata)]
+    # ESIK 1 YETERLI: kelime siniri eklendikten sonra olculdu — "MAJESTIC 12
+    # Files" 0/N ile dusuyor. Esigi 2'ye cikarmak mesru adaylari da dusurdu
+    # (LoC public-domain ogesi 1/2 ile reddedildi, 3 Faz B testi kirildi).
+    if not tutan:
+        return False, (f"konu terimlerinin HICBIRI metadata'da yok "
+                       f"(kelime siniriyla): {terimler[:6]}")
+
+    # ── SERI UYUSMAZLIGI ──
+    # ⚠ Olculdu: "Apollo 11" sorgusuna "AS06-02-1445 - Apollo 6" adayi
+    # geliyordu ve "apollo" tuttugu icin kapiyi geciyordu. Apollo 6 goruntusu
+    # Apollo 11 belgeselinde YANLIS bilgi olur. Iddiada numarali bir ozel ad
+    # varsa (Apollo 11), metadata'da AYNI ozel adin FARKLI numarasi geciyorsa
+    # ve dogru numara HIC gecmiyorsa reddedilir.
+    for ad, no in re.findall(r"([a-zà-ÿğüşıöç]{4,})\s+(\d{1,3})\b",
+                             str(iddia_metni or "").lower()):
+        dogru = re.search(rf"(?<![0-9a-z]){ad}\s*-?\s*{no}(?![0-9])", metadata)
+        if dogru:
+            continue
+        yanlis = re.findall(rf"(?<![0-9a-z]){ad}\s*-?\s*(\d{{1,3}})(?![0-9])",
+                            metadata)
+        if yanlis and no not in yanlis:
+            return False, (f"seri uyusmazligi: '{ad} {no}' isteniyor ama "
+                           f"metadata '{ad} {yanlis[:3]}' diyor")
+
+    return True, f"alaka {len(tutan)}: {tutan[:4]}"
+
+
 def puanla(aday, *, varliklar: dict, amac: str, iddia_metni: str = "",
            gorulen_hashler: Optional[set] = None,
            vision_puanlayici=None) -> "object":
@@ -189,9 +279,16 @@ def puanla(aday, *, varliklar: dict, amac: str, iddia_metni: str = "",
     aday.toplam_skor = round(max(0.0, min(100.0,
         AGIRLIK["semantik"] * sem + AGIRLIK["amac"] * am
         + AGIRLIK["teknik"] * tek + AGIRLIK["vision"] * float(vis) - ceza)), 1)
+    alaka_ok, alaka_sebep = alaka_kapisi(aday, varliklar, iddia_metni)
     aday.skor_detay = {"semantik": sem_detay, "amac": am, "teknik": tek,
                        "teknik_uyari": tek_uyari, "vision": vis_detay,
-                       "ceza_neden": ceza_neden}
+                       "ceza_neden": ceza_neden, "alaka": alaka_sebep}
+    if not alaka_ok:
+        # Lisans duvarindan gecse bile ALAKA kapisindan gecemeyen oge render'a
+        # giremez; referans olarak kalir.
+        aday.render_kullanilabilir = False
+        aday.red_nedeni = (f"alaka kapisi: {alaka_sebep}"[:200]
+                           if not aday.red_nedeni else aday.red_nedeni)
     return aday
 
 

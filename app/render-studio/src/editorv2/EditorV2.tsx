@@ -19,6 +19,7 @@
 import React from 'react';
 import {AbsoluteFill, Sequence, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
 
+import {SesZamanCizelgesi} from './Ses';
 import {
   AlintiKarti,
   AltBand,
@@ -296,9 +297,18 @@ export const VidrushEditorV2: React.FC<EditorV2Props> = (props) => {
     );
   }
 
+  const toplamKare = kareler.reduce((a, b) => a + b, 0);
   let ofset = 0;
   return (
     <AbsoluteFill style={{backgroundColor: RENK.taban}}>
+      {/* SES: kok seviyede, sahne Sequence'lerinin DISINDA.
+          Sahne icine koyulsa J/L cut kirpilirdi (bkz. Ses.tsx notu). */}
+      <SesZamanCizelgesi
+        ayar={props.ses}
+        sahneler={sahneler}
+        kareler={kareler}
+        toplamKare={toplamKare}
+      />
       {sahneler.map((sh, i) => {
         const bas = ofset;
         ofset += kareler[i];

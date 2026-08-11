@@ -65,6 +65,45 @@ export interface EditorSahne {
   premium_gerekce?: PremiumGerekce[];
   /** 2.5D icin hazir katman gorselleri (yoksa pseudo-depth fallback) */
   parallax_katmanlari?: string[];
+
+  /* ── SES (Faz E) ── */
+  /** Ses dosyasinda baslangic noktasi (sn) */
+  ses_bas_sn?: number;
+  /** 0..1 seviye; sahne sesi anlatim sayilir, duck uygulanmaz */
+  ses_seviye?: number;
+  /** j_cut true ise sesin goruntuden KAC SN once girecegi (varsayilan 0.4) */
+  j_cut_sn?: number;
+  /** l_cut true ise sesin goruntuden KAC SN sonra bitecegi (varsayilan 0.4) */
+  l_cut_sn?: number;
+}
+
+/**
+ * SES AYARI — master anlatim, ambans ve muzik katmanlari.
+ *
+ * `anlatim_araliklari` verilirse ducking YALNIZCA o araliklarda uygulanir;
+ * verilmezse master anlatim tum videoyu kaplar kabul edilir. Bu ayrim onemli:
+ * sessiz bir kapanista muzigin kisik kalmasi yanlis olur.
+ */
+export interface SesAyari {
+  /** Tek master anlatim dosyasi (public/ altinda goreli yol) */
+  anlatim?: string;
+  anlatim_bas_sn?: number;
+  anlatim_seviye?: number;
+  /** [[t0,t1],...] saniye — konusmanin oldugu araliklar */
+  anlatim_araliklari?: number[][];
+  /** Ortam sesleri (dongu) */
+  ambans?: string[];
+  ambans_seviye?: number;
+  /** Yatak muzigi (dongu) */
+  muzik?: string;
+  muzik_seviye?: number;
+  /** Ducking dipleri; verilmezse Ses.tsx DUCK varsayilanlari */
+  ducking?: {ambans?: number; muzik?: number};
+  /** Anlatimin yapay/deneme oldugunu ACIKCA isaretler (QA raporlar) */
+  yapay_ses?: boolean;
+  /** Post master hedefi — QA olcumu bu degerlerle karsilastirir */
+  hedef_lufs?: number;
+  hedef_tp_dbtp?: number;
 }
 
 export interface EditorV2Props {
@@ -86,6 +125,9 @@ export interface EditorV2Props {
     tipografi?: Record<string, unknown>;
     motion?: Record<string, unknown>;
   };
+  /** Ses zaman cizelgesi (Faz E). Yoksa video SESSIZ render edilir ve
+   *  Python kapisi V2-ANLATIM-YOK uyarisi verir — sessizce gecmez. */
+  ses?: SesAyari;
   /** true ise dogrulama hatasi ekrana BASILIR (render durmaz) */
   hatalariGoster?: boolean;
 }

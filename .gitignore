@@ -9,3 +9,6 @@ vps-bootstrap.sh
 cikti/
 app/render-studio/public/editorv2/
 app/render-studio/public/gerileme_testi/
+
+# Faz E arastirma/medya onbellegi — yerel, depoya girmez
+webapp/veri/onbellek/
