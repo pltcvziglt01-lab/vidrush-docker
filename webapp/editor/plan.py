@@ -1,0 +1,268 @@
+"""ORKESTRATOR — dort cikti dosyasini uretir.
+
+    edit_manifest.json  : beat + cekim + motion + tipografi + ses kararlari
+    render_plan.json    : render motorunun tuketecegi duz plan
+    editor_qa.json      : pre-render QA (PASS/WARN/FAIL + oneriler)
+    attribution.txt     : lisans atif metni (CC gerekliligi)
+
+Her karar scene_id / fact_id / asset_id tasir — kullanicinin izlenebilirlik
+sarti. Bu modul AG KULLANMAZ ve INDIRME YAPMAZ; girdiler Faz A/B
+manifestlerinden gelir.
+"""
+from __future__ import annotations
+
+import json
+import os
+from typing import Optional
+
+from . import adapter, beat, gramer, motion, profil, qa_on, ses, tipografi
+from .profil import EditProfili
+
+
+def _json_yaz(yol: str, veri) -> None:
+    os.makedirs(os.path.dirname(os.path.abspath(yol)) or ".", exist_ok=True)
+    gecici = yol + ".tmp"
+    with open(gecici, "w", encoding="utf-8") as f:
+        json.dump(veri, f, ensure_ascii=False, indent=1)
+    os.replace(gecici, yol)
+
+
+def _adaylari_indeksle(medya_manifest: dict) -> tuple:
+    """asset_id -> aday, ve scene_id -> [adaylar]."""
+    index, sahne = {}, {}
+    for a in (medya_manifest.get("adaylar") or []):
+        aid = a.get("asset_id")
+        if aid:
+            index[aid] = a
+        sid = a.get("scene_id") or "-"
+        sahne.setdefault(sid, []).append(a)
+    return index, sahne
+
+
+def _bosluk_indeksle(medya_manifest: dict) -> dict:
+    return {b.get("scene_id"): b
+            for b in (medya_manifest.get("kapsam_bosluklari") or [])
+            if b.get("scene_id")}
+
+
+def _yazi_katmanlari_kur(cekimler: list, beatler: list, adaylar_index: dict,
+                         p: EditProfili) -> tuple:
+    """Beat/cekimden yazi katmanlarini uret ve cakismalari coz."""
+    katmanlar = []
+    for c, b in zip(cekimler, beatler):
+        # Bolum basligi: yalnizca perde basinda
+        if b.perde == "acilis" and b.beat_id == beatler[0].beat_id:
+            katmanlar.append(tipografi.katman_kur(
+                "chapter-title", (b.metin[:42] or "").upper(), b.bas_sn + 0.2,
+                min(5.5, b.sure_sn + 1.5), fact_id=b.fact_id, p=p))
+        # Kanit beat'lerinde alt band (yer/kurum)
+        if b.islev == "kanit" and c.ulke:
+            katmanlar.append(tipografi.katman_kur(
+                "lower-third", c.ulke[:34], b.bas_sn + 0.3,
+                min(4.7, b.sure_sn), fact_id=b.fact_id, p=p))
+        # Kaynak etiketi: gercek medya varliklarinda
+        aday = adaylar_index.get(c.asset_id) if c.asset_id else None
+        if aday and aday.get("atif_gerekli") and aday.get("eser_sahibi"):
+            katmanlar.append(tipografi.katman_kur(
+                "source-label", f"{aday.get('eser_sahibi')} / "
+                                f"{aday.get('lisans', '').upper()}",
+                b.bas_sn + 0.4, min(3.0, b.sure_sn), fact_id=b.fact_id, p=p))
+    return tipografi.cakisma_coz(katmanlar, p=p)
+
+
+def _motion_kur(cekimler: list, beatler: list, p: EditProfili) -> list:
+    """Her beat icin motion spec listesi (beat_id ile etiketli)."""
+    specler = []
+    for i, (c, b) in enumerate(zip(cekimler, beatler)):
+        yerel = [motion.kamera_spec(c.hareket, b.sure_sn, c.kadraj, p=p)]
+        yerel += motion.taban_katmanlar(b.sure_sn, p=p)
+
+        if c.cekim_turu == "archive" and c.kaynak_turu == "medya":
+            yerel.append(motion.parallax_spec(3, b.sure_sn, p=p))
+        if c.cekim_turu == "document":
+            yerel.append(motion.belge_vurgusu_spec((0.28, 0.32, 0.4, 0.22),
+                                                   b.sure_sn))
+        if c.cekim_turu == "map":
+            yerel.append(motion.harita_spec(c.ulke or "", None, b.sure_sn))
+        if c.cekim_turu == "data":
+            yerel.append(motion.veri_grafigi_spec(b.metin[:28], [1], b.sure_sn))
+        if b.islev == "hook" and i == 0:
+            yerel.append(motion.light_sweep_spec(min(0.9, b.sure_sn * 0.4)))
+        if b.perde == "kapanis" and b.islev == "sonuc":
+            yerel.append(motion.film_burn_spec(0.5))
+
+        onceki_islev = beatler[i - 1].islev if i else ""
+        yerel.append(motion.sec_gecis(onceki_islev, b.islev, i,
+                                      j_cut=b.j_cut, l_cut=b.l_cut))
+        for sp in yerel:
+            d = sp.sozluk()
+            d["beat_id"] = b.beat_id
+            d["scene_id"] = b.scene_id
+            d["fact_id"] = b.fact_id
+            specler.append(d)
+    return specler
+
+
+def _katman_specleri(katmanlar: list, beatler: list, p: EditProfili) -> list:
+    """Cozulmus yazi katmanlarini motion spec'e cevir ve beat'e bagla.
+
+    Katmanin basladigi ana denk gelen beat'e atanir; boylece adapter sahne
+    bazinda dogru alana yazabilir (bolum / altBand / kaynakYazi / etiketler)."""
+    out = []
+    for k in katmanlar:
+        hedef = None
+        for b in beatler:
+            if b.bas_sn <= k.bas_sn < b.bitis_sn + 0.001:
+                hedef = b
+                break
+        hedef = hedef or (beatler[0] if beatler else None)
+        if hedef is None:
+            continue
+        if k.ad == "chapter-title":
+            sp = motion.bolum_basligi_spec(k.metin, k.sure_sn, p=p)
+        elif k.ad == "lower-third":
+            sp = motion.alt_band_spec(k.metin, "", k.sure_sn, p=p)
+        elif k.ad == "source-label":
+            sp = motion.kaynak_etiketi_spec(k.metin, k.fact_id, k.sure_sn, p=p)
+        elif k.ad == "quote-card":
+            sp = motion.alinti_karti_spec(k.metin, k.fact_id, k.sure_sn)
+        else:
+            sp = motion.callout_spec(k.metin, 0.5, k.y_orani, k.sure_sn, p=p)
+        d = sp.sozluk()
+        d["bas_sn"] = k.bas_sn
+        d["beat_id"] = hedef.beat_id
+        d["scene_id"] = hedef.scene_id
+        d["fact_id"] = k.fact_id or hedef.fact_id
+        d["parametre"]["y_orani"] = k.y_orani      # cakisma cozumu korunur
+        out.append(d)
+    return out
+
+
+def uret(*, cumleler: list, medya_manifest: dict,
+         arastirma_manifest: Optional[dict] = None,
+         profil_adi: str = "premium-modern",
+         beklenen_ulke: str = "", beklenen_donem: str = "",
+         cikti_dizin: str = ".", ambience: str = "", muzik: str = "",
+         saglayici_tavani: int = 4) -> dict:
+    """Tum Faz C zincirini kosur ve dort dosyayi yazar."""
+    p = profil.profil(profil_adi)
+    index, sahne_adaylari = _adaylari_indeksle(medya_manifest)
+    bosluklar = _bosluk_indeksle(medya_manifest)
+    fact_idler = {i.get("fact_id") for i in
+                  ((arastirma_manifest or {}).get("iddialar") or [])
+                  if i.get("fact_id")}
+
+    # 1) BEAT
+    bplan = beat.plan_yap(cumleler, profil_=p)
+    # 2) GRAMER
+    cekimler = gramer.gramer_uygula(
+        bplan.beatler, sahne_adaylari=sahne_adaylari,
+        kapsam_bosluklari=bosluklar, saglayici_tavani=saglayici_tavani)
+    # 3) MOTION
+    specler = _motion_kur(cekimler, bplan.beatler, p)
+    # 4) TIPOGRAFI
+    katmanlar, tipo_rapor = _yazi_katmanlari_kur(cekimler, bplan.beatler, index, p)
+    # ⚠ Cozulmus yazi katmanlari MOTION SPEC'e cevrilir. Ilk surumde katmanlar
+    # yalnizca edit_manifest'te duruyordu; render_plan'a girmedigi icin adapter
+    # bolum basligini ve kaynak yazisini GOREMIYORDU (test yakaladi) — yani
+    # tipografi sessizce kayboluyordu.
+    specler += _katman_specleri(katmanlar, bplan.beatler, p)
+    # 5) SES
+    splan = ses.plan_yap(bplan.beatler, profil_=p, ambience=ambience, muzik=muzik)
+    # 6) PRE-RENDER QA
+    q = qa_on.denetle(beat_plani=bplan, cekimler=cekimler,
+                      yazi_katmanlari=katmanlar, motion_specler=specler,
+                      ses_plani=splan, adaylar_index=index, profil_=p,
+                      beklenen_ulke=beklenen_ulke,
+                      beklenen_donem=beklenen_donem,
+                      arastirma_fact_idler=fact_idler or None)
+
+    # ── edit_manifest ──
+    edit_manifest = {
+        "sema": "1.0", "profil": p.token_sozlugu(),
+        "profil_uyarilari": p.dogrula(),
+        "beat_plani": bplan.sozluk(),
+        "perde_ozeti": beat.perde_ozeti(bplan),
+        "islev_ozeti": beat.islev_ozeti(bplan),
+        "cekimler": [c.__dict__ for c in cekimler],
+        "yazi_katmanlari": [k.__dict__ for k in katmanlar],
+        "tipografi_raporu": tipo_rapor,
+        "ses_plani": splan.sozluk(),
+        "motion_spec_sayisi": len(specler),
+    }
+
+    # ── render_plan ──
+    sahneler = []
+    for c, b in zip(cekimler, bplan.beatler):
+        aday = index.get(c.asset_id) if c.asset_id else None
+        sahneler.append({
+            "beat_id": b.beat_id, "scene_id": b.scene_id, "fact_id": b.fact_id,
+            "asset_id": c.asset_id, "saglayici": c.saglayici,
+            "kaynak_turu": c.kaynak_turu, "fallback_turu": c.fallback_turu,
+            "medya_turu": (aday.get("tur") if aday else "image"),
+            "medya_yolu": (aday.get("yerel_yol") or "") if aday else "",
+            "indirme_url": (aday.get("indirme_url") or "") if aday else "",
+            "orijinal_url": (aday.get("orijinal_url") or "") if aday else "",
+            "lisans": (aday.get("lisans") or "") if aday else "",
+            "ses_yolu": "", "sure_sn": b.sure_sn, "bas_sn": b.bas_sn,
+            "islev": b.islev, "perde": b.perde,
+            "cekim_turu": c.cekim_turu, "hareket": c.hareket, "kadraj": c.kadraj,
+            "kaynak_aralik": list(c.kaynak_aralik),
+            "j_cut": b.j_cut, "l_cut": b.l_cut,
+            "altyazi": [],
+            "motion": [s for s in specler if s.get("beat_id") == b.beat_id],
+            "gerekce": c.gerekce,
+        })
+    render_plan = {
+        "sema": "1.0", "fps": p.fps, "genislik": p.genislik,
+        "yukseklik": p.yukseklik, "gecis_modu": "sinematik",
+        "altyazi_stili": "yok",
+        "toplam_sn": round(bplan.toplam_sn, 2),
+        "sahne_sayisi": len(sahneler),
+        "ses": splan.sozluk(),
+        "sahneler": sahneler,
+    }
+
+    # ── attribution.txt ──
+    atiflar, gorulen = [], set()
+    for c in cekimler:
+        aday = index.get(c.asset_id) if c.asset_id else None
+        if not aday or not aday.get("atif_gerekli"):
+            continue
+        metin = aday.get("atif_metni") or ""
+        if metin and metin not in gorulen:
+            gorulen.add(metin)
+            atiflar.append(f"[{c.fact_id or '-'}] {metin}")
+    atif_metni = ("MEDYA ATIFLARI (video aciklamasina eklenmelidir)\n"
+                  + ("\n".join(atiflar) if atiflar
+                     else "(atif gerektiren medya kullanilmadi)") + "\n")
+
+    # ── ADAPTER (bilgi amacli; render koduna baglanmiyor) ──
+    don = adapter.donustur(render_plan, fps=p.fps, genislik=p.genislik,
+                           yukseklik=p.yukseklik)
+    edit_manifest["adapter"] = don.sozluk()
+    # Premium (Remotion) gereksinimi render_plan'a da yazilir: Faz D
+    # yonlendirmeyi buradan okuyacak, adapter'i yeniden kosmak zorunda kalmayacak.
+    _premium = set(don.remotion_gerekli_sahneler)
+    for sh in render_plan["sahneler"]:
+        sh["remotion_gerekli"] = sh["beat_id"] in _premium
+    render_plan["remotion_gerekli_sahne"] = sorted(_premium)
+    render_plan["remotion_props_ozeti"] = {
+        "sahne": len(don.remotion_sahneler),
+        "spec": don.sozluk()["remotion_spec_sayisi"]}
+
+    qa = q.sozluk()
+    qa["adapter_kayip_efekt"] = don.kayip_efektler
+    qa["adapter_remotion_gerekli"] = don.remotion_gerekli_sahneler
+
+    _json_yaz(os.path.join(cikti_dizin, "edit_manifest.json"), edit_manifest)
+    _json_yaz(os.path.join(cikti_dizin, "render_plan.json"), render_plan)
+    _json_yaz(os.path.join(cikti_dizin, "editor_qa.json"), qa)
+    with open(os.path.join(cikti_dizin, "attribution.txt"), "w",
+              encoding="utf-8") as f:
+        f.write(atif_metni)
+
+    return {"edit_manifest": edit_manifest, "render_plan": render_plan,
+            "editor_qa": qa, "attribution": atif_metni,
+            "adapter": don, "beat_plani": bplan, "cekimler": cekimler,
+            "ses_plani": splan, "yazi_katmanlari": katmanlar}
