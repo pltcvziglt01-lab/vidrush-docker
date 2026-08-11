@@ -400,10 +400,21 @@ img, svg, video { max-width: 100%; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .iskart-satir { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* ⚠ Native <progress>: yuzde degeri INLINE STIL gerektirmez ve erisilebilirlik
+   anlamini tarayici saglar (role/aria-valuenow elle yazilmaz). */
 .ilerleme {
-  height: 5px; border-radius: 999px; background: var(--z3); overflow: hidden;
+  display: block; width: 100%; height: 5px; border: 0; border-radius: 999px;
+  background: var(--z3); appearance: none; -webkit-appearance: none;
+  overflow: hidden;
 }
-.ilerleme > i { display: block; height: 100%; background: var(--vurgu); border-radius: 999px; }
+.ilerleme::-webkit-progress-bar { background: var(--z3); border-radius: 999px; }
+.ilerleme::-webkit-progress-value { background: var(--vurgu); border-radius: 999px; }
+.ilerleme::-moz-progress-bar { background: var(--vurgu); border-radius: 999px; }
+
+.iskelet-s { height: 64px; }
+.iskelet-m { height: 96px; }
+.iskelet-l { height: 120px; }
+.iskelet-xl { height: 150px; }
 
 /* Sistem durumu satiri */
 .durum-liste { display: grid; gap: 8px; }
@@ -588,3 +599,318 @@ img, svg, video { max-width: 100%; }
   }
   .iskelet { animation: none; background: var(--z2); }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   FAZ G — SECIM DENEYIMI
+   Kart hiyerarsisi, secili durum ve bosluk cok daha net. Emoji yok,
+   inline style yok, dis medya yok (onizlemeler tamamen CSS).
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── Bolum kabugu ── */
+.sb { margin-bottom: 26px; min-width: 0; }
+.sb-bas { margin-bottom: 12px; }
+.sb-bas h3 { font-size: 17px; }
+.sb-alt {
+  font-size: 13px; color: var(--yazi-sessiz);
+  margin-top: 4px; max-width: 62ch;
+}
+.sb-tumu { margin-top: 12px; }
+.sb-bos { margin-top: 10px; }
+.sb-not:empty { display: none; }
+.sb-not { margin-top: 10px; color: var(--uyari); }
+
+.sb-arama {
+  position: relative; margin-top: 12px; display: flex; align-items: center;
+}
+.sb-arama svg {
+  position: absolute; left: 11px; width: 17px; height: 17px;
+  color: var(--yazi-sessiz); pointer-events: none;
+}
+.sb-arama .girdi { padding-left: 36px; }
+.sb-suzgec { display: grid; gap: 10px; margin-top: 12px; }
+
+/* ── Secim karti ── */
+.sk-izgara {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+}
+.sk-izgara-ses { grid-template-columns: repeat(auto-fit, minmax(212px, 1fr)); }
+
+.sk {
+  display: flex; flex-direction: column; gap: 0;
+  text-align: left; padding: 0; overflow: hidden;
+  background: var(--z2); border: 1px solid var(--cizgi);
+  border-radius: var(--r-l); cursor: pointer; min-width: 0;
+  transition: border-color var(--gecis), background var(--gecis),
+              box-shadow var(--gecis);
+}
+.sk:hover { background: var(--z3); border-color: var(--cizgi-parlak); }
+/* Secili durum: YALNIZ renk degil — cerceve + onay isareti + "Seçildi" metni */
+.sk[aria-checked="true"] {
+  border-color: var(--vurgu);
+  box-shadow: inset 0 0 0 1px var(--vurgu);
+  background: var(--z3);
+}
+.sk-govde { display: flex; flex-direction: column; gap: 7px; padding: 13px 14px; }
+.sk-bas { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sk-bas > svg { width: 18px; height: 18px; color: var(--vurgu); flex: none; }
+.sk-ad { font-weight: 650; font-size: 14.5px; min-width: 0; }
+.sk-acik {
+  font-size: 12.5px; color: var(--yazi-orta); line-height: 1.5;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sk-etiketler { display: flex; gap: 6px; flex-wrap: wrap; }
+.sk-ek {
+  display: flex; align-items: center; gap: 8px; margin-top: 2px;
+  min-height: 30px;
+}
+
+/* "Seçildi" isareti — secili degilken gizli */
+.sk-secili {
+  display: none; align-items: center; gap: 5px; margin-left: auto;
+  color: var(--vurgu); font-size: 11.5px; font-weight: 700;
+  letter-spacing: .02em; white-space: nowrap;
+}
+.sk-secili svg { width: 15px; height: 15px; }
+.sk[aria-checked="true"] .sk-secili,
+.pk[aria-checked="true"] .sk-secili { display: inline-flex; }
+
+/* Otomatik karti one cikar */
+.sk-oto {
+  border-color: var(--cizgi-parlak);
+  background:
+    radial-gradient(420px 130px at 8% -40%, rgba(245,225,75,.10), transparent 70%),
+    var(--z2);
+}
+.sk-oto[aria-checked="true"] {
+  background:
+    radial-gradient(420px 130px at 8% -40%, rgba(245,225,75,.16), transparent 70%),
+    var(--z3);
+}
+
+/* ── Mini onizleme kabugu (16:9) — icerik inline SVG, dis medya YOK ── */
+.onizk {
+  position: relative; display: block; width: 100%; aspect-ratio: 16 / 9;
+  overflow: hidden; border-bottom: 1px solid var(--cizgi); background: var(--z1);
+}
+.onizk svg { display: block; width: 100%; height: 100%; }
+
+/* ── Ses dinle dugmesi ── */
+/* ⚠ Dinle/Durdur BIRINCIL bir kontrol (artik kartin kardesi, kendi satirinda).
+   Masaustunde 34px olcumustu; dokunma hedefi kurali her genislikte gecerli. */
+.ses-dinle {
+  display: inline-flex; align-items: center; gap: 6px;
+  min-height: var(--dokunma); padding: 0 14px; border-radius: 999px;
+  border: 1px solid var(--cizgi-parlak); background: var(--z1);
+  font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--yazi);
+}
+.ses-dinle:hover { background: var(--z3); }
+.ses-dinle svg { width: 16px; height: 16px; color: var(--vurgu); }
+
+/* ── Marka chip'i ── */
+.cip-oto svg { width: 16px; height: 16px; color: var(--vurgu); }
+.cip[aria-checked="true"] {
+  background: var(--vurgu); color: var(--vurgu-yazi); border-color: var(--vurgu);
+}
+.cip[aria-checked="true"] svg { color: var(--vurgu-yazi); }
+.cip small { opacity: .72; font-size: 11px; }
+
+/* ── Hizli tercihler ── */
+.ht-izgara {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.ht {
+  display: block; padding: 12px 14px; border-radius: var(--r-l);
+  border: 1px solid var(--cizgi); background: var(--z2); cursor: pointer;
+  min-height: var(--dokunma);
+}
+.ht:hover { background: var(--z3); }
+.ht input { position: absolute; opacity: 0; width: 0; height: 0; }
+.ht-govde { display: flex; flex-direction: column; gap: 5px; }
+.ht-bas { display: flex; align-items: center; gap: 9px; }
+.ht-bas > svg { width: 17px; height: 17px; color: var(--yazi-sessiz); flex: none; }
+.ht-ad { font-weight: 600; font-size: 14px; flex: 1 1 auto; }
+.ht-acik { font-size: 12.5px; color: var(--yazi-sessiz); line-height: 1.45; }
+.ht input:checked ~ .ht-govde .ht-bas > svg { color: var(--vurgu); }
+.ht input:checked + .ht-govde .ht-bas .anahtar-gorsel,
+.ht input:checked ~ .ht-govde .anahtar-gorsel {
+  background: var(--vurgu); border-color: var(--vurgu);
+}
+.ht input:checked ~ .ht-govde .anahtar-gorsel::after {
+  transform: translateX(18px); background: var(--vurgu-yazi);
+}
+.ht input:focus-visible ~ .ht-govde .anahtar-gorsel {
+  outline: 2px solid var(--vurgu); outline-offset: 2px;
+}
+
+/* ── Profesyonel ayarlar: akordeon ── */
+.pro { margin-top: 8px; }
+.pro-bolum {
+  border: 1px solid var(--cizgi); border-radius: var(--r-l);
+  background: var(--z1); margin-bottom: 10px; overflow: hidden;
+}
+.pro-bas { margin: 0; font-size: inherit; font-weight: inherit; }
+.pro-dugme {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  min-height: var(--dokunma); padding: 0 14px; cursor: pointer;
+  background: transparent; border: 0; color: var(--yazi);
+  font-weight: 600; font-size: 14px; text-align: left;
+}
+.pro-dugme:hover { background: var(--z2); }
+.pro-dugme > svg:first-child { width: 17px; height: 17px; color: var(--yazi-sessiz); flex: none; }
+.pro-dugme span { flex: 1 1 auto; min-width: 0; }
+.pro-ok { width: 15px; height: 15px; color: var(--yazi-sessiz); transition: transform var(--gecis); }
+.pro-dugme[aria-expanded="true"] { background: var(--z2); }
+.pro-dugme[aria-expanded="true"] > svg:first-child { color: var(--vurgu); }
+.pro-dugme[aria-expanded="true"] .pro-ok { transform: rotate(90deg); }
+.pro-ic { padding: 14px; border-top: 1px solid var(--cizgi); }
+.pro-not {
+  font-size: 12.5px; color: var(--yazi-sessiz); margin-bottom: 12px;
+  line-height: 1.5;
+}
+.pro-fieldset { border: 0; padding: 0; margin: 0 0 16px; }
+
+/* ── Palet kartlari (GERCEK hex) ── */
+.pk-izgara {
+  display: grid; gap: 10px; margin-bottom: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+}
+.pk {
+  display: flex; flex-direction: column; gap: 7px; padding: 10px;
+  border: 1px solid var(--cizgi); border-radius: var(--r-m);
+  background: var(--z2); cursor: pointer; text-align: left;
+  min-height: var(--dokunma);
+}
+.pk:hover { background: var(--z3); }
+.pk[aria-checked="true"] {
+  border-color: var(--vurgu); box-shadow: inset 0 0 0 1px var(--vurgu);
+}
+.pk-serit {
+  display: block; height: 20px; border-radius: 4px; overflow: hidden;
+  background: var(--z3);
+}
+.pk-serit svg { display: block; width: 100%; height: 100%; }
+.pk-oto-serit {
+  background: repeating-linear-gradient(45deg,
+    var(--z3) 0 5px, var(--cizgi-parlak) 5px 10px);
+}
+.pk-ad { font-size: 12.5px; font-weight: 600; }
+
+/* ── Secim ozeti ── */
+.oz {
+  background: var(--z2); border: 1px solid var(--cizgi-parlak);
+  border-radius: var(--r-l); padding: 16px; min-width: 0;
+}
+.oz-bas { font-size: 15px; margin-bottom: 10px; }
+.oz-satir {
+  display: grid; grid-template-columns: 1fr auto;
+  gap: 2px 10px; padding: 9px 0; border-bottom: 1px solid var(--cizgi);
+  align-items: baseline;
+}
+.oz-satir:last-of-type { border-bottom: 0; }
+.oz-ad { font-size: 12px; color: var(--yazi-sessiz); }
+.oz-deg {
+  font-size: 13px; font-weight: 600; grid-column: 1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.oz-degistir {
+  grid-row: 1 / span 2; grid-column: 2; align-self: center;
+  min-height: 32px; padding: 0 10px; border-radius: var(--r-s);
+  border: 1px solid var(--cizgi-parlak); background: var(--z1);
+  color: var(--yazi-orta); font-size: 12px; cursor: pointer;
+}
+.oz-degistir:hover { background: var(--z3); color: var(--yazi); }
+.oz-oneri { width: 100%; margin-top: 14px; }
+.oz-not { margin-top: 8px; line-height: 1.45; }
+
+/* Adim 3 iki kolon: form + sticky ozet */
+.a3-giris { margin: 6px 0 18px; }
+.a3 { display: grid; gap: 22px; grid-template-columns: minmax(0, 1fr) 268px; }
+.a3-ozet { position: sticky; top: calc(var(--ustbar-y) + 16px); }
+
+@media (max-width: 980px) {
+  .a3 { grid-template-columns: minmax(0, 1fr); }
+  /* Mobil/dar: ozet formun USTUNDE kisa serit */
+  .a3-ozet { position: static; order: -1; }
+  .oz { padding: 13px; }
+  .oz-satir { padding: 7px 0; }
+}
+
+@media (max-width: 720px) {
+  .sk-izgara, .sk-izgara-ses, .ht-izgara, .pk-izgara {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sb { margin-bottom: 20px; }
+  .birak-kucuk { padding: 14px 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pro-ok, .sk, .pk, .ht { transition: none !important; }
+}
+
+/* ⚠ OLCUM (Faz G tarayici QA): `.ses-dinle` 34px, `.cip` 36px ve
+   `.oz-degistir` 32px yuksekligindeydi — dokunma hedefi kurali >=44px.
+   Ilk surumde kural 720px'e kadardi; 768px TABLET olcumunde hedefler yine
+   34-36px cikti. Kural dokunmatik olma olasiligi yuksek TUM daralmis
+   duzenlere (<=980px) genisletildi; masaustu yogunlugu korunuyor. */
+@media (max-width: 980px) {
+  /* ⚠ Adim gostergesi dugmeleri 36px olcumustu (Faz F'ten kalma). Secicimi
+     TUM `button`lara genisletince ortaya cikti — onceki olcumler yalnizca
+     belirli siniflara bakiyordu. */
+  .adim-dugme { min-height: var(--dokunma); padding: 0 12px; }
+  .adim-no { width: 21px; height: 21px; }
+  .ses-dinle, .cip, .oz-degistir {
+    min-height: var(--dokunma);
+    padding-left: 14px; padding-right: 14px;
+  }
+  .oz-degistir { padding-left: 12px; padding-right: 12px; }
+  .oz-satir { padding: 11px 0; }
+}
+
+/* ── Ozet: mobilde KISA SERIT, masaustunde tam panel ── */
+.oz-tepe { display: flex; align-items: center; gap: 10px; }
+.oz-ac { display: none; }
+@media (max-width: 980px) {
+  .oz { padding: 10px 12px; }
+  .oz-bas { display: none; }
+  .oz-ac {
+    display: flex; align-items: center; gap: 10px; width: 100%;
+    min-height: var(--dokunma); padding: 0; cursor: pointer;
+    background: transparent; border: 0; color: var(--yazi);
+    font-size: 13px; font-weight: 600; text-align: left;
+  }
+  .oz-serit {
+    flex: 1 1 auto; min-width: 0; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .oz-ok { flex: none; color: var(--yazi-sessiz); transition: transform var(--gecis); }
+  .oz-ac[aria-expanded="true"] .oz-ok { transform: rotate(90deg); }
+  .oz[data-acik="0"] .oz-govde { display: none; }
+  .oz[data-acik="1"] .oz-govde { padding-top: 6px; }
+}
+
+/* ── Faz G: wizard'daki inline style'larin CSS karsiliklari ── */
+.adim-giris { margin: 6px 0 16px; }
+.yontem-cip { margin-bottom: 14px; }
+.anim-eylem { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.anim-sonuc { margin-top: 10px; }
+.onay-etiket { margin-bottom: 10px; }
+.onay-metin { white-space: pre-wrap; max-height: 120px; overflow: auto; }
+.onay-bilgi, .onay-durum, .ozet-bilgi { margin-top: 14px; }
+.ozet-bilgi { margin-top: 16px; }
+.ozet-kart-bas { margin-bottom: 8px; }
+.wz-uyari { color: var(--uyari); }
+.iyi-yazi { color: var(--iyi); }
+.hata-yazi { color: var(--hata); }
+.baglanti { text-decoration: underline; }
+.ust-bosluk { margin-top: 12px; }
+.ust-bosluk-kucuk { margin-top: 8px; }
+.dar-metin { max-width: 46ch; }
+
+/* ── Ses karti + Dinle dugmesi: KARDES yapi (ic ice buton YOK) ── */
+.sk-sar { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.sk-sar > .sk { flex: 1 1 auto; }
+.sk-sar > .ses-dinle { align-self: flex-start; margin-left: 14px; margin-bottom: 12px; }
+.sb-kaynak { margin-top: 12px; }

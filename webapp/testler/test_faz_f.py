@@ -174,14 +174,20 @@ for ad, iz in [("Sora (hikaye)", "wzSora"), ("acilis", "wzAcilis"),
                ("buyuk harf", "wzAltBuyuk"), ("golge", "wzAltGolge"),
                ("palet", "grup=\"palet\""), ("ozel hex", "wzHex"),
                ("isik duzeyi", "wzIsik"), ("arkaplan", "wzArkaplan"),
-               ("marka kiti/profil", "wzProfil"), ("gorsel model", "wzModel"),
+               ("marka kiti/profil", 'data-grup="marka"'), ("gorsel model", "wzModel"),
                ("karakter gorseli", "wzKarGirdi"), ("stil gorseli", "wzStilGirdi"),
                ("referans kare", "wzRefGirdi"), ("anim analiz", "animAnaliz"),
                ("anim sorular", "animSorular")]:
-    kontrol(f"korundu: {ad}", iz in JS["wizard.js"] or iz in JS["api.js"])
-kontrol("teknik ayarlar Gelismis altinda",
-        JS["wizard.js"].count("gelismis(") >= 4,
-        str(JS["wizard.js"].count("gelismis(")))
+    # ⚠ Faz G'de secim bilesenleri `js/secim-deneyimi.js` modulune tasindi.
+    # Kuralin NIYETI "kontrol hala var mi", "wizard.js'te mi" DEGIL — bu yuzden
+    # arama TUM on yuz modullerinde yapiliyor; ileride tasinsa da kirilmaz.
+    kontrol(f"korundu: {ad}", any(iz in m for m in JS.values()) or iz in APP)
+# ⚠ Faz G: tek dev "Gelismis" yigini yerine 4 hedef odakli PROFESYONEL
+# bolum geldi. Kural "teknik ayarlar temel akista degil" — bu hala gecerli.
+kontrol("teknik ayarlar ayri profesyonel bolumlerde",
+        JS["secim-deneyimi.js"].count("PRO_BOLUMLER") >= 2
+        and 'data-pro-ac=' in JS["secim-deneyimi.js"],
+        "4 bolumlu akordeon bekleniyor")
 
 # ═══════════ 4) ADIM 4: SAHTE SAYI YOK ═══════════
 blok("adim 4: uydurma sayi yasagi")
@@ -283,17 +289,21 @@ kontrol("her cizimde duyuru temizlenir",
 # QA maddesi 4: her form ogesinin adi
 kontrol("secimAlani label uretiyor",
         '<label class="alan-ad" for=' in JS["bilesenler.js"])
+_tum_on = "\n".join(JS.values()) + APP
 kontrol("renk girdilerine gizli label",
-        'class="gorunmez" for="wzAltRenk"' in JS["wizard.js"]
-        and 'class="gorunmez" for="wzHex' in JS["wizard.js"])
+        'class="gorunmez" for="wzAltRenk"' in _tum_on
+        and 'class="gorunmez" for="wzHex' in _tum_on)
 kontrol("dosya girdilerine gizli label",
-        'for="wzRefGirdi"' in JS["wizard.js"]
-        and 'for="wzKarGirdi"' in JS["wizard.js"])
+        'for="wzRefGirdi"' in _tum_on and 'for="wzKarGirdi"' in _tum_on)
 kontrol("birak alanlarina aria-label",
-        'aria-label="Karakter görseli seç"' in JS["wizard.js"])
+        'aria-label="Karakter görseli seç"' in _tum_on)
 kontrol("anahtar gercek checkbox (klavye)",
         'type="checkbox"' in JS["bilesenler.js"])
-kontrol("ilerleme cubugu progressbar", 'role="progressbar"' in JS["bilesenler.js"])
+# ⚠ Faz G: ozel div+aria yerine NATIVE <progress> kullaniliyor; rol ve
+# deger anlamini tarayici sagliyor (inline stil de gerekmiyor).
+kontrol("ilerleme gostergesi native <progress>",
+        '<progress class="ilerleme"' in JS["bilesenler.js"]
+        and 'max="100"' in JS["bilesenler.js"])
 kontrol("kontrast notu: sessiz metin >=4.5:1", "4.9:1" in CSS)
 
 # ═══════════ 8) KULLANICI METINLERI DOGRU TURKCE ═══════════

@@ -53,6 +53,16 @@ const IKON_YOLLARI = {
   cip: `<rect x="6.5" y="6.5" width="11" height="11" rx="2" ${IKON_P}/><path ${IKON_P} d="M10 3.5v3M14 3.5v3M10 17.5v3M14 17.5v3M3.5 10h3M3.5 14h3M17.5 10h3M17.5 14h3"/>`,
   yenile: `<path ${IKON_P} d="M19 12a7 7 0 1 1-2.4-5.3"/><path ${IKON_P} d="M19.5 4.5V9H15"/>`,
   cop: `<path ${IKON_P} d="M5.5 7.5h13M9.5 7.5V5.2h5v2.3M7 7.5 8 19.5h8l1-12"/>`,
+  // ── Faz G: secim deneyimi ikonlari ──
+  otomatik: `<path ${IKON_P} d="M12 3.5l1.7 4.1 4.3.4-3.3 2.9 1 4.3L12 13l-3.7 2.2 1-4.3-3.3-2.9 4.3-.4Z"/><path ${IKON_P} d="M18.5 16.5l.7 1.7 1.8.2-1.4 1.2.4 1.8-1.5-1-1.5 1 .4-1.8-1.4-1.2 1.8-.2Z"/>`,
+  oynatDaire: `<circle cx="12" cy="12" r="8.4" ${IKON_P}/><path ${IKON_P} d="M10 8.6 16 12l-6 3.4Z"/>`,
+  durdur: `<circle cx="12" cy="12" r="8.4" ${IKON_P}/><rect x="9.2" y="9.2" width="5.6" height="5.6" rx="1" ${IKON_P}/>`,
+  onayDaire: `<circle cx="12" cy="12" r="8.4" ${IKON_P}/><path ${IKON_P} d="m8.4 12.2 2.6 2.6 4.6-5"/>`,
+  suzge: `<path ${IKON_P} d="M4 6h16M7 12h10M10 18h4"/>`,
+  hareket: `<path ${IKON_P} d="M4 12h9"/><path ${IKON_P} d="m10 8.5 3.5 3.5L10 15.5"/><rect x="15.5" y="6.5" width="4.5" height="11" rx="1.4" ${IKON_P}/>`,
+  altyaziIm: `<rect x="3.5" y="5.5" width="17" height="13" rx="2" ${IKON_P}/><path ${IKON_P} d="M7 14.5h4M13 14.5h4"/>`,
+  tempo: `<path ${IKON_P} d="M4 17V9M8 17v-5M12 17V7M16 17v-6M20 17v-3"/>`,
+  katman: `<path ${IKON_P} d="m12 4 8 4-8 4-8-4Z"/><path ${IKON_P} d="m4 12 8 4 8-4M4 16l8 4 8-4"/>`,
   kanal: `<circle cx="12" cy="12" r="8.2" ${IKON_P}/><path ${IKON_P} d="M4 12h16M12 4c2.4 2.2 3.6 5 3.6 8s-1.2 5.8-3.6 8c-2.4-2.2-3.6-5-3.6-8s1.2-5.8 3.6-8Z"/>`,
 };
 

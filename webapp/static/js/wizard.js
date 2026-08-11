@@ -22,6 +22,7 @@ import {dosyalar, dosyalariTemizle, taslak, taslakSil, taslakYaz,
 import {$, $$, alan, anahtar, duyur, etiket, gelismis, grupBagla, kac,
         ozetSatir, secKart, secimAlani, uyariKutu, yukleniyor} from './bilesenler.js';
 import {ikon, ikonlariBagla} from './ikon.js';
+import {adim3Govde, adim3Kur, bosDurum, sesDurdur} from './secim-deneyimi.js';
 
 /** Uzun yer tutucu metinleri — sablon dizesi ICINDE kesme isareti kullanmak
  *  kacis sorunu yaratiyor, bu yuzden ayri sabit. */
@@ -40,7 +41,8 @@ const ADIMLAR = [
 ];
 
 let adim = 1;
-let kaynak = {};          // sunucudan gelen listeler
+let kaynak = {};
+let _yenidenCiz = null;   // ozet panelinden tam cizim tetigi          // sunucudan gelen listeler
 let sesOynatici = null;
 
 /* ════════════════ YARDIMCILAR ════════════════ */
@@ -78,7 +80,7 @@ function ilerlemeDurumu() {
 function adim1() {
   const t = taslak();
   return `<h2>Ne üretiyorsun?</h2>
-  <p class="kucuk orta" style="margin:6px 0 16px">
+  <p class="kucuk orta adim-giris">
     Tür, üretim akışının bir ayarı. Sonraki adımlarda değiştirebilirsin.</p>
   <div class="izgara izgara-3" role="radiogroup" aria-label="Video türü">
     ${TURLER.map((x) => secKart({
@@ -100,10 +102,10 @@ function adim2() {
     {id: 'senaryo', ad: 'Metin yapıştır'},
   ];
   return `<h2>Konu ve içerik</h2>
-  <p class="kucuk orta" style="margin:6px 0 16px">
+  <p class="kucuk orta adim-giris">
     Konuyu bir paragrafla anlat ya da hazır metnini yapıştır.</p>
 
-  <div class="cipler" role="radiogroup" aria-label="Giriş yöntemi" style="margin-bottom:14px">
+  <div class="cipler yontem-cip" role="radiogroup" aria-label="Giriş yöntemi">
     ${yontemler.map((y) => `<button type="button" class="cip" data-grup="yontem"
       data-deger="${y.id}" aria-pressed="${t.girisYontemi === y.id}">${
       kac(y.ad)}</button>`).join('')}
@@ -151,172 +153,31 @@ function adim2() {
   ${t.tur === 'animasyon' ? gelismis('Referans analizi (gelişmiş)', `
     <p class="kucuk orta">Kareleri yükledikten sonra stil analizi
       çalıştırabilirsin. Analiz, üretimde aynı karelerle birlikte kullanılır.</p>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+    <div class="anim-eylem">
       <button type="button" class="dugme" id="wzAnimAnaliz">
         ${ikon('cip', {boyut: 17})} Stil analizi yap</button>
       <button type="button" class="dugme dugme-hayalet" id="wzAnimSorular">
         ${ikon('bilgi', {boyut: 17})} Netleştirme soruları</button>
     </div>
-    <div id="wzAnimSonuc" class="kucuk orta" style="margin-top:10px"></div>
+    <div id="wzAnimSonuc" class="kucuk orta anim-sonuc"></div>
   `) : ''}`;
 }
 
 /* ════════════════ ADIM 3 — GORSEL YON ════════════════ */
+/**
+ * ⚠ FAZ G: bu adim eskiden "her seyi ayni anda gosteren kontrol paneli"ydi
+ * (select yigini + tek dev "Gelismis" bloku). Kullanici geri bildirimi:
+ * "stil seciyoruz, cok kotu ve karmakarisik". Yeni model:
+ *   Hizli secim (Otomatik + en fazla 3 oneri)  ->  hizli tercihler  ->
+ *   profesyonel ayarlar (tek acik akordeon)    ->  canli secim ozeti
+ * Butun cizim `secim-deneyimi.js` icinde; burada yalnizca durum ve baglama var.
+ */
+
+/** Adim 3'un yerel gorunum durumu (taslakta saklanmaz — gecici UI durumu). */
+const a3 = bosDurum();   // adim 3'un gecici UI durumu (taslakta saklanmaz)
 
 function adim3() {
-  const t = taslak();
-  const stilListe = t.tur === 'animasyon'
-    ? (kaynak.animStilleri || []) : (kaynak.editStilleri || []);
-  const stilDeger = t.tur === 'animasyon' ? t.animStili : t.editStili;
-
-  return `<h2>Görsel yön</h2>
-  <p class="kucuk orta" style="margin:6px 0 16px">
-    Şablon ve ses temel; geri kalan her şey "Gelişmiş" altında.</p>
-
-  <div class="alan">
-    <span class="alan-ad">Edit şablonu</span>
-    <div id="wzStiller" class="izgara izgara-3" role="radiogroup"
-         aria-label="Edit şablonu">${
-      stilListe.length
-        ? stilListe.map((s) => secKart({
-          id: s.id ?? s.ad ?? s, ad: s.ad ?? s.id ?? s,
-          acik: s.ozet || s.aciklama || '', ikonAd: 'sablon', grup: 'stil',
-          secili: (s.id ?? s.ad ?? s) === stilDeger,
-        })).join('')
-        : `<p class="kucuk sessiz">Şablon listesi alınamadı — üretim ` +
-          `varsayılan şablonla devam eder.</p>`}
-    </div>
-  </div>
-
-  ${secimAlani({
-    id: 'wzSes', ad: 'Anlatıcı sesi', deger: t.ses,
-    ipucu: 'Boş bırakırsan sistem türe uygun sesi kendi seçer.',
-    secenekler: [{id: '', ad: 'Otomatik (önerilen)'},
-      ...(kaynak.sesler || []).map((s) => ({
-        id: s.id ?? s.ad ?? s, ad: s.ad ?? s.id ?? s}))],
-  })}
-
-  ${secimAlani({
-    id: 'wzProfil', ad: 'Marka kiti', deger: t.profil,
-    ipucu: 'Kanal profili: videolar arası renk ve karakter tutarlılığı.',
-    secenekler: [{id: '', ad: 'Yok'},
-      ...(kaynak.profiller || []).map((p) => ({
-        id: p.pid ?? p.id ?? p, ad: p.ad ?? p.pid ?? p}))],
-  })}
-
-  ${gelismis('Gelişmiş: hareket ve altyazı', `
-    ${anahtar({id: 'wzGecis', ad: 'Sahne geçişleri',
-      acik: 'Kapatırsan tüm kesmeler sert olur.', acikMi: t.gecis})}
-    ${anahtar({id: 'wzZoom', ad: 'Kamera hareketi',
-      acik: 'Yavaş yaklaşma/uzaklaşma (Ken Burns).', acikMi: t.zoom})}
-    ${anahtar({id: 'wzAltyazi', ad: 'Gömülü altyazı',
-      acik: 'Videoya yazılır, sonradan kapatılamaz.', acikMi: t.altyazi})}
-    <div id="wzAltyaziAyar" class="${t.altyazi ? '' : 'gorunmez'}"
-         style="margin-top:12px">
-      ${secimAlani({id: 'wzAltSablon', ad: 'Altyazı şablonu',
-        deger: (t.altyaziSablon && t.altyaziSablon.id) || '',
-        secenekler: [{id: '', ad: 'Varsayılan'},
-          ...(kaynak.altyaziSablonlari || []).map((a) => ({
-            id: a.id ?? a.ad ?? a, ad: a.ad ?? a.id ?? a}))]})}
-      <div class="izgara izgara-2">
-        ${alan({id: 'wzAltBoyut', ad: 'Punto',
-          ic: `<input class="girdi" type="number" id="wzAltBoyut" min="18" max="120"
-                value="${kac((t.altyaziSablon && t.altyaziSablon.boyut) || 42)}">`})}
-        ${alan({id: 'wzAltKonum', ad: 'Konum',
-          ic: `<select class="secim" id="wzAltKonum">
-            ${['alt', 'orta', 'ust'].map((k) => `<option value="${k}" ${
-              (t.altyaziSablon && t.altyaziSablon.konum) === k ? 'selected' : ''
-            }>${k}</option>`).join('')}</select>`})}
-      </div>
-      <fieldset class="alan" style="border:0;padding:0;margin:0 0 16px">
-        <legend class="alan-ad" style="padding:0">Yazı ve kontur rengi</legend>
-        <div class="renkler">
-          <label class="gorunmez" for="wzAltRenk">Yazı rengi</label>
-          <input type="color" id="wzAltRenk" aria-label="Yazı rengi"
-            value="${kac((t.altyaziSablon && t.altyaziSablon.renk) || '#ffffff')}">
-          <label class="gorunmez" for="wzAltKontur">Kontur rengi</label>
-          <input type="color" id="wzAltKontur" aria-label="Kontur rengi"
-            value="${kac((t.altyaziSablon && t.altyaziSablon.kontur) || '#000000')}">
-        </div>
-      </fieldset>
-      ${anahtar({id: 'wzAltBuyuk', ad: 'BÜYÜK HARF',
-        acikMi: Boolean(t.altyaziSablon && t.altyaziSablon.buyuk)})}
-      ${anahtar({id: 'wzAltGolge', ad: 'Gölge',
-        acikMi: Boolean(t.altyaziSablon && t.altyaziSablon.golge)})}
-    </div>
-  `)}
-
-  ${gelismis('Gelişmiş: renk ve ışık', `
-    <div class="alan">
-      <span class="alan-ad">Renk paleti</span>
-      <div class="cipler" role="radiogroup" aria-label="Renk paleti">
-        <button type="button" class="cip" data-grup="palet" data-deger=""
-          aria-pressed="${!t.palet}">Otomatik</button>
-        ${(kaynak.paletler || []).map((p) => {
-          const id = p.id ?? p.ad ?? p;
-          return `<button type="button" class="cip" data-grup="palet"
-            data-deger="${kac(id)}" aria-pressed="${t.palet === id}">${
-            kac(p.ad ?? id)}</button>`;
-        }).join('')}
-        <button type="button" class="cip" data-grup="palet" data-deger="ozel"
-          aria-pressed="${t.palet === 'ozel'}">Özel renkler</button>
-      </div>
-      <div id="wzPaletOzel" class="${t.palet === 'ozel' ? '' : 'gorunmez'}"
-           style="margin-top:10px">
-        <div class="renkler">${t.paletOzel.map((h, i) =>
-          `<label class="gorunmez" for="wzHex${i}">Özel renk ${i + 1}</label>
-           <input type="color" id="wzHex${i}" value="${kac(h)}"
-            aria-label="Özel renk ${i + 1}">`).join('')}</div>
-      </div>
-    </div>
-    ${secimAlani({id: 'wzIsik', ad: 'Işık düzeyi', deger: t.isik,
-      secenekler: [{id: '', ad: 'Otomatik'},
-        ...(kaynak.isikDuzeyleri || []).map((i) => ({
-          id: i.id ?? i.ad ?? i, ad: i.ad ?? i.id ?? i}))]})}
-    ${secimAlani({id: 'wzArkaplan', ad: 'Arka plan', deger: t.arkaplan,
-      secenekler: [{id: '', ad: 'Otomatik'},
-        ...(kaynak.arkaplanlar || []).map((a) => ({
-          id: a.id ?? a.ad ?? a, ad: a.ad ?? a.id ?? a}))]})}
-  `)}
-
-  ${t.tur === 'hikaye' ? gelismis('Gelişmiş: hikâye seçenekleri', `
-    ${secimAlani({id: 'wzAcilis', ad: 'Açılış sahnesi', deger: t.acilis,
-      ipucu: 'Videonun ilk saniyelerinin kuruluşu.',
-      secenekler: [{id: '', ad: 'Otomatik'}, {id: 'soru', ad: 'Soru ile'},
-        {id: 'sahne', ad: 'Sahne ile'}, {id: 'alinti', ad: 'Alıntı ile'}]})}
-    ${anahtar({id: 'wzSora', ad: 'Hareketli açılış planı',
-      acik: 'Açılış için video modeli kullanılır; süre ve maliyet artar.',
-      acikMi: t.sora})}
-  `) : ''}
-
-  ${gelismis('Gelişmiş: görsel model ve ek referanslar', `
-    ${secimAlani({id: 'wzModel', ad: 'Görsel model', deger: t.gorselModel,
-      ipucu: 'Boş = sistem kararı. Yalnızca görsel üretilen türlerde etkili.',
-      secenekler: [{id: '', ad: 'Otomatik'}, {id: 'gpt-image', ad: 'gpt-image'},
-        {id: 'gemini', ad: 'gemini'}]})}
-    <div class="izgara izgara-2">
-      <div class="alan">
-        <span class="alan-ad">Karakter görseli</span>
-        <div class="birak" id="wzKarBirak" role="button" tabindex="0"
-             aria-label="Karakter görseli seç">
-          ${ikon('yukle', {boyut: 20})}<div class="birak-ad">Seç</div>
-          <label class="gorunmez" for="wzKarGirdi">Karakter görseli dosyası</label>
-          <input type="file" id="wzKarGirdi" accept="image/*" class="gorunmez">
-        </div>
-        <span class="alan-ipucu" id="wzKarAd">Seçilmedi</span>
-      </div>
-      <div class="alan">
-        <span class="alan-ad">Stil görseli</span>
-        <div class="birak" id="wzStilBirak" role="button" tabindex="0"
-             aria-label="Stil görseli seç">
-          ${ikon('yukle', {boyut: 20})}<div class="birak-ad">Seç</div>
-          <label class="gorunmez" for="wzStilGirdi">Stil görseli dosyası</label>
-          <input type="file" id="wzStilGirdi" accept="image/*" class="gorunmez">
-        </div>
-        <span class="alan-ipucu" id="wzStilAd">Seçilmedi</span>
-      </div>
-    </div>
-  `)}`;
+  return adim3Govde({t: taslak(), kaynak, durum: a3, dosyalar});
 }
 
 /* ════════════════ ADIM 4 — URETIM OZETI ════════════════ */
@@ -328,13 +189,13 @@ function adim4() {
   const tb = turBilgi(t.tur);
   const kelime = Math.round(Number(t.sureDk || 2) * 139);  // olculen TTS hizi
   return `<h2>Üretim özeti</h2>
-  <p class="kucuk orta" style="margin:6px 0 16px">
+  <p class="kucuk orta adim-giris">
     Bunlar senin seçtiklerin. Araştırma ve medya sayıları üretim sırasında
     ölçülür — burada tahmin göstermiyoruz.</p>
 
   <div class="ozet-izgara">
     <section class="kart">
-      <h3 style="margin-bottom:8px">Seçimlerin</h3>
+      <h3 class="ozet-kart-bas">Seçimlerin</h3>
       ${ozetSatir('Tür', tb ? tb.ad : '—')}
       ${ozetSatir('Hedef süre', `${t.sureDk} dk`)}
       ${ozetSatir('Anlatım (yaklaşık)', `${kelime.toLocaleString('tr-TR')} kelime`)}
@@ -348,7 +209,7 @@ function adim4() {
     </section>
 
     <section class="kart">
-      <h3 style="margin-bottom:8px">Üretimde belirlenecek</h3>
+      <h3 class="ozet-kart-bas">Üretimde belirlenecek</h3>
       <!-- ⚠ Bu alanlarin backend ucu YOK. Sayi UYDURULMAZ. -->
       ${ozetSatir('Güvenilir kaynak sayısı', HESAPLANACAK, {hesaplanacak: true})}
       ${ozetSatir('Doğrulanmış iddia', HESAPLANACAK, {hesaplanacak: true})}
@@ -360,7 +221,7 @@ function adim4() {
     </section>
   </div>
 
-  <div style="margin-top:16px">
+  <div class="ozet-bilgi">
     ${uyariKutu('Bu değerler için henüz bir ön-kontrol ucu yok. Üretim ' +
       'başladığında iş ekranında gerçek ölçülen değerler görünür.', 'bilgi')}
   </div>`;
@@ -372,25 +233,25 @@ function adim5() {
   const t = taslak();
   const tb = turBilgi(t.tur);
   return `<h2>Onay</h2>
-  <p class="kucuk orta" style="margin:6px 0 16px">
+  <p class="kucuk orta adim-giris">
     Üretim başlatılınca sunucu kuyruğuna alınır; ilerlemeyi Projeler
     ekranından izleyebilirsin.</p>
 
   <section class="kart">
-    <div class="iskart-satir" style="margin-bottom:10px">
+    <div class="iskart-satir onay-etiket">
       ${etiket(tb ? tb.ad : '—', 'vurgu')}${etiket(`${t.sureDk} dk`)}
       ${t.altyazi ? etiket('Altyazili') : ''}
     </div>
-    <p class="kucuk orta" style="white-space:pre-wrap;max-height:120px;overflow:auto">${
+    <p class="kucuk orta onay-metin">${
       kac((t.konu || '').slice(0, 600))}${(t.konu || '').length > 600 ? '…' : ''}</p>
   </section>
 
-  <div style="margin-top:14px">
+  <div class="onay-bilgi">
     ${uyariKutu('Çıktı dosyaları: video, kapak görseli ve kullanılan ' +
       'kaynakların listesi.', 'bilgi')}
   </div>
 
-  <div id="wzUretimDurum" class="kucuk" style="margin-top:14px" role="status"
+  <div id="wzUretimDurum" class="kucuk onay-durum" role="status"
        aria-live="polite"></div>`;
 }
 
@@ -466,7 +327,7 @@ export function wizardHtml() {
     <button type="button" class="dugme dugme-hayalet" id="wzGeri"
       ${adim === 1 ? 'disabled' : ''}>${ikon('geri', {boyut: 17})} Geri</button>
     <span class="bosluk"></span>
-    <span id="wzUyari" class="kucuk" style="color:var(--uyari)"></span>
+    <span id="wzUyari" class="kucuk wz-uyari"></span>
     ${adim < 5
       ? `<button type="button" class="dugme dugme-ana" id="wzDevam">Devam
           ${ikon('ok', {boyut: 17})}</button>`
@@ -532,6 +393,7 @@ function olaylariBagla(yenidenCiz) {
     const g = adimGecerli(adim);
     if (!g.ok) { uyariGoster(g.sebep); return; }
     uyariTemizle();                 // eski hata sonraki adimda okunmasin
+    sesDurdur();                    // adim degisti: calan ornek sussun
     adim = Math.min(5, adim + 1);
     yenidenCiz();
   });
@@ -548,13 +410,8 @@ function olaylariBagla(yenidenCiz) {
     taslakYaz(v === 'animasyon' ? {editStili: ''} : {animStili: ''});
   });
   grupBagla(document, 'yontem', (v) => taslakYaz({girisYontemi: v}));
-  grupBagla(document, 'stil', (v) => taslakYaz(
-    taslak().tur === 'animasyon' ? {animStili: v} : {editStili: v}));
-  grupBagla(document, 'palet', (v) => {
-    taslakYaz({palet: v});
-    const oz = $('#wzPaletOzel');
-    if (oz) oz.classList.toggle('gorunmez', v !== 'ozel');
-  });
+  // Stil/palet/marka/ses ARTIK adim3Bagla() icinde radio semantics ile
+  // baglaniyor — burada TEKRAR baglamak cift islem yapardi.
 
   const konu = $('#wzKonu');
   if (konu) konu.addEventListener('input', () => {
@@ -565,67 +422,10 @@ function olaylariBagla(yenidenCiz) {
   const sure = $('#wzSure');
   if (sure) sure.addEventListener('change', () => taslakYaz({sureDk: sure.value}));
 
-  [['wzSes', 'ses'], ['wzProfil', 'profil'], ['wzIsik', 'isik'],
-   ['wzArkaplan', 'arkaplan'], ['wzAcilis', 'acilis'],
-   ['wzModel', 'gorselModel']].forEach(([id, anahtarAd]) => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('change', () => taslakYaz({[anahtarAd]: el.value}));
-  });
-
-  [['wzGecis', 'gecis'], ['wzZoom', 'zoom'], ['wzSora', 'sora']]
-    .forEach(([id, anahtarAd]) => {
-      const el = document.getElementById(id);
-      if (el) el.addEventListener('change', () =>
-        taslakYaz({[anahtarAd]: el.checked}));
-    });
-
-  const alt = $('#wzAltyazi');
-  if (alt) alt.addEventListener('change', () => {
-    taslakYaz({altyazi: alt.checked});
-    const kap = $('#wzAltyaziAyar');
-    if (kap) kap.classList.toggle('gorunmez', !alt.checked);
-  });
-
-  // Altyazi sablonu alanlari -> tek nesne
-  const altyaziTopla = () => {
-    const g = (id) => document.getElementById(id);
-    taslakYaz({altyaziSablon: {
-      id: g('wzAltSablon')?.value || '',
-      boyut: Number(g('wzAltBoyut')?.value || 42),
-      konum: g('wzAltKonum')?.value || 'alt',
-      renk: g('wzAltRenk')?.value || '#ffffff',
-      kontur: g('wzAltKontur')?.value || '#000000',
-      buyuk: Boolean(g('wzAltBuyuk')?.checked),
-      golge: Boolean(g('wzAltGolge')?.checked),
-    }});
-  };
-  ['wzAltSablon', 'wzAltBoyut', 'wzAltKonum', 'wzAltRenk', 'wzAltKontur',
-   'wzAltBuyuk', 'wzAltGolge'].forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('change', altyaziTopla);
-  });
-
-  [0, 1, 2].forEach((i) => {
-    const el = document.getElementById(`wzHex${i}`);
-    if (el) el.addEventListener('change', () => {
-      const h = [...taslak().paletOzel];
-      h[i] = el.value;
-      taslakYaz({paletOzel: h});
-    });
-  });
-
   dosyaAlaniBagla('#wzRefBirak', '#wzRefGirdi', true, (f) => {
     dosyalar.sahneRef = dosyalar.sahneRef.concat(f).slice(0, 8);
     onizlemeleriCiz();
     duyur(`${dosyalar.sahneRef.length} referans kare seçildi`);
-  });
-  dosyaAlaniBagla('#wzKarBirak', '#wzKarGirdi', false, (f) => {
-    dosyalar.karakter = f;
-    const e = $('#wzKarAd'); if (e) e.textContent = f.name;
-  });
-  dosyaAlaniBagla('#wzStilBirak', '#wzStilGirdi', false, (f) => {
-    dosyalar.stil = f;
-    const e = $('#wzStilAd'); if (e) e.textContent = f.name;
   });
   onizlemeleriCiz();
 
@@ -636,6 +436,16 @@ function olaylariBagla(yenidenCiz) {
 
   const uret = $('#wzUret');
   if (uret) uret.addEventListener('click', () => uretimiBaslat(uret));
+
+  // Adim 3'un secim deneyimi — yalnizca o adimda bagla
+  // Adim 3'un TUM secim mantigi `secim-deneyimi.js` icinde — wizard yalnizca
+  // durumu ve `generate` sozlesmesini yonetiyor.
+  if (adim === 3) {
+    adim3Kur({
+      kap: $('#wzGovde'), durum: a3, taslak, taslakYaz, kaynak, dosyalar,
+      dosyaAlaniBagla, duyur, yenidenCiz,
+    });
+  }
 }
 
 function uyariGoster(metin) {
@@ -739,9 +549,9 @@ async function uretimiBaslat(dugme) {
       olusturma: new Date().toISOString(),
     });
     if (durum) {
-      durum.innerHTML = `<span style="color:var(--iyi)">Başlatıldı.</span> ` +
+      durum.innerHTML = `<span class="iyi-yazi">Başlatıldı.</span> ` +
         `İş kimliği <strong class="tekfont">${kac(isId)}</strong>. ` +
-        `<a href="#/projeler" style="text-decoration:underline">Projeler</a> ` +
+        `<a href="#/projeler" class="baglanti">Projeler</a> ` +
         `ekranından izleyebilirsin.`;
     }
     duyur('Üretim başlatıldı');
@@ -750,7 +560,7 @@ async function uretimiBaslat(dugme) {
   } catch (e) {
     dugme.disabled = false;
     if (durum) {
-      durum.innerHTML = `<span style="color:var(--hata)">Başlatılamadı:</span> ` +
+      durum.innerHTML = `<span class="hata-yazi">Başlatılamadı:</span> ` +
         kac(String(e.message || e).slice(0, 240));
     }
   }
@@ -766,6 +576,7 @@ export async function wizardCiz(kap, {adimNo} = {}) {
   if (!kaynak.yuklendi) {
     kaynak = {...(await kaynaklariYukle()), yuklendi: true};
   }
+  _yenidenCiz = () => ciz();
   const ciz = () => {
     kap.innerHTML = wizardHtml();
     ikonlariBagla(kap);

@@ -43,7 +43,7 @@ export async function anaSayfa(kap) {
 
   <div class="bolum-bas">
     <h2>Son işler</h2>
-    <a class="kucuk orta" href="#/projeler" style="text-decoration:underline">
+    <a class="kucuk orta baglanti" href="#/projeler">
       Tümü</a>
   </div>
   <div id="anaIsler">${yukleniyor(3, 150)}</div>
@@ -120,7 +120,7 @@ async function islerBolumu(kap, sinir = 0) {
     ${yalnizYerel ? uyariKutu(
       'Sunucu listesine ulaşılamadı; aşağıdakiler <strong>bu tarayıcıda' +
       '</strong> kayıtlı işler. Başka cihazda görünmezler.', 'uyari') : ''}
-    <div class="izgara izgara-3" style="margin-top:${yalnizYerel ? '12px' : '0'}">
+    <div class="izgara izgara-3 ${yalnizYerel ? 'ust-bosluk' : ''}">
       ${liste.map(isKart).join('')}
     </div>`;
   ikonlariBagla(kap);
@@ -183,7 +183,7 @@ export async function sablonlar(kap) {
       <article class="kart kart-sik">
         <div class="seckart-bas">${ikon(ikonAd, {boyut: 19})}
           <span class="seckart-ad">${kac(s.ad ?? s.id ?? s)}</span></div>
-        <p class="kucuk orta" style="margin-top:8px">${
+        <p class="kucuk orta ust-bosluk-kucuk">${
           kac(s.ozet || s.aciklama || 'Açıklama yok.')}</p>
       </article>`).join('')}</div>`;
 
@@ -283,7 +283,7 @@ export async function ayarlar(kap) {
         ${k.durum === 'uyari' ? etiket('koşullu', 'uyari') : ''}</div>
       <p class="kucuk orta">${kac(k.not)}</p>
     </div>`).join('')}</div>
-  <div style="margin-top:12px">${uyariKutu(
+  <div class="ust-bosluk">${uyariKutu(
     'Arama sırası: <strong>Pexels → Pixabay → Coverr → YouTube (yalnızca CC)' +
     '</strong>. Belgeselde yapay zekâ görseli <strong>üretilmez</strong>; ' +
     'uygun gerçek görüntü bulunamazsa sahne kapsam boşluğu olarak işaretlenir.',

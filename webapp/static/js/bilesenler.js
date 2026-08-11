@@ -13,11 +13,17 @@ export function kac(s) {
 export const $ = (s, k = document) => k.querySelector(s);
 export const $$ = (s, k = document) => Array.from(k.querySelectorAll(s));
 
-/** Yukleniyor iskeleti. */
+/**
+ * Yukleniyor iskeleti.
+ * ⚠ Yukseklik INLINE STIL ile verilmiyor (kural: CSS siniflari). Cagiranlarin
+ * kullandigi degerler dort kademeye yuvarlaniyor.
+ */
 export function yukleniyor(adet = 3, yukseklik = 96) {
+  const kademe = yukseklik <= 70 ? 's' : yukseklik <= 100 ? 'm'
+    : yukseklik <= 130 ? 'l' : 'xl';
   return `<div class="izgara izgara-3" aria-busy="true" aria-label="Yükleniyor">` +
     Array.from({length: adet}, () =>
-      `<div class="iskelet" style="height:${yukseklik}px"></div>`).join('') +
+      `<div class="iskelet iskelet-${kademe}"></div>`).join('') +
     `</div>`;
 }
 
@@ -30,7 +36,7 @@ export function durumBlok({tur = 'bos', baslik, aciklama, eylem = ''}) {
   return `<div class="durum-blok ${tur === 'hata' ? 'hata' : ''}">
     ${ikon(im, {boyut: 26})}
     <h3>${kac(baslik)}</h3>
-    <p class="kucuk orta" style="max-width:46ch">${kac(aciklama)}</p>
+    <p class="kucuk orta dar-metin">${kac(aciklama)}</p>
     ${eylem}
   </div>`;
 }
@@ -111,9 +117,8 @@ export function isKart(is) {
     <div class="iskart-satir">${durumEtiket}
       ${is.tur ? etiket(is.tur) : ''}</div>
     ${!bittiMi && !hataMi
-      ? `<div class="ilerleme" role="progressbar" aria-valuenow="${yuzde}"
-            aria-valuemin="0" aria-valuemax="100"><i style="width:${
-        Math.max(2, Math.min(100, yuzde))}%"></i></div>`
+      ? `<progress class="ilerleme" max="100" value="${
+        Math.max(0, Math.min(100, yuzde))}">${yuzde}%</progress>`
       : ''}
     <div class="iskart-satir kucuk sessiz tekfont">
       <span>${kac(is.is_id)}</span></div>
