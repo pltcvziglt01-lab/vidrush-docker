@@ -11,7 +11,8 @@
  *   5. Footage zinciri gercek sirayla: Pexels -> Pixabay -> Coverr -> YouTube(CC).
  *   6. Sunucu/yenileme tarihi gibi altyapi bilgisi kullanici yuzune KONULMUYOR.
  */
-import {UCLAR, getirSessiz, islerListesi, oturumId, yol} from './api.js';
+import {UCLAR, getirSessiz, isDurumu, islerListesi, oturumId,
+        yol} from './api.js';
 import {taslak, taslakVarMi, yerelIsler} from './durum.js';
 import {$, $$, durumBlok, etiket, isKart, kac, uyariKutu,
         yukleniyor} from './bilesenler.js';
@@ -51,7 +52,7 @@ export async function anaSayfa(kap) {
   <div class="bolum-bas"><h2>Sistem durumu</h2></div>
   <div id="anaSaglik">${yukleniyor(1, 64)}</div>`;
   ikonlariBagla(kap);
-  islerBolumu($('#anaIsler'), 3);
+  islerBolumu($('#anaIsler'), 3, {poll: true});
   saglikBolumu($('#anaSaglik'));
 }
 
@@ -63,7 +64,28 @@ export async function anaSayfa(kap) {
  * gorunuyor ve kullanici islerini kaybettigini saniyordu. Hangi kaynagin
  * kullanildigi artik ekranda YAZILI.
  */
-async function islerBolumu(kap, sinir = 0) {
+/**
+ * ⚠ FAZ H — CANLI TAKIP.
+ * Onceden Projeler ekrani BIR KEZ ciziliyor ve hic yenilenmiyordu; `isDurumu()`
+ * tanimliydi ama hicbir yerden cagrilmiyordu. Kullanici uretimin ilerledigini
+ * ancak sayfayi elle yenileyerek gorebiliyordu.
+ * Artik: aktif is varsa POLL_MS'de bir `/api/job/{id}` cagrilir.
+ * Sekme arka plandaysa poll DURUR (bosa istek atmaz), one gelince devam eder.
+ */
+const POLL_MS = 4000;
+let _pollZaman = null;
+
+export function pollDurdur() {
+  if (_pollZaman) { clearTimeout(_pollZaman); _pollZaman = null; }
+}
+
+/** Bir isin bittigi/hata aldigi. Aktif isler icin poll surer. */
+function bitmisMi(is) {
+  const d = String(is.status || is.durum || '').toLowerCase();
+  return d === 'done' || d === 'error' || d.includes('bitti') || d.includes('hata');
+}
+
+async function islerBolumu(kap, sinir = 0, {poll = false} = {}) {
   if (!kap) return;
   const yerel = yerelIsler();
   let sunucu = null;
@@ -79,8 +101,9 @@ async function islerBolumu(kap, sinir = 0) {
 
   const harita = new Map();
   (sunucu || []).forEach((x) => {
-    const id = x.is_id || x.id || x.job;
-    if (id) harita.set(id, {...x, is_id: id, _kaynak: 'sunucu'});
+    // ⚠ FAZ H: `job_id` sozlesmenin BIRINCIL adi; eskiler yedek.
+    const id = x.job_id || x.is_id || x.id || x.job;
+    if (id) harita.set(id, {...x, is_id: id, job_id: id, _kaynak: 'sunucu'});
   });
   yerel.forEach((x) => {
     if (x.is_id && !harita.has(x.is_id)) {
@@ -124,6 +147,49 @@ async function islerBolumu(kap, sinir = 0) {
       ${liste.map(isKart).join('')}
     </div>`;
   ikonlariBagla(kap);
+
+  if (poll && liste.some((x) => !bitmisMi(x))) {
+    isleriTazele(kap, liste, sinir);
+  }
+}
+
+/**
+ * Aktif isleri TEK TEK `/api/job/{id}` ile tazele ve karti YERINDE guncelle.
+ * Tum listeyi yeniden cizmiyoruz: kullanici bir videoyu oynatiyorsa
+ * `innerHTML` degisimi oynaticiyi sifirlardi.
+ */
+function isleriTazele(kap, liste, sinir) {
+  pollDurdur();
+  _pollZaman = setTimeout(async () => {
+    // Kap DOM'dan cikmissa (baska ekrana gecildi) poll'u birak.
+    if (!kap.isConnected) { pollDurdur(); return; }
+    // Sekme arka plandaysa istek atma, bir tur sonra tekrar bak.
+    if (document.hidden) { isleriTazele(kap, liste, sinir); return; }
+
+    const aktif = liste.filter((x) => !bitmisMi(x));
+    let degisti = false;
+    await Promise.all(aktif.map(async (x) => {
+      const id = x.job_id || x.is_id;
+      if (!id) return;
+      try {
+        const yeni = await isDurumu(id);
+        const birlesik = {...x, ...yeni, ad: x.ad, tur: x.tur || yeni.tur};
+        const i = liste.indexOf(x);
+        if (i >= 0) liste[i] = birlesik;
+        const kart = kap.querySelector(`[data-is="${CSS.escape(id)}"]`);
+        if (kart) {
+          kart.outerHTML = isKart(birlesik);
+          degisti = true;
+        }
+      } catch {
+        // ⚠ Ag kesintisi TAKIBI DURDURMAZ. Kart eski haliyle kalir ve bir
+        // sonraki turda yeniden denenir; sahte "hata" durumu YAZILMAZ.
+      }
+    }));
+    if (degisti) ikonlariBagla(kap);
+    if (liste.some((x) => !bitmisMi(x))) isleriTazele(kap, liste, sinir);
+    else pollDurdur();
+  }, POLL_MS);
 }
 
 /* ════════════════ PROJELER / VIDEOLAR ════════════════ */
@@ -139,7 +205,7 @@ export async function projeler(kap) {
   </div>
   <div id="prjIsler">${yukleniyor(6, 150)}</div>`;
   ikonlariBagla(kap);
-  islerBolumu($('#prjIsler'));
+  islerBolumu($('#prjIsler'), 0, {poll: true});
 }
 
 /* ════════════════ SABLONLAR ════════════════ */
@@ -213,27 +279,51 @@ async function saglikBolumu(kap) {
   }
 
   const v = s.veri || {};
-  // Sunucu esnek sema donduruyor: bilinen anahtarlari topla, gerisini gorsel
-  // olarak listele. UYDURMA yok — yalnizca gelen degerler.
-  const girdiler = Object.entries(v)
-    .filter(([, d]) => typeof d !== 'object' || d === null)
-    .slice(0, 12);
-  const iyiMi = String(v.durum ?? v.status ?? 'ok').toLowerCase()
-    .match(/ok|iyi|hazir|true/);
-  if (nokta) nokta.dataset.durum = iyiMi ? 'iyi' : 'uyari';
-  if (yazi) yazi.textContent = iyiMi ? 'Sistem hazır' : 'Kısmi uyarı';
+  // ⚠ FAZ H — YANLIS POZITIF KAPATILDI.
+  // Eski satir: `String(v.durum ?? v.status ?? 'ok')` — yani sunucu `durum`
+  // alani DONDURMEZSE 'ok' VARSAYIYORDU. `/api/saglik` o alani hic
+  // dondurmuyordu; sonuc olarak ffmpeg/renderer/disk cokse bile ust barda
+  // "Sistem hazir" yaziyordu.
+  // Yeni kural: durum alani YOKSA "bilinmiyor" denir, hazir DENMEZ.
+  const ham = String(v.durum ?? v.status ?? '').toLowerCase();
+  const DURUMLAR = {
+    hazir: {pul: 'iyi', yazi: 'Sistem hazır'},
+    kisitli: {pul: 'uyari', yazi: 'Kısıtlı çalışıyor'},
+    kullanilamiyor: {pul: 'hata', yazi: 'Üretim kullanılamıyor'},
+  };
+  const d = DURUMLAR[ham] ||
+    {pul: 'uyari', yazi: 'Durum bilinmiyor'};
+  if (nokta) nokta.dataset.durum = d.pul;
+  if (yazi) yazi.textContent = d.yazi;
 
-  kap.innerHTML = girdiler.length ? `<div class="durum-liste">
-    ${girdiler.map(([k, d]) => `<div class="durum-satir">
-      <span class="pul-nokta" data-durum="${
-        String(d).toLowerCase().match(/ok|true|hazir|iyi/) ? 'iyi'
-          : String(d).toLowerCase().match(/false|hata|yok/) ? 'hata' : 'uyari'
-      }"></span>
-      <span class="ad">${kac(k)}</span>
-      <span class="kucuk orta tekfont">${kac(String(d))}</span>
-    </div>`).join('')}</div>`
-    : uyariKutu('Sunucu yanıt verdi ama ayrıntılı durum alanı döndürmedi.',
-      'bilgi');
+  const derin = await getirSessiz(UCLAR.saglikDerin);
+  const dv = derin.ok ? (derin.veri || {}) : {};
+  const bilesenler = dv.bilesenler || {};
+  const satir = (ad, ok, not) => `<div class="durum-satir">
+    <span class="pul-nokta" data-durum="${ok ? 'iyi' : 'hata'}"></span>
+    <span class="ad">${kac(ad)}</span>
+    <span class="kucuk orta">${kac(not || (ok ? 'çalışıyor' : 'yok'))}</span>
+  </div>`;
+
+  kap.innerHTML = `
+    ${ham === 'kullanilamiyor'
+      ? uyariKutu(`<strong>Video üretilemez.</strong> ${kac(v.ozet || '')}`,
+        'hata')
+      : ham === 'kisitli'
+        ? uyariKutu(kac(v.ozet || 'Bazı bileşenler eksik.'), 'uyari')
+        : ham === 'hazir'
+          ? uyariKutu(kac(v.ozet || 'Tüm bileşenler çalışıyor.'), 'bilgi')
+          : uyariKutu('Sunucu durum alanı döndürmedi; sistemin hazır olduğu ' +
+            '<strong>varsayılmıyor</strong>.', 'uyari')}
+    ${Object.keys(bilesenler).length ? `<div class="durum-liste ust-bosluk">
+      ${Object.entries(bilesenler).map(([k, b]) => satir(
+        k.replace(/_/g, ' '), b && b.ok,
+        (b && (b.detay || b.surum)) || '')).join('')}
+    </div>` : (derin.ok ? '' : uyariKutu(
+      `Ayrıntılı ölçüm alınamadı (${kac(derin.hata || '')}).`, 'uyari'))}
+    ${Array.isArray(dv.eksik_opsiyonel) && dv.eksik_opsiyonel.length
+      ? `<p class="kucuk orta ust-bosluk-kucuk">Kısıtlayan eksikler: ${
+        kac(dv.eksik_opsiyonel.join(', '))}</p>` : ''}`;
   ikonlariBagla(kap);
 }
 

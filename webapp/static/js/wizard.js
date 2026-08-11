@@ -15,8 +15,8 @@
  * kullanilabilir medya, tahmini maliyet) UYDURULMAZ. "Uretim sirasinda
  * hesaplanacak" diye acikca yazilir.
  */
-import {GENERATE_ALANLARI, TURLER, UCLAR, getirSessiz, oturumId, uretimBaslat,
-        yol} from './api.js';
+import {GENERATE_ALANLARI, TURLER, UCLAR, getirSessiz, isKimligiCoz, oturumId,
+        uretimBaslat, yol} from './api.js';
 import {dosyalar, dosyalariTemizle, taslak, taslakSil, taslakYaz,
         yerelIsEkle} from './durum.js';
 import {$, $$, alan, anahtar, duyur, etiket, gelismis, grupBagla, kac,
@@ -540,7 +540,13 @@ async function uretimiBaslat(dugme) {
   if (durum) durum.textContent = 'Üretim başlatılıyor…';
   try {
     const cevap = await uretimBaslat(generateDegerleri());
-    const isId = cevap.job || cevap.is_id || cevap.id || '';
+    // ⚠ FAZ H: sunucu `job_id` donduruyor. Eski satir bu adi OKUMUYORDU
+    // (`cevap.job || cevap.is_id || cevap.id`) -> kimlik hep bos kaliyor,
+    // onay ekraninda bos <strong> gorunuyor ve localStorage'a is_id:"" gidiyordu.
+    const isId = isKimligiCoz(cevap);
+    if (!isId) {
+      throw new Error('Sunucu iş kimliği döndürmedi; üretim izlenemez.');
+    }
     yerelIsEkle({
       is_id: isId,
       ad: (taslak().konu || '').slice(0, 60) || isId,

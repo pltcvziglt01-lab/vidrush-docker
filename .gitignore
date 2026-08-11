@@ -20,3 +20,8 @@ webapp/veri/onbellek/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# Calisma zamani is durumu / gecici yuklemeler — depoya girmez (Faz H)
+webapp/veri/durumlar/
+webapp/veri/gecici/
+webapp/ciktilar/

@@ -100,28 +100,82 @@ export function gelismis(baslik, ic, acik = false) {
   </details>`;
 }
 
-/** Is/proje karti. `is` = {is_id, ad, tur, durum, yuzde, kapak} */
+/**
+ * Is/proje karti.
+ *
+ * ⚠ FAZ H — IKI KOK NEDEN DUZELTILDI:
+ *  1. Ilerleme `is.yuzde`den okunuyordu ama sunucu `ilerleme` donduruyordu ->
+ *     cubuk HER ZAMAN %0 idi. Artik sozlesme alani `progress` birincil,
+ *     `ilerleme`/`yuzde` yedek.
+ *  2. Tamamlanan iste OYNAT/INDIR YOKTU — uretilen video arayuzden hic
+ *     acilamiyordu. Artik `video_url` varsa oynatici + indirme baglantisi var.
+ *
+ * ⚠ UYDURMA YOK: aşama/QA/kaynak yalnizca sunucu gonderdiyse cizilir.
+ */
 export function isKart(is) {
-  const d = String(is.durum || '').toLowerCase();
-  const bittiMi = d.includes('bitti') || d.includes('tamam') || d === 'done';
-  const hataMi = d.includes('hata') || d.includes('error');
-  const yuzde = Number(is.yuzde || 0);
+  const durumHam = String(is.status || is.durum || '').toLowerCase();
+  const bittiMi = durumHam === 'done' || durumHam.includes('bitti') ||
+    durumHam.includes('tamam');
+  const hataMi = durumHam === 'error' || durumHam.includes('hata');
+  const yuzde = Math.max(0, Math.min(100, Number(
+    is.progress ?? is.ilerleme ?? is.yuzde ?? 0)));
+  const isId = is.job_id || is.is_id || is.id || '';
+  const video = is.video_url || is.video || '';
+  const kapak = is.cover_url || is.kapak || '';
+  const hata = is.error || is.hata || '';
+  const uyari = is.warning || is.uyari || '';
+  const dususler = Array.isArray(is.fallbacks) ? is.fallbacks : [];
+  const kaynakSayi = Number(is.research?.kaynak_sayisi ?? 0);
+  const olguSayi = Number(is.research?.dogrulanmis_iddia ?? 0);
+
   const durumEtiket = hataMi ? etiket('Hata', 'hata')
     : bittiMi ? etiket('Tamamlandı', 'iyi')
-      : etiket(is.durum ? String(is.durum) : 'Üretimde', 'uyari');
-  return `<article class="iskart">
-    <div class="iskart-kapak">${is.kapak
-      ? `<img src="${kac(is.kapak)}" alt="" loading="lazy">`
+      : etiket(is.stage_ad || (durumHam === 'queued' ? 'Sırada' : 'Üretimde'),
+        'uyari');
+
+  const kuyrukNot = (!bittiMi && !hataMi && is.queue_position)
+    ? `<span class="kucuk sessiz">Kuyrukta ${kac(String(is.queue_position))}${
+      is.queue_total ? '/' + kac(String(is.queue_total)) : ''}</span>` : '';
+
+  return `<article class="iskart" data-is="${kac(isId)}">
+    <div class="iskart-kapak">${kapak
+      ? `<img src="${kac(kapak)}" alt="" loading="lazy">`
       : ikon('video', {boyut: 26})}</div>
-    <h3 class="iskart-ad" title="${kac(is.ad || is.is_id)}">${kac(is.ad || is.is_id)}</h3>
+    <h3 class="iskart-ad" title="${kac(is.ad || isId)}">${kac(is.ad || isId)}</h3>
     <div class="iskart-satir">${durumEtiket}
-      ${is.tur ? etiket(is.tur) : ''}</div>
-    ${!bittiMi && !hataMi
-      ? `<progress class="ilerleme" max="100" value="${
-        Math.max(0, Math.min(100, yuzde))}">${yuzde}%</progress>`
-      : ''}
+      ${is.tur ? etiket(is.tur) : ''}${kuyrukNot}</div>
+    ${!bittiMi && !hataMi ? `
+      <progress class="ilerleme" max="100" value="${yuzde}">${yuzde}%</progress>
+      <div class="kucuk sessiz">${kac(is.message || is.mesaj || '')}</div>` : ''}
+    ${hataMi && hata
+      ? `<p class="kucuk hata-yazi">${kac(String(hata).slice(0, 220))}</p>` : ''}
+    ${bittiMi && video ? `
+      <video class="iskart-oynatici" controls preload="none"
+        ${kapak ? `poster="${kac(kapak)}"` : ''}
+        src="${kac(video)}"></video>
+      <div class="iskart-eylem">
+        <a class="dugme dugme-ana" href="${kac(video)}" download>
+          ${ikon('yukle', {boyut: 16})} Videoyu indir</a>
+        ${is.research?.manifest
+          ? `<a class="dugme dugme-hayalet" href="ciktilar/${
+            kac(is.research.manifest)}" download>
+            ${ikon('bilgi', {boyut: 16})} Araştırma manifesti</a>` : ''}
+      </div>` : ''}
+    ${bittiMi && (kaynakSayi || olguSayi) ? `
+      <div class="iskart-satir kucuk orta">
+        ${etiket(`${kaynakSayi} kaynak`)}${etiket(`${olguSayi} doğrulanmış olgu`)}
+      </div>` : ''}
+    ${uyari ? uyariKutu(kac(uyari), 'uyari') : ''}
+    ${dususler.length ? `
+      <details class="gelismis iskart-dusus">
+        <summary><span>Kalite notları (${dususler.length})</span></summary>
+        <div class="gelismis-ic"><ul class="kucuk orta">${dususler.map((f) =>
+          `<li><strong>${kac(f.asama || '')}</strong>: ${kac(f.etki || '')}
+           <span class="sessiz">(${kac(f.neden || '')})</span></li>`).join('')}
+        </ul></div>
+      </details>` : ''}
     <div class="iskart-satir kucuk sessiz tekfont">
-      <span>${kac(is.is_id)}</span></div>
+      <span>${kac(isId)}</span></div>
   </article>`;
 }
 

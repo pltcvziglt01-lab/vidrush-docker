@@ -30,6 +30,7 @@ import uret as uretmod  # seslendir, altyazi_parcala (DIKKAT: bu dosyada 'uret' 
                         # modulu takma adla al ki golgelenmesin)
 
 import kaynak  # YT/Pexels footage + Magnific upscale
+import arastirma_kopru  # Faz H: arastirma motorunu bu hatta baglar (bkz. modul basligi)
 
 OPENAI_KEY = os.environ.get("OPENAI_KEY", "")
 STUDYO = os.path.join(KOK_YOL, "render-studio")
@@ -3595,6 +3596,20 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         print(f"  kelime butcesi (plan oncesi): {_eski_kel_on} -> {prof['kelime']} "
               f"(wpm={prof.get('_wpm'):.0f}, hedef {prof.get('sahne_sn')} sn)", file=sys.stderr)
 
+    # ═══════ ARASTIRMA (Faz H, 12 Agu 2026) — ARTIK GERCEKTEN CALISIYOR ═══════
+    # ⚠ Faz H envanteri: `webapp/arastirma/` paketi Faz A'da yazilmisti ama bu
+    # dosya onu HIC import etmiyordu. Ana sayfadaki "Arastirma ... tek akista"
+    # iddiasi karsiliksizdi. Kopru burada devreye giriyor:
+    #   konu -> web arastirmasi -> bagimsiz kaynak dogrulamasi -> OLGU LISTESI
+    # ve olgular plan promptuna giriyor, yani anlatim dogrulanmis olgulara
+    # DAYANIYOR. Yalnizca `documentary` turunde; animasyon/hikaye kurgudur.
+    #
+    # ⚠ HAT ASLA COKMEZ: kopru istisna firlatmaz. Anahtar yok / ag coktu /
+    # tavan doldu -> `arastirma_sonuc.dususler` doluyor ve bu is sozlugune,
+    # oradan arayuze cikiyor. SESSIZ DUSUS YOK.
+    story, arastirma_sonuc = arastirma_kopru.arastir_ve_zenginlestir(
+        story, mod=mod, is_adi=is_adi, cikti_dizin=CIKTI_DIR, bildir=bildir)
+
     bildir("Hikaye sahnelere bölünüyor...", 5)
     plan = uzun_plan(story, prof, sure_dk)
     scenes = plan["scenes"]
@@ -4131,7 +4146,16 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
              "edit": prof["ad"],
              # CC kliplerin atif metni. Lisans atfi ACIKLAMADA istiyor; ekrandaki kucuk
              # kunye yazisi ek. Bu liste bos ise videoda CC klip kullanilmamis demektir.
-             "atiflar": kaynak.atif_listesi()}
+             "atiflar": kaynak.atif_listesi(),
+             # ── FAZ H: arastirma sonucu ise YAZILIR ──
+             # Wizard Adim 4'te "Guvenilir kaynak sayisi / Dogrulanmis iddia ->
+             # Uretim sirasinda hesaplanacak" YAZIYORDU ama hicbir zaman
+             # hesaplanmiyordu. Artik gercek sayilar burada.
+             "arastirma": arastirma_sonuc.sozluk(),
+             "kaynaklar": arastirma_kopru.atif_satirlari(
+                 CIKTI_DIR, arastirma_sonuc.manifest_dosya),
+             # Gorunur dusus kayitlari: hangi asamada neden geri duselduği.
+             "dususler": list(arastirma_sonuc.dususler)}
     uyarilar = []
     if plan.get("_eksik_oran"):
         uyarilar.append(f"İçerik planı beklenenden kısa çıktı (~%{int(plan['_eksik_oran']*100)}).")

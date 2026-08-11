@@ -21,6 +21,8 @@ from PIL import Image
 
 import pipeline
 import anim_studyo
+import is_sozlesme   # Faz H: tek tip, geriye donuk uyumlu is sozlesmesi
+import saglik_derin  # Faz H: bagimliliklari GERCEKTEN olcen saglik ucu
 
 KOK = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(KOK, "static")
@@ -31,6 +33,11 @@ os.makedirs(GECICI, exist_ok=True)
 os.makedirs(IS_DURUM_DIR, exist_ok=True)
 
 MAKS_UPLOAD = 20 * 1024 * 1024   # 20 MB gorsel tavani (OOM korumasi)
+
+# ⚠ Isci thread'leri modulun SONUNDA baslatiliyor ama /api/saglik onlardan
+# ONCE tanimlaniyor. Isim modul yuklenirken cozulmedigi icin sorun cikmaz,
+# yine de erken bir istek NameError almasin diye burada 0 ile baslatilir.
+_ISCI_SAYISI = 0
 
 app = FastAPI(title="BEDOSAHO AI")
 
@@ -135,11 +142,40 @@ def anasayfa():
         return f.read()
 
 
+@app.get("/api/saglik/derin")
+def saglik_derin_uc():
+    """DERIN SAGLIK — bagimliliklari GERCEKTEN dener (bkz. saglik_derin.py).
+
+    ⚠ Eski `/api/saglik` yalnizca anahtar booleanlari donduruyor ve icinde
+    `durum` alani BULUNMUYORDU; arayuz alan yoksa 'ok' varsayip "Sistem hazir"
+    yaziyordu. Bu uc ffmpeg/ffprobe'u calistirir, dizinlere gercekten yazar,
+    render motorunu ve isci thread'lerini kontrol eder.
+    Genel durum: hazir | kisitli | kullanilamiyor. Anahtar DEGERI donmez.
+    """
+    return saglik_derin.derin(
+        pipeline, isci_sayisi=_ISCI_SAYISI, kuyruk_boyu=is_kuyrugu.qsize(),
+        durum_dizini=IS_DURUM_DIR, gecici_dizin=GECICI)
+
+
 @app.get("/api/saglik")
 def saglik():
-    """Hangi servislerin anahtari kurulu (deger DONMEZ, sadece var/yok)."""
+    """Hangi servislerin anahtari kurulu (deger DONMEZ, sadece var/yok).
+
+    ⚠ FAZ H: bu uc artik `durum` ve `uretim_mumkun` alanlarini da donduruyor.
+    Onceden bu alanlar YOKTU ve arayuz eksik alani 'ok' sayip kritik bilesen
+    coktuğunde bile "Sistem hazir" gosteriyordu. Ayrintili olcum icin
+    `/api/saglik/derin`.
+    """
     import kaynak
+    _d = saglik_derin.derin(
+        pipeline, isci_sayisi=_ISCI_SAYISI, kuyruk_boyu=is_kuyrugu.qsize(),
+        durum_dizini=IS_DURUM_DIR, gecici_dizin=GECICI)
     return {
+        "durum": _d["durum"],
+        "uretim_mumkun": _d["uretim_mumkun"],
+        "ozet": _d["ozet"],
+        "eksik_kritik": _d["eksik_kritik"],
+        "eksik_opsiyonel": _d["eksik_opsiyonel"],
         "openai": bool(os.environ.get("OPENAI_KEY")),
         "magnific": bool(os.environ.get("MAGNIFIC_KEY")),
         # 11 Agu 2026: bunlar env'e BAKIYORDU ama kaynak.py anahtari env YA DA
@@ -674,8 +710,15 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
                     _ses_secimi(ses),
                     isik.strip() if isik.strip() in pipeline.ISIK_DUZEYLERI else "",
                     acilis_dk, sref, _bayrak(sora), gorsel_model.strip()))
-    return {"job_id": is_id, "kuyruk": is_kuyrugu.qsize(), "tur": mod, "edit": edit_id,
-            "profil": profil.strip()}
+    # ⚠ FAZ H: cevap ARTIK tek tip sozlesmeden geciyor. Eskiden yalnizca
+    # `job_id` donuyordu; wizard.js `cevap.job/is_id/id` okudugu icin is
+    # kimligi HER ZAMAN bos kaliyordu. Simdi job_id + id + is_id birlikte var.
+    cevap = is_sozlesme.normalize(is_id, isler[is_id],
+                                  kuyruk_sira=_kuyruk_sirasi(is_id),
+                                  kuyruk_toplam=is_kuyrugu.qsize())
+    cevap.update({"kuyruk": is_kuyrugu.qsize(), "tur": mod, "edit": edit_id,
+                  "profil": profil.strip()})
+    return cevap
 
 
 @app.get("/api/isler")
@@ -697,11 +740,11 @@ def is_listesi(session: str):
                 if d is None:
                     with open(yol, encoding="utf-8") as f:
                         d = json.load(f)
-                cikti.append({"id": ad[:-5], "durum": d.get("durum"),
-                              "ilerleme": d.get("ilerleme", 0), "mesaj": d.get("mesaj", ""),
-                              "video": d.get("video"), "kapak": d.get("kapak"),
-                              "sure": d.get("sure"), "edit": d.get("edit"),
-                              "t": os.path.getmtime(yol)})
+                # ⚠ FAZ H: liste de TEK TIP sozlesmeden geciyor. Eskiden
+                # `ilerleme` donuyordu ama arayuz `yuzde` okuyordu -> ilerleme
+                # cubugu her zaman %0 gorunuyordu. normalize() ikisini de verir.
+                cikti.append(is_sozlesme.normalize(
+                    ad[:-5], d, zaman=os.path.getmtime(yol)))
             except Exception:
                 continue
     except Exception:
@@ -712,6 +755,10 @@ def is_listesi(session: str):
 
 @app.get("/api/job/{is_id}")
 def is_durum(is_id: str):
+    """Tek isin CANLI durumu. Arayuz Projeler ekraninda bunu periyodik cagirir.
+    ⚠ FAZ H: cevap `is_sozlesme.normalize()`ten geciyor — yeni (job_id/status/
+    progress/stage/video_url/qa/attribution/fallbacks) ve eski (durum/ilerleme/
+    mesaj/video) adlar BIRLIKTE donuyor."""
     d = isler.get(is_id)
     if not d:
         # bellekte yoksa (restart olmus olabilir) diskten dene
@@ -720,15 +767,16 @@ def is_durum(is_id: str):
             yol = os.path.join(IS_DURUM_DIR, f"{gecerli_session(is_id)}.json")
             if os.path.exists(yol):
                 with open(yol, encoding="utf-8") as f:
-                    return json.load(f)
+                    return is_sozlesme.normalize(is_id, json.load(f))
+        except HTTPException:
+            raise
         except Exception:
             pass
         raise HTTPException(404, "is yok")
-    if d.get("durum") == "kuyrukta":
-        sira = _kuyruk_sirasi(is_id)
-        if sira is not None:
-            d = {**d, "kuyruk_sira": sira, "kuyruk_toplam": is_kuyrugu.qsize()}
-    return d
+    sira = _kuyruk_sirasi(is_id) if d.get("durum") == "kuyrukta" else None
+    return is_sozlesme.normalize(
+        is_id, d, kuyruk_sira=sira,
+        kuyruk_toplam=is_kuyrugu.qsize() if sira is not None else None)
 
 
 def _kuyruk_sirasi(is_id):
@@ -779,7 +827,12 @@ def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom
                   "kapak": ("ciktilar/" + sonuc["kapak"]) if sonuc.get("kapak") else None,
                   "sure": sonuc.get("sure"), "sahne_sayisi": sonuc.get("sahne_sayisi"),
                   "edit": sonuc.get("edit"), "uyari": sonuc.get("uyari"),
-                  "atiflar": sonuc.get("atiflar") or []})
+                  "atiflar": sonuc.get("atiflar") or [],
+                  # ── FAZ H: arastirma + QA + gorunur dususler ise yazilir ──
+                  "arastirma": sonuc.get("arastirma") or {},
+                  "kaynaklar": sonuc.get("kaynaklar") or [],
+                  "qa": sonuc.get("qa") or {},
+                  "dususler": sonuc.get("dususler") or []})
     except Exception as e:
         traceback.print_exc()
         d.update({"durum": "hata", "hata": str(e)[:300], "mesaj": "Hata olustu"})
@@ -822,5 +875,6 @@ _eski_ciktilari_temizle()   # 14 gunden eski cikti/durum dosyalarini temizle (di
 threading.Thread(target=_temizlik_dongusu, daemon=True).start()
 # 2 paralel isci (eski 2 vCPU sunucuda 1'di): iki kisi ayni anda video uretebilir.
 # ISCI_SAYISI env ile ayarlanir; render cakismasi kabul edilebilir yavaslatma yaratir.
-for _ in range(max(1, int(os.environ.get("ISCI_SAYISI", "2")))):
+_ISCI_SAYISI = max(1, int(os.environ.get("ISCI_SAYISI", "2")))
+for _ in range(_ISCI_SAYISI):
     threading.Thread(target=_isci, daemon=True).start()

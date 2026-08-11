@@ -914,3 +914,21 @@ img, svg, video { max-width: 100%; }
 .sk-sar > .sk { flex: 1 1 auto; }
 .sk-sar > .ses-dinle { align-self: flex-start; margin-left: 14px; margin-bottom: 12px; }
 .sb-kaynak { margin-top: 12px; }
+
+/* ══ FAZ H — IS KARTI CIKTI ERISIMI ══
+   Onceden tamamlanan iste videoyu acmanin YOLU YOKTU (kart yalnizca kapak
+   gorseli ciziyordu). Oynatici + indirme + kalite notlari burada. */
+.iskart-oynatici {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  background: #000;
+  border: 1px solid var(--cizgi);
+  margin-top: 4px;
+}
+.iskart-eylem { display: flex; flex-wrap: wrap; gap: 8px; }
+/* 44px dokunma hedefi (Faz F erisilebilirlik kurali) */
+.iskart-eylem .dugme { min-height: 44px; }
+.iskart-dusus { margin-top: 4px; }
+.iskart-dusus ul { margin: 0; padding-left: 18px; }
+.iskart-dusus li { margin-bottom: 6px; }

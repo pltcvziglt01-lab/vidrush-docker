@@ -13,6 +13,7 @@
 
 export const UCLAR = {
   saglik: 'api/saglik',
+  saglikDerin: 'api/saglik/derin',   // Faz H: gercek bagimlilik olcumu
   isler: 'api/isler',
   is: 'api/job/',                    // + is_id
   uret: 'api/generate',
@@ -165,8 +166,25 @@ export async function uretimBaslat(degerler) {
   return r.json();
 }
 
+/**
+ * Tek isin CANLI durumu. Projeler ekrani bunu periyodik cagirir.
+ * ⚠ FAZ H: bu fonksiyon tanimliydi ama HIC CAGRILMIYORDU — Projeler ekrani
+ * bir kez cizilip hic yenilenmiyordu. Artik `gorunumler.js` kullaniyor.
+ */
 export function isDurumu(isId) {
   return getir(UCLAR.is + encodeURIComponent(isId));
+}
+
+/**
+ * Sunucu cevabindan is kimligini coz.
+ * ⚠ FAZ H KOK NEDEN: `/api/generate` `job_id` donduruyordu, wizard ise
+ * `cevap.job || cevap.is_id || cevap.id` okuyordu -> kimlik HER ZAMAN bostu.
+ * Artik `job_id` BIRINCIL; eski adlar yedek olarak duruyor ki eski bir
+ * sunucu surumune karsi da calissin.
+ */
+export function isKimligiCoz(cevap) {
+  const c = cevap || {};
+  return String(c.job_id || c.is_id || c.id || c.job || '');
 }
 
 export function islerListesi() {
