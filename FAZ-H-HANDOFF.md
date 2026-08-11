@@ -201,7 +201,55 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 6 | Marka kiti oluşturma/silme UI'ı | `POST/DELETE /api/profil` hâlâ UI'sız |
 | 7 | Belgeselde etkisiz kontroller (palet/arkaplan/ışık/görsel model) | Türe göre gizlenmeli |
 
-## 11. Test çalıştırma (yerel)
+## 11. ⛔ DEPLOY ENGELİ — `origin/main` ile derin ayrışma (12 Ağu, ölçüldü)
+
+**Deploy denenmedi ve denenmemeli.** Ölçüm:
+
+```
+merge-base:                     2793be1
+main'de olup bizde OLMAYAN:     13 commit
+bizde olup main'de olmayan:     36 commit
+```
+
+`main`'in en son commit'i (`a61c24d`) tam olarak şu:
+> *"deploy.sh EZME koruması: yerel kopya origin/main'in gerisindeyse deploy durur — bugün 3 kez yaşanan 'eski kopyayla canlıyı ezme' kazasını kökten engeller"*
+
+Bizim branch'te o koruma **yoktu** (merge ile geldi). Bu branch'ten deploy edilseydi, ekibin 13 commit'i canlıdan silinirdi — korumanın engellemek için yazıldığı kazanın aynısı.
+
+### `main`'de olup bizde olmayan canlı özellikler
+- Grok video motoru (`grok-imagine-video`, Sora'nın yarı fiyatı) + bakiye güvencesi
+- Ünlü modu (`unlu` — **22. generate alanı**) + CELEBRITY OVERRIDE
+- Ses kütüphanesi: sayfalama (2071 ses), disk önbelleği, hız sınırı dayanıklılığı, Vbee/Klon sekmeleri
+- Hikâye Stüdyosu video süresi seçici
+- `deploy.sh` ezme koruması
+
+### Deneme merge sonucu
+`git merge origin/main` → `deploy.sh` **temiz birleşti** (ezme koruması + alt paket kopyalama birlikte). 3 çatışma:
+
+| Dosya | Çatışma | Niteliği |
+|---|---|---|
+| `webapp/server.py` | 2 | **Mekanik.** main `unlu` alanını + `XAI_KEY`'i ekledi; bizim `/api/saglik` zaten üst küme. İkisi de alınır. |
+| `webapp/pipeline.py` | 3 | **Orta.** main Grok/ünlü mantığı ekledi, biz araştırma köprüsü. Kesişmiyorlar. |
+| `webapp/static/index.html` | 2 | **AĞIR — asıl karar burada.** |
+
+### Asıl mesele: iki ayrı arayüz kuşağı
+- Bizim branch: **76 satır** modüler `index.html` + `ui/app.js` + `js/*.js` (Faz F/G)
+- `main`: **1761 satır** eski monolit, inline script/style; `ui/app.js`'i hiç çağırmıyor
+
+**Faz F/G arayüzü hiç canlıya çıkmamış.** Bu arada `main` yeni özellikleri *eski* arayüze eklemiş. Yani merge "hangi satır kalsın" değil, **hangi arayüz kuşağı canlıya gidecek** sorusu.
+
+### Önerilen sıra (sonraki oturum)
+1. `git merge origin/main` — `server.py` + `pipeline.py` çatışmalarını **birleştirerek** çöz (ikisini de al, birini atma).
+2. `unlu` alanını sözleşmeye ekle: `api.js GENERATE_ALANLARI` 21 → **22**, `test_faz_h.py` §5 sayısı güncellensin.
+3. `index.html`: **bizim modüler sürümü koru**, `main`'in 4 UI özelliğini yeni arayüze taşı (süre seçici, ünlü anahtarı, ses kütüphanesi sekmeleri, Grok maliyet metinleri).
+4. A–H'yi yeniden koş → yeşil.
+5. `bash deploy.sh` (artık ezme koruması var, `GERIDE=0` olacak).
+
+Yedek branch: `fazh-yedek-e4af286`.
+
+---
+
+## 12. Test çalıştırma (yerel)
 
 ```bash
 python3 -m venv .venv-test
