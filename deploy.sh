@@ -75,12 +75,25 @@ fi
 
 echo "== 3/5 Dosyalari konteynere kopyala =="
 # webapp (pipeline/server/kaynak/static)
-$SSH "mkdir -p /tmp/dep/webapp/static /tmp/dep/rs/src /tmp/dep/rs/fonts"
+$SSH "mkdir -p /tmp/dep/webapp/static/js /tmp/dep/rs/src/editorv2 /tmp/dep/rs/fonts"
 scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/webapp/*.py root@$IP:/tmp/dep/webapp/ >/dev/null
 scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/webapp/static/index.html root@$IP:/tmp/dep/webapp/static/ >/dev/null
+# ⚠ 12 Agu 2026: arayuz tek dosyadan CIKARILDI. `index.html` artik `ui/app.css`
+# ve `ui/app.js`'i cagiriyor; bunlar kopyalanmazsa CANLI SITE STILSIZ VE
+# ISLEVSIZ kalir (index.html gider, bagimliliklari gitmez). server.py'deki
+# allowlist'li /ui rotasi bu dosyalari sunuyor.
+scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/webapp/static/app.css "$KOK"/webapp/static/app.js root@$IP:/tmp/dep/webapp/static/ >/dev/null
+scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/webapp/static/js/*.js root@$IP:/tmp/dep/webapp/static/js/ >/dev/null
 scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/app/uret.py root@$IP:/tmp/dep/ >/dev/null
 # Remotion kaynaklari: .tsx + .ts (fontlar.ts gibi yardimcilar da)
 scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/app/render-studio/src/*.tsx "$KOK"/app/render-studio/src/*.ts root@$IP:/tmp/dep/rs/src/ >/dev/null
+# ⚠ 12 Agu 2026: `src/*.tsx` globu ALT DIZINLERI KAPSAMAZ. `Root.tsx`
+# `./editorv2/EditorV2`'yi import ediyor; editorv2 kopyalanmazsa Remotion
+# PAKETLEME COKER ve TUM video render'i durur (yalnizca V2 degil, VidrushVideo
+# da bundle edilemez).
+if ls "$KOK"/app/render-studio/src/editorv2/* >/dev/null 2>&1; then
+  scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/app/render-studio/src/editorv2/* root@$IP:/tmp/dep/rs/src/editorv2/ >/dev/null
+fi
 # Gomulu altyazi fontlari (varsa)
 # Doku dosyalari (grain vb.) — 11 Agu 2026: grain artik onceden uretilmis PNG kullaniyor,
 # deploy kopyalamazsa efekt sessizce kaybolur.
@@ -93,7 +106,9 @@ if ls "$KOK"/app/render-studio/public/fonts/*.ttf >/dev/null 2>&1; then
 fi
 $SSH "docker cp /tmp/dep/webapp/. bedosaho:/opt/vidrush/webapp/ && \
       docker cp /tmp/dep/uret.py bedosaho:/opt/vidrush/uret.py && \
+      docker exec bedosaho mkdir -p /opt/vidrush/render-studio/src/editorv2 && \
       docker cp /tmp/dep/rs/src/. bedosaho:/opt/vidrush/render-studio/src/ && \
+      docker exec bedosaho mkdir -p /opt/vidrush/webapp/static/js && \
       docker exec bedosaho mkdir -p /opt/vidrush/render-studio/public/fonts && \
       (ls /tmp/dep/rs/fonts/*.ttf >/dev/null 2>&1 && docker cp /tmp/dep/rs/fonts/. bedosaho:/opt/vidrush/render-studio/public/fonts/ || true) && \
       docker exec bedosaho mkdir -p /opt/vidrush/render-studio/public/doku && \
