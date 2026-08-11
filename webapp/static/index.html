@@ -912,6 +912,8 @@ const SES_GRUPLARI=[
   {id:"minimax",    ad:"🎵 MiniMax",             kutuphane:"minimax"},
   {id:"fishaudio",  ad:"🐟 FishAudio",           kutuphane:"fishaudio"},
   {id:"kokoro",     ad:"🌸 Kokoro",              kutuphane:"kokoro"},
+  {id:"vbee",       ad:"🇻🇳 Vbee",               kutuphane:"vbee"},
+  {id:"clone",      ad:"🎤 Klonlar",             kutuphane:"clone"},
 ];
 let sesGrubu = "ucretsiz";
 const kutupCache = {};   // saglayici -> liste
@@ -1539,7 +1541,7 @@ setInterval(()=>{ const v=$("#view-videolar"); if(v && v.classList.contains("on"
   }
   /* KUTUPHANE: saglayicinin TUM katalogu (ana ekrandaki kutupCache + DIL/YAS/CINS
      sozlukleri global oldugu icin buradan da kullanilir). Sec -> stSes="ozel:<voice_id>" */
-  const ST_KUTUP={elevenlabs:"elevenlabs",minimax:"minimax",fishaudio:"fishaudio",kokoro:"kokoro"};
+  const ST_KUTUP={elevenlabs:"elevenlabs",minimax:"minimax",fishaudio:"fishaudio",kokoro:"kokoro",vbee:"vbee",clone:"clone"};
   let stFilt={dil:"",cinsiyet:"",yas:"",aksan:"",kategori:""}, stAktifSag="";
   function stKutupCiz(liste){
     const kc=$s("#stKutupListe"); if(!kc) return; kc.innerHTML="";
@@ -1605,9 +1607,9 @@ setInterval(()=>{ const v=$("#view-videolar"); if(v && v.classList.contains("on"
     sesListe2=list;
     /* SESLER gruplari + sadece-kutuphane saglayicilari (minimax/fishaudio/kokoro) tek sirada */
     const gruplar=[...new Set(list.map(v=>v.grup||"ucretsiz"))];
-    ["minimax","fishaudio","kokoro"].forEach(x=>{ if(!gruplar.includes(x)) gruplar.push(x); });
+    ["minimax","fishaudio","kokoro","vbee","clone"].forEach(x=>{ if(!gruplar.includes(x)) gruplar.push(x); });
     const GRUP_AD2={...GRUP_AD, elevenlabs:"⭐ ElevenLabs", minimax:"🎵 MiniMax",
-                    fishaudio:"🐟 FishAudio", kokoro:"🌸 Kokoro"};
+                    fishaudio:"🐟 FishAudio", kokoro:"🌸 Kokoro", vbee:"🇻🇳 Vbee", clone:"🎤 Klonlar"};
     const g=$s("#stSesGrup");
     gruplar.forEach((gr,i)=>{
       const b2=document.createElement("span");

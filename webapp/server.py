@@ -114,7 +114,7 @@ def _kucult(data: bytes, hedef: str, boyut=1024):
     im.save(hedef, "PNG")
 
 
-_OZEL_SES_RE = re.compile(r"^ozel:(elevenlabs|minimax|fishaudio|kokoro)_[A-Za-z0-9_-]{1,64}$")
+_OZEL_SES_RE = re.compile(r"^ozel:(elevenlabs|minimax|fishaudio|kokoro|vbee|clone|edge)_[A-Za-z0-9_.-]{1,80}$")
 
 
 def _ses_secimi(ses: str) -> str:
@@ -275,21 +275,37 @@ def _ai33_key():
 def ses_kutuphane(saglayici: str = "elevenlabs"):
     """Ai33 ses KUTUPHANESI — saglayicinin TUM katalogu (isim, tarif, onizleme).
     Kullanici istedigi sesi secer; secim 'ozel:<voice_id>' olarak generate'e gider."""
-    if saglayici not in ("elevenlabs", "minimax", "fishaudio", "kokoro"):
+    if saglayici not in ("elevenlabs", "minimax", "fishaudio", "kokoro", "vbee", "clone"):
         raise HTTPException(400, "gecersiz saglayici")
     zaman, liste = _SES_KUTUPHANE_ONBELLEK.get(saglayici, (0, None))
-    if liste is not None and time.time() - zaman < 600:
+    if liste is not None and time.time() - zaman < 1800:
         return liste
     key = _ai33_key()
     if not key:
         raise HTTPException(503, "AI33 anahtari kurulu degil")
     import requests
+    # SAYFALAMA SART: varsayilan 30 kayit donuyor — elevenlabs'te 605, minimax'ta 481,
+    # vbee'de 462 ses var. 100'luk sayfalarla tumu cekilir (guvenlik tavani 10 sayfa).
+    veri = []
+    gorulen = set()   # Ai33 sayfalamasi kararsiz: sayfalar arasi MUKERRER kayit gelebiliyor
     try:
-        r = requests.get(f"https://api.ai33.pro/v3/voices?provider={saglayici}",
-                         headers={"xi-api-key": key}, timeout=30)
-        veri = r.json().get("data", [])
+        for sayfa in range(1, 11):
+            r = requests.get(f"https://api.ai33.pro/v3/voices?provider={saglayici}"
+                             f"&limit=100&page={sayfa}",
+                             headers={"xi-api-key": key}, timeout=30)
+            parca = r.json().get("data", [])
+            yeni = 0
+            for v in parca:
+                vid = v.get("voice_id")
+                if vid and vid not in gorulen:
+                    gorulen.add(vid)
+                    veri.append(v)
+                    yeni += 1
+            if len(parca) < 100 or yeni == 0:   # kisa sayfa VEYA tamamen tekrar -> bitti
+                break
     except Exception:
-        raise HTTPException(502, "Ses kütüphanesi alınamadı")
+        if not veri:
+            raise HTTPException(502, "Ses kütüphanesi alınamadı")
     # Saglayicilar dil degerini karisik gonderiyor: kimi ISO kod ("en"), kimi tam ad
     # ("English", "Cantonese"). KIRPMADAN ISO koda normallestir (eski [:5] kirpmasi
     # "engli"/"canto" gibi bozuk degerler uretiyordu).
