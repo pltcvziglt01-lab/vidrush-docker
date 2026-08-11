@@ -85,27 +85,31 @@ YASAK_LISANS_ISARETLERI = ("-nc", "-nd", "editorial", "rights-managed", "royalty
 
 def lisans_normalize(ham: Optional[str]) -> str:
     """Saglayicilarin farkli yazimlarini tek anahtara indirger.
-    Taninmayan her sey "unknown" -> kullanilamaz."""
+    Taninmayan her sey "unknown" -> kullanilamaz.
+
+    ⚠ Ilk surumde regex ile "cc" onekini normalize etmeye calistim ve "cc0"
+    girdisini "cc-0"a cevirip TANINMAZ hale getirdim (test yakaladi: gecerli bir
+    kamu malı lisansi "belirsiz" sayilip medya reddediliyordu). Artik acik
+    esleme tablosu var — sihir yok.
+    """
     if not ham:
         return "unknown"
     d = str(ham).strip().lower().replace("_", "-").replace(" ", "-")
-    d = re.sub(r"^(cc-?)?", "cc-", d) if d.startswith(("by", "cc")) else d
-    d = d.replace("cc-cc-", "cc-")
-    # sik gorulen yazimlar
+    d = re.sub(r"-(\d+\.\d+|\d\.\d|\d+)$", "", d)      # surum sonekini at: cc-by-4.0 -> cc-by
     esler = {
-        "cc0-1.0": "cc0", "cc-cc0": "cc0", "cc-zero": "cc0", "cc0": "cc0",
-        "publicdomain": "public-domain", "public-domain-mark": "pdm",
-        "cc-by-4.0": "cc-by", "cc-by-3.0": "cc-by", "cc-by-2.0": "cc-by",
-        "cc-by-sa-4.0": "cc-by-sa", "cc-by-sa-3.0": "cc-by-sa",
-        "cc-by-sa-2.0": "cc-by-sa", "cc-by-sa-2.5": "cc-by-sa",
-        "creative-commons": "unknown",   # HANGI CC oldugu belli degil -> belirsiz
+        "cc0": "cc0", "cc-0": "cc0", "cc-zero": "cc0", "creativecommons-zero": "cc0",
+        "publicdomain": "public-domain", "public-domain": "public-domain",
+        "pd": "public-domain", "pd-us": "public-domain",
+        "public-domain-mark": "pdm", "pdm": "pdm",
+        "cc-by": "cc-by", "by": "cc-by",
+        "cc-by-sa": "cc-by-sa", "by-sa": "cc-by-sa",
+        "nasa": "nasa-public", "nasa-public": "nasa-public",
+        "pexels": "pexels", "pixabay": "pixabay", "coverr": "coverr",
+        "kullanici-sahip": "kullanici-sahip",
+        # HANGI CC oldugu belirsiz -> kullanilamaz
+        "creative-commons": "unknown", "cc": "unknown",
     }
-    if d in esler:
-        return esler[d]
-    for anahtar in LISANS_KURALLARI:
-        if d == anahtar or d.startswith(anahtar + "-"):
-            return anahtar
-    return "unknown"
+    return esler.get(d, "unknown")
 
 
 def lisans_kullanilabilir(ham: Optional[str]) -> tuple[bool, str]:

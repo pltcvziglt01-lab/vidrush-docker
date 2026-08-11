@@ -31,6 +31,19 @@ BUYUK_HABER = frozenset({
     "theguardian.com", "bloomberg.com", "afp.com", "dw.com", "aljazeera.com",
     "japantimes.co.jp", "asahi.com", "mainichi.jp", "yomiuri.co.jp", "kyodonews.net",
     "lemonde.fr", "spiegel.de", "elpais.com", "cbc.ca", "abc.net.au",
+    # 11 Agu 2026 canli kuru testinde eklendi: nippon.com Japonya'nin kamu
+    # yararina calisan yayin kurulusu (Nippon Communications Foundation) ama
+    # "bilinmiyor" cikiyordu ve SADECE bu yuzden 8 iddia tek-kaynak kaliyordu.
+    "nippon.com", "japan-forward.com", "nikkei.com", "jiji.com", "sankei.com",
+    "channelnewsasia.com", "straitstimes.com", "scmp.com", "koreaherald.com",
+    "thehindu.com", "indianexpress.com", "haaretz.com", "trtworld.com",
+    "anadoluajansi.com.tr", "aa.com.tr", "hurriyet.com.tr", "milliyet.com.tr",
+})
+# Arastirma kurulusu / dusunce kurulusu: haber degil, akademige yakin
+ARASTIRMA_KURULUSU = frozenset({
+    "nli-research.co.jp", "pewresearch.org", "brookings.edu", "rand.org",
+    "chathamhouse.org", "csis.org", "carnegieendowment.org", "iiss.org",
+    "statista.com", "ourworldindata.org", "jri.co.jp", "dir.co.jp",
 })
 MUZE_ARSIV = frozenset({
     "loc.gov", "archives.gov", "nationalarchives.gov.uk", "europeana.eu",
@@ -81,12 +94,21 @@ def kaynak_turu(url: str, baslik: str = "") -> str:
     alan = alan_adi(url)
     if not alan:
         return "bilinmiyor"
+    # ⚠ ACIK AD LISTELERI SONEK KURALLARINDAN ONCE. loc.gov (Library of Congress)
+    # hem ".gov" hem arsiv; test yakaladi: sonek once bakilinca "resmi-kurum"
+    # cikiyordu ve medya arayan katman onu arsiv saglayicisi saymiyordu.
+    if alan in MUZE_ARSIV or any(alan.endswith("." + a) for a in MUZE_ARSIV) \
+            or any(alan.endswith(s) for s in MUZE_ARSIV_SONEK):
+        return "muze-arsiv"
+    if alan in AKADEMIK_AD or any(alan.endswith("." + a) for a in AKADEMIK_AD):
+        return "akademik"
+    if alan in ARASTIRMA_KURULUSU or any(alan.endswith("." + a)
+                                        for a in ARASTIRMA_KURULUSU):
+        return "kurulus"
     if any(alan.endswith(s) or f"{s}." in alan for s in KURUM_SONEK):
         return "resmi-kurum"
-    if alan in AKADEMIK_AD or any(alan.endswith(s) or s in alan for s in AKADEMIK_SONEK):
+    if any(alan.endswith(s) or s in alan for s in AKADEMIK_SONEK):
         return "akademik"
-    if alan in MUZE_ARSIV or any(alan.endswith(s) for s in MUZE_ARSIV_SONEK):
-        return "muze-arsiv"
     if any(alan == a or alan.endswith("." + a) for a in ANSIKLOPEDI):
         return "ansiklopedi"
     if any(alan == a or alan.endswith("." + a) for a in FORUM):
