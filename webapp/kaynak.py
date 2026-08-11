@@ -296,6 +296,13 @@ def _yt_aday_uygun(aday: dict, sorgu: str) -> bool:
     if konu and not any(k in baslik or k.rstrip("s") in baslik for k in konu):
         print(f"  YT atlandi (sorguyla alakasiz): {baslik[:56]}", file=sys.stderr)
         return False
+    # YER KAPISI — stok kaynaklarla ayni kural (11 Agu 2026). Bu olmadan Japonya
+    # metnine Avrupa CC klibi girebiliyordu; kapiyi sadece Pexels'e koymak yetmez.
+    bilgi = {"title": baslik, "description": ""}
+    yer = _etkin_yer(sorgu)
+    if yer and not (_yer_dogru_mu(bilgi, yer) or _notr_cekim_mi(bilgi)):
+        print(f"  YT atlandi (yanlis ulke riski): {baslik[:56]}", file=sys.stderr)
+        return False
     return True
 
 
@@ -314,8 +321,35 @@ def youtube_sahne(sorgu: str, hedef: str, maks_sure: int = 25,
             print(f"  CC degil, atlandi: {aday['baslik'][:60]}", file=sys.stderr)
             continue
         if youtube_indir(aday["url"], hedef, maks_sure=maks_sure):
+            atif_kaydet(hedef, kanal=aday.get("kanal") or "", baslik=aday.get("baslik") or "",
+                        url=aday.get("url") or "", lisans="CC BY")
             return True
     return False
+
+
+def atif_kaydet(hedef: str, kanal: str, baslik: str = "", url: str = "", lisans: str = ""):
+    with _KULLANILAN_KILIT:
+        _ATIFLAR[os.path.abspath(hedef)] = {"kanal": kanal, "baslik": baslik,
+                                            "url": url, "lisans": lisans}
+
+
+def atif_al(hedef: str) -> dict:
+    with _KULLANILAN_KILIT:
+        return dict(_ATIFLAR.get(os.path.abspath(hedef)) or {})
+
+
+def atif_listesi() -> list:
+    """Videoda kullanilan tum CC kaynaklari — YouTube aciklamasina konur.
+    Lisans metni atfi ACIKLAMADA istiyor; ekrandaki kucuk yazi ek nezaket."""
+    with _KULLANILAN_KILIT:
+        gorulen, out = set(), []
+        for v in _ATIFLAR.values():
+            anahtar = (v.get("kanal"), v.get("url"))
+            if anahtar in gorulen:
+                continue
+            gorulen.add(anahtar)
+            out.append(dict(v))
+        return out
 
 
 # ─────────────────────── Stok video ortak yardimcilari ───────────────────────
@@ -335,35 +369,131 @@ def _stok_indir(url: str, ham_yol: str, zaman_asimi: int = 120) -> bool:
     return os.path.exists(ham_yol) and os.path.getsize(ham_yol) > 20000
 
 
+def _indir_ve_hazirla(url: str, hedef: str, zaman_asimi: int = 120) -> bool:
+    ham = hedef + ".ham"
+    if not _stok_indir(url, ham, zaman_asimi):
+        try: os.remove(ham)
+        except Exception: pass
+        return False
+    return _remotion_uygun_yap(ham, hedef)
+
+
+# BU VIDEODA kullanilan klip kimlikleri. _sahne_medya PARALEL THREAD'lerde kostugu icin
+# kilitli. Is basinda klip_gecmisi_sifirla() ile temizlenir; is icinde ASLA temizlenmez
+# (temizlense paralel thread'ler birbirinin kaydini siler ve tekrar geri gelir).
+import threading as _th
+_KULLANILAN = set()
+_KULLANILAN_KILIT = _th.Lock()
+# Tekrar izni THREAD-YEREL: _sahne_medya paralel kosuyor. Modul geneli olsa bir
+# sahnenin son-care izni digerlerinin tekrar yasagini da kaldirirdi ve sessizce
+# tekrar eden klipler girerdi.
+_YEREL = _th.local()
+
+
+def _tekrara_izin_var():
+    return bool(getattr(_YEREL, "tekrar", False))
+
+
+# ATIF DEFTERI. Creative Commons (CC BY) klip kullanmak ATIF ZORUNLULUGU getirir:
+# kaynak belirtilmeden kullanmak lisansi ihlal eder. Bu defter hem ekrana basilacak
+# kucuk yaziyi hem YouTube aciklamasina konacak listeyi besler.
+# DIKKAT: atif TELIF IZNI DEGILDIR. Telifli bir videoya kaynak yazmak onu kullanilabilir
+# yapmaz — Content ID yine talep acar. Bu yuzden youtube_sahne CC disina CIKMAZ.
+_ATIFLAR = {}                # {hedef_dosya_yolu: {"kanal":..,"baslik":..,"url":..,"lisans":..}}
+
+
+def klip_gecmisi_sifirla():
+    """Yeni is baslarken cagrilir — onceki videonun klip gecmisi tasinmasin."""
+    global _YER_BAGLAM
+    _YER_BAGLAM = []
+    _vision_sayac[0] = 0
+    _vision_onbellek.clear()
+    with _KULLANILAN_KILIT:
+        _KULLANILAN.clear()
+        _ATIFLAR.clear()
+
+
+def _klip_kullanildi_mi(kimlik: str) -> bool:
+    with _KULLANILAN_KILIT:
+        return str(kimlik) in _KULLANILAN
+
+
+def _klip_isaretle(kimlik: str):
+    with _KULLANILAN_KILIT:
+        _KULLANILAN.add(str(kimlik))
+
+
+FOOTAGE_MAKS_GEN = 2560     # kaynak genislik tavani
+FOOTAGE_MAKS_SN = 12        # kaynak sure tavani (sahne tavani 8 sn + pay)
+
+
 def _remotion_uygun_yap(ham_yol: str, hedef: str) -> bool:
-    """Ham stok mp4'u Remotion'un headless Chrome'unun KESIN cozebilecegi bicime getir.
-    H.264+yuv420p ise sadece +faststart remux; degilse H.264'e RE-ENCODE (siyah sahne olmasin)."""
+    """Ham stok mp4'u Remotion'un headless Chrome'unun KESIN cozebilecegi bicime getir,
+    ve AYNI ADIMDA kirp + olcekle.
+
+    NEDEN KIRPMA/OLCEKLEME (11 Agu 2026 olcumu): Pexels 4K'ya gecince tek klip
+    558 MB geldi. Sahne basina ortalama 125 MB x ~330 sahne = 41 GB — 10 Agu'da
+    diski doldurup bir render'i oldurdugum tabloya geri donerdik. Ustelik sahne
+    5-8 sn kullaniyor, klibin geri kalan 50 saniyesi indirilip cozuluyor ve
+    ATILIYOR.
+
+    NEDEN 2560 KAYIP DEGIL: cikti 1920x1080 ve Ken Burns zoom tavani 1.38 —
+    yani en yakin karede bile 1920x1.38 = 2650 pikselin altinda ornekleme
+    gerekmiyor; 2560 kaynak 1080p ciktida gozle ayirt edilemez. Alt tarafi
+    4K'nin decode maliyeti 2.25 kat ve render'i yavaslatiyor.
+    ONEMLI: 4K'yi Pexels'ten ISTEMEYE devam ediyoruz — kotu 1080p kaynagi
+    buyutmek ile iyi 4K kaynagi kucultmek ayni sey degil, ikincisi keskin.
+    """
     import subprocess
-    codec = ""; piks = ""
+    codec = ""; piks = ""; gen = 0; sure = 0.0
     try:
         p = subprocess.run(
             ["ffprobe", "-v", "error", "-select_streams", "v:0",
-             "-show_entries", "stream=codec_name,pix_fmt", "-of", "default=nw=1:nk=1", ham_yol],
+             "-show_entries", "stream=codec_name,pix_fmt,width",
+             "-show_entries", "format=duration",
+             "-of", "default=nw=1:nk=1", ham_yol],
             capture_output=True, timeout=30)
-        satirlar = p.stdout.decode(errors="ignore").split()
-        if satirlar:
-            codec = satirlar[0]
-            piks = satirlar[1] if len(satirlar) > 1 else ""
+        alan = p.stdout.decode(errors="ignore").split()
+        for a in alan:
+            if a in ("h264", "hevc", "vp9", "av1", "mpeg4"):
+                codec = a
+            elif a.startswith("yuv") or a.startswith("gbr"):
+                piks = a
+            elif a.isdigit() and int(a) > 200:
+                gen = max(gen, int(a))
+            else:
+                try:
+                    sure = max(sure, float(a))
+                except Exception:
+                    pass
     except Exception:
         pass
-    uygun = (codec == "h264" and piks == "yuv420p")
+
+    kucult = gen > FOOTAGE_MAKS_GEN
+    kirp = sure > FOOTAGE_MAKS_SN + 1
+    uygun = (codec == "h264" and piks == "yuv420p" and not kucult)
+
+    def _re_encode():
+        k = ["ffmpeg", "-nostdin", "-y", "-i", ham_yol]
+        if kirp:
+            k += ["-t", str(FOOTAGE_MAKS_SN)]
+        if kucult:
+            k += ["-vf", f"scale={FOOTAGE_MAKS_GEN}:-2:flags=lanczos"]
+        k += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "19",
+              "-pix_fmt", "yuv420p", "-an", "-movflags", "+faststart", hedef]
+        return subprocess.run(k, capture_output=True, timeout=600)
+
     try:
         if uygun:
-            cmd = ["ffmpeg", "-y", "-i", ham_yol, "-c", "copy", "-movflags", "+faststart", hedef]
+            k = ["ffmpeg", "-nostdin", "-y", "-i", ham_yol]
+            if kirp:
+                k += ["-t", str(FOOTAGE_MAKS_SN)]
+            k += ["-c", "copy", "-an", "-movflags", "+faststart", hedef]
+            r = subprocess.run(k, capture_output=True, timeout=300)
+            if r.returncode != 0:
+                r = _re_encode()
         else:
-            cmd = ["ffmpeg", "-y", "-i", ham_yol, "-c:v", "libx264", "-preset", "veryfast",
-                   "-pix_fmt", "yuv420p", "-an", "-movflags", "+faststart", hedef]
-        r = subprocess.run(cmd, capture_output=True, timeout=300)
-        if r.returncode != 0 and uygun:   # remux tutmadiysa re-encode'a dus
-            r = subprocess.run(
-                ["ffmpeg", "-y", "-i", ham_yol, "-c:v", "libx264", "-preset", "veryfast",
-                 "-pix_fmt", "yuv420p", "-an", "-movflags", "+faststart", hedef],
-                capture_output=True, timeout=300)
+            r = _re_encode()
         if r.returncode != 0:
             print(f"  ffmpeg normalize rc={r.returncode}", file=sys.stderr)
     except Exception as e:
@@ -377,16 +507,50 @@ def _remotion_uygun_yap(ham_yol: str, hedef: str) -> bool:
     return os.path.exists(hedef) and os.path.getsize(hedef) > 20000
 
 
-def _indir_ve_hazirla(url: str, hedef: str, zaman_asimi: int = 120) -> bool:
-    ham = hedef + ".ham"
-    if not _stok_indir(url, ham, zaman_asimi):
-        try: os.remove(ham)
-        except Exception: pass
-        return False
-    return _remotion_uygun_yap(ham, hedef)
-
 
 # ─────────────────────────── Pexels (ucretsiz stok) ───────────────────────────
+
+def _yer_ekli_sorgu(sorgu: str) -> str:
+    """Sorguda yer kelimesi yoksa VIDEONUN ulkesini basa ekle. Kapi zaten reddedecek;
+    sorguyu da duzeltmek bosa arama yapmayi onler ve dogru klibi bulma sansini artirir."""
+    if not _YER_BAGLAM or _sorgu_yer_terimleri(sorgu):
+        return sorgu
+    takma = YER_TAKMA_AD.get(_YER_BAGLAM[0], [])
+    return f"{takma[0]} {sorgu}" if takma else sorgu
+
+
+def _yer_yedek_sorgular(sorgu: str) -> list:
+    """Sorgu stokta KARSILIGI OLMAYAN bir cekim istiyorsa, ULKEYI KORUYARAK genellestir.
+
+    Vidrush'in AI Prompt Checker'i ayni sorunu uretimden once yakaliyor ve kullaniciya
+    "kesin cekimi degil, konuyu tarif et" diyor. Bizde kullaniciya sormak yerine kod
+    genellestiriyor. Ornek (11 Agu'da videoyu bozan sorgu):
+      "Japanese apartment electric meter and light switch"  -> stokta YOK
+      yedekler: "japan apartment", "tokyo apartment", "tokyo street", "japan city"
+    Boylece klip Japonya'da kalir; alternatif (eski davranis) Avrupa sigorta kutusuydu.
+    """
+    yerler = _etkin_yer(sorgu)
+    if not yerler:
+        return []
+    takma = YER_TAKMA_AD.get(yerler[0], [])
+    if not takma:
+        return []
+    ulke = takma[0]
+    sehir = takma[2] if len(takma) > 2 else ulke
+    konu = [k.lower() for k in sorgu.replace(",", " ").split()
+            if len(k) > 3 and k.lower() not in _COVERR_KAMERA_KELIME
+            and k.lower() not in _YER_KELIME_HARITA]
+    yedek = []
+    for kel in konu[:2]:
+        yedek += [f"{ulke} {kel}", f"{sehir} {kel}"]
+    yedek += [f"{sehir} street", f"{ulke} city", f"{ulke} daily life"]
+    gorulen, temiz = set(), []
+    for y in yedek:
+        if y not in gorulen:
+            gorulen.add(y)
+            temiz.append(y)
+    return temiz
+
 
 def _coverr_sorgular(sorgu: str):
     """Coverr'in kutuphanesi kucuk ve anahtar kelimeleri AND'liyor: 7 Agu 2026 olcumu ->
@@ -397,7 +561,13 @@ def _coverr_sorgular(sorgu: str):
       "aerial island"                              = 84
     Yani plan'in uzun betimleyici footage_sorgu'sunu oldugu gibi yollamak bos donuyor.
     Cozum: sorguyu kademeli kisalt, sonuc CIKAN ilk varyantta dur."""
+    sorgu = _yer_ekli_sorgu(sorgu)
     kel = [k for k in sorgu.replace(",", " ").split() if len(k) > 2]
+    # YER KELIMESI ONE ALINIR (11 Agu 2026). Kisaltma sondan kirpiyor; "elderly community
+    # meeting Japan" 2 kelimeye inince "elderly community" oluyor ve ulke kayboluyor.
+    # Ulke kaybolunca arama Bati sonucu donduruyor, alaka kapisi hepsini reddediyor ve
+    # bosa API cagrisi yapiliyor. Yer kelimesi basa alinirsa her varyantta korunur.
+    kel.sort(key=lambda x: 0 if x.lower() in _YER_KELIME_HARITA else 1)
     varyant, gorulen = [], set()
     for n in (len(kel), 4, 3, 2):
         if n < 1:
@@ -413,7 +583,7 @@ def _coverr_sorgular(sorgu: str):
     # "arriving" basliкta gercekten vardi — ama kelime konuyu tasimiyor.
     # Iki kelimenin altinda anlam kalmiyor; bulunamazsa Coverr False donsun ve zincir
     # Pexels/Pixabay/YouTube CC'ye dussun. Alakasiz klip, klipsizlikten kotudur.
-    return varyant
+    return varyant + _yer_yedek_sorgular(sorgu)
 
 
 # Kamera/genel kelimeler: bunlar KONUYU anlatmiyor, sadece cekimi tarif ediyor.
@@ -429,6 +599,270 @@ _COVERR_KAMERA_KELIME = {
     "struggling", "working", "going", "coming", "sitting", "holding", "using",
     "after", "before", "during", "through", "around", "between", "toward",
 }
+
+
+# ─────────────── YER DOGRULUGU (11 Agu 2026 — canli iste yakalandi) ───────────────
+# Tokyo/kodokushi metniyle uretilen videoda 12 sahnenin 9'u Bati Avrupa cikti:
+#   "Japanese apartment electric meter"  -> "person flicking switches" (Avrupa sigorta kutusu)
+#   "elderly community meeting Japan"    -> "businessmen in a meeting"
+#   "smart home elderly care Japan"      -> "elderly person using a tablet"
+# Sebep: alaka kapisi "switch/meeting/tablet" gibi YARDIMCI kelimeyle geciyordu, yani
+# metnin en belirleyici kelimesini (ulkeyi) istege bagli sayiyordu.
+#
+# Ama duz "sorguda Japan varsa klipte de Japan yazsin" kurali da YANLIS: iyi kliplerin
+# basliginda ulke adi gecmiyor ("bustling nightlife in shinjuku s kabukicho district"
+# tam istedigimiz klip ama icinde "japan" yok). Bu yuzden takma-ad tablosu var.
+YER_TAKMA_AD = {
+    "japan": ["japan", "japanese", "tokyo", "kyoto", "osaka", "shinjuku", "shibuya",
+              "kabukicho", "ginza", "akihabara", "fuji", "nippon", "okinawa", "sapporo",
+              "hokkaido", "nara", "kanto", "shinkansen", "torii", "ryokan", "izakaya"],
+    "korea": ["korea", "korean", "seoul", "busan", "gangnam", "hanbok", "hangul"],
+    "china": ["china", "chinese", "beijing", "shanghai", "shenzhen", "guangzhou",
+              "hong kong", "chengdu", "xian"],
+    "india": ["india", "indian", "delhi", "mumbai", "kolkata", "bangalore", "varanasi",
+              "rajasthan", "kerala"],
+    "usa": ["usa", "america", "american", "new york", "manhattan", "brooklyn", "chicago",
+            "los angeles", "california", "texas", "washington", "boston", "detroit"],
+    "uk": ["uk", "britain", "british", "england", "english", "london", "scotland",
+           "wales", "manchester", "liverpool"],
+    "france": ["france", "french", "paris", "marseille", "lyon", "eiffel", "provence"],
+    "germany": ["germany", "german", "berlin", "munich", "hamburg", "bavaria"],
+    "italy": ["italy", "italian", "rome", "milan", "venice", "florence", "naples", "sicily"],
+    "spain": ["spain", "spanish", "madrid", "barcelona", "seville", "andalusia"],
+    "russia": ["russia", "russian", "moscow", "petersburg", "siberia", "kremlin"],
+    "brazil": ["brazil", "brazilian", "rio", "sao paulo", "amazon", "favela"],
+    "turkey": ["turkey", "turkish", "istanbul", "ankara", "izmir", "cappadocia", "bosphorus"],
+    "egypt": ["egypt", "egyptian", "cairo", "nile", "giza", "pyramid", "luxor"],
+    "mexico": ["mexico", "mexican", "cancun", "oaxaca", "yucatan", "aztec", "maya"],
+    "thailand": ["thailand", "thai", "bangkok", "phuket", "chiang mai"],
+    "vietnam": ["vietnam", "vietnamese", "hanoi", "saigon", "mekong"],
+    "africa": ["africa", "african", "kenya", "nigeria", "ethiopia", "sahara", "serengeti"],
+    "arab": ["arab", "dubai", "saudi", "emirates", "qatar", "riyadh", "abu dhabi", "bedouin"],
+}
+# Sorgudaki hangi kelime "yer iddiasi" sayilir: takma-ad tablosundaki HERHANGI bir kelime.
+_YER_KELIME_HARITA = {kel: ulke for ulke, kelimeler in YER_TAKMA_AD.items() for kel in kelimeler}
+
+# REKLAM STOGU REDDI: bu kelimeler stok sitesinin "kurumsal tanitim" havuzunu isaret eder.
+# Belgesel tonuna asla oturmaz — 11 Agu videosundaki "businessmen in a meeting" ve
+# "woman in apron reading letter" tam bu havuzdan geldi.
+REKLAM_STOK_KELIME = {
+    "businessman", "businessmen", "businesswoman", "corporate", "startup", "teamwork",
+    "coworking", "handshake", "mockup", "isolated", "white background", "green screen",
+    "studio shot", "model posing", "smiling family", "happy family", "lifestyle",
+    "presentation", "brainstorming", "office meeting", "customer service", "influencer",
+    "copy space", "advertisement", "commercial", "product shot",
+}
+# NOTR CEKIM — 11 Agu 2026'da DARALTILDI, cunku ilk surumu videoyu bozdu.
+# Ilk listede "water", "sea", "sky", "door", "window", "hallway", "night" gibi
+# kelimeler vardi ve bunlari "kulturel iz tasimaz" saymistim. YANLISTI: Tokyo
+# metnine turkuaz sulu bir TROPIK ADA havadan cekimi girdi (slug'da "water"
+# oldugu icin), Avrupa mutfagi girdi (slug'da "door"), Filipinler mutfagi girdi.
+# Genis plan HER ZAMAN yer soyler — mimari, bitki, isik, insan.
+# Gercekten kultursuz olan tek sey MAKRO/YAKIN PLAN: bir elin parmagi, cam
+# uzerindeki yagmur damlasi, saatin yelkovani her ulkede ayni gorunur.
+# Bu yuzden notr kademe artik SADECE yakin plan isareti tasiyan klipleri kabul eder.
+NOTR_ZORUNLU_ISARET = {"close up", "closeup", "close-up", "macro", "extreme close"}
+NOTR_KONU_KELIME = {
+    "hands", "hand", "fingers", "finger", "texture", "detail", "raindrops",
+    "droplets", "candle", "flame", "smoke", "steam", "dust", "clock", "keyhole",
+    "key", "lock", "paper", "pen", "ink", "fabric", "thread", "grain", "sand",
+    "coin", "coins", "switch", "button", "dial", "wire", "screw",
+}
+# Bu kelimeler ekranda TANIMLANABILIR insan oldugunu gosterir — yer dogrulanmadan kabul
+# edilemez, cunku yanlis ulkenin insani en cok goze batan hata.
+INSAN_KELIME = {
+    "man", "men", "woman", "women", "person", "people", "boy", "girl", "child", "children",
+    "family", "couple", "crowd", "group", "worker", "student", "teacher", "doctor", "nurse",
+    "elderly", "senior", "guy", "lady", "male", "female", "portrait", "face",
+}
+
+
+# ── VIDEO DUZEYINDE YER BAGLAMI (11 Agu 2026, ucuncu deneme) ──
+# Yer kapisini once klip basligina, sonra makro-notr kurala baglayarak sikilastirdim.
+# IKISI DE YETMEDI: Tokyo metnine yine turkuaz sulu TROPIK ADA ve Filipinler ic mekani
+# girdi. Sebep basit ve benim gozden kacirdigim sey: o sahnelerin SORGUSUNDA hic yer
+# kelimesi yoktu ("aerial view of coastal community" gibi), kapi da yer iddiasi
+# olmayan sorguda kendini KAPATIYOR.
+# Dogru cozum: ulkeyi tek tek sorgudan degil, VIDEONUN METNINDEN bir kez tespit edip
+# butun sahnelere zorunlu kilmak. Boylece plan ulkeyi yazmayi unutsa da kapi acik kalir.
+_YER_BAGLAM = []
+
+
+def yer_baglami_kur(metin: str) -> list:
+    """Videonun tamaminin gectigi yer(ler)i metinden tespit et ve is boyunca sabitle."""
+    global _YER_BAGLAM
+    d = " " + (metin or "").lower().replace(",", " ").replace(".", " ") + " "
+    sayim = {}
+    for kel, ulke in _YER_KELIME_HARITA.items():
+        n = d.count(f" {kel} ")
+        if n:
+            sayim[ulke] = sayim.get(ulke, 0) + n
+    # Tek baskin ulke varsa onu al; ikisi baskinsa ikisini de kabul et (kiyas videolari)
+    if not sayim:
+        _YER_BAGLAM = []
+    else:
+        en = max(sayim.values())
+        _YER_BAGLAM = [u for u, n in sorted(sayim.items(), key=lambda x: -x[1])
+                       if n >= max(2, en * 0.4)][:2]
+    print(f"  yer baglami: {_YER_BAGLAM or 'yok'} (sayim: {sayim})", file=sys.stderr)
+    return _YER_BAGLAM
+
+
+# ── VISION DOGRULAMASI (11 Agu 2026, dorduncu ve son katman) ──
+# Slug tabanli yer kapisi ucuncu denemede tropik adayi durdurdu ama iki klip yine gecti:
+# basliginda "japanese apartment" yazan, iceride BATILI oyuncu olan reklam stogu.
+# Bunu metin okuyarak yakalamak IMKANSIZ — yukleyici mekani "japanese" diye etiketlemis.
+# Tek dogru yol KAREYE BAKMAK. Klip indikten sonra ortasindan bir kare cikarilip
+# gpt-4.1-mini vision'a soruluyor. Maliyet ~$0.0008/klip; 30 dk videoda ~330 klip
+# icin ~$0.26 — yanlis ulke klibinin bedeli bundan cok daha yuksek.
+VISION_DOGRULA = os.environ.get("VISION_DOGRULA", "1") not in ("0", "false", "")
+VISION_MAKS = int(os.environ.get("VISION_MAKS", "600"))       # is basina cagri tavani
+_vision_sayac = [0]
+_vision_onbellek = {}
+
+
+def _kare_base64(video_yolu: str) -> str:
+    """Klibin %40'indan bir kare -> 512px JPEG -> base64."""
+    import base64
+    import subprocess
+    try:
+        sure = 0.0
+        r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                            "-of", "csv=p=0", video_yolu], capture_output=True, text=True,
+                           timeout=30)
+        sure = float((r.stdout or "0").strip() or 0)
+    except Exception:
+        sure = 0.0
+    t = max(0.0, sure * 0.4)
+    gec = video_yolu + ".kare.jpg"
+    try:
+        import subprocess as sp
+        sp.run(["ffmpeg", "-nostdin", "-loglevel", "error", "-y", "-ss", f"{t:.2f}",
+                "-i", video_yolu, "-frames:v", "1", "-vf", "scale=512:-2", "-q:v", "4",
+                gec], capture_output=True, timeout=60)
+        with open(gec, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    except Exception:
+        return ""
+    finally:
+        try:
+            os.remove(gec)
+        except Exception:
+            pass
+
+
+def _vision_yer_uygun(video_yolu: str, sorgu: str, yerler: list, kimlik: str = "") -> bool:
+    """Klip GERCEKTEN o ulkede mi cekilmis gorunuyor? Kareye bakarak karar verir.
+    Anahtar yoksa / cagri basarisizsa True doner (kapiyi kapatmaz, sadece ek suzgec)."""
+    if not (VISION_DOGRULA and yerler):
+        return True
+    if _vision_sayac[0] >= VISION_MAKS:
+        return True
+    if kimlik and kimlik in _vision_onbellek:
+        return _vision_onbellek[kimlik]
+    anahtar = _anahtar_oku("OPENAI_KEY", "openai_key.txt")
+    if not anahtar:
+        return True
+    b64 = _kare_base64(video_yolu)
+    if not b64:
+        return True
+    ulke = yerler[0]
+    takma = YER_TAKMA_AD.get(ulke, [ulke])
+    ulke_adi = takma[0].upper()
+    sistem = (
+        f"You verify stock footage for a documentary set in {ulke_adi}. "
+        f"Look at the frame. Decide if it could plausibly have been SHOT IN {ulke_adi}. "
+        "Use architecture, signage and script on signs, vehicles, vegetation, interior "
+        "style, and the apparent ethnicity of any visible people. "
+        f"If people are visible and they clearly do not look like residents of {ulke_adi}, "
+        "answer false. If the frame is a tight close-up with no cultural cues at all, "
+        "answer true. "
+        'Reply ONLY as JSON: {"uygun": true|false, "neden": "<max 12 words>"}')
+    try:
+        _vision_sayac[0] += 1
+        r = requests.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {anahtar}", "Content-Type": "application/json"},
+            json={"model": "gpt-4.1-mini",
+                  "messages": [
+                      {"role": "system", "content": sistem},
+                      {"role": "user", "content": [
+                          {"type": "text", "text": f"Scene intent: {sorgu[:120]}"},
+                          {"type": "image_url",
+                           "image_url": {"url": f"data:image/jpeg;base64,{b64}",
+                                         "detail": "low"}}]}],
+                  "response_format": {"type": "json_object"},
+                  "temperature": 0,
+                  "max_tokens": 60},
+            timeout=45)
+        if r.status_code != 200:
+            print(f"  vision {r.status_code}, atlandi", file=sys.stderr)
+            return True
+        icerik = (r.json().get("choices") or [{}])[0].get("message", {}).get("content") or "{}"
+        d = json.loads(icerik)
+        uygun = bool(d.get("uygun", True))
+        if not uygun:
+            print(f"  VISION RED ({ulke}): {str(d.get('neden'))[:50]} "
+                  f"[{os.path.basename(video_yolu)}]", file=sys.stderr)
+        if kimlik:
+            _vision_onbellek[kimlik] = uygun
+        return uygun
+    except Exception as e:
+        print(f"  vision hata: {str(e)[:90]}", file=sys.stderr)
+        return True
+
+
+def _etkin_yer(sorgu: str) -> list:
+    """Bu sorgu icin gecerli yer kisiti: sorgununki varsa o, yoksa VIDEONUN yeri."""
+    return _sorgu_yer_terimleri(sorgu) or list(_YER_BAGLAM)
+
+
+def _sorgu_yer_terimleri(sorgu: str) -> list:
+    """Sorgunun ICINDEKI yer iddialarini bul -> ["japan"] gibi ulke anahtarlari."""
+    d = " " + sorgu.lower().replace(",", " ") + " "
+    bulunan = []
+    for kel, ulke in _YER_KELIME_HARITA.items():
+        if f" {kel} " in d and ulke not in bulunan:
+            bulunan.append(ulke)
+    return bulunan
+
+
+def _havuz(h: dict) -> str:
+    return (str(h.get("title") or "") + " " + str(h.get("description") or "")).lower()
+
+
+def _reklam_stogu_mu(h: dict) -> bool:
+    havuz = _havuz(h)
+    return any(k in havuz for k in REKLAM_STOK_KELIME)
+
+
+def _yer_dogru_mu(h: dict, yer_terimleri: list) -> bool:
+    """Klip, sorgunun iddia ettigi yerlerden BIRINE ait mi (takma adlar dahil)?"""
+    if not yer_terimleri:
+        return True                       # sorgunun yer iddiasi yok, kapi yok
+    havuz = " " + _havuz(h) + " "
+    for ulke in yer_terimleri:
+        for takma in YER_TAKMA_AD.get(ulke, []):
+            if f" {takma} " in havuz or havuz.startswith(takma + " "):
+                return True
+    return False
+
+
+def _notr_cekim_mi(h: dict) -> bool:
+    """Yer dogrulanamadi; klip yine de kullanilabilir mi?
+
+    IKI SART BIRLIKTE (11 Agu 2026'da sikilastirildi):
+      1) Klip YAKIN PLAN oldugunu SOYLEMELI ("close up" / "macro"). Genis plan
+         her zaman yer belli eder; tek gecerli kultursuz cerceve makrodur.
+      2) Konusu kultursuz bir nesne olmali ve ekranda insan olmamali.
+    Bu kadar dar olmasinin sebebi olculdu: gevsek listeyle Tokyo metnine tropik
+    ada ve Filipinler mutfagi girdi."""
+    havuz = " " + _havuz(h) + " "
+    if not any(k in havuz for k in NOTR_ZORUNLU_ISARET):
+        return False                      # yakin plan degil -> yer belli eder
+    if any(f" {k} " in havuz for k in INSAN_KELIME):
+        return False                      # insan var -> yanlis ulkenin insani riski
+    return any(f" {k} " in havuz for k in NOTR_KONU_KELIME)
 
 
 def _coverr_alakali(h: dict, sorgu: str) -> bool:
@@ -509,6 +943,10 @@ def coverr_video(sorgu: str, hedef: str) -> bool:
                 return False
             if not _coverr_alakali(h, sorgu):
                 return False               # konu kaymasi: alakasiz klip kullanilmaz
+            if _reklam_stogu_mu(h):
+                return False               # kurumsal tanitim havuzu
+            if not (_yer_dogru_mu(h, _etkin_yer(sorgu)) or _notr_cekim_mi(h)):
+                return False               # yanlis ulke riski
             return bool(_coverr_mp4(h))
 
         secilmis = sorted([h for h in adaylar if uygun(h)],
@@ -524,61 +962,171 @@ def coverr_video(sorgu: str, hedef: str) -> bool:
     return False
 
 
+def _slug_kelimeleri(url: str) -> str:
+    """Pexels video sayfa URL'sindeki slug betimleyici kelimeleri tasir:
+    /video/tranquil-narrow-street-in-traditional-japanese-town-12345/
+    API baslik/aciklama alani DONDURMUYOR, alaka kontrolu icin tek kaynak bu."""
+    try:
+        p = [x for x in str(url).rstrip("/").split("/") if x]
+        return p[-1].replace("-", " ").lower() if p else ""
+    except Exception:
+        return ""
+
+
 def pexels_video(sorgu: str, hedef: str) -> bool:
-    """Pexels'ten yatay 1080p stok video. Ucretsiz API anahtari yeter (PEXELS_KEY)."""
+    """Pexels'ten YATAY 4K stok video (yoksa Full HD'ye duser).
+
+    NEDEN 4K (11 Agu 2026): render 1920x1080 ama Ken Burns zoom KIRPARAK calisiyor —
+    1.38 tavana kadar. 1080p kaynakta zoom sonunda etkin cozunurluk ~780p'ye iniyor ve
+    goruntu yumusuyor. 4K kaynakta zoom sonunda bile 1080p'nin ustunde kaliyor.
+    Pexels arama ucunda size=large = 4K filtresi var, kaynakta filtreleyip bosa
+    indirme yapmiyoruz.
+
+    ALAKA KAPISI: Coverr'da olculen sorun burada da gecerli — sorgu kisalinca konu
+    kayiyor. Pexels API baslik dondurmedigi icin sayfa URL'sindeki slug kullanilir.
+    """
     if not PEXELS_KEY:
         return False
-    try:
-        r = requests.get("https://api.pexels.com/videos/search",
-                         headers={"Authorization": PEXELS_KEY},
-                         params={"query": sorgu, "per_page": 8,
-                                 "orientation": "landscape", "size": "medium"}, timeout=30)
-        if r.status_code == 401:
-            print("  pexels 401 (anahtar gecersiz/placeholder)", file=sys.stderr)
-            return False
-        r.raise_for_status()
-        for v in r.json().get("videos", []):
-            files = [f for f in v.get("video_files", [])
-                     if f.get("file_type") == "video/mp4"
-                     and (f.get("width") or 0) >= 1280 and (f.get("height") or 0) >= 700]
-            if not files:
+    bas_h = {"Authorization": PEXELS_KEY}
+
+    def ara(q, boyut):
+        try:
+            r = requests.get("https://api.pexels.com/videos/search", headers=bas_h,
+                             params={"query": q, "per_page": 15,
+                                     "orientation": "landscape", "size": boyut}, timeout=30)
+            if r.status_code == 401:
+                print("  pexels 401 (anahtar gecersiz)", file=sys.stderr)
+                return None
+            if r.status_code == 429:
+                print("  pexels 429 (saatlik limit doldu)", file=sys.stderr)
+                return []
+            r.raise_for_status()
+            return r.json().get("videos", [])
+        except Exception as e:
+            print(f"  pexels hata: {str(e)[:120]}", file=sys.stderr)
+            return []
+
+    # size=large (4K) ONCE; bulunmazsa medium (Full HD). Sorgu da kademeli kisalir.
+    for boyut in ("large", "medium"):
+        for q in _coverr_sorgular(sorgu):
+            adaylar = ara(q, boyut)
+            if adaylar is None:
+                return False                      # anahtar bozuk, denemeye devam etme
+            if not adaylar:
                 continue
-            files.sort(key=lambda f: (0 if f.get("width", 0) <= 1920 else 1,
-                                      abs(f.get("width", 0) - 1920)))
-            if _indir_ve_hazirla(files[0]["link"], hedef):
-                return True
-    except Exception as e:
-        print(f"  pexels hata: {str(e)[:140]}", file=sys.stderr)
+            yer_terim = _etkin_yer(sorgu)
+            kademe1, kademe2 = [], []      # 1 = yeri dogrulanmis, 2 = notr cekim
+            for v in adaylar:
+                h = {"title": _slug_kelimeleri(v.get("url")), "description": ""}
+                if not _coverr_alakali(h, sorgu):
+                    continue
+                if _reklam_stogu_mu(h):
+                    continue               # kurumsal tanitim havuzu — belgesele oturmaz
+                if not _tekrara_izin_var() and _klip_kullanildi_mi(v.get("id")):
+                    continue               # bu klip videoda zaten var
+                if _yer_dogru_mu(h, yer_terim):
+                    kademe = kademe1
+                elif _notr_cekim_mi(h):
+                    kademe = kademe2
+                else:
+                    continue               # yanlis ulke riski -> AI gorsele birak
+                dosyalar = [f for f in (v.get("video_files") or [])
+                            if f.get("file_type") == "video/mp4"
+                            and (f.get("width") or 0) >= 1920]
+                if not dosyalar:
+                    continue
+                # RENDITION SECIMI: arama zaten size=large ile filtrelendi, yani klip
+                # 4K-YERLI. Ama Pexels ayni klibin 3840/2560/1920 surumlerini sunuyor.
+                # Ciktimiz 1080p ve zoom tavani 1.38 -> 2650 pikselin ustu bosa gidiyor.
+                # 2560'a esit/ustu EN KUCUK dosyayi aliyoruz: 558 MB yerine ~60 MB iner,
+                # goruntu 1080p ciktida ayni. 2560+ yoksa en buyugunu alip yerelde
+                # kucultuyoruz (_remotion_uygun_yap).
+                dosyalar.sort(key=lambda f: (f.get("width") or 0))
+                sec = next((f for f in dosyalar if (f.get("width") or 0) >= FOOTAGE_MAKS_GEN),
+                           dosyalar[-1])
+                kademe.append((v, sec))
+            uygunlar = kademe1 + kademe2   # yeri dogrulanmis olan HER ZAMAN once
+            if not uygunlar:
+                continue
+            for v, f in uygunlar[:4]:
+                if f.get("link") and _indir_ve_hazirla(f["link"], hedef):
+                    # KAREYE BAK: slug "japanese" diyor olabilir ama iceride Batili
+                    # oyuncu olan reklam stogu olabilir. Reddedilirse dosya silinip
+                    # siradaki aday denenir.
+                    if not _vision_yer_uygun(hedef, sorgu, yer_terim, str(v.get("id"))):
+                        _klip_isaretle(v.get("id"))     # bir daha denenmesin
+                        try:
+                            os.remove(hedef)
+                        except Exception:
+                            pass
+                        continue
+                    _klip_isaretle(v.get("id"))
+                    print(f"  pexels OK [{q}/{boyut}]: {_slug_kelimeleri(v.get('url'))[:44]} "
+                          f"({f.get('width')}x{f.get('height')})", file=sys.stderr)
+                    return True
+    print(f"  pexels: uygun klip yok ({sorgu[:44]})", file=sys.stderr)
     return False
 
-
-# ─────────────────────────── Pixabay (ucretsiz stok) ───────────────────────────
 
 def pixabay_video(sorgu: str, hedef: str) -> bool:
-    """Pixabay'den yatay stok video. Ucretsiz API anahtari yeter (PIXABAY_KEY)."""
+    """Pixabay'den YATAY 4K stok video (yoksa Full HD'ye duser).
+
+    Pexels'ten farki: arama ucunde cozunurluk filtresi YOK, o yuzden gelen
+    sonuclarin icinden 'large' varyanti 4K olanlar secilir. Pixabay 'tags'
+    alani donduruyor — alaka kapisi bunun uzerinden calisir.
+    """
     if not PIXABAY_KEY:
         return False
-    try:
-        r = requests.get("https://pixabay.com/api/videos/",
-                         params={"key": PIXABAY_KEY, "q": sorgu,
-                                 "per_page": 12, "safesearch": "true"}, timeout=30)
-        if r.status_code in (400, 401, 403):
-            print(f"  pixabay {r.status_code} (anahtar/sorgu)", file=sys.stderr)
+    for q in _coverr_sorgular(sorgu):
+        try:
+            r = requests.get("https://pixabay.com/api/videos/",
+                             params={"key": PIXABAY_KEY, "q": q, "per_page": 20,
+                                     "safesearch": "true", "order": "popular"}, timeout=30)
+            if r.status_code in (400, 401, 403):
+                print(f"  pixabay {r.status_code} (anahtar/sorgu)", file=sys.stderr)
+                return False
+            if r.status_code == 429:
+                print("  pixabay 429 (limit)", file=sys.stderr)
+                return False
+            r.raise_for_status()
+            hits = r.json().get("hits", [])
+        except Exception as e:
+            print(f"  pixabay hata: {str(e)[:140]}", file=sys.stderr)
             return False
-        r.raise_for_status()
-        for hit in r.json().get("hits", []):
-            vids = hit.get("videos", {}) or {}
-            aday = None
-            for boyut in ("large", "medium", "small"):
-                v = vids.get(boyut) or {}
-                w = v.get("width") or 0; h = v.get("height") or 0
-                if v.get("url") and w >= 1280 and w >= h:
-                    aday = v["url"]; break
-            if aday and _indir_ve_hazirla(aday, hedef):
+
+        dortk, fullhd = [], []
+        yer_terim = _etkin_yer(sorgu)
+        for hit in hits:
+            # DIKKAT: asagidaki boyut dongusu "h" adini yukseklik icin kullaniyor.
+            # Aday sozlugune "bilgi" diyoruz ki gizlice int'e donusmesin.
+            bilgi = {"title": hit.get("tags", ""), "description": ""}
+            if not _coverr_alakali(bilgi, sorgu):
+                continue
+            if _reklam_stogu_mu(bilgi):
+                continue
+            if not (_yer_dogru_mu(bilgi, yer_terim) or _notr_cekim_mi(bilgi)):
+                continue
+            for boyut in ("large", "medium"):
+                v = (hit.get("videos") or {}).get(boyut) or {}
+                w, h = v.get("width") or 0, v.get("height") or 0
+                if not v.get("url") or w < h:          # dikey ele
+                    continue
+                (dortk if w >= 3840 else fullhd if w >= 1920 else []).append(
+                    (v["url"], w, h, hit.get("tags", "")))
+                break
+        for url, w, h, etiket in (dortk + fullhd)[:4]:
+            if _indir_ve_hazirla(url, hedef):
+                if not _vision_yer_uygun(hedef, sorgu, yer_terim, url):
+                    try:
+                        os.remove(hedef)
+                    except Exception:
+                        pass
+                    continue
+                print(f"  pixabay OK [{q}]: {etiket[:44]} ({w}x{h})", file=sys.stderr)
                 return True
-    except Exception as e:
-        print(f"  pixabay hata: {str(e)[:140]}", file=sys.stderr)
+    print(f"  pixabay: uygun klip yok ({sorgu[:44]})", file=sys.stderr)
     return False
+
 
 
 # ────────────── Freepik stok video (opsiyonel — arama bedava, indirme kredi ister) ──────────────
@@ -641,14 +1189,28 @@ def freepik_video(sorgu: str, hedef: str) -> bool:
             return False
 
 
-def footage_getir(sorgu: str, hedef: str, yt_once: bool = True) -> bool:
+def genel_yedek_sorgular(sorgu: str) -> list:
+    """Gorsel yasakli stillerde (belgesel) son merdiven: ULKEYI koruyan genel sorgular.
+    Sahnenin kendi konusu stokta yoksa bile ulke dogru kalir."""
+    yerler = _etkin_yer(sorgu)
+    if not yerler:
+        return ["establishing shot city street", "aerial cityscape", "street at night"]
+    takma = YER_TAKMA_AD.get(yerler[0], [])
+    ulke = takma[0] if takma else ""
+    sehir = takma[2] if len(takma) > 2 else ulke
+    return [f"{sehir} street", f"{ulke} city aerial", f"{ulke} neighbourhood",
+            f"{sehir} at night", f"{ulke} landscape"]
+
+
+def footage_getir(sorgu: str, hedef: str, yt_once: bool = True,
+                  tekrara_izin: bool = False) -> bool:
     """Sahne footage'i getir. Oncelik GERCEK+UCRETSIZ stok video:
        Coverr -> Pexels -> Pixabay -> Freepik(kredi varsa) -> YouTube(CC).
     Her katman kendi timeout'una sahip; biri patlarsa digerine gecer; hicbiri yoksa
     False -> caller AI gorsele duser."""
     # Coverr EN BASTA: ucretsiz, gunluk tavan yok, ve gercek/yatay/HD filtresi
     # uygulanabiliyor (is_ai_generated + is_vertical + max_height alanlari sayesinde).
-    kaynaklar = [coverr_video, pexels_video, pixabay_video, freepik_video]
+    kaynaklar = [pexels_video, pixabay_video, coverr_video, freepik_video]
     if yt_once:
         # 5 Agu 2026: eskiden bu satir "YT_COOKIES varsa" diye kosulluydu. Cookie dosyasi
         # olmayan sunucuda YouTube HIC denenmiyordu; Pexels/Pixabay anahtari da bos olunca
@@ -656,6 +1218,10 @@ def footage_getir(sorgu: str, hedef: str, yt_once: bool = True) -> bool:
         # gibi %92 footage'li bir stil bu haliyle calismaz. android_vr istemcisi cookie
         # gerektirmedigi icin kosul kaldirildi.
         kaynaklar.append(youtube_sahne)   # en sona: ucretsiz stok once denenir
+    # AYNI KLIP IKI KEZ KULLANILMASIN (11 Agu 2026 olcumu): 8 sorgunun 2'si ayni
+    # "traditional japanese temple" klibini getirdi. Yer kapisi sikilastikca havuz
+    # daraliyor ve tekrar olasiligi artiyor; izleyicinin fark ettigi ilk sey bu.
+    _YEREL.tekrar = bool(tekrara_izin)
     for fn in kaynaklar:
         try:
             if fn(sorgu, hedef):

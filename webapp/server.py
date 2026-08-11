@@ -142,8 +142,13 @@ def saglik():
     return {
         "openai": bool(os.environ.get("OPENAI_KEY")),
         "magnific": bool(os.environ.get("MAGNIFIC_KEY")),
-        "pexels": bool(os.environ.get("PEXELS_KEY")),
-        "pixabay": bool(os.environ.get("PIXABAY_KEY")),
+        # 11 Agu 2026: bunlar env'e BAKIYORDU ama kaynak.py anahtari env YA DA
+        # veri/*.txt dosyasindan okuyor. Dosyaya yazilan Pexels anahtari calisirken
+        # gosterge "false" diyordu — yanlis teshise yol aciyor. kaynak'in cozdugu
+        # degeri okuyoruz.
+        "pexels": bool(kaynak.PEXELS_KEY),
+        "pixabay": bool(kaynak.PIXABAY_KEY),
+        "coverr": bool(kaynak.COVERR_KEY),
         "gemini": bool(os.environ.get("GEMINI_KEY")),
         "freepik_anahtar_sayisi": len(kaynak.FREEPIK_KEYS),
     }
@@ -710,7 +715,8 @@ def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom
                   "video": "ciktilar/" + sonuc["video"],
                   "kapak": ("ciktilar/" + sonuc["kapak"]) if sonuc.get("kapak") else None,
                   "sure": sonuc.get("sure"), "sahne_sayisi": sonuc.get("sahne_sayisi"),
-                  "edit": sonuc.get("edit"), "uyari": sonuc.get("uyari")})
+                  "edit": sonuc.get("edit"), "uyari": sonuc.get("uyari"),
+                  "atiflar": sonuc.get("atiflar") or []})
     except Exception as e:
         traceback.print_exc()
         d.update({"durum": "hata", "hata": str(e)[:300], "mesaj": "Hata olustu"})

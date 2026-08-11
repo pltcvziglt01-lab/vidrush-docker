@@ -185,8 +185,17 @@ def _zoompan_ifadeleri(sahne, gecis, fps, F):
 #   ZeroReports  karartma %23.1 (x3.0)  -> karanlik/gizemli ton
 #   NavyDecoded  flash %10.3 (x2.5) + zoom-through %4.8 (x4.7) + whip %6.2 (x1.9)
 #   Auralis      %97.5 saf sert kesme   -> sakin anlati
+# ⚠ 11 Agu 2026 — "karartma" ARTIK fadeblack DEGIL.
+# ffmpeg'in xfade=fadeblack'ini yalitilmis olctum (duz renkli iki klip, 30 fps):
+#   d=0.40 -> 118, 118, 59, 0, 0, 0, 3, 16, 30, 44, 57, 66, 75, 84
+# Yani inis 2 KARE, siyahta 3 kare, cikis 8 kare — ASIMETRIK. Ekranda "siyaha
+# carpip yavas acilma" olarak goruluyor, hata gibi duruyor. Bizim kodun hatasi
+# degil, filtrenin kendi davranisi.
+# Referans olcumu (OLCUM_EDIT_TAKSONOMI, 786 gecis): karartmada parlaklik 88 -> 44,
+# yani SIYAHA HIC INMIYOR, yariya dusuyor. Dogru karsilik: crossfade + iki tarafli
+# kisa parlaklik dip'i (bkz. _karartma_dip).
 GECIS_IMZA_FFMPEG = {
-    "karartma": "fadeblack",
+    "karartma": "fade",
     "flash": "fadewhite",
     "whip": "slideleft",
 }
@@ -207,32 +216,121 @@ def _font(ad="Montserrat-Bold.ttf") -> str:
     return f"fontfile='{y}':" if os.path.exists(y) else ""
 
 
+# ─────────────── YAZI SISTEMI (11 Agu 2026 — cikti okunmuyordu) ───────────────
+# 11 Agu videosunda "KODOKUSHI: THE LONELY DEATH" ve "COMMUNITY EFFORTS AGAINST
+# ISOLATION" ekranda gri/gorunmez cikti. Sebep kontrast: beyaz yazi ACIK zeminde
+# (aydinlik koridor duvari) kayboluyor; borderw=3 black@0.62 ayirmaya yetmiyor.
+#
+# Vidrush ciktisinda olctugum cozum: yazi ZEMINE GUVENMIYOR, altina yari saydam
+# koyu bant koyuluyor. Bant kontrasti garanti eder, zemin ne olursa olsun.
+#
+# Bant SERT acilmiyor: drawbox genislik ifadesi kabul ettigi icin soldan saga
+# 0.28 sn'de aciliyor (referans olcumu: giris animasyonlari 0.5 sn'nin ALTINDA;
+# 1 sn'lik fade "amator" gorunuyor). Yazi bant acildiktan 0.12 sn sonra beliriyor.
+YAZI_GIRIS_SN = 0.28
+YAZI_IZGARA_X = 100          # sol hizalama izgarasi
+
+
+def _yazi_genislik(metin: str, fontsize: int) -> int:
+    """Montserrat-Bold icin kaba genislik tahmini — bant yaziyi tam ortmeli."""
+    buyuk = sum(1 for c in metin if c.isupper())
+    oran = 0.63 if buyuk > len(metin) * 0.6 else 0.57
+    return int(len(metin) * fontsize * oran)
+
+
+def _bant_ve_yazi(metin, fontsize, x, y_ifade, bas, omur, alt_metin="", alt_fontsize=26):
+    """Kademeli acilan koyu bant + uzerine kalin beyaz yazi.
+
+    ⚠ FFMPEG TUZAGI (11 Agu 2026'da olcerek bulundu):
+    drawbox'un w/h IFADELERINDE "t" DEGISKENI YOKTUR — sadece "enable" ifadesinde var.
+    Ilk surumde bantı w='if(lt(t,0.2),0,GEN*(t-0.2)/0.28,...)' ile soldan saga acmaya
+    calistim. t tanimsiz oldugu icin ifade son dala dusup 23.663 uretti ve ffmpeg bantı
+    kareye kirpti: bant HER SAHNEDE tam ekran cizildi (piksel olcumu: x=75'ten 1919'a,
+    yani tam olarak iw - x = 1845).
+    Cozum: genislik SABIT sayilarla verilir, animasyon "enable" zaman pencereleriyle
+    kademeli yapilir. 3 kademe x 0.07 sn = 0.21 sn acilis; referans olcumunde giris
+    animasyonlari 0.5 sn'nin ALTINDA oldugu icin bu yeterli ve dogru."""
+    gir = YAZI_GIRIS_SN
+    son = bas + omur
+    kapan = son + gir
+    dolgu = int(fontsize * 0.42)
+    gen = _yazi_genislik(metin, fontsize) + dolgu * 2
+    if alt_metin:
+        gen = max(gen, _yazi_genislik(alt_metin, alt_fontsize) + dolgu * 2)
+    gen = min(gen, 1740)                    # kareyi tasmasin
+    yuk = fontsize + dolgu * 2 + (alt_fontsize + 10 if alt_metin else 0)
+    y_kutu = y_ifade.replace("h*", "ih*")   # drawbox'ta girdi yuksekligi "ih"
+    kx = x - dolgu
+
+    def kutu(w, t0, t1):
+        return (f",drawbox=x={kx}:y='{y_kutu}-{dolgu}':w={int(w)}:h={yuk}:"
+                f"color=black@0.62:t=fill:enable='between(t\,{t0:.3f}\,{t1:.3f})'")
+
+    f = ""
+    KADEME = 3
+    adim = gir / (KADEME + 1)
+    for k in range(1, KADEME + 1):                      # acilis
+        f += kutu(gen * k / KADEME, bas + adim * (k - 1), bas + adim * k)
+    f += kutu(gen, bas + gir, son)                      # tutma
+    for k in (2, 1):                                    # kapanis
+        f += kutu(gen * k / 3, son + gir * (2 - k) / 3, son + gir * (3 - k) / 3)
+
+    # YAZI: alpha ifadesi drawtext'te CALISIR (drawbox'tan farkli olarak t var)
+    y_bas = bas + 0.12
+    alfa = (f"if(lt(t\,{y_bas:.2f})\,0\,"
+            f"if(lt(t\,{y_bas + gir:.2f})\,(t-{y_bas:.2f})/{gir:.2f}\,"
+            f"if(lt(t\,{son:.2f})\,1\,max(0\,({kapan:.2f}-t)/{gir:.2f}))))")
+    f += (f",drawtext={_font()}text='{metin}':fontcolor=white:fontsize={fontsize}:"
+          f"borderw=2:bordercolor=black@0.55:"
+          f"x={x}:y='{y_ifade}':alpha='{alfa}'")
+    if alt_metin:
+        f += (f",drawtext={_font()}text='{alt_metin}':fontcolor=white@0.88:"
+              f"fontsize={alt_fontsize}:borderw=2:bordercolor=black@0.55:"
+              f"x={x}:y='{y_ifade}+{fontsize + 10}':alpha='{alfa}'")
+    return f
+
+
 def _alt_band_filtre(sahne, fps, F):
-    """Alt band (lower third) — Video.tsx'teki AltBand'in ffmpeg karsiligi.
-    OLCULEN degerler: en yaygin yazi turu (%33), omur 4.7 sn, giris 0.28 sn.
-    Sol kenardaki sari dikey cubuk drawbox ile, yazi drawtext ile."""
+    """Alt band (lower third) — olculen EN YAYGIN yazi turu (%33), omur 4.7 sn.
+    11 Agu 2026: kontrast bandina cevrildi; onceden sadece kontur vardi ve acik
+    zeminde yazi kayboluyordu."""
     ab = sahne.get("altBand")
     if not isinstance(ab, dict) or not str(ab.get("baslik") or "").strip():
         return ""
     b = _ffmpeg_kacir(str(ab["baslik"]).strip()[:34])
     a = _ffmpeg_kacir(str(ab.get("alt") or "").strip()[:40])
-    gir, omur = 0.28, min(4.7, max(1.0, F / fps - 0.4))
-    son = 0.3 + omur
-    # alpha: 0.3'te girer, omur boyunca kalir, 0.28 sn'de soner
-    alfa = (f"if(lt(t\\,0.3)\\,0\\,if(lt(t\\,{0.3 + gir:.2f})\\,(t-0.3)/{gir:.2f}\\,"
-            f"if(lt(t\\,{son:.2f})\\,1\\,max(0\\,({son + gir:.2f}-t)/{gir:.2f}))))")
-    f = ""
-    # Sari dikey vurgu cubugu (AltBand'deki 6px'lik cubuk)
-    f += (f",drawbox=x=100:y=ih*0.78:w=6:h=76:color=#F5E14B@1:t=fill:"
-          f"enable='between(t\\,0.3\\,{son + gir:.2f})'")
-    f += (f",drawtext={_font()}text='{b}':fontcolor=white:fontsize=44:"
-          f"borderw=4:bordercolor=black@0.8:shadowcolor=black@0.9:shadowx=0:shadowy=3:"
-          f"x=122:y=h*0.78:alpha='{alfa}'")
-    if a:
-        f += (f",drawtext={_font()}text='{a}':fontcolor=white@0.9:fontsize=26:"
-              f"borderw=3:bordercolor=black@0.8:shadowcolor=black@0.9:shadowx=0:shadowy=2:"
-              f"x=122:y=h*0.78+52:alpha='{alfa}'")
+    omur = min(4.7, max(1.0, F / fps - 0.4))
+    bas = 0.3
+    f = _bant_ve_yazi(b, 42, YAZI_IZGARA_X + 22, "h*0.78", bas, omur,
+                      alt_metin=a, alt_fontsize=25)
+    yuk = 42 + int(42 * 0.42) * 2 + (25 + 10 if a else 0)
+    f += (f",drawbox=x={YAZI_IZGARA_X}:y='ih*0.78-{int(42 * 0.42)}':w=6:h={yuk}:"
+          f"color=#F5E14B@0.95:t=fill:"
+          f"enable='between(t\,{bas:.2f}\,{bas + omur + YAZI_GIRIS_SN:.2f})'")
     return f
+
+def _kaynak_yazi_filtre(sahne, fps, F):
+    """Sag altta kucuk, yari saydam kaynak yazisi — "Kanal Adi / CC BY".
+
+    NEDEN VAR (11 Agu 2026, Polat'in onerisi): Creative Commons klip kullanmak ATIF
+    ZORUNLULUGU getirir. Bu yaziyi koymadan CC klip kullanmak lisansi ihlal ediyordu.
+    ONEMLI SINIR: bu yazi TELIF IZNI DEGILDIR. Telifli bir videoya kaynak yazmak onu
+    kullanilabilir yapmaz; Content ID yine talep acar. Bu yuzden youtube_sahne CC
+    disina cikmaz ve bu yazi da yalnizca CC kliplerde ciziliyor.
+    Lisansin resmi atif yeri VIDEO ACIKLAMASI — kaynak.atif_listesi() onu uretiyor."""
+    kanal = str(sahne.get("kaynakYazi") or "").strip()
+    if not kanal:
+        return ""
+    m = _ffmpeg_kacir(kanal[:34])
+    if not m:
+        return ""
+    fnt = _font("Montserrat-Bold.ttf")
+    fs = 21
+    # Okunurluk zemine birakilmaz: ince koyu kontur + hafif golge. Bant KOYMUYORUZ,
+    # cunku bu yazi bilgi degil kunye — goze batmamali ama secilmeli.
+    return (f",drawtext=fontfile='{fnt}':text='{m}':"
+            f"x=w-tw-26:y=h-th-22:fontsize={fs}:fontcolor=white@0.62:"
+            f"borderw=2:bordercolor=black@0.5:shadowx=1:shadowy=1:shadowcolor=black@0.4")
 
 
 def _etiket_filtre(sahne, fps, F):
@@ -299,25 +397,16 @@ def _vurgu_kutu_filtre(sahne, fps, F):
 
 
 def _bolum_filtre(sahne, fps, F):
-    """Bolum basligi — BolumBasligi'nin ffmpeg karsiligi.
-    ust: sol ust 46px cumle duzeni | orta: ortali 68px BUYUK HARF."""
+    """Bolum basligi. ARTIK EKRANIN ORTASINA YAZILMIYOR (11 Agu 2026): ortali baslik
+    yuzun/konunun tam ustune denk geliyordu, hem okunmuyor hem goruntuyu kapatiyordu."""
     b = str(sahne.get("bolum") or "").strip()
     if not b:
         return ""
     yer = str(sahne.get("bolumYeri") or "orta")
-    metin = _ffmpeg_kacir(b.upper() if yer == "orta" else b)
-    gir, omur = 0.28, 4.5
-    son = 0.2 + omur
-    alfa = (f"if(lt(t\\,0.2)\\,0\\,if(lt(t\\,{0.2 + gir:.2f})\\,(t-0.2)/{gir:.2f}\\,"
-            f"if(lt(t\\,{son:.2f})\\,1\\,max(0\\,({son + gir:.2f}-t)/{gir:.2f}))))")
     if yer == "ust":
-        return (f",drawtext={_font()}text='{metin}':fontcolor=white:fontsize=46:"
-                f"borderw=4:bordercolor=black@0.8:shadowcolor=black@0.9:shadowx=0:shadowy=4:"
-                f"x=w*0.032:y=h*0.044:alpha='{alfa}'")
-    return (f",drawtext={_font()}text='{metin}':fontcolor=white:fontsize=68:"
-            f"borderw=3:bordercolor=black@0.62:shadowcolor=black@0.85:shadowx=0:shadowy=6:"
-            f"x=(w-text_w)/2:y=h*0.52:alpha='{alfa}'")
-
+        return _bant_ve_yazi(_ffmpeg_kacir(b[:46]), 44, YAZI_IZGARA_X, "h*0.055", 0.2, 4.5)
+    return _bant_ve_yazi(_ffmpeg_kacir(b.upper()[:42]), 60, YAZI_IZGARA_X,
+                         "h*0.70", 0.2, 5.5)
 
 def _overlay_filtre(sahne, fps, F):
     """Overlay basligini drawtext ile ciz (4 Agu 2026 — bu eksik oldugu icin overlay'li
@@ -361,6 +450,190 @@ def _overlay_filtre(sahne, fps, F):
     return f
 
 
+# ─────────────── CEKIM BOLME (11 Agu 2026 — en buyuk kurgu boslugu) ───────────────
+# Olculen durum: 1 anlatim sahnesi = 1 klip = 1 kesintisiz cekim, ortalama 5.25 sn.
+# Referans olcumu (OLCUM_EDIT_TAKSONOMI, 246 cekim): medyan cekim 6.5 sn AMA dagilim
+# CIFT MODLU — cekimlerin %32'si 4 saniyenin ALTINDA. Yani bir anlatim beat'inin
+# icinde birden fazla cekim var. Vidrush ciktisinda da olctum: 1-3 sn.
+# Bizde bu hic yoktu, video "slayt gosterisi" gibi duruyordu.
+#
+# COZUM EKSTRA INDIRME GEREKTIRMIYOR: ayni klibin FARKLI ZAMAN NOKTASI + FARKLI
+# KADRAJI ikinci cekim olarak kullaniliyor (kurguda "cutting within a shot" denen
+# klasik teknik). Klip 12 saniyeye kirpiliyor, sahne 5-9 sn; yani ikinci cekim icin
+# gercek malzeme var, donmus kare tekrari degil.
+CEKIM_MIN_SN = 2.2          # bundan kisa cekim goz yormaya basliyor
+CEKIM_BOL_ESIK = 5.0        # bu sureden uzun sahne bolunmeye ADAY olur
+# ⚠ HER SAHNE BOLUNMEZ (11 Agu 2026 olcumu). Ilk surumde esigi gecen her sahneyi
+# boluyordum ve sonuc TERS yone kacti: sahne suresi 6.55 sn (referans medyani 6.5,
+# tam isabet) olmasina ragmen ortalama CEKIM 3.9 sn'ye, 4 sn alti cekim orani %59'a
+# cikti — referans %32.
+# Referansin dagilimi CIFT MODLU: cogu cekim uzun, azinligi cok kisa. Matematigi:
+#   bolunen oran f ise -> cekim sayisi N(1+f), 4 sn alti pay 2f/(1+f)
+#   hedef %32  ->  2f/(1+f) = 0.32  ->  f = 0.19
+# Yani sahnelerin sadece ~%19'u bolunmeli. Secim deterministik (ayni sahne her
+# uretimde ayni davranir), rastgele degil.
+CEKIM_BOL_ORAN = int(os.environ.get("CEKIM_BOL_ORAN", "19"))   # yuzde
+CEKIM_UC_BOL_ESIK = 10.0    # 3 parcaya sadece cok uzun sahneler bolunur
+
+
+def _cekim_planla(sure: float, indeks: int) -> list:
+    """Sahne suresini cekimlere bol. Deterministik: ayni sahne her uretimde ayni bolunur.
+    Donen: [(baslangic_sn, sure_sn, kadraj_kodu)] — kadraj 0 = tam kare, 1-2 = punch-in."""
+    if sure < CEKIM_BOL_ESIK:
+        return [(0.0, sure, 0)]
+    # ⚠ KULLANICI KURALI (7 Agu 2026, degismedi): hicbir goruntu 8 SANIYEDEN fazla
+    # ekranda kalmaz. Bu kural %19'luk secici bolmeden ONCE gelir — 8 sn'yi asan
+    # sahne SECIM DISI, her zaman bolunur. (11 Agu olcumu: secici bolmeye gecince
+    # cekimlerin %18'i 8 sn'yi asti; kural ihlal ediliyordu.)
+    ZORUNLU = 8.0
+    if sure <= ZORUNLU and (indeks * 7919 + 13) % 100 >= CEKIM_BOL_ORAN:
+        return [(0.0, sure, 0)]
+    adet = 2 if sure < CEKIM_UC_BOL_ESIK else 3
+    # 8 sn tavani: parca sayisi her parca 8 sn'nin altinda kalacak kadar artirilir
+    while sure / adet > ZORUNLU and adet < 5:
+        adet += 1
+    if sure / adet < CEKIM_MIN_SN:
+        adet = max(1, int(sure // CEKIM_MIN_SN))
+    if adet < 2:
+        return [(0.0, sure, 0)]
+    # Esit bolmuyoruz: referansta cekimler esit degil. 55/45 ve 40/35/25 dagilimi
+    # kullaniyoruz — esit bolme metronom gibi duyuluyor.
+    paylar = {2: (0.55, 0.45), 3: (0.40, 0.35, 0.25),
+              4: (0.30, 0.27, 0.23, 0.20), 5: (0.24, 0.22, 0.20, 0.18, 0.16)}[adet]
+    # Sahne indeksine gore paylari cevir ki her sahne ayni ritimde olmasin
+    if indeks % 2:
+        paylar = tuple(reversed(paylar))
+    cekimler, t = [], 0.0
+    for k, pay in enumerate(paylar):
+        d = sure * pay if k < adet - 1 else max(0.05, sure - t)
+        # Kadraj: ilk cekim tam kare, sonrakiler punch-in (farkli bolge)
+        cekimler.append((round(t, 3), round(d, 3), k))
+        t += d
+    return cekimler
+
+
+def _kadraj_vf(kod: int, indeks: int) -> str:
+    """Cekim kadraji. 0 = tam kare. 1/2 = punch-in: kaynagin bir bolgesine yaklas.
+    Punch-in kaynak 2560 genislikte oldugu icin 1080p ciktida kayip yok."""
+    if kod == 0:
+        return "scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080"
+    olcek = 1.38 if kod == 1 else 1.62
+    # Bolge secimi deterministik ama sahneye gore degisir (hep ayni yere yaklasmasin)
+    yatay = [0.5, 0.34, 0.66, 0.42][(indeks + kod) % 4]
+    dikey = [0.44, 0.5, 0.38, 0.56][(indeks * 3 + kod) % 4]
+    g = int(1920 / olcek) // 2 * 2
+    y = int(1080 / olcek) // 2 * 2
+    return (f"scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,"
+            f"crop={g}:{y}:x='(iw-{g})*{yatay:.2f}':y='(ih-{y})*{dikey:.2f}',"
+            f"scale=1920:1080:flags=lanczos")
+
+
+GECIS_SN_TAHMIN = 0.4       # HIZLI_GECIS_SN varsayilani (dip'i onune yerlestirmek icin)
+KARARTMA_DIP_SN = 0.24      # dip'in her yarisi
+KARARTMA_DIP = 0.13         # olculdu: 0.20 -> dip %32'ye iniyordu, referans %50
+
+
+def _karartma_dip(sahne, sure: float) -> str:
+    """Karartma imzasinin gercek karsiligi: sahnenin BASINDA ve/veya SONUNDA kisa
+    parlaklik dip'i. Siyaha inmez — referansta olculen sey parlakligin YARIYA
+    dusmesi (88 -> 44), tam karartma degil.
+    eq'nun eval=frame kipi ifadelerde "t" kabul ediyor; drawbox'un aksine burada
+    zaman degiskeni CALISIYOR."""
+    parcalar = []
+    if sahne.get("_karart_bas"):
+        parcalar.append(f"if(lt(t\,{KARARTMA_DIP_SN})\,"
+                        f"-{KARARTMA_DIP}*(1-t/{KARARTMA_DIP_SN})\,0)")
+    if sahne.get("_karart_son"):
+        # DIKKAT: dip crossfade penceresinin ONUNDE bitmeli. Ilk surumde dip'i
+        # sahnenin son 0.24 sn'sine koydum; ama crossfade de son 0.4 sn'yi tuketiyor,
+        # yani A zaten devreden cikarken kararmaya basliyordu ve ekranda inis
+        # gorunmuyordu (olcum: 116 -> 37 tek karede). Dip crossfade'den ONCE tamamlanir
+        # ve dipli seviye kuyruk boyunca korunur.
+        bitis = max(0.0, sure - GECIS_SN_TAHMIN)
+        t0 = max(0.0, bitis - KARARTMA_DIP_SN)
+        parcalar.append(f"if(lt(t\,{t0:.3f})\,0\,"
+                        f"if(lt(t\,{bitis:.3f})\,"
+                        f"-{KARARTMA_DIP}*(t-{t0:.3f})/{KARARTMA_DIP_SN}\,"
+                        f"-{KARARTMA_DIP}))")
+    if not parcalar:
+        return ""
+    return f",eq=eval=frame:brightness='{'+'.join(parcalar)}'"
+
+
+def _zoompan_efekt(g: float, sure: float, fps: int) -> str:
+    """Kare kare degerlendirilen yavas zoom. zoompan'in "z" ifadesinde kare sayaci
+    "on" kullanilabiliyor; crop/scale'in boyut ifadelerinde zaman YOK."""
+    kare = max(1, int(round(sure * fps)))
+    return (f",zoompan=z='1+{g:.4f}*on/{kare}':"
+            f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':"
+            f"d=1:s=1920x1080:fps={fps}")
+
+
+def _efekt_ffmpeg(_ef: dict, sure: float, fps: int) -> str:
+    """Efektler.tsx'te olan ama hizli motorda KARSILIGI OLMAYAN efektlerin ffmpeg hali.
+
+    NEDEN (11 Agu 2026): iki render yolu ayrisiyordu. Efektler.tsx'te 35 bilesen,
+    hizli motorda 6 filtre vardi ve RENDER_MOTOR=ffmpeg varsayilan oldugu icin
+    sarsinti / elde-kamera / dolly-zoom / kromatik / yon-blur / glow gibi efektler
+    SESSIZCE KAYBOLUYORDU. Kullanicinin gordugu tek "edit" grain + vinyet + zoom'du.
+    Bu, kalite sistemi degil kura: hangi yol kosarsa o kalite cikiyordu.
+
+    Buradaki karsiliklarin hepsi saf matematik — ffmpeg'de bedava yapilabiliyor.
+    ZAMAN DEGISKENI NOTU: crop/rotate/rgbashift ifadelerinde "t" CALISIR
+    (drawbox'un w/h ifadelerinin aksine, bkz. _bant_ve_yazi).
+    """
+    f = ""
+    # ── SARSINTI: crop penceresini karesel titret. Referansta vurgu anlarinda var.
+    for ad, carpan in (("sarsinti", 1.0), ("agresif-sarsinti", 2.6)):
+        if ad in _ef:
+            g = max(1.0, 6.0 * carpan * float(_ef[ad]))
+            # Iki farkli frekans -> mekanik degil organik titreme
+            dx = f"({g:.1f}*sin(t*37)+{g * 0.6:.1f}*sin(t*61))"
+            dy = f"({g:.1f}*cos(t*43)+{g * 0.6:.1f}*sin(t*71))"
+            pay = int(g * 2 + 4) * 2
+            f += (f",scale=iw+{pay}:ih+{pay}:flags=bicubic,"
+                  f"crop=w=iw-{pay}:h=ih-{pay}:x='{pay // 2}+{dx}':y='{pay // 2}+{dy}'")
+            break
+    # ── ELDE KAMERA: yavas, genis genlikli surukleme (sarsintidan farki: dusuk frekans)
+    if "elde-kamera" in _ef:
+        g = max(2.0, 9.0 * float(_ef["elde-kamera"]))
+        pay = int(g * 2 + 6) * 2
+        dx = f"({g:.1f}*sin(t*1.7)+{g * 0.5:.1f}*sin(t*2.9))"
+        dy = f"({g:.1f}*cos(t*1.3)+{g * 0.5:.1f}*cos(t*2.3))"
+        f += (f",scale=iw+{pay}:ih+{pay}:flags=bicubic,"
+              f"crop=w=iw-{pay}:h=ih-{pay}:x='{pay // 2}+{dx}':y='{pay // 2}+{dy}'")
+    # ── DOLLY ZOOM: sure boyunca kadraji yavasca daralt.
+    # ⚠ crop ILE YAPILAMAZ (11 Agu 2026 olcumu): crop'un w/h ifadeleri config aninda
+    # BIR KEZ degerlendiriliyor ve "t" tanimli degil — ffmpeg
+    # "Error when evaluating the expression 'ih/1.1/(1+0.030*t/4.00)'" verip segmenti
+    # tamamen dusuruyordu (sahne videodan kayboluyor). crop'ta t yalnizca x/y'de var.
+    # zoompan'in "z" ifadesi kare kare degerlendiriliyor, dogru arac o.
+    if "dolly-zoom" in _ef and sure > 0.5:
+        g = min(0.16, 0.09 * float(_ef["dolly-zoom"]))
+        f += _zoompan_efekt(g, sure, fps)
+    # ── YON BLUR: karsilastirma anlarinda yatay kayma hissi
+    if "yon-blur" in _ef:
+        g = max(1, int(6 * float(_ef["yon-blur"])))
+        f += f",gblur=sigma={g}:sigmaV=0"
+    # ── KROMATIK: RGB kanallarini ayir (referansta gerilim anlarinda)
+    if "kromatik" in _ef:
+        k = max(1, int(3 * float(_ef["kromatik"])))
+        f += f",rgbashift=rh=-{k}:bh={k}"
+    # ── GLOW: parlak bolgeleri yumusatarak ust uste bindir
+    if "glow" in _ef:
+        g = float(_ef["glow"])
+        f += f",unsharp=5:5:{-0.6 * g:.2f}:5:5:0,eq=brightness={0.02 * g:.3f}"
+    # ── KESKINLESTIR
+    if "keskinlestir" in _ef:
+        f += f",unsharp=5:5:{0.8 * float(_ef['keskinlestir']):.2f}:5:5:0"
+    # ── YUMUSAK ZOOM (sonuc sahnelerinde): cok hafif nefes
+    if "yumusak-zoom" in _ef and sure > 0.5:
+        g = min(0.05, 0.03 * float(_ef["yumusak-zoom"]))
+        f += _zoompan_efekt(g, sure, fps)
+    # ── SUZULME / DONME-3D: 2B'de karsiligi yok, atlanir (Remotion'a ozel)
+    return f
+
+
 def _segment_uret(sahne, gecis, fps, crf, seg_yol):
     """Tek sahne segmentini uretir. Gorsel sahne: Ken Burns + kendi sesi.
     VIDEO sahne (Sora klibi / footage): klip 1080p'ye olceklenir, gerekirse dongulenir,
@@ -373,15 +646,53 @@ def _segment_uret(sahne, gecis, fps, crf, seg_yol):
     F = max(1, int(round(sure * fps)))
     if sahne.get("tur") == "video":
         # Gercek video: Ken Burns YOK (klibin kendi hareketi var). Kisa klip donguyle uzar.
-        vf = ((f"scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,"
-               f"fps={fps}") + _overlay_filtre(sahne, fps, F)
-              + _bolum_filtre(sahne, fps, F) + _alt_band_filtre(sahne, fps, F)
-              + _etiket_filtre(sahne, fps, F) + _vurgu_kutu_filtre(sahne, fps, F)
-              + ",format=yuv420p")
-        komut = ["ffmpeg", "-y", "-loglevel", "error",
-                 "-stream_loop", "-1", "-i", medya, "-i", ses,
-                 "-filter_complex", f"[0:v]{vf}[v]",
-                 "-map", "[v]", "-map", "1:a",
+        # CEKIM BOLME: sahne CEKIM_BOL_ESIK'ten uzunsa ayni klipten farkli zaman
+        # noktasi + farkli kadrajla 2-3 cekim uretilip birlestirilir. Katmanlar
+        # (bolum/alt band/etiket/kunye) BIRLESTIRME SONRASINA uygulanir, cunku
+        # zamanlamalari sahneye gore — cekim basina uygulansa her cekimde bastan baslar.
+        sindeks = int(sahne.get("_indeks") or 0)
+        cekimler = _cekim_planla(sure, sindeks)
+        girisler, zincirler, etiketler = [], [], []
+        for k, (bas, d, kadraj) in enumerate(cekimler):
+            # -ss/-t GIRIS secenegi: her cekim klibin farkli anindan alinir.
+            girisler += ["-stream_loop", "-1", "-ss", f"{bas:.3f}", "-t", f"{d:.3f}",
+                         "-i", medya]
+            _ef_v = {str(e.get("ad")): float(e.get("siddet") or 1)
+                     for e in (sahne.get("efektler") or []) if isinstance(e, dict)}
+            renk = ""
+            if "grain" in _ef_v:
+                renk += f",noise=alls={int(6 + 6 * _ef_v['grain'])}:allf=t+u"
+            if "vinyet" in _ef_v:
+                renk += ",vignette=angle=PI/5"
+            if "siyah-beyaz" in _ef_v:
+                renk += ",hue=s=0"
+            if "kontrast-grade" in _ef_v:
+                renk += f",eq=contrast={1 + 0.18 * _ef_v['kontrast-grade']:.3f}"
+            if "sicak-grade" in _ef_v:
+                renk += f",colortemperature=temperature={int(6500 - 700 * _ef_v['sicak-grade'])}"
+            if "soguk-grade" in _ef_v:
+                renk += f",colortemperature=temperature={int(6500 + 900 * _ef_v['soguk-grade'])}"
+            renk += _efekt_ffmpeg(_ef_v, d, fps)
+            zincirler.append(f"[{k}:v]{_kadraj_vf(kadraj, sindeks)},fps={fps}"
+                             f"{renk},setsar=1[c{k}]")
+            etiketler.append(f"[c{k}]")
+        ses_giris = len(cekimler)
+        if len(cekimler) > 1:
+            zincirler.append("".join(etiketler) + f"concat=n={len(cekimler)}:v=1:a=0[cat]")
+            kaynak_etiket = "[cat]"
+        else:
+            kaynak_etiket = etiketler[0]
+        katman = (_karartma_dip(sahne, sure) + _overlay_filtre(sahne, fps, F)
+                  + _bolum_filtre(sahne, fps, F) + _alt_band_filtre(sahne, fps, F)
+                  + _etiket_filtre(sahne, fps, F) + _vurgu_kutu_filtre(sahne, fps, F)
+                  + _kaynak_yazi_filtre(sahne, fps, F) + ",format=yuv420p")
+        # katman "," ile basliyor; setpts ile sifirdan baslat ki drawtext zamanlari
+        # birlestirme sonrasi sahne basina gore dogru olsun.
+        zincirler.append(f"{kaynak_etiket}setpts=PTS-STARTPTS{katman}[v]")
+        komut = ["ffmpeg", "-y", "-loglevel", "error"] + girisler + [
+                 "-i", ses,
+                 "-filter_complex", ";".join(zincirler),
+                 "-map", "[v]", "-map", f"{ses_giris}:a",
                  "-af", f"apad=whole_dur={sure:.3f}",
                  "-t", f"{sure:.3f}", "-r", str(fps),
                  "-c:v", "libx264", "-crf", str(crf), "-preset", "veryfast",
@@ -420,6 +731,8 @@ def _segment_uret(sahne, gecis, fps, crf, seg_yol):
         vf += f",colortemperature=temperature={int(6500 - 700 * _ef['sicak-grade'])}"
     if "soguk-grade" in _ef:
         vf += f",colortemperature=temperature={int(6500 + 900 * _ef['soguk-grade'])}"
+    vf += _efekt_ffmpeg(_ef, sure, fps)
+    vf += _karartma_dip(sahne, sure)
     vf += _overlay_filtre(sahne, fps, F)
     # ── EDIT KATMANLARI (11 Agu 2026) ──
     # Bu katmanlar sadece Remotion'da cizilebiliyordu, o yuzden katmanli isler hizli
@@ -429,6 +742,7 @@ def _segment_uret(sahne, gecis, fps, crf, seg_yol):
     vf += _alt_band_filtre(sahne, fps, F)
     vf += _etiket_filtre(sahne, fps, F)
     vf += _vurgu_kutu_filtre(sahne, fps, F)
+    vf += _kaynak_yazi_filtre(sahne, fps, F)
     vf += ",format=yuv420p"
     komut = ["ffmpeg", "-y", "-loglevel", "error",
              "-loop", "1", "-i", gorsel, "-i", ses,
@@ -496,6 +810,16 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
         seg_yollar = {}
         tamam = [0]
         with ThreadPoolExecutor(max_workers=paralel) as havuz:
+            # _indeks: cekim bolmede kadraj/ritim secimi sahneye gore degissin diye
+            # (deterministik — ayni sahne her uretimde ayni bolunur).
+            for i, s in enumerate(sahneler):
+                s["_indeks"] = i
+                # Karartma imzasi GELEN sahnede duruyor; dip iki tarafli olmali ki
+                # gecis simetrik gorunsun (tek tarafli dip yine "carpma" hissi verir).
+                if str(s.get("gecisImza") or "") == "karartma":
+                    s["_karart_bas"] = True
+                    if i > 0:
+                        sahneler[i - 1]["_karart_son"] = True
             isler = {havuz.submit(_segment_uret, s, gecis, fps, crf,
                                   os.path.join(tmp, f"seg_{i:04d}.mp4")): i
                      for i, s in enumerate(sahneler)}

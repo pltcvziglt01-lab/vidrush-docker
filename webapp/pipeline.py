@@ -483,8 +483,11 @@ EDIT_STILLERI = {
     # ortalama 7.5-12.7 sn — yani cok kisa kesmelerle uzun duran planlar karisik.
     # Diger 3 edit stilinden TEMEL farki: bu bir GORUNTU DERLEMESI. Karelerin tamami
     # gercek kamera goruntusu (drone hava cekimi + yer + makro) ve arsiv fotografi;
-    # AI illustrasyon yok. O yuzden footage_pct 92 — motorun en yuksek degeri.
-    # AI gorsel sadece goruntu bulunamayan sahneler icin (tarihi an, soyut kavram).
+    # AI illustrasyon yok. KULLANICI KARARI (11 Agu 2026): "belgesel stilinde gorsel
+    # kullanma, 0 gorsel olsun". Bu yuzden footage_pct 100 ve AI gorsele dusme YOK —
+    # footage bulunamayan sahne, ulkeye capali genel klibe duser (bkz. _sahne_medya).
+    # Sebep: 11 Agu ciktisinda AI gorseller belgesel dokusunu bozuyordu; referans
+    # kanalda (@ImpossibleTravel38) tek kare AI gorsel yok.
     "seyahat-belgeseli": {
         "ad": "Seyahat Belgeseli (4K)",
         "ozet": "ImpossibleTravel — gerçek drone + yer görüntüsü derlemesi, yavaş anlatı, arşiv",
@@ -493,7 +496,8 @@ EDIT_STILLERI = {
         # %29'u 12 sn'den uzun. Talep uzerine uygulandi.
         # 8 sn tavani altinda tutulabilen en yuksek ortalama 5.5 sn (bant dagilimi asagida):
         # bantlar 3.0 / 5.0 / 6.5 / 8.0 sn, agirliklar %32/%26/%14/%29 -> ortalama 5.5 sn.
-        "sahne_sn": 5.5, "maks_sahne_sn": 8, "kelime": 15, "footage_pct": 92, "overlay": "yok",
+        "sahne_sn": 5.5, "maks_sahne_sn": 8, "kelime": 15, "footage_pct": 100, "overlay": "yok",
+        "gorsel_yasak": True,     # AI gorsel URETILMEZ; footage yoksa genel klip kullanilir
         "altyazi": "yok", "motion": "sinematik", "mag": "films_n_photography",
         "tempo": "cift-modlu",   # olculen dagilim: %33 kisa / %26 orta / %29 uzun
         "saha_etiketi": True, "etiket_pct": 25,
@@ -2383,15 +2387,74 @@ def sahne_tipi_atamasi(adet: int) -> str:
 #   OpenAI yasli sesler  speed 0.86-0.98 -> ~130-150
 #   ai33/minimax         ~133 (bu videoda olculdu)
 # Sabit kelime + yavas ses = uzun sahne. Artik butce sesin GERCEK hizindan turetilir.
+SES_HIZI_DOSYA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "veri",
+                              "ses_hizi.json")
+
+
+def _ses_hizi_oku(anahtar: str):
+    """Onceki islerden OLCULEN hiz. Tablodan onceliklidir."""
+    try:
+        with open(SES_HIZI_DOSYA) as f:
+            d = json.load(f)
+        v = d.get(anahtar)
+        if v and 60 < float(v.get("wpm", 0)) < 400:
+            return float(v["wpm"])
+    except Exception:
+        pass
+    return None
+
+
+def ses_hizi_kaydet(anahtar: str, kelime: int, saniye: float):
+    """Isin GERCEK hizini kaydet — sonraki isler bunu kullanir (kendi kendini kalibre).
+
+    NEDEN VAR (11 Agu 2026): tabloda edge-tts 178 wpm yaziyordu; 73 kelimelik metni
+    seslendirip olctum, 212 wpm cikti. Sonuc: plan her videoda hedefin %19 altinda
+    kelime yaziyordu ve VIDEO ISTENENDEN %33 KISA cikiyordu (olcum: durum "56.1 sn"
+    diyor, dosya 39.2 sn). Ayrica sahneler 5.5 sn yerine 2.8 sn oluyordu, bu da cekim
+    bolme esigini (5.0 sn) hic tetiklemiyordu — yani tempo duzeltmesi de calismiyordu.
+    Sabit sayiya guvenmek yerine her isin sonunda gercek hiz yazilir; ses/model
+    degisse bile sistem 1 videoda kendini toplar.
+    """
+    if kelime < 20 or saniye < 5:
+        return                                  # olcum guvenilir degil
+    wpm = kelime / saniye * 60.0
+    if not (60 < wpm < 400):
+        return
+    try:
+        os.makedirs(os.path.dirname(SES_HIZI_DOSYA), exist_ok=True)
+        try:
+            with open(SES_HIZI_DOSYA) as f:
+                d = json.load(f)
+        except Exception:
+            d = {}
+        eski = d.get(anahtar) or {}
+        onceki = float(eski.get("wpm") or 0)
+        # Yumusatma: tek is anormal cikarsa hedefi savurmasin
+        yeni_wpm = wpm if onceki <= 0 else onceki * 0.6 + wpm * 0.4
+        d[anahtar] = {"wpm": round(yeni_wpm, 1), "son_olcum": round(wpm, 1),
+                      "kelime": kelime, "saniye": round(saniye, 1)}
+        with open(SES_HIZI_DOSYA, "w") as f:
+            json.dump(d, f, indent=1)
+        print(f"  ses hizi kalibre: {anahtar} -> {yeni_wpm:.0f} wpm "
+              f"(bu iste {wpm:.0f})", file=sys.stderr)
+    except Exception as e:
+        print(f"  ses hizi kaydedilemedi: {str(e)[:80]}", file=sys.stderr)
+
+
 def ses_wpm(ses_secim: str) -> float:
-    """Secili sesin GERCEK konusma hizi (kelime/dakika). Olculdu, tahmin degil."""
-    v = SESLER.get((ses_secim or "").strip()) or {}
+    """Secili sesin GERCEK konusma hizi (kelime/dakika).
+    Once onceki islerden OLCULEN deger, yoksa tablo."""
+    anahtar = (ses_secim or "otomatik").strip() or "otomatik"
+    olculen = _ses_hizi_oku(anahtar)
+    if olculen:
+        return olculen
+    v = SESLER.get(anahtar) or {}
     motor = v.get("motor", "edge")
     if motor == "openai":
         return 165 * float(v.get("hiz", 0.95))      # 0.86-0.98 -> ~142-162
-    if motor == "ai33" or (ses_secim or "").startswith("ozel:"):
+    if motor == "ai33" or anahtar.startswith("ozel:"):
         return 135                                  # olculdu (minimax, 4 Agu 2026)
-    return 178                                      # edge-tts +%15
+    return 212                                      # OLCULDU 11 Agu 2026 (onceki: 178)
 
 
 def kelime_butcesi(prof, ses_secim: str) -> int:
@@ -2840,8 +2903,61 @@ def _plan_kelime(plan: dict) -> int:
                for sc in (plan.get("scenes") or []))
 
 
+def satirlari_uzat(plan: dict, prof: dict, hedef_kel: int) -> dict:
+    """Sahne SAYISINI degistirmeden her sahnenin anlatimini hedef uzunluga getirir.
+
+    NEDEN VAR (11 Agu 2026 olcumu): sure_tamamla eksik sureyi SAHNE EKLEYEREK
+    kapatiyordu. Sonuc: 60 sn'lik videoda 10 sahne hedeflenirken 13 sahne olustu ve
+    ortalama cekim 3.8 sn'ye dustu (referans medyani 6.5 sn, olculen dagilim %32'si
+    4 sn alti — bizde %64). Yani sureyi tutturmak ugruna TEMPO bozuluyordu.
+    Dogru cozum: sahne sayisi hedefteyse satirlari UZAT, yeni sahne ekleme.
+    """
+    scenes = plan.get("scenes") or []
+    if not scenes:
+        return plan
+    satirlar = [{"i": i, "voiceover": str(sc.get("voiceover") or "")}
+                for i, sc in enumerate(scenes)]
+    sistem = (
+        "You rewrite documentary narration lines to be LONGER without changing meaning, "
+        f"order, or count. Each line must become between {hedef_kel} and {hedef_kel + 2} "
+        f"words (currently shorter). NEVER exceed {hedef_kel + 2} words on any line. "
+        "Add concrete detail that belongs to that exact moment: a number, a texture, a "
+        "consequence, a small observed fact. Do NOT add new scenes, do NOT merge or split "
+        "lines, do NOT summarise, do NOT repeat other lines. Keep the same language and tone. "
+        'Return JSON: {"lines":[{"i":<same index>,"voiceover":"<longer text>"}]} with EXACTLY '
+        f"{len(satirlar)} entries.")
+    try:
+        j = oai_chat({"model": "gpt-4.1-mini",
+                      "messages": [{"role": "system", "content": sistem},
+                                   {"role": "user", "content": json.dumps(satirlar)}],
+                      "response_format": {"type": "json_object"},
+                      "temperature": 0.6,
+                      "max_tokens": int(min(12000, max(2000, len(satirlar) * 160 + 800)))},
+                     timeout=180)
+        icerik = (j.get("choices") or [{}])[0].get("message", {}).get("content") or ""
+        yeni = json.loads(icerik).get("lines") or []
+    except Exception as e:
+        print(f"  satir uzatma basarisiz: {str(e)[:120]}", file=sys.stderr)
+        return plan
+    degisen = 0
+    for y in yeni:
+        try:
+            i = int(y.get("i"))
+            metin = str(y.get("voiceover") or "").strip()
+        except Exception:
+            continue
+        if not (0 <= i < len(scenes)) or not metin:
+            continue
+        # SADECE UZATMA: model kisaltirsa eskisi korunur (video daha da kisalmasin)
+        if len(metin.split()) > len(str(scenes[i].get("voiceover") or "").split()):
+            scenes[i]["voiceover"] = metin
+            degisen += 1
+    print(f"  satir uzatma: {degisen}/{len(scenes)} satir uzatildi", file=sys.stderr)
+    return plan
+
+
 def sure_tamamla(plan: dict, story: str, prof: dict, sure_dk: float,
-                 bildir=None) -> dict:
+                 bildir=None, hedef_sahne: int = 0) -> dict:
     """Plan hedef SUREYI tutuyor mu? Tutmuyorsa sahne EKLEYEREK tamamlar.
 
     NEDEN GEREKLI (7 Agu 2026, canli iste olculdu): 1 dakika istenen bir belgesel
@@ -2861,7 +2977,21 @@ def sure_tamamla(plan: dict, story: str, prof: dict, sure_dk: float,
         if mevcut >= butce * 0.92:
             break
         eksik = butce - mevcut
+        # SAHNE SAYISI TAVANI: hedefe ulasildiysa yeni sahne EKLEMEYIZ, satirlari uzatiriz.
+        # (11 Agu 2026: sahne ekleme temposu 3.8 sn'ye dusuruyordu, referans 6.5.)
+        if hedef_sahne and len(plan.get("scenes") or []) >= hedef_sahne:
+            # %8 pay birakiliyor: model hedefi ASIYOR (11 Agu olcumu: 17 kelime
+            # istendi, 20.6 yazdi -> video 60 sn yerine 72 sn, yani %121).
+            ihtiyac = int(round(butce * 0.92 / max(1, len(plan.get("scenes") or []))))
+            print(f"  sahne sayisi hedefte ({len(plan.get('scenes') or [])}/{hedef_sahne}); "
+                  f"sahne EKLENMIYOR, satirlar ~{ihtiyac} kelimeye uzatiliyor", file=sys.stderr)
+            if bildir:
+                bildir("Anlatım uzatılıyor (tempo korunuyor)...", None)
+            plan = satirlari_uzat(plan, prof, ihtiyac)
+            continue
         ek_sahne = int(min(60, max(1, round(eksik / kel_sahne))))
+        if hedef_sahne:
+            ek_sahne = min(ek_sahne, max(1, hedef_sahne - len(plan.get("scenes") or [])))
         tahmini = mevcut / wpm * 60
         mesaj = (f"Plan {tahmini:.0f} sn'lik ({mevcut} kelime / butce {butce:.0f}); "
                  f"{ek_sahne} sahne daha isteniyor")
@@ -2894,7 +3024,7 @@ def uzun_plan(story: str, prof: dict, sure_dk: float, bildir=None) -> dict:
     hedef_sahne = int(min(MAKS_SAHNE, max(1, (sure_dk * 60) / prof["sahne_sn"])))
     if hedef_sahne <= 55:
         return sure_tamamla(plan_uret(story, prof, hedef_sahne=hedef_sahne),
-                            story, prof, sure_dk, bildir)
+                            story, prof, sure_dk, bildir, hedef_sahne=hedef_sahne)
     # ── PARALEL PLANLAMA ──
     # Eskiden parcalar SIRALI yaziliyordu (her biri oncekinin ozetini bekler; 30 dk video
     # ~8-10 dk plan). Simdi: 1 ucuz cagriyla hikaye ISKELETI (bolum ozetleri) cikar, sonra
@@ -2936,7 +3066,8 @@ def uzun_plan(story: str, prof: dict, sure_dk: float, bildir=None) -> dict:
     if len(scenes) < hedef_sahne * 0.85:
         toplam_plan["_eksik_oran"] = round(len(scenes) / hedef_sahne, 2)
     # Uzun (paralel) yolda da SURE denetimi: parcalar kisa yazdiysa eksik kapatilir
-    return sure_tamamla(toplam_plan, story, prof, sure_dk, bildir)
+    return sure_tamamla(toplam_plan, story, prof, sure_dk, bildir,
+                        hedef_sahne=hedef_sahne)
 
 
 def on_ciz_16x9(yol: str) -> bool:
@@ -3443,6 +3574,19 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         except Exception:
             pass
 
+    # ⚠ KELIME BUTCESI PLANDAN ONCE (11 Agu 2026'da olcerek bulundu).
+    # Onceden butce plan URETILDIKTEN SONRA duzeltiliyordu; yani plan her zaman
+    # profilin varsayilan kelime sayisi ve wpm=150 ile yazilıyordu. Olcum:
+    #   log "Plan 41 sn'lik (102 kelime / butce 150)" -> butce 150 = wpm 150
+    #   gercek ses hizi 212 wpm -> istenen 60 sn yerine 39 sn video
+    # Butce plandan once hesaplaninca plan dogru uzunlukta yaziyor.
+    prof = dict(prof)
+    _eski_kel_on = prof.get("kelime")
+    prof["kelime"] = kelime_butcesi(prof, ses_secim)      # prof["_wpm"] de burada set olur
+    if prof["kelime"] != _eski_kel_on:
+        print(f"  kelime butcesi (plan oncesi): {_eski_kel_on} -> {prof['kelime']} "
+              f"(wpm={prof.get('_wpm'):.0f}, hedef {prof.get('sahne_sn')} sn)", file=sys.stderr)
+
     bildir("Hikaye sahnelere bölünüyor...", 5)
     plan = uzun_plan(story, prof, sure_dk)
     scenes = plan["scenes"]
@@ -3552,6 +3696,17 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             print(f"  SORA acik: {len(sora_adaylari)} acilis sahnesi videolastirilacak",
                   file=sys.stderr)
 
+    # Klip tekrarini onlemek icin gecmis her iste sifirlanir (kaynak.py modul duzeyinde
+    # tutuyor; sifirlanmazsa onceki videonun klipleri bu videoda da "kullanildi" sayilir).
+    kaynak.klip_gecmisi_sifirla()
+    # VIDEONUN yerini metinden bir kez tespit et: plan bazi sahnelerin footage
+    # sorgusuna ulkeyi yazmayi unutuyor ve o sahnelerde yer kapisi kapaniyor.
+    # 11 Agu olcumu: Tokyo metnine tropik ada ve Filipinler ic mekani bu bosluktan girdi.
+    try:
+        kaynak.yer_baglami_kur(story)
+    except Exception as e:
+        print(f"  yer baglami kurulamadi: {str(e)[:80]}", file=sys.stderr)
+
     def _sahne_medya(n, s):
         """Tek sahnenin medyasini (footage / AI gorsel / Sora video) uretir. Thread'de kosar."""
         nonlocal bakiye_bitti, uretim_durdu
@@ -3561,7 +3716,30 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         if footage_acik and str(s.get("kaynak")) == "footage" and str(s.get("footage_sorgu", "")).strip():
             vyol_full = os.path.join(PUBLIC, "isler", is_adi, f"sahne_{n}.mp4")
             if kaynak.footage_getir(s["footage_sorgu"].strip(), vyol_full, yt_once=yt_once):
+                # CC klip geldiyse ekrana kucuk kaynak yazisi — lisans ATIF ISTIYOR.
+                atif = kaynak.atif_al(vyol_full)
+                if atif.get("kanal"):
+                    s["kaynakYazi"] = atif["kanal"]
                 return ("video", f"isler/{is_adi}/sahne_{n}.mp4")
+            # 1b) GORSEL YASAK STILLERDE (belgesel) AI gorsele DUSMUYORUZ.
+            # Kullanici karari 11 Agu 2026: "belgesel stilinde gorsel kullanma, 0 gorsel".
+            # Onun yerine ulkeye capali genel klip denenir; o da olmazsa klip tekrarina
+            # izin verilir (ayni ulkenin tekrar eden klibi, AI gorselden iyidir).
+            if prof.get("gorsel_yasak"):
+                for yedek_sorgu in kaynak.genel_yedek_sorgular(s["footage_sorgu"].strip()):
+                    if kaynak.footage_getir(yedek_sorgu, vyol_full, yt_once=yt_once):
+                        atif = kaynak.atif_al(vyol_full)
+                        if atif.get("kanal"):
+                            s["kaynakYazi"] = atif["kanal"]
+                        print(f"  sahne {n}: genel yedek klip '{yedek_sorgu}'", file=sys.stderr)
+                        return ("video", f"isler/{is_adi}/sahne_{n}.mp4")
+                # Son care: tekrar yasagini gecici olarak kaldir
+                if kaynak.footage_getir(s["footage_sorgu"].strip(), vyol_full,
+                                        yt_once=yt_once, tekrara_izin=True):
+                    print(f"  sahne {n}: klip TEKRARI (gorsel yasak)", file=sys.stderr)
+                    return ("video", f"isler/{is_adi}/sahne_{n}.mp4")
+                print(f"  sahne {n}: footage YOK ve gorsel yasak -> AI gorsele mecbur",
+                      file=sys.stderr)
         # 2) AI gorsel (footage yoksa/basarisizsa)
         sp = str(s.get("scene_prompt", "")).strip() or str(s.get("footage_sorgu", "")).strip()
         # BEYAZ TUVAL sahnesi: gorsel, beyaz zemine YALITILMIS konu olarak uretilmeli.
@@ -3689,6 +3867,21 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             print(f"sahne {n} sesi uretilemedi, atlandi", file=sys.stderr)
             continue
         tts_sonuc[n] = (syol, kelimeler, sure)
+
+    # GERCEK konusma hizini kaydet — sonraki isler bunu kullanir
+    try:
+        # Kelime sayisi SAHNE METNINDEN sayilir. Ilk surumde uret_seslendir'in donen
+        # "kelimeler" degerinden sayiyordum; o deger bos/farkli bicimde geldi ve
+        # ses_hizi_kaydet sessizce "olcum guvenilir degil" diyerek cikti (kalibrasyon
+        # dosyasi hic yazilmadi). Metin her zaman elimizde.
+        _kel = sum(len(str(metin).split())
+                   for _i, _n, _s, metin, _ov in islenecek if _n in tts_sonuc)
+        _sn = sum(float(v[2] or 0) for v in tts_sonuc.values())
+        print(f"  hiz olcumu: {_kel} kelime / {_sn:.1f} sn = "
+              f"{(_kel / _sn * 60) if _sn else 0:.0f} wpm", file=sys.stderr)
+        ses_hizi_kaydet(ses_secim or "otomatik", _kel, _sn)
+    except Exception as e:
+        print(f"  hiz kalibrasyonu atlandi: {str(e)[:80]}", file=sys.stderr)
 
     # Ard arda ayni kamera hareketi olmasin diye bir onceki sahnenin kurgusu tutulur
     _son_kurgu = {}
@@ -3856,17 +4049,56 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # rakiplerden 1.8 dB kisik caliyordu. Tek gecisli loudnorm ile hedefe cekilir.
     # GORUNTU YENIDEN KODLANMAZ (-c:v copy) -> ek sure ~saniyeler, kalite kaybi yok.
     # Basarisiz olursa ham dosya oldugu gibi kopyalanir; video ASLA kaybolmaz.
+    # ZINCIR (preset paketindeki ses presetlerinin ffmpeg karsiligi):
+    #   highpass 80 Hz  = "Anti Mic Rumble" (TTS'te de dusuk frekans cop var)
+    #   deesser         = "DeEsser" (s/ş sesleri tizde bicak gibi ciktigi icin)
+    #   loudnorm -14    = YouTube hedefi
+    #   alimiter        = "Hard Limiter" (tepe noktalari kirpilmadan tutulur)
+    # acompressor: NORMALIZASYONDAN ONCE tepe-ortalama farkini daraltir.
+    # NEDEN (11 Agu 2026 olcumu): iki gecisli loudnorm kurdum ama cikti yine -15.6
+    # LUFS geldi. Sebep kaynak: ham ses -21.97 LUFS ve tepeleri yuksek; -14'e cikmak
+    # icin +8 dB gerekiyor, bu da TP'yi -1.5'in ustune atacagi icin loudnorm
+    # kendini kisiyor (linear mod dinamige duser ve hedefi tutturamaz).
+    # Hafif kompresyon (3:1, -18 dB esik) tepeleri toparlar, +8 dB sigar.
+    ON_ZINCIR = ("highpass=f=80,deesser=i=0.35:m=0.5:f=0.18,"
+                 "acompressor=threshold=-18dB:ratio=3:attack=8:release=140:makeup=2")
+
+    # ── IKI GECISLI LOUDNORM (11 Agu 2026) ──
+    # Tek gecisli loudnorm AKIS halinde calisiyor: dosyanin tamamini gormeden
+    # kademeli duzeltiyor ve hedefi tutturamiyor. Olcum: hedef -14 istenirken
+    # cikti -15.9 LUFS, yani 4 Agu'daki -15.8'den neredeyse hic iyilesme yok —
+    # "duzeltildi" sandigim sey calismiyordu.
+    # Dogru yontem: 1. gecis SADECE OLCER (print_format=json), 2. gecis olculen
+    # degerleri parametre olarak alir ve tek adimda tam hedefe getirir.
+    olculen = {}
+    try:
+        r_olc = subprocess.run(
+            ["ffmpeg", "-hide_banner", "-nostdin", "-i", ham, "-af",
+             f"{ON_ZINCIR},loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json",
+             "-f", "null", "-"], capture_output=True, text=True, timeout=1800)
+        blok = r_olc.stderr[r_olc.stderr.rfind("{"):r_olc.stderr.rfind("}") + 1]
+        olculen = json.loads(blok)
+        print(f"  ses olcumu: {olculen.get('input_i')} LUFS -> hedef -14", file=sys.stderr)
+    except Exception as e:
+        print(f"  ses olcumu basarisiz, tek gecise dusuluyor: {str(e)[:100]}", file=sys.stderr)
+
+    if olculen.get("input_i"):
+        ln = ("loudnorm=I=-14:TP=-1.5:LRA=11:linear=true"
+              f":measured_I={olculen['input_i']}"
+              f":measured_TP={olculen['input_tp']}"
+              f":measured_LRA={olculen['input_lra']}"
+              f":measured_thresh={olculen['input_thresh']}"
+              f":offset={olculen.get('target_offset', '0.0')}")
+    else:
+        ln = "loudnorm=I=-14:TP=-1.5:LRA=11"
+
     ses_ok = False
     try:
         r_ses = subprocess.run(
             ["ffmpeg", "-y", "-loglevel", "error", "-i", ham,
-             # ZINCIR (preset paketindeki ses presetlerinin ffmpeg karsiligi):
-             #   highpass 80 Hz  = "Anti Mic Rumble" (TTS'te de dusuk frekans cop var)
-             #   deesser         = "DeEsser" (s/ş sesleri tizde bicak gibi ciktigi icin)
-             #   loudnorm -14    = YouTube hedefi
-             #   alimiter        = "Hard Limiter" (tepe noktalari kirpilmadan tutulur)
-             "-af", ("highpass=f=80,deesser=i=0.35:m=0.5:f=0.18,"
-                     "loudnorm=I=-14:TP=-1.5:LRA=11,alimiter=limit=0.95:level=disabled"),
+             # alimiter loudnorm'dan SONRA gelir ama artik "level=disabled" ile
+             # seviyeyi degistirmiyor, sadece tepe kirpmayi onluyor.
+             "-af", f"{ON_ZINCIR},{ln},alimiter=limit=0.95:level=disabled",
              "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", son_video],
             capture_output=True, text=True, timeout=1800)
         ses_ok = (r_ses.returncode == 0 and os.path.exists(son_video)
@@ -3888,7 +4120,10 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
              "kapak": f"{is_adi}_kapak.png" if son_kapak else None,
              "sure": round(sum(s["sure"] for s in props_sahneler), 1),
              "sahne_sayisi": len(props_sahneler),
-             "edit": prof["ad"]}
+             "edit": prof["ad"],
+             # CC kliplerin atif metni. Lisans atfi ACIKLAMADA istiyor; ekrandaki kucuk
+             # kunye yazisi ek. Bu liste bos ise videoda CC klip kullanilmamis demektir.
+             "atiflar": kaynak.atif_listesi()}
     uyarilar = []
     if plan.get("_eksik_oran"):
         uyarilar.append(f"İçerik planı beklenenden kısa çıktı (~%{int(plan['_eksik_oran']*100)}).")
