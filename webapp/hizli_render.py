@@ -26,7 +26,8 @@ import subprocess
 import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-STUDYO = "/opt/vidrush/render-studio"
+KOK_YOL = os.environ.get("VIDRUSH_KOK", "/opt/vidrush")
+STUDYO = os.path.join(KOK_YOL, "render-studio")
 PUBLIC = os.path.join(STUDYO, "public")
 FONT_DIZIN = os.path.join(PUBLIC, "fonts")
 

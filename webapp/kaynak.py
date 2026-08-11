@@ -22,7 +22,9 @@ import requests
 # isi oldurur ve imaja islenmis durumu riske atar. Dosyadan okumak ise deploy'un
 # docker commit'i sayesinde kalici olur ve yeniden baslatmaya dayanir.
 #   Ekleme:  docker exec bedosaho sh -c 'echo ANAHTAR > /opt/vidrush/webapp/veri/coverr_key.txt'
-ANAHTAR_DIZIN = os.environ.get("ANAHTAR_DIZIN", "/opt/vidrush/webapp/veri")
+KOK_YOL = os.environ.get("VIDRUSH_KOK", "/opt/vidrush")
+ANAHTAR_DIZIN = os.environ.get("ANAHTAR_DIZIN",
+                               os.path.join(KOK_YOL, "webapp", "veri"))
 
 
 def _anahtar_oku(env_ad: str, dosya_ad: str) -> str:
@@ -50,8 +52,8 @@ FREEPIK_KEYS = [k.strip() for k in os.environ.get("FREEPIK_KEYS", "").split(",")
 if not FREEPIK_KEYS and MAGNIFIC_KEY:
     FREEPIK_KEYS = [MAGNIFIC_KEY]
 FP_GUNLUK_TAVAN = int(os.environ.get("FREEPIK_GUNLUK_TAVAN", "100"))
-FP_KOTA_DOSYA = os.environ.get("FREEPIK_KOTA_DOSYA",
-                               "/opt/vidrush/webapp/veri/freepik_kota.json")
+FP_KOTA_DOSYA = os.environ.get(
+    "FREEPIK_KOTA_DOSYA", os.path.join(ANAHTAR_DIZIN, "freepik_kota.json"))
 _fp_kilit = threading.Lock()      # gorseller 4-8 paralel uretiliyor, sayac yarissiz olmali
 
 
@@ -127,7 +129,8 @@ _MAG_5XX = 0          # ust uste 5xx sayaci: servis coktuyse (or. 502) her sahne
 
 # YouTube veri-merkezi IP'lerinden "Sign in to confirm you're not a bot" verir.
 # Cozum: tarayicidan disa aktarilan Netscape cookies dosyasi (varsa) kullanilir.
-YT_COOKIES = os.environ.get("YT_COOKIES_FILE", "/opt/vidrush/webapp/veri/yt_cookies.txt")
+YT_COOKIES = os.environ.get("YT_COOKIES_FILE",
+                            os.path.join(ANAHTAR_DIZIN, "yt_cookies.txt"))
 
 
 def _yt_cookie_opts(opts: dict) -> dict:

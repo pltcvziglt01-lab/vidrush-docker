@@ -17,14 +17,22 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 
-sys.path.insert(0, "/opt/vidrush")
+# ⚠ KOK YOLU (Faz H, 12 Agu 2026) — URETIM DAVRANISI DEGISMEDI.
+# Varsayilan `/opt/vidrush`: konteynerdeki yerlesim aynen korunur. `VIDRUSH_KOK`
+# env'i YALNIZCA yerel gelistirme/test icin baska bir koku isaret ettirir.
+# NEDEN GEREKLI: bu modul IMPORT ANINDA `os.makedirs("/opt/vidrush/...")`
+# cagiriyordu; yerelde `PermissionError` veriyor ve `pipeline` hic import
+# edilemiyordu. Bu yuzden gercek FastAPI ucu yerelde HIC test edilememisti.
+KOK_YOL = os.environ.get("VIDRUSH_KOK", "/opt/vidrush")
+
+sys.path.insert(0, KOK_YOL)
 import uret as uretmod  # seslendir, altyazi_parcala (DIKKAT: bu dosyada 'uret' adli fonksiyon var,
                         # modulu takma adla al ki golgelenmesin)
 
 import kaynak  # YT/Pexels footage + Magnific upscale
 
 OPENAI_KEY = os.environ.get("OPENAI_KEY", "")
-STUDYO = "/opt/vidrush/render-studio"
+STUDYO = os.path.join(KOK_YOL, "render-studio")
 PUBLIC = os.path.join(STUDYO, "public")
 # ═══════════ EFEKT ATAMASI (7 Agu 2026) ═══════════
 # Efektler.tsx kutuphanesi vardi ama motor KULLANMIYORDU. Atama LLM'e sorulmuyor:
@@ -96,7 +104,7 @@ def gecis_imza_sec(edit_id: str, indeks: int) -> str:
     return imza if (indeks * 4177 % 1000) / 1000.0 < oran else ""
 
 
-SFX_DIR = os.environ.get("SFX_DIR", "/opt/vidrush/sfx")
+SFX_DIR = os.environ.get("SFX_DIR", os.path.join(KOK_YOL, "sfx"))
 
 # Anlatim islevi -> hangi ses efekti. Bos = o islevde ses yok (cogu sahne sessiz kalir).
 SFX_ISLEV = {
@@ -159,7 +167,7 @@ def sfx_bindir(video: str, sahneler: list, is_dizini: str) -> str:
     return cikti
 
 
-CIKTI_DIR = "/opt/vidrush/webapp/ciktilar"
+CIKTI_DIR = os.environ.get("CIKTI_DIR", os.path.join(KOK_YOL, "webapp", "ciktilar"))
 os.makedirs(CIKTI_DIR, exist_ok=True)
 
 # ═══════════════ KANAL PROFILI (videolar ARASI tutarlilik) ═══════════════
@@ -167,7 +175,7 @@ os.makedirs(CIKTI_DIR, exist_ok=True)
 # -> her video kendi capasini sifirdan uretiyor -> 50 videoluk kanalda stil kayiyor.
 # Cozum: profil = KALICI karakter + capa + kilit metinleri. Her videoda ayni referanslar
 # enjekte edilir -> tum kanal ayni gorunur. Bu dizin ASLA is temizliginde silinmez.
-PROFIL_DIR = "/opt/vidrush/webapp/veri/profiller"
+PROFIL_DIR = os.environ.get("PROFIL_DIR", os.path.join(KOK_YOL, "webapp", "veri", "profiller"))
 os.makedirs(PROFIL_DIR, exist_ok=True)
 _PROFIL_RE = __import__("re").compile(r"^[A-Za-z0-9_-]{1,48}$")
 
@@ -3976,7 +3984,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     motor = os.environ.get("RENDER_MOTOR", "")
     if not motor:
         try:
-            with open("/opt/vidrush/RENDER_MOTOR") as f:
+            with open(os.path.join(KOK_YOL, "RENDER_MOTOR")) as f:
                 motor = f.read().strip()
         except Exception:
             motor = ""

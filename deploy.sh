@@ -47,8 +47,16 @@ KOKPY="$(cygpath -m "$KOK" 2>/dev/null || echo "$KOK")"
 # compile() KULLAN, ast.parse DEGIL. ast.parse "duplicate argument 'ses'" gibi hatalari
 # YAKALAMAZ (bunlar ayristirmada degil bytecode uretiminde bulunur) — 1 Agu 2026'da tam
 # boyle bir hata syntax kontrolunden gecti ve siteyi dusurdu.
+# ⚠ 12 Agu 2026 (Faz H): glob ALT PAKETLERI de kapsamali. `webapp/arastirma`,
+# `webapp/medya`, `webapp/editor` paketleri pipeline'a baglandi; bunlardaki bir
+# sozdizimi hatasi eskiden taramadan GECIYORDU ve ancak canlida ImportError
+# olarak patlardi (server hic acilmaz, TUM uclar 500).
 PYTHONUTF8=1 "$PYBIN" -c "import glob,sys
-yollar = sorted(glob.glob('$KOKPY/webapp/*.py'))+['$KOKPY/app/uret.py']
+yollar = (sorted(glob.glob('$KOKPY/webapp/*.py'))
+          + sorted(glob.glob('$KOKPY/webapp/*/*.py'))
+          + sorted(glob.glob('$KOKPY/webapp/*/*/*.py'))
+          + ['$KOKPY/app/uret.py'])
+yollar = [y for y in yollar if '/testler/' not in y.replace('\\\\', '/')]
 hata = 0
 for f in yollar:
     try:
@@ -63,7 +71,10 @@ sys.exit(hata) if hata else print('  ✓ derleme OK (%d dosya)' % len(yollar))" 
 # GECER ve ancak istek geldiginde 500 verir. 1 Agu 2026'da tam boyle oldu: /api/generate
 # 'NameError: name ses is not defined' ile patladi ve kullanicinin videosu baslamadi.
 if "$PYBIN" -m pyflakes --version >/dev/null 2>&1; then
-  TANIMSIZ=$(PYTHONUTF8=1 "$PYBIN" -m pyflakes "$KOKPY"/webapp/*.py "$KOKPY/app/uret.py" 2>&1 \
+  TANIMSIZ=$(PYTHONUTF8=1 "$PYBIN" -m pyflakes "$KOKPY"/webapp/*.py \
+               "$KOKPY"/webapp/arastirma/*.py "$KOKPY"/webapp/medya/*.py \
+               "$KOKPY"/webapp/medya/providers/*.py "$KOKPY"/webapp/editor/*.py \
+               "$KOKPY/app/uret.py" 2>&1 \
              | grep "undefined name" || true)
   if [ -n "$TANIMSIZ" ]; then
     echo "  ✗ TANIMSIZ ISIM — deploy iptal:"; echo "$TANIMSIZ"; exit 3
@@ -77,6 +88,18 @@ echo "== 3/5 Dosyalari konteynere kopyala =="
 # webapp (pipeline/server/kaynak/static)
 $SSH "mkdir -p /tmp/dep/webapp/static/js /tmp/dep/rs/src/editorv2 /tmp/dep/rs/fonts"
 scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/webapp/*.py root@$IP:/tmp/dep/webapp/ >/dev/null
+# ⚠ 12 Agu 2026 (Faz H): `webapp/*.py` globu ALT PAKETLERI KAPSAMAZ.
+# `arastirma/`, `medya/` (+ `medya/providers/`) ve `editor/` paketleri
+# pipeline.py tarafindan import ediliyor; kopyalanmazlarsa konteynerde
+# ModuleNotFoundError olur, server.py HIC ACILMAZ ve site tamamen duser.
+# `testler/` bilerek DISARIDA: canliya test betigi gitmez.
+$SSH "mkdir -p /tmp/dep/webapp/arastirma /tmp/dep/webapp/medya/providers /tmp/dep/webapp/editor"
+for _p in arastirma medya editor; do
+  scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/webapp/$_p/*.py \
+      root@$IP:/tmp/dep/webapp/$_p/ >/dev/null
+done
+scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/webapp/medya/providers/*.py \
+    root@$IP:/tmp/dep/webapp/medya/providers/ >/dev/null
 scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/webapp/static/index.html root@$IP:/tmp/dep/webapp/static/ >/dev/null
 # ⚠ 12 Agu 2026: arayuz tek dosyadan CIKARILDI. `index.html` artik `ui/app.css`
 # ve `ui/app.js`'i cagiriyor; bunlar kopyalanmazsa CANLI SITE STILSIZ VE
@@ -104,7 +127,9 @@ fi
 if ls "$KOK"/app/render-studio/public/fonts/*.ttf >/dev/null 2>&1; then
   scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/app/render-studio/public/fonts/*.ttf root@$IP:/tmp/dep/rs/fonts/ >/dev/null
 fi
-$SSH "docker cp /tmp/dep/webapp/. bedosaho:/opt/vidrush/webapp/ && \
+$SSH "docker exec bedosaho mkdir -p /opt/vidrush/webapp/arastirma \
+        /opt/vidrush/webapp/medya/providers /opt/vidrush/webapp/editor && \
+      docker cp /tmp/dep/webapp/. bedosaho:/opt/vidrush/webapp/ && \
       docker cp /tmp/dep/uret.py bedosaho:/opt/vidrush/uret.py && \
       docker exec bedosaho mkdir -p /opt/vidrush/render-studio/src/editorv2 && \
       docker cp /tmp/dep/rs/src/. bedosaho:/opt/vidrush/render-studio/src/ && \

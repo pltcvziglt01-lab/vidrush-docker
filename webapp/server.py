@@ -350,7 +350,7 @@ def _ai33_key():
     k = os.environ.get("AI33_KEY", "").strip()
     if not k:
         try:
-            with open("/opt/vidrush/AI33_KEY") as f:
+            with open(os.path.join(pipeline.KOK_YOL, "AI33_KEY")) as f:
                 k = f.read().strip()
         except Exception:
             k = ""

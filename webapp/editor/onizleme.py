@@ -28,7 +28,8 @@ def _font_yolu() -> str:
         os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(
             os.path.abspath(__file__)))), "app", "render-studio", "public",
             "fonts", "Montserrat-Bold.ttf"),
-        "/opt/vidrush/render-studio/public/fonts/Montserrat-Bold.ttf",
+        os.path.join(os.environ.get("VIDRUSH_KOK", "/opt/vidrush"),
+                     "render-studio", "public", "fonts", "Montserrat-Bold.ttf"),
         "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
     ]

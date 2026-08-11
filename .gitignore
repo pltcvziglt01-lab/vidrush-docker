@@ -15,3 +15,8 @@ webapp/veri/onbellek/
 
 # Yerel arac/test artiklari — depoya girmez (Faz F QA maddesi 5)
 .claude/
+
+# Python bytecode / test onbellegi — depoya girmez (Faz H)
+__pycache__/
+*.py[cod]
+.pytest_cache/
