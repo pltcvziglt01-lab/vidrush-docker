@@ -251,6 +251,69 @@ def font_ver(dosya: str):
                         headers={"Cache-Control": "public, max-age=604800"})
 
 
+"""Arayuz varliklari — DAR ISTISNA (Faz F, kullanicinin acik izniyle).
+
+⚠ NEDEN GEREKLI: sunucuda genel bir statik mount YOK; eski arayuz bu yuzden
+tek 1698 satirlik `index.html` icinde inline stil/script tasiyordu. Arayuz
+ayri dosyalara bolununce (`app.css`, `app.js`, `js/*.js`) bunlarin
+sunulmasi gerekti.
+
+⚠ NEDEN ALLOWLIST: `StaticFiles` ile tum `static/` dizinini acmak, is
+ciktilarini ve yuklenen gorselleri de acardi. Burada YALNIZCA arayuz
+dosyalari sunulur:
+    app.css · app.js · js/<ad>.js
+Bunun disindaki her sey 404. Ayrica `realpath` ile cozulen yol STATIC
+onekiyle dogrulanir; `../` ile disari cikma denemesi reddedilir.
+
+API, /api/generate ve pipeline davranisi DEGISMEDI.
+"""
+UI_TAM_IZIN = frozenset({"app.css", "app.js"})
+UI_DIZIN_IZIN = frozenset({"js"})
+UI_MIME = {".css": "text/css; charset=utf-8",
+           ".js": "text/javascript; charset=utf-8"}
+
+
+@app.get("/ui/{dosya:path}")
+def ui_varlik(dosya: str):
+    parcalar = [p for p in str(dosya).split("/") if p not in ("", ".")]
+    # Traversal ve gizli dosya denemeleri: daha yol kurulmadan reddedilir
+    if not parcalar or any(p == ".." or p.startswith(".") for p in parcalar):
+        raise HTTPException(404, "yok")
+
+    if len(parcalar) == 1:
+        if parcalar[0] not in UI_TAM_IZIN:
+            raise HTTPException(404, "yok")
+    elif len(parcalar) == 2:
+        if parcalar[0] not in UI_DIZIN_IZIN or not parcalar[1].endswith(".js"):
+            raise HTTPException(404, "yok")
+    else:
+        raise HTTPException(404, "yok")
+
+    uzanti = os.path.splitext(parcalar[-1])[1].lower()
+    if uzanti not in UI_MIME:
+        raise HTTPException(404, "yok")
+
+    # ⚠ Ikinci savunma katmani: sembolik bag ya da beklenmeyen bir birlestirme
+    # STATIC disina cikarsa dosya SUNULMAZ.
+    kok = os.path.realpath(STATIC)
+    yol = os.path.realpath(os.path.join(STATIC, *parcalar))
+    if not (yol == kok or yol.startswith(kok + os.sep)):
+        raise HTTPException(404, "yok")
+    if not os.path.isfile(yol):
+        raise HTTPException(404, "yok")
+
+    # ⚠ ONBELLEK DERSI (Faz F tarayici testi): ilk surumde
+    # `max-age=3600` vardi. Dosya adlarinda surum/hash YOK oldugu icin
+    # deploy sonrasi tarayici 1 saat boyunca ESKI app.js/gorunumler.js'i
+    # sunuyordu — testte tam bunu yasadim, ekranda duzeltilmis metinler
+    # yerine eskisi cikti. Eski tek-dosya arayuzde bu sorun yoktu (index.html
+    # her istekte tazeydi).
+    # `no-cache` = her kullanimda dogrula; FileResponse ETag/Last-Modified
+    # verdigi icin degismemis dosya 304 doner (bant genisligi maliyeti yok).
+    return FileResponse(yol, media_type=UI_MIME[uzanti],
+                        headers={"Cache-Control": "no-cache"})
+
+
 @app.get("/api/paletler")
 def paletler():
     """Kanal renk paletleri — gorsel promptuna KESIN HEX olarak girer (kelimeyle tarif degil)."""

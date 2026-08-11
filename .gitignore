@@ -12,3 +12,6 @@ app/render-studio/public/gerileme_testi/
 
 # Faz E arastirma/medya onbellegi — yerel, depoya girmez
 webapp/veri/onbellek/
+
+# Yerel arac/test artiklari — depoya girmez (Faz F QA maddesi 5)
+.claude/
