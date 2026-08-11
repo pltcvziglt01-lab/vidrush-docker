@@ -69,6 +69,10 @@ export const GENERATE_ALANLARI = [
   {ad: 'karakter', tur: 'dosya', zorunlu: false},
   {ad: 'stil', tur: 'dosya', zorunlu: false},
   {ad: 'sahne_ref', tur: 'dosya-listesi', zorunlu: false, kosul: 'animasyon'},
+  // 12 Agu 2026 — main'den gelen 22. alan: UNLU MODU. Hikaye gercek bir
+  // unlu hakkindaysa acilir; sahne promptlarina gercek isim YAZILIR ve
+  // gorsel Grok/Gemini yoluna duser (OpenAI isimli talebi 400 ile reddeder).
+  {ad: 'unlu', tur: 'metin', zorunlu: false, kosul: 'hikaye'},
 ];
 
 /** Video turleri — tek uretim akisinin PARAMETRESI, ayri menu DEGIL. */

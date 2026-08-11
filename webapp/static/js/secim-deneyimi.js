@@ -253,10 +253,13 @@ export function stilBolumu({liste, deger, tumunuAc, arama, hataMetni}) {
  * kimlik istemcide de AYNI regexle dogrulaniyor ve gecmeyen ses secilebilir
  * KART OLARAK SUNULMUYOR.
  */
+// ⚠ 12 Agu 2026: `vbee` ve `clone` main'den geldi (2071 sesli tam katalog).
+// Liste ve kalip `server.py:_OZEL_SES_RE` ile BIREBIR ayni olmali; aksi halde
+// kullanicinin sectigi ses sunucuda reddedilir ve sessizce varsayilana duser.
 export const KUTUPHANE_SAGLAYICILARI = ['elevenlabs', 'minimax', 'fishaudio',
-                                        'kokoro'];
+                                        'kokoro', 'vbee', 'clone'];
 const OZEL_SES_KALIBI =
-  /^ozel:(elevenlabs|minimax|fishaudio|kokoro)_[A-Za-z0-9_-]{1,64}$/;
+  /^ozel:(elevenlabs|minimax|fishaudio|kokoro|vbee|clone|edge)_[A-Za-z0-9_.-]{1,80}$/;
 
 /** voice_id -> generate degeri. Gecersizse '' doner (kart uretilmez). */
 export function ozelSesKimligi(saglayici, voiceId) {
@@ -677,6 +680,15 @@ export function proPanel({acik, t, kaynak}) {
         <span class="anahtar-gorsel" aria-hidden="true"></span>
         <span class="anahtar-yazi">Hareketli açılış planı
           <small>Açılış için video modeli kullanılır; süre ve maliyet artar.</small>
+        </span></label>
+      <label class="anahtar" for="wzUnlu">
+        <input type="checkbox" id="wzUnlu" ${t.unlu ? 'checked' : ''}>
+        <span class="anahtar-gorsel" aria-hidden="true"></span>
+        <span class="anahtar-yazi">Ünlü hikâyesi
+          <small>Hikâye gerçek bir ünlü hakkındaysa aç — sahneler o kişinin
+            gerçek görünümüyle üretilir. Grok/Gemini anahtarı gerekir;
+            yoksa üretim tarif-bazlı normal moda düşer ve bunu iş
+            ekranında bildirir.</small>
         </span></label>`
     : '<p class="pro-not">Açılış ve hareketli plan seçenekleri yalnızca ' +
       'Hikâye türünde geçerlidir.</p>'}`;
@@ -1122,6 +1134,8 @@ export function adim3Kur(baglam) {
   });
   const sora = $('#wzSora', kap);
   if (sora) sora.addEventListener('change', () => taslakYaz({sora: sora.checked}));
+  const unlu = $('#wzUnlu', kap);
+  if (unlu) unlu.addEventListener('change', () => taslakYaz({unlu: unlu.checked}));
 
   const altyaziTopla = () => {
     const g = (id) => document.getElementById(id);

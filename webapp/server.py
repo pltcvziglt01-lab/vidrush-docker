@@ -121,7 +121,7 @@ def _kucult(data: bytes, hedef: str, boyut=1024):
     im.save(hedef, "PNG")
 
 
-_OZEL_SES_RE = re.compile(r"^ozel:(elevenlabs|minimax|fishaudio|kokoro)_[A-Za-z0-9_-]{1,64}$")
+_OZEL_SES_RE = re.compile(r"^ozel:(elevenlabs|minimax|fishaudio|kokoro|vbee|clone|edge)_[A-Za-z0-9_.-]{1,80}$")
 
 
 def _ses_secimi(ses: str) -> str:
@@ -186,6 +186,8 @@ def saglik():
         "pixabay": bool(kaynak.PIXABAY_KEY),
         "coverr": bool(kaynak.COVERR_KEY),
         "gemini": bool(os.environ.get("GEMINI_KEY")),
+        # main (12 Agu): Grok/xAI unlu modu gorsel+video motoru
+        "grok": bool(pipeline.XAI_KEY),
         "freepik_anahtar_sayisi": len(kaynak.FREEPIK_KEYS),
     }
 
@@ -397,21 +399,77 @@ def _ai33_key():
 def ses_kutuphane(saglayici: str = "elevenlabs"):
     """Ai33 ses KUTUPHANESI — saglayicinin TUM katalogu (isim, tarif, onizleme).
     Kullanici istedigi sesi secer; secim 'ozel:<voice_id>' olarak generate'e gider."""
-    if saglayici not in ("elevenlabs", "minimax", "fishaudio", "kokoro"):
+    if saglayici not in ("elevenlabs", "minimax", "fishaudio", "kokoro", "vbee", "clone"):
         raise HTTPException(400, "gecersiz saglayici")
     zaman, liste = _SES_KUTUPHANE_ONBELLEK.get(saglayici, (0, None))
-    if liste is not None and time.time() - zaman < 600:
+    if liste is not None and time.time() - zaman < 1800:
         return liste
+    import json
+    # ── DISK ONBELLEGI ONCE ──
+    # Sunucu IP'si Ai33'te kisitli (canli cekim 1-2 kayit donduruyor); tam katalog
+    # (2071 ses) yerel makineden cekilip buraya kondu. 7 gunden tazeyse diski kullan.
+    disk_yol = os.path.join(VERI, "ses-kutuphane", f"{saglayici}.json")
+    ham = None
+    try:
+        if os.path.exists(disk_yol) and time.time() - os.path.getmtime(disk_yol) < 7 * 86400:
+            with open(disk_yol, encoding="utf-8") as f:
+                ham = json.load(f)
+    except Exception:
+        ham = None
+    if ham:
+        veri = ham
+    else:
+        veri = _ai33_canli_katalog(saglayici, disk_yol)
+    return _katalog_donustur(saglayici, veri)
+
+
+def _ai33_canli_katalog(saglayici, disk_yol):
+    """Canli cekim (disk yoksa/bayatsa). Basarili genis cekim diske de yazilir."""
+    import json
     key = _ai33_key()
     if not key:
         raise HTTPException(503, "AI33 anahtari kurulu degil")
     import requests
+    # SAYFALAMA SART: varsayilan 30 kayit donuyor — elevenlabs'te 605, minimax'ta 481,
+    # vbee'de 462 ses var. 100'luk sayfalarla tumu cekilir (guvenlik tavani 10 sayfa).
+    veri = []
+    gorulen = set()   # Ai33 sayfalamasi kararsiz: sayfalar arasi MUKERRER kayit gelebiliyor
     try:
-        r = requests.get(f"https://api.ai33.pro/v3/voices?provider={saglayici}",
-                         headers={"xi-api-key": key}, timeout=30)
-        veri = r.json().get("data", [])
+        for sayfa in range(1, 11):
+            parca = []
+            for dene in range(3):   # Ai33 art arda isteklerde IP'yi kisip 1-2 kayit dondurebiliyor
+                r = requests.get(f"https://api.ai33.pro/v3/voices?provider={saglayici}"
+                                 f"&limit=100&page={sayfa}",
+                                 headers={"xi-api-key": key}, timeout=30)
+                parca = r.json().get("data", [])
+                if len(parca) >= 30 or (sayfa > 1 and parca is not None):
+                    break            # saglikli sayfa (son sayfa kucuk olabilir, o normal)
+                time.sleep(2 + dene * 2)
+            yeni = 0
+            for v in parca:
+                vid = v.get("voice_id")
+                if vid and vid not in gorulen:
+                    gorulen.add(vid)
+                    veri.append(v)
+                    yeni += 1
+            if len(parca) < 100 or yeni == 0:   # kisa sayfa VEYA tamamen tekrar -> bitti
+                break
+            time.sleep(0.7)          # sayfalar arasi nefes: hiz sinirini tetikleme
     except Exception:
-        raise HTTPException(502, "Ses kütüphanesi alınamadı")
+        if not veri:
+            raise HTTPException(502, "Ses kütüphanesi alınamadı")
+    # Genis cekim basarili olduysa diske yaz (7 gunluk taze onbellek)
+    if len(veri) >= 30:
+        try:
+            os.makedirs(os.path.dirname(disk_yol), exist_ok=True)
+            with open(disk_yol, "w", encoding="utf-8") as f:
+                json.dump(veri, f, ensure_ascii=False)
+        except Exception:
+            pass
+    return veri
+
+
+def _katalog_donustur(saglayici, veri):
     # Saglayicilar dil degerini karisik gonderiyor: kimi ISO kod ("en"), kimi tam ad
     # ("English", "Cantonese"). KIRPMADAN ISO koda normallestir (eski [:5] kirpmasi
     # "engli"/"canto" gibi bozuk degerler uretiyordu).
@@ -614,6 +672,7 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
                       palet_ozel: str = Form(""),
                       acilis: str = Form(""),
                       sora: str = Form(""),
+                      unlu: str = Form(""),
                       arkaplan: str = Form(""),
                       ses: str = Form(""),
                       isik: str = Form(""),
@@ -709,7 +768,8 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
                     arkaplan.strip() if arkaplan.strip() in pipeline.ARKA_PLANLAR else "",
                     _ses_secimi(ses),
                     isik.strip() if isik.strip() in pipeline.ISIK_DUZEYLERI else "",
-                    acilis_dk, sref, _bayrak(sora), gorsel_model.strip()))
+                    acilis_dk, sref, _bayrak(sora), gorsel_model.strip(),
+                    _bayrak(unlu)))
     # ⚠ FAZ H: cevap ARTIK tek tip sozlesmeden geciyor. Eskiden yalnizca
     # `job_id` donuyordu; wizard.js `cevap.job/is_id/id` okudugu icin is
     # kimligi HER ZAMAN bos kaliyordu. Simdi job_id + id + is_id birlikte var.
@@ -800,7 +860,7 @@ def cikti(dosya: str):
 def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom_acik,
             profil_id="", altyazi="", altyazi_sablon="", palet="", palet_ozel="",
             arkaplan="", ses_secim="", isik="", acilis_dk=None, sahne_ref=None,
-            sora_acik=False, gorsel_model_secim=""):
+            sora_acik=False, gorsel_model_secim="", unlu_modu=False):
     d = isler.get(is_id)
     if not d:
         return
@@ -821,7 +881,8 @@ def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom
                                           ses_secim=ses_secim, isik=isik,
                                           acilis_dk=acilis_dk, sahne_ref=sahne_ref,
                                           sora_acik=sora_acik,
-                                          gorsel_model_secim=gorsel_model_secim))
+                                          gorsel_model_secim=gorsel_model_secim,
+                                          unlu_modu=unlu_modu))
         d.update({"durum": "bitti", "ilerleme": 100, "mesaj": "Hazir!",
                   "video": "ciktilar/" + sonuc["video"],
                   "kapak": ("ciktilar/" + sonuc["kapak"]) if sonuc.get("kapak") else None,

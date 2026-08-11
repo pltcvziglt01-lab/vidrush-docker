@@ -349,7 +349,8 @@ imza = imza[:imza.find("):") + 2]
 sunucu_alanlari = set(re.findall(r"(\w+):\s*(?:str|List\[UploadFile\]|UploadFile)",
                                  imza))
 on_alanlar = set(re.findall(r"\{ad: '(\w+)'", JS["api.js"]))
-kontrol("21 alan", len(on_alanlar) == 21, str(len(on_alanlar)))
+# 12 Agu 2026: `unlu` eklendi -> 22
+kontrol("22 alan", len(on_alanlar) == 22, str(len(on_alanlar)))
 kontrol("alanlar server.py ile AYNI", on_alanlar == sunucu_alanlari,
         f"fark: {sorted(on_alanlar ^ sunucu_alanlari)}")
 # Wizard'in urettigi anahtarlar sozlesme icinde mi

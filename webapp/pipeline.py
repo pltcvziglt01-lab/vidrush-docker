@@ -292,7 +292,59 @@ BAKIYE_MESAJI = ("OpenAI bakiyesi/harcama limiti doldu. platform.openai.com → 
 # OpenAI kilitliyken (billing limit) tum hat Gemini uzerinden calisabilsin diye.
 # SAGLAYICI=gemini -> planlama + gorsel Gemini'den; openai -> eski davranis.
 GEMINI_KEY = os.environ.get("GEMINI_KEY", "")
-SAGLAYICI = os.environ.get("AI_SAGLAYICI", "gemini" if GEMINI_KEY else "openai").lower()
+if not GEMINI_KEY:   # konteyner yeniden yaratmadan kurulum: docker exec ile dosyaya yaz
+    try:
+        with open(os.path.join(KOK_YOL, "GEMINI_KEY")) as _f:
+            GEMINI_KEY = _f.read().strip()
+    except Exception:
+        pass
+# DIKKAT: eskiden "anahtar varsa varsayilan gemini" idi — GEMINI_KEY kurulunca TUM hat
+# sessizce Gemini'ye donerdi. Artik global saglayici ACIKCA secilir (AI_SAGLAYICI=gemini);
+# anahtarin varligi sadece UNLU MODU gibi is-bazli kullanimlari acar.
+SAGLAYICI = os.environ.get("AI_SAGLAYICI", "openai").lower()
+
+# ── GROK (xAI) — UNLU MODU icin: unlu benzerligine EN toleransli gorsel API ──
+# console.x.ai'den anahtar; OpenAI-uyumlu uc (api.x.ai/v1). NOT: grok gorsel API'si
+# REFERANS GORSEL almaz (text-to-image) -> unlu modunda tutarliligi ismin kendisi saglar.
+XAI_KEY = os.environ.get("XAI_KEY", "")
+if not XAI_KEY:   # konteyner yeniden yaratmadan kurulum
+    try:
+        with open(os.path.join(KOK_YOL, "XAI_KEY")) as _f:
+            XAI_KEY = _f.read().strip()
+    except Exception:
+        pass
+
+
+def grok_gorsel(prompt: str, hedef: str, deneme: int = 4) -> bool:
+    """xAI Grok ile text-to-image (unlu modu). Basari: True; hata: False (cagiran atlar)."""
+    if not XAI_KEY:
+        return False
+    for d in range(deneme):
+        try:
+            r = requests.post("https://api.x.ai/v1/images/generations",
+                              headers={"Authorization": f"Bearer {XAI_KEY}"},
+                              json={"model": os.environ.get("GROK_GORSEL_MODEL", "grok-imagine-image"),
+                                    "prompt": prompt[:1024], "response_format": "b64_json"},
+                              timeout=180)
+            if r.status_code == 429:
+                time.sleep(_retry_after_bekle(r, d)); continue
+            if r.status_code >= 400:
+                print(f"  grok gorsel hata {r.status_code}: {r.text[:200]}", file=sys.stderr)
+                if r.status_code in (401, 402, 403):
+                    # Kredi/anahtar bitti: TUM uretimi durdur (OpenAI bakiye kurtarmasi devreye
+                    # girer, eldeki sahnelerle video tamamlanir — bosa deneme = bosa bekleme yok)
+                    raise BakiyeHatasi("Grok (xAI) kredisi/yetkisi doldu — console.x.ai'den "
+                                       "bakiye yukleyin.")
+                time.sleep(5); continue
+            import base64
+            b64 = r.json()["data"][0]["b64_json"]
+            with open(hedef, "wb") as f:
+                f.write(base64.b64decode(b64))
+            return True
+        except Exception as e:
+            print(f"  grok istisna: {str(e)[:160]}", file=sys.stderr)
+            time.sleep(5)
+    return False
 GEM_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 GEM_METIN_MODEL = os.environ.get("GEMINI_TEXT_MODEL", "gemini-2.5-flash")
 # ORTA kalite + en iyi fiyat: gemini-2.5-flash-image ("Nano Banana") $0.039/gorsel.
@@ -558,7 +610,13 @@ HKANAL_STIL = (
     "cinematic photorealistic film still, shot on 35mm anamorphic cinema lenses, shallow depth "
     "of field, dramatic motivated lighting, moody filmic color grade, subtle film grain, high "
     "dynamic range, realistic skin and fabric texture, professional movie production value, "
-    "absolutely no text, no captions, no watermark, no logo, no illustration, no 3D render"
+    "absolutely no text, no captions, no watermark, no logo. "
+    # SERT GERCEKCILIK KILIDI: mini/animasyon egilimli ciktilarda tema karismasi goruldu —
+    # tek bir sahnenin bile cizim/anime gorunmesi tum kanali amatorlestirir.
+    "STRICTLY LIVE-ACTION REALISM: this frame must look like real footage captured by a real "
+    "cinema camera. NEVER cartoon, NEVER anime, NEVER illustration, NEVER painting, NEVER "
+    "comic, NEVER 3D render or CGI look, NEVER stylized or flat art of any kind — if in doubt, "
+    "make it MORE photographic, not less"
 )
 # Karakter yuklenmezse: gorunusu SABITLEMEZ (hikayeye gore model secer), ayni kalmasini SART kosar.
 HKANAL_VARSAYILAN_KARAKTER = (
@@ -2475,7 +2533,8 @@ def kelime_butcesi(prof, ses_secim: str) -> int:
     return max(6, min(24, kel))
 
 
-def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
+# ⚠ `unlu` main'den geldi (unlu modu): gercek kisi ismi promptta YAZILIR.
+def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet="", unlu=False):
     footage = prof["footage_pct"]
     mag_var = bool(prof.get("mag"))
     overlay_kural = (
@@ -2670,6 +2729,18 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
         sahne_kural = prof["sahne_sozlesme"]
         if prof.get("tip_atamasi", True):
             sahne_kural = sahne_tipi_atamasi(hedef) + sahne_kural
+    # UNLU MODU EZMESI: hikaye sozlesmesi "the main character" ifadesini SART kosuyor,
+    # unlu kurali ise gercek isim istiyor — model sozlesmeye uyup ismi YAZMIYORDU.
+    # Sonuc (4 Agu Marley testi): her sahnede FARKLI rastgele insan. Ezme kurali en sona
+    # eklenir ki sozlesmeyi acikca gecersiz kilsin.
+    if unlu:
+        sahne_kural += (
+            "\nCELEBRITY OVERRIDE (this beats every rule above): do NOT use the phrase 'the "
+            "main character' anywhere. In EVERY scene_prompt and in thumbnail.prompt write the "
+            "real person's actual NAME as the subject (e.g. 'Bob Marley'). The name itself "
+            "guarantees identity consistency across scenes; never invent appearance details "
+            "that contradict the real person, and keep every frame strictly photorealistic "
+            "live-action — never cartoon, illustration or 3D-render style.")
     else:
         sahne_kural = (
             "IMPORTANT: give scene_prompt for EVERY scene = a vivid 16:9 ENGLISH description of the "
@@ -2710,14 +2781,19 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
         f"{grafik_kural}"
         f"{bolum_kural}"
         f"{etiket_kural}"
-        # Gorsel API'leri gercek kisi tasvirini ISIMLE isteyince 400 basiyor (policy).
-        # Isimsiz ama iyi tarif edilirse uretiyor -> planlayici ismi degil gorunusu yazsin.
-        "REAL PEOPLE: NEVER write a real person's name inside scene_prompt or thumbnail.prompt "
-        "(image APIs reject named-likeness requests). Instead describe an era-appropriate figure by "
-        "APPEARANCE only: build, outfit, hairstyle, pose, decade styling — without naming or claiming "
-        "identity (e.g. 'a slim pop star in a red leather jacket, 1980s stage lighting'). Real names "
-        "ARE allowed in footage_sorgu (stock search).\n"
-        "Respond ONLY valid JSON: {\"language\":\"en\",\"voice\":\"...\",\"ozet\":\"...\","
+        # UNLU MODU: kullanici acikca sectiyse (Gemini yolu benzerlik destekliyor) gercek isim
+        # YAZILIR — her sahne ayni taninabilir kisiyi gosterir. Normal modda isim YASAK:
+        # gorsel API'leri isimli talebi reddediyor (400) -> tarif yazilir.
+        + ("REAL PEOPLE: this video is ABOUT a real public figure and the image engine supports "
+           "likeness — you SHOULD write the person's real name in scene_prompt and thumbnail.prompt "
+           "so every scene depicts the SAME recognizable person accurately in their era.\n"
+           if unlu else
+           "REAL PEOPLE: NEVER write a real person's name inside scene_prompt or thumbnail.prompt "
+           "(image APIs reject named-likeness requests). Instead describe an era-appropriate figure by "
+           "APPEARANCE only: build, outfit, hairstyle, pose, decade styling — without naming or claiming "
+           "identity (e.g. 'a slim pop star in a red leather jacket, 1980s stage lighting'). Real names "
+           "ARE allowed in footage_sorgu (stock search).\n")
+        + "Respond ONLY valid JSON: {\"language\":\"en\",\"voice\":\"...\",\"ozet\":\"...\","
         "\"thumbnail\":{\"text\":\"...\",\"prompt\":\"...\"},"
         "\"scenes\":[{\"n\":1,\"voiceover\":\"...\",\"kaynak\":\"ai|footage\","
         "\"scene_prompt\":\"...\",\"footage_sorgu\":\"...\",\"overlay\":\"...\",\"hd\":false"
@@ -2730,12 +2806,12 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet=""):
 
 
 def plan_uret(story: str, prof: dict, hedef_sahne=40, devam=False, onceki_ozet="",
-              bolum_yonergesi="") -> dict:
+              bolum_yonergesi="", unlu=False) -> dict:
     # max_tokens sahne sayisina gore OLCEKLI. Sabit 16000, dusuk-kademe OpenAI hesabinda
     # TPM (dakikadaki token) limitini asip HER cagriyi 429'a sokuyordu — retry bile kurtarmaz.
     # ~250 token/sahne yeterli; tavan 12000, taban 2000.
     mt = int(min(12000, max(2000, hedef_sahne * 250 + 1200)))
-    sistem = plan_sistem(prof, hedef_sahne, devam, onceki_ozet)
+    sistem = plan_sistem(prof, hedef_sahne, devam, onceki_ozet, unlu=unlu)
     if bolum_yonergesi:   # paralel planlamada her parcaya "SEN SU BOLUMU anlat" yonergesi
         sistem += f"\nPART DIRECTIVE: {bolum_yonergesi}\n"
     body = {
@@ -2821,7 +2897,7 @@ def _iskelet_cikar(story: str, n_parca: int) -> list:
     return parts
 
 
-def _uzun_plan_sirali(story: str, prof: dict, hedef_sahne: int, parca=40) -> dict:
+def _uzun_plan_sirali(story: str, prof: dict, hedef_sahne: int, parca=40, unlu=False) -> dict:
     """ESKI guvenilir yol: parca parca SIRALI planla (her parca oncekinin ozetini bekler).
     Paralel yolun iskeleti cikarilamazsa buraya dusulur."""
     toplam_plan = None
@@ -2831,7 +2907,7 @@ def _uzun_plan_sirali(story: str, prof: dict, hedef_sahne: int, parca=40) -> dic
         kalan = hedef_sahne - len(scenes)
         bu = min(parca, kalan)
         try:
-            p = plan_uret(story, prof, hedef_sahne=bu, devam=bool(scenes), onceki_ozet=ozet)
+            p = plan_uret(story, prof, hedef_sahne=bu, devam=bool(scenes), onceki_ozet=ozet, unlu=unlu)
         except Exception as e:
             # Bir parca yine de basarisizsa (retry'lar tukendi): elde sahne varsa onlarla
             # devam et, yoksa hatayi firlat. Boylece tek parca 30dk isi oldurmez.
@@ -3029,10 +3105,13 @@ def sure_tamamla(plan: dict, story: str, prof: dict, sure_dk: float,
     return plan
 
 
-def uzun_plan(story: str, prof: dict, sure_dk: float, bildir=None) -> dict:
+# ⚠ `unlu` main'den geldi; plan_uret -> plan_sistem'e kadar tasinir.
+def uzun_plan(story: str, prof: dict, sure_dk: float, bildir=None,
+              unlu: bool = False) -> dict:
     hedef_sahne = int(min(MAKS_SAHNE, max(1, (sure_dk * 60) / prof["sahne_sn"])))
     if hedef_sahne <= 55:
-        return sure_tamamla(plan_uret(story, prof, hedef_sahne=hedef_sahne),
+        return sure_tamamla(plan_uret(story, prof, hedef_sahne=hedef_sahne,
+                                      unlu=unlu),
                             story, prof, sure_dk, bildir, hedef_sahne=hedef_sahne)
     # ── PARALEL PLANLAMA ──
     # Eskiden parcalar SIRALI yaziliyordu (her biri oncekinin ozetini bekler; 30 dk video
@@ -3044,7 +3123,7 @@ def uzun_plan(story: str, prof: dict, sure_dk: float, bildir=None) -> dict:
         bolumler = _iskelet_cikar(story, n_parca)
     except Exception as e:
         print(f"  iskelet cikarilamadi ({str(e)[:120]}) -> sirali plana donuluyor", file=sys.stderr)
-        return _uzun_plan_sirali(story, prof, hedef_sahne, parca)
+        return _uzun_plan_sirali(story, prof, hedef_sahne, parca, unlu=unlu)
     gorevler = []
     for i in range(n_parca):
         bu = min(parca, hedef_sahne - parca * i)
@@ -3055,7 +3134,7 @@ def uzun_plan(story: str, prof: dict, sure_dk: float, bildir=None) -> dict:
         gorevler.append((i, bu, yon))
     sonuc = [None] * n_parca
     with ThreadPoolExecutor(max_workers=min(4, n_parca)) as havuz:
-        isler_f = {havuz.submit(plan_uret, story, prof, bu, i > 0, "", yon): i
+        isler_f = {havuz.submit(plan_uret, story, prof, bu, i > 0, "", yon, unlu): i
                    for i, bu, yon in gorevler}
         for f in as_completed(isler_f):
             i = isler_f[f]
@@ -3111,7 +3190,7 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
                       stil_prompt: str = "", kar_kilit: str = "", stil_yol: str = "",
                       capa_yol: str = "", stil_kilit: str = "", yazi_yasak: bool = True,
                       model: str = "", cerceve: str = "", deneme=5,
-                      kanon_modu: bool = False) -> bool:
+                      kanon_modu: bool = False, saglayici: str = "") -> bool:
     """OpenAI images/edits: karakter + stil + GORSEL CAPA referanslariyla sahne uretir.
     capa_yol: ilk uretilen sahnenin gorseli -> sonraki sahnelere ek referans olarak verilir,
     boylece karakter VE stil ilk kareye kilitlenir (her sahnede birebir ayni). kar_kilit:
@@ -3199,8 +3278,16 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
                    "and never cover the image with words. Single full-bleed illustration: do NOT split "
                    "the image into panels, grids, frames, borders or comic strips.")
 
-    # GEMINI yolu: ayni referanslarla (karakter + capa + stil) coklu-referans gorsel uretimi
-    if SAGLAYICI == "gemini" and GEMINI_KEY:
+    # GROK yolu (unlu modu): referans desteklemez, prompt tek basina gider — unlu ismin
+    # kendisi tutarlilik cipasidir. Basarisizsa asagidaki yollara DUSMEZ (stil karismasin).
+    if saglayici == "grok" and XAI_KEY:
+        # Grok'un varsayilan estetigi stilize/oyun-sanati kaciyor; uzun promptta gercekcilik
+        # kilidi eriyebiliyor -> EN SONA sert ve kisa bir kilit daha (son talimat agir basar).
+        return grok_gorsel(prompt + " ULTRA-REALISTIC PHOTOGRAPH: this must look like a real "
+                           "photo taken by a real camera — absolutely NOT illustration, NOT "
+                           "3D render, NOT game art, NOT stylized.", hedef)
+    # GEMINI yolu: global saglayici gemini ise VEYA bu is icin acikca istendiyse (unlu modu)
+    if (saglayici or SAGLAYICI) == "gemini" and GEMINI_KEY:
         refler = [y for y in (kar_yol if kar_var else None,
                               capa_yol if capa_var else None,
                               stil_yol if (stil_gor and not capa_var) else None) if y]
@@ -3304,6 +3391,66 @@ def capa_uret(ref_yol: str, hedef: str, kimlik: str, stil: str, stil_yol: str = 
                              kanon_modu=True)
 
 
+def grok_klip(gorsel_yol: str, scene_prompt: str, hedef_mp4: str) -> bool:
+    """GROK (xAI) image-to-video: Sora'nin YARI fiyatina ($0.05/sn) + unlu yuzune toleransli.
+    Dogrulanmis akis (4 Agu testi): data-URI gorsel -> request_id -> poll -> video.url indir.
+    402/403 -> BakiyeHatasi (uretim temiz durur); diger hatalar -> False (Sora'ya dusulur)."""
+    if not XAI_KEY:
+        return False
+    try:
+        saniye = int(os.environ.get("GROK_VIDEO_SN", "8"))
+        import base64
+        with open(gorsel_yol, "rb") as f:
+            b64 = base64.b64encode(f.read()).decode()
+        prompt = ((scene_prompt or "").strip()[:900] +
+                  " Cinematic live-action: natural motion of the elements and characters, "
+                  "subtle camera drift, photorealistic film look, no on-screen text.")
+        r = requests.post("https://api.x.ai/v1/videos/generations",
+                          headers={"Authorization": f"Bearer {XAI_KEY}"},
+                          json={"model": os.environ.get("GROK_VIDEO_MODEL", "grok-imagine-video"),
+                                "prompt": prompt,
+                                "image": {"url": f"data:image/png;base64,{b64}"},
+                                "duration": saniye}, timeout=120)
+        if r.status_code in (401, 402, 403):
+            raise BakiyeHatasi("Grok (xAI) kredisi/yetkisi doldu — console.x.ai'den bakiye yukleyin.")
+        if r.status_code >= 400:
+            print(f"  grok video hata {r.status_code}: {r.text[:200]}", file=sys.stderr)
+            return False
+        rid = r.json().get("request_id")
+        if not rid:
+            return False
+        bas = time.time()
+        url = ""
+        while time.time() - bas < 420:
+            time.sleep(8)
+            try:
+                d = requests.get(f"https://api.x.ai/v1/videos/{rid}",
+                                 headers={"Authorization": f"Bearer {XAI_KEY}"}, timeout=30).json()
+            except Exception:
+                continue
+            st = d.get("status", "")
+            if st == "done":
+                url = (d.get("video") or {}).get("url", "")
+                break
+            if st in ("failed", "error", "rejected"):
+                print(f"  grok video basarisiz: {json.dumps(d)[:200]}", file=sys.stderr)
+                return False
+        if not url:
+            print("  grok video zaman asimi", file=sys.stderr)
+            return False
+        c = requests.get(url, timeout=300)
+        if c.status_code >= 400 or len(c.content) < 50000:
+            return False
+        with open(hedef_mp4, "wb") as f:
+            f.write(c.content)
+        return True
+    except BakiyeHatasi:
+        raise
+    except Exception as e:
+        print(f"  grok video istisna: {str(e)[:160]}", file=sys.stderr)
+        return False
+
+
 def sora_klip(gorsel_yol: str, scene_prompt: str, hedef_mp4: str) -> bool:
     """GERCEK VIDEOLASTIRMA: uretilmis sahne gorselini OpenAI Sora'ya referans verip
     gercek video klibe cevirir (yagmur yagar, karakter kipirdar, kamera suzulur).
@@ -3373,7 +3520,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                altyazi_ac: str = "", palet: str = "", palet_ozel: str = "",
                arkaplan: str = "", ses_secim: str = "", isik: str = "",
                acilis_dk=None, sahne_ref: list = None, sora_acik: bool = False,
-               gorsel_model_secim: str = "") -> dict:
+               gorsel_model_secim: str = "", unlu_modu: bool = False) -> dict:
     """Tam hat. mod: 'animasyon'|'documentary'. stil_yol: referans stil gorseli (opsiyonel).
     sure_dk: hedef sure (hikaye maks 60, digerleri maks 14). gecis_acik/zoom_acik: kullanicinin tercihi.
     profil_id: KANAL PROFILI — verilirse karakter/capa/kilitler profilden gelir ve tum
@@ -3471,10 +3618,16 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     footage_acik = prof.get("footage_pct", 0) > 0
     # Maliyet/kalite: animasyon (duz vektor) ucuz mini, documentary (foto-gercekci) gpt-image-2
     gorsel_model = GORSEL_MODEL_ANIM if mod == "animasyon" else GORSEL_MODEL_DOC
-    # Kullanici Studyo'dan kalite sectiyse o kazanir (Standart=mini / Yuksek=gpt-image-2)
-    if gorsel_model_secim in ("gpt-image-1-mini", "gpt-image-2", "gpt-image-1"):
+    # Kullanici Studyo'dan kalite sectiyse o kazanir (Standart=mini / Yuksek=gpt-image-2).
+    # ISTISNA — HIKAYE: mini model ANIMASYON icin ayarli; gercekci hikaye sahnelerine cizim/
+    # animasyon gorunumu sizdiriyor (4 Agu testinde yer yer karisik tema cikti). Hikaye HER
+    # ZAMAN foto-gercekci modelle calisir, kalite secimi yok sayilir.
+    if mod != "hikaye" and gorsel_model_secim in ("gpt-image-1-mini", "gpt-image-2", "gpt-image-1"):
         gorsel_model = gorsel_model_secim
         print(f"  gorsel modeli (kullanici secimi): {gorsel_model}", file=sys.stderr)
+    elif mod == "hikaye" and gorsel_model_secim and gorsel_model_secim != GORSEL_MODEL_DOC:
+        print(f"  hikaye modu: '{gorsel_model_secim}' yok sayildi -> {GORSEL_MODEL_DOC} "
+              "(gercekcilik korunur)", file=sys.stderr)
     yt_once = True
     # Sure tavani: hikaye kanali 60 dk (uzun hikaye formati), diger turler 14 dk.
     # 60 dk hikaye (8sn sahne, paralel gorsel, 10 cekirdek render) ~2-2.5 saat, ~$40 gorsel.
@@ -3611,7 +3764,16 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         story, mod=mod, is_adi=is_adi, cikti_dizin=CIKTI_DIR, bildir=bildir)
 
     bildir("Hikaye sahnelere bölünüyor...", 5)
-    plan = uzun_plan(story, prof, sure_dk)
+    # UNLU MODU: yalniz hikaye + GEMINI_KEY varken aktif (Gemini benzerlige tolerans).
+    # Anahtar yoksa sessizce normal moda duser (OpenAI isimli talebi reddeder cunku).
+    unlu_aktif = bool(unlu_modu and mod == "hikaye" and (XAI_KEY or GEMINI_KEY))
+    # Motor onceligi: Grok (benzerlikte en toleransli) > Gemini
+    unlu_motor = "grok" if XAI_KEY else "gemini"
+    if unlu_modu and not unlu_aktif:
+        print("  UNLU modu istendi ama XAI/GEMINI anahtari yok -> tarif-bazli normal mod", file=sys.stderr)
+    if unlu_aktif:
+        print(f"  UNLU MODU AKTIF: gercek isimler + {unlu_motor} gorsel yolu", file=sys.stderr)
+    plan = uzun_plan(story, prof, sure_dk, unlu=unlu_aktif)
     scenes = plan["scenes"]
     # ── METIN DERIN ANALIZI: her satirin anlatim islevi -> sahne bazinda kurgu ──
     # Basarisiz olursa bos liste doner ve asagida eski mekanik atamaya dusulur.
@@ -3780,7 +3942,8 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             uretildi = referansli_gorsel(sp, kar_yol, gyol_full, stil_prompt=gorsel_ek,
                                          kar_kilit=kar_kilit, stil_yol=stil_yol,
                                          capa_yol=capa_yol, stil_kilit=stil_kilit,
-                                         model=gorsel_model, cerceve=cerceve_ek)
+                                         model=gorsel_model, cerceve=cerceve_ek,
+                                         saglayici=unlu_motor if unlu_aktif else "")
         except BakiyeHatasi:
             # Bakiye/limit doldu: DAHA FAZLA PARA HARCAMA; diger isciler de yeni istek acmaz.
             bakiye_bitti = True
@@ -3790,13 +3953,23 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         renk_uydur(gyol_full, olcum_hedef, f"sahne {n}")
         if mag_profil and s.get("hd"):   # OTOMATIK: sadece plan HD isaretlediyse
             kaynak.magnific_upscale(gyol_full, optimized_for=mag_profil, scale="2x")
-        # 3) SORA: acilis sahnesiyse gorseli GERCEK videoya cevir (basarisizsa fotografla devam)
+        # 3) GERCEK VIDEO: acilis sahnesiyse gorseli canlandir. Motor zinciri:
+        #    GROK once ($0.40/8sn — Sora'nin yarisi + unlu toleransli) -> SORA ($0.80) -> efekt.
+        #    VIDEO_MOTOR=sora ile Grok atlanabilir.
         if n in sora_adaylari and not bakiye_bitti and not uretim_durdu:
             svyol = os.path.join(PUBLIC, "isler", is_adi, f"sahne_{n}_sora.mp4")
-            if sora_klip(gyol_full, sp, svyol):
+            klip_ok = False
+            if XAI_KEY and os.environ.get("VIDEO_MOTOR", "grok") != "sora":
+                try:
+                    klip_ok = grok_klip(gyol_full, sp, svyol)
+                except BakiyeHatasi:
+                    print("  grok kredisi bitti -> bu sahne icin Sora denenecek", file=sys.stderr)
+            if not klip_ok:
+                klip_ok = sora_klip(gyol_full, sp, svyol)
+            if klip_ok:
                 time.sleep(gorsel_bekle)
                 return ("video", f"isler/{is_adi}/sahne_{n}_sora.mp4")
-            print(f"  sahne {n}: sora klip olmadi, efektli fotografla devam", file=sys.stderr)
+            print(f"  sahne {n}: video klip olmadi, efektli fotografla devam", file=sys.stderr)
         # Hiz limiti: her ISCI kendi isteginden sonra bekler (toplam hiz = paralel/(uretim+bekleme))
         time.sleep(gorsel_bekle)
         return ("image", f"isler/{is_adi}/sahne_{n}.png")
@@ -3974,7 +4147,8 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         if referansli_gorsel(kp, kar_yol, khedef, stil_prompt=gorsel_ek,
                              kar_kilit=kar_kilit, stil_yol=stil_yol, capa_yol=capa_yol,
                              stil_kilit=stil_kilit, yazi_yasak=False,
-                             model=GORSEL_MODEL_DOC):   # kapak: her zaman en iyi model
+                             model=GORSEL_MODEL_DOC,
+                             saglayici=unlu_motor if unlu_aktif else ""):   # kapak: en iyi model
             if mag_profil:   # kapak: documentary'de her zaman HD (thumbnail kalitesi kritik)
                 kaynak.magnific_upscale(khedef, optimized_for=mag_profil, scale="2x")
             kapak_yolu = khedef

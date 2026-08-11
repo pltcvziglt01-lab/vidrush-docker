@@ -20,6 +20,20 @@ KOK="$(cd "$(dirname "$0")" && pwd)"
 
 [ -f "$KEY" ] || { echo "HATA: SSH anahtari yok: $KEY (Polat'tan iste)"; exit 1; }
 
+echo "== 0/5 Kopya guncel mi (baskasinin isini EZME korumasi) =="
+# 4 Agu 2026: uc kez ayni kaza — biri eski checkout'la deploy edip digerinin canliya aldigi
+# isi ezdi. Yerel kopya origin/main'in GERISINDEYSE deploy DURUR: once git pull.
+git -C "$KOK" fetch -q origin main 2>/dev/null || echo "  (uyari: origin'e ulasilamadi, kontrol atlandi)"
+GERIDE=$(git -C "$KOK" rev-list --count HEAD..origin/main 2>/dev/null || echo 0)
+if [ "${GERIDE:-0}" -gt 0 ]; then
+  echo "⛔ DEPLOY DURDURULDU — yerel kopyan GitHub'in $GERIDE commit GERISINDE."
+  echo "   Boyle deploy edersen ekibin canlidaki son degisikliklerini EZERSIN."
+  echo "   Once:  git pull   (sonra tekrar deploy et)"
+  echo "   Bilerek eski surumu basmak istiyorsan: FORCE=1 bash deploy.sh"
+  [ "${FORCE:-0}" = "1" ] || exit 5
+fi
+echo "  ✓ kopya guncel"
+
 echo "== 1/5 Devam eden is var mi (varsa bekle, isi bozma) =="
 # ONEMLI: sadece render'a bakmak YETMEZ — is once ~10-40 dk GORSEL URETIM asamasinda gecirir
 # ve o sirada hicbir remotion/chrome sureci yoktur. Gercek kontrol: durum dosyalari.

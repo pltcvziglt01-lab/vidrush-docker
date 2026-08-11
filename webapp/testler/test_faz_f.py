@@ -111,7 +111,8 @@ sunucu_alanlari = set(re.findall(r"(\w+):\s*(?:str|List\[UploadFile\]|UploadFile
 on_alanlar = set(re.findall(r"\{ad: '(\w+)'", JS["api.js"]))
 # ⚠ Gercek sayi 21 (server.py `uret_baslat` imzasindan sayildi). Testi
 # yazarken 22 demistim — kumeler birebir esitken sayiyi yanlis saymisim.
-kontrol("generate alan sayisi 21", len(on_alanlar) == 21, str(len(on_alanlar)))
+# 12 Agu 2026: main `unlu` (unlu modu) alanini ekledi -> 21 DEGIL 22.
+kontrol("generate alan sayisi 22", len(on_alanlar) == 22, str(len(on_alanlar)))
 kontrol("generate alanlari server.py imzasiyla AYNI",
         on_alanlar == sunucu_alanlari,
         f"fazla={sorted(on_alanlar - sunucu_alanlari)} "

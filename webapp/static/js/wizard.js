@@ -205,6 +205,8 @@ function adim4() {
       ${ozetSatir('Altyazı', t.altyazi ? 'Açık (gömülü)' : 'Kapalı')}
       ${ozetSatir('Kamera hareketi', t.zoom ? 'Açık' : 'Kapalı')}
       ${ozetSatir('Geçişler', t.gecis ? 'Açık' : 'Sert kesme')}
+      ${t.tur === 'hikaye'
+        ? ozetSatir('Ünlü hikâyesi', t.unlu ? 'Açık' : 'Kapalı') : ''}
       ${ozetSatir('Referans kare', String(dosyalar.sahneRef.length))}
     </section>
 
@@ -515,6 +517,8 @@ function generateDegerleri() {
   if (t.tur === 'hikaye') {
     if (t.acilis) d.acilis = t.acilis;
     d.sora = t.sora ? '1' : '0';
+    // 22. alan (main, 12 Agu): unlu modu — yalnizca hikayede anlamli
+    d.unlu = t.unlu ? '1' : '0';
   }
   if (dosyalar.karakter) d.karakter = dosyalar.karakter;
   if (dosyalar.stil) d.stil = dosyalar.stil;

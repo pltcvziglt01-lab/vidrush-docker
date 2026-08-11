@@ -221,15 +221,37 @@ blok("5. 21 generate alani birebir korunuyor")
 alanlar_js = re.findall(r"\{ad: '([a-z_]+)'", API_JS)
 imza = re.search(r"async def uret_baslat\((.*?)\):", SERVER, re.S)
 alanlar_py = re.findall(r"(\w+): [^=]+= (?:Form|File)\(", imza.group(1)) if imza else []
-kontrol("api.js 21 generate alani listeliyor", len(alanlar_js) == 21,
-        f"{len(alanlar_js)} bulundu")
-kontrol("server.py 21 Form/File alani tanimliyor", len(alanlar_py) == 21,
-        f"{len(alanlar_py)} bulundu")
+# ⚠ 12 Agu 2026: main `unlu` (unlu modu) alanini ekledi -> 21 DEGIL 22.
+# Sayi degisirse iki taraf da degismeli; bu test tam o senkronu kilitler.
+ALAN_SAYISI = 22
+kontrol(f"api.js {ALAN_SAYISI} generate alani listeliyor",
+        len(alanlar_js) == ALAN_SAYISI, f"{len(alanlar_js)} bulundu")
+kontrol(f"server.py {ALAN_SAYISI} Form/File alani tanimliyor",
+        len(alanlar_py) == ALAN_SAYISI, f"{len(alanlar_py)} bulundu")
+kontrol("22. alan `unlu` iki tarafta da var",
+        "unlu" in alanlar_js and "unlu" in alanlar_py,
+        f"js={'unlu' in alanlar_js} py={'unlu' in alanlar_py}")
+kontrol("wizard unlu'yu hikayede gonderiyor", "d.unlu" in WIZARD)
 kontrol("alan adlari BIREBIR ayni", set(alanlar_js) == set(alanlar_py),
         f"fark: {set(alanlar_js) ^ set(alanlar_py)}")
 kontrol("wizard tum alanlari uretebiliyor",
         all(f"d.{a}" in WIZARD or f"'{a}'" in WIZARD or f"{a}:" in WIZARD
             for a in ("session", "story", "tur", "sure_dk", "gecis", "zoom")))
+
+# ── SES KUTUPHANESI SAGLAYICI SENKRONU (main, 12 Agu) ──
+# Arayuzdeki liste ile server.py'nin dogrulamasi ayrisirsa kullanicinin
+# sectigi ses SESSIZCE reddedilir ve varsayilana duser.
+SECIM = yorumsuz(oku(JS_DIZIN, "secim-deneyimi.js"))
+_py_sag = re.search(r'if saglayici not in \(([^)]*)\)', SERVER)
+_py_kume = set(re.findall(r'"(\w+)"', _py_sag.group(1))) if _py_sag else set()
+_js_sag = re.search(r"KUTUPHANE_SAGLAYICILARI = \[([^\]]*)\]", SECIM)
+_js_kume = set(re.findall(r"'(\w+)'", _js_sag.group(1))) if _js_sag else set()
+kontrol("ses saglayici listeleri BIREBIR ayni", _py_kume == _js_kume,
+        f"py={sorted(_py_kume)} js={sorted(_js_kume)}")
+kontrol("vbee ve clone iki tarafta da var",
+        {"vbee", "clone"} <= _py_kume and {"vbee", "clone"} <= _js_kume)
+kontrol("ozel ses kalibi vbee/clone kabul ediyor",
+        "vbee|clone" in SECIM and "vbee|clone" in SERVER)
 
 # ═══════════════ 6. ARASTIRMA KOPRUSU ═══════════════
 blok("6. Arastirma koprusu (hat cokmez, dusus gorunur, tavan zorunlu)")

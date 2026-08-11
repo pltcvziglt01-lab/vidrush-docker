@@ -35,6 +35,7 @@ export function bosTaslak() {
     altyaziSablon: null,
     acilis: '',
     sora: false,
+    unlu: false,
     gorselModel: '',
     guncelleme: '',
   };
