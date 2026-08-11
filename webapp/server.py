@@ -290,10 +290,15 @@ def ses_kutuphane(saglayici: str = "elevenlabs"):
     gorulen = set()   # Ai33 sayfalamasi kararsiz: sayfalar arasi MUKERRER kayit gelebiliyor
     try:
         for sayfa in range(1, 11):
-            r = requests.get(f"https://api.ai33.pro/v3/voices?provider={saglayici}"
-                             f"&limit=100&page={sayfa}",
-                             headers={"xi-api-key": key}, timeout=30)
-            parca = r.json().get("data", [])
+            parca = []
+            for dene in range(3):   # Ai33 art arda isteklerde IP'yi kisip 1-2 kayit dondurebiliyor
+                r = requests.get(f"https://api.ai33.pro/v3/voices?provider={saglayici}"
+                                 f"&limit=100&page={sayfa}",
+                                 headers={"xi-api-key": key}, timeout=30)
+                parca = r.json().get("data", [])
+                if len(parca) >= 30 or (sayfa > 1 and parca is not None):
+                    break            # saglikli sayfa (son sayfa kucuk olabilir, o normal)
+                time.sleep(2 + dene * 2)
             yeni = 0
             for v in parca:
                 vid = v.get("voice_id")
@@ -303,6 +308,7 @@ def ses_kutuphane(saglayici: str = "elevenlabs"):
                     yeni += 1
             if len(parca) < 100 or yeni == 0:   # kisa sayfa VEYA tamamen tekrar -> bitti
                 break
+            time.sleep(0.7)          # sayfalar arasi nefes: hiz sinirini tetikleme
     except Exception:
         if not veri:
             raise HTTPException(502, "Ses kütüphanesi alınamadı")
