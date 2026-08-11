@@ -4,3 +4,8 @@ app/render-studio/out
 app/render-studio/public/isler
 _kaynak_wf.json
 vps-bootstrap.sh
+
+# Faz D render ciktilari — dosyalar diskte KALIR, depoya girmez
+cikti/
+app/render-studio/public/editorv2/
+app/render-studio/public/gerileme_testi/
