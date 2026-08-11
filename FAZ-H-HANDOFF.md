@@ -157,7 +157,10 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 |---|---|---|---|
 | 12 Ağu | H0 envanter + handoff | `4ec1be1` | ✅ |
 | 12 Ağu | H1 kök yolu + deploy.sh alt paket | `eda27fc` | ✅ |
-| 12 Ağu | H2–H3 araştırma köprüsü + iş sözleşmesi + derin sağlık + UI | bu commit | ✅ **DEPLOY CHECKPOINT** |
+| 12 Ağu | H2–H3 araştırma köprüsü + iş sözleşmesi + derin sağlık + UI | `e4af286` | ✅ |
+| 12 Ağu | Deploy engeli belgelendi (main ile ayrışma) | `f19a3f5` | ✅ |
+| 12 Ağu | origin/main birleştirmesi (22 alan, ünlü modu, vbee/clone) | `5739d4e` | ✅ |
+| 12 Ağu | **CANLIYA ÇIKILDI** + Shackleton pilotu | bu commit | ✅ **CANLI** |
 
 ---
 
@@ -249,7 +252,55 @@ Yedek branch: `fazh-yedek-e4af286`.
 
 ---
 
-## 12. Test çalıştırma (yerel)
+## 12. ✅ CANLI DEPLOY + SHACKLETON PİLOTU (12 Ağu, ölçüldü)
+
+Merge sonrası `bash deploy.sh` → **başarılı**. Ezme koruması `GERIDE=0` ile geçti, 48 dosya derlendi, 8 uç 200, imaja basıldı.
+
+### Canlı smoke
+| Kontrol | Sonuç |
+|---|---|
+| `/api/saglik/derin` | `durum: hazir`, `uretim_mumkun: true`, 8/8 bileşen ok, render motoru `ffmpeg` |
+| Anahtar sızıntısı | **yok** (`sk-`/`AIza` taraması temiz) |
+| Modüler arayüz | `index.html` 76 satır canlıda; `ui/app.css`, `ui/app.js`, `ui/js/*.js` hepsi 200 |
+| Sağlık göstergesi | "Sistem hazır" artık **ölçülmüş** iddia (ffmpeg/ffprobe/disk/render/işçi/araştırma tek tek yeşil) |
+
+### Pilot: "Shackleton'ın Endurance seferi ve mürettebatın kurtuluşu"
+`tur=documentary`, `sure_dk=1`, `altyazi=1` · iş `job_1786491521724_fazh15_102297`
+
+**Aşama geçişleri canlı izlendi** (polling ile): `sirada → arastirma(2%) → plan(5%) → medya(33-39%) → kapak(72%) → render(79-90%) → ses(96%) → bitti(100%)`
+
+| Ölçüm | Değer | Hedef | Durum |
+|---|---|---|---|
+| Araştırma | 3 kaynak, 5 iddia, **1 doğrulanmış**, 5 sorgu | — | çalıştı |
+| Araştırma maliyeti | **$0.3016** (tavan $0.60) | ≤ $0.60 | ✅ |
+| Toplam oturum maliyeti | ~$0.30 + görsel yok | ≤ $2.00 | ✅ |
+| Süre | 77.95 sn | 60 sn | ⚠ **%130** |
+| Çözünürlük / fps | 1920×1080 / 24 | 1080p | ✅ |
+| **Loudness** | **−14.0 LUFS**, tepe **−1.5 dBFS** | −14 / ≤−1.5 | ✅ **tam isabet** |
+| Siyah kare | 0 | 0 | ✅ |
+| Donmuş kare | 0 | 0 | ✅ |
+| Kesme (scene>0.12) | 10 | — | ölçüldü |
+| **AI görsel üretimi** | **0** | 0 (yasak) | ✅ **kural korundu** |
+| Dosya boyutu | 241 MB / 78 sn (25.9 Mbps) | — | ⚠ çok yüksek |
+
+**Arayüz canlı doğrulaması** (Projeler ekranı, tarayıcı): iş kartında `<video>` oynatıcı ✅, "Videoyu indir" ✅, "Araştırma manifesti" ✅, etiketler `Tamamlandı · 3 kaynak · 1 doğrulanmış olgu` ✅.
+
+### ⚠ PİLOTUN ORTAYA ÇIKARDIĞI GERÇEK SORUN — medya yer/dönem isabeti
+
+Sunucu logu:
+```
+pexels OK [South Georgia island approach boat/large]:
+  "aerial view of boat approaching TROPICAL shore"
+```
+Videoda bu klip **"GÜNEY GEORGIA / SAHİL"** alt bandıyla gösteriliyor. Güney Georgia sub-Antarktik bir ada; ekrana tropik sahil geldi.
+
+Bu tam olarak `webapp/medya/` (Faz B) modülünün K1–K4 yer doğrulama katmanlarının + `vision.py`'nin yakalamak için yazıldığı hata sınıfı — **ama o modül hâlâ pipeline'a bağlı değil.** Araştırma motoru bağlandı, medya motoru bağlanmadı.
+
+**Sonuç:** Faz H'nin bir sonraki en yüksek etkili işi net — `medya/avci` + `medya/vision` + lisans duvarını `/api/generate` hattına bağlamak (§10 madde 1).
+
+---
+
+## 13. Test çalıştırma (yerel)
 
 ```bash
 python3 -m venv .venv-test
