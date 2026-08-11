@@ -280,6 +280,28 @@ def ses_kutuphane(saglayici: str = "elevenlabs"):
     zaman, liste = _SES_KUTUPHANE_ONBELLEK.get(saglayici, (0, None))
     if liste is not None and time.time() - zaman < 1800:
         return liste
+    import json
+    # ── DISK ONBELLEGI ONCE ──
+    # Sunucu IP'si Ai33'te kisitli (canli cekim 1-2 kayit donduruyor); tam katalog
+    # (2071 ses) yerel makineden cekilip buraya kondu. 7 gunden tazeyse diski kullan.
+    disk_yol = os.path.join(VERI, "ses-kutuphane", f"{saglayici}.json")
+    ham = None
+    try:
+        if os.path.exists(disk_yol) and time.time() - os.path.getmtime(disk_yol) < 7 * 86400:
+            with open(disk_yol, encoding="utf-8") as f:
+                ham = json.load(f)
+    except Exception:
+        ham = None
+    if ham:
+        veri = ham
+    else:
+        veri = _ai33_canli_katalog(saglayici, disk_yol)
+    return _katalog_donustur(saglayici, veri)
+
+
+def _ai33_canli_katalog(saglayici, disk_yol):
+    """Canli cekim (disk yoksa/bayatsa). Basarili genis cekim diske de yazilir."""
+    import json
     key = _ai33_key()
     if not key:
         raise HTTPException(503, "AI33 anahtari kurulu degil")
@@ -312,6 +334,18 @@ def ses_kutuphane(saglayici: str = "elevenlabs"):
     except Exception:
         if not veri:
             raise HTTPException(502, "Ses kütüphanesi alınamadı")
+    # Genis cekim basarili olduysa diske yaz (7 gunluk taze onbellek)
+    if len(veri) >= 30:
+        try:
+            os.makedirs(os.path.dirname(disk_yol), exist_ok=True)
+            with open(disk_yol, "w", encoding="utf-8") as f:
+                json.dump(veri, f, ensure_ascii=False)
+        except Exception:
+            pass
+    return veri
+
+
+def _katalog_donustur(saglayici, veri):
     # Saglayicilar dil degerini karisik gonderiyor: kimi ISO kod ("en"), kimi tam ad
     # ("English", "Cantonese"). KIRPMADAN ISO koda normallestir (eski [:5] kirpmasi
     # "engli"/"canto" gibi bozuk degerler uretiyordu).
