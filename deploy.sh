@@ -82,6 +82,12 @@ scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/app/uret.py root@$IP:/tmp/dep/ 
 # Remotion kaynaklari: .tsx + .ts (fontlar.ts gibi yardimcilar da)
 scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/app/render-studio/src/*.tsx "$KOK"/app/render-studio/src/*.ts root@$IP:/tmp/dep/rs/src/ >/dev/null
 # Gomulu altyazi fontlari (varsa)
+# Doku dosyalari (grain vb.) — 11 Agu 2026: grain artik onceden uretilmis PNG kullaniyor,
+# deploy kopyalamazsa efekt sessizce kaybolur.
+$SSH "mkdir -p /tmp/dep/rs/doku"
+if ls "$KOK"/app/render-studio/public/doku/*.png >/dev/null 2>&1; then
+  scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/app/render-studio/public/doku/*.png root@$IP:/tmp/dep/rs/doku/ >/dev/null
+fi
 if ls "$KOK"/app/render-studio/public/fonts/*.ttf >/dev/null 2>&1; then
   scp -i "$KEY" -o StrictHostKeyChecking=no "$KOK"/app/render-studio/public/fonts/*.ttf root@$IP:/tmp/dep/rs/fonts/ >/dev/null
 fi
@@ -90,6 +96,8 @@ $SSH "docker cp /tmp/dep/webapp/. bedosaho:/opt/vidrush/webapp/ && \
       docker cp /tmp/dep/rs/src/. bedosaho:/opt/vidrush/render-studio/src/ && \
       docker exec bedosaho mkdir -p /opt/vidrush/render-studio/public/fonts && \
       (ls /tmp/dep/rs/fonts/*.ttf >/dev/null 2>&1 && docker cp /tmp/dep/rs/fonts/. bedosaho:/opt/vidrush/render-studio/public/fonts/ || true) && \
+      docker exec bedosaho mkdir -p /opt/vidrush/render-studio/public/doku && \
+      (ls /tmp/dep/rs/doku/*.png >/dev/null 2>&1 && docker cp /tmp/dep/rs/doku/. bedosaho:/opt/vidrush/render-studio/public/doku/ || true) && \
       rm -rf /tmp/dep"
 echo "  ✓ kopyalandi"
 

@@ -24,7 +24,7 @@
  * TOHUMLU (sahne indeksinden), yoksa her render farkli cikar ve tekrar uretilemez.
  */
 import React from 'react';
-import {AbsoluteFill, Easing, interpolate, random, spring, useCurrentFrame,
+import {AbsoluteFill, Easing, interpolate, random, spring, staticFile, useCurrentFrame,
   useVideoConfig} from 'remotion';
 import {fontAilesi} from './fontlar';
 
@@ -215,21 +215,28 @@ export const KanalFiltreleri: React.FC = () => (
 /** Film grain: tohumlu, kare basina degisen ince gurultu dokusu. */
 export const Grain: React.FC<{siddet?: number; tohum?: string}> = ({siddet = 1, tohum = 'g'}) => {
   const frame = useCurrentFrame();
-  // Her karede desenin yerini kaydirmak "hareketli grain" hissi verir (statik grain
-  // "kirli ekran" gibi durur). Desen SVG turbulence ile uretilir, dosya gerekmez.
-  const kay = Math.floor(random(`${tohum}-${frame}`) * 100);
+  // ⚠ 11 Agu 2026 — BU EFEKT BIR VIDEOYU OLDURDU.
+  // Ilk surumde her karede YENI bir <feTurbulence> SVG filtresi uretiyordum, ustune her
+  // karede yeni filter ID veriyordum. feTurbulence SVG'nin en pahali filtresidir ve
+  // degisen ID tum onbellegi devre disi birakiyor: 2 dakikalik videoda 3.600 kez
+  // 1920x1080 turbulans hesabi. Sonuc: render 30 dk sinirini asti, kullanicinin isi
+  // HATA ile bitti (job_1786396388861).
+  // Cozum: doku BIR KEZ uretildi (public/doku/grain.png, ffmpeg geq=random ile) ve
+  // burada sadece KONUMU kaydiriliyor. Kare basina maliyet: bir background-position.
+  const kay = random(`${tohum}-${Math.floor(frame / 2)}`);   // 2 karede bir yeni konum
+  const kay2 = random(`${tohum}b-${Math.floor(frame / 2)}`);
   return (
-    <AbsoluteFill style={{opacity: 0.05 + 0.07 * siddet, mixBlendMode: 'overlay',
-      pointerEvents: 'none'}}>
-      <svg width="100%" height="100%">
-        <filter id={`grain-${kay}`}>
-          <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves={2}
-                        seed={kay} stitchTiles="stitch" />
-          <feColorMatrix type="saturate" values="0" />
-        </filter>
-        <rect width="100%" height="100%" filter={`url(#grain-${kay})`} />
-      </svg>
-    </AbsoluteFill>
+    <AbsoluteFill
+      style={{
+        opacity: 0.05 + 0.07 * siddet,
+        mixBlendMode: 'overlay',
+        pointerEvents: 'none',
+        backgroundImage: `url(${staticFile('doku/grain.png')})`,
+        backgroundRepeat: 'repeat',
+        backgroundSize: '512px 512px',
+        backgroundPosition: `${Math.floor(kay * 512)}px ${Math.floor(kay2 * 512)}px`,
+      }}
+    />
   );
 };
 

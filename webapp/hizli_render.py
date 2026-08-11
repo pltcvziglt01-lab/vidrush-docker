@@ -192,6 +192,133 @@ GECIS_IMZA_FFMPEG = {
 }
 
 
+def _ffmpeg_kacir(t: str) -> str:
+    """drawtext metin kacisi.
+
+    VIRGUL SILINMEZ, KACIRILIR: ilk surumde siliyordum ve "400,000 DWT" ekranda
+    "400000 DWT" olarak cikiyordu. Veri-sayi olculen yazi turlerinin %12'si; binlik
+    ayraci kaybolunca sayi okunmaz hale geliyor."""
+    return (str(t).replace("\\", "").replace(":", "\\:").replace("'", "")
+            .replace("%", "\\%").replace(",", "\\,"))
+
+
+def _font(ad="Montserrat-Bold.ttf") -> str:
+    y = os.path.join(FONT_DIZIN, ad)
+    return f"fontfile='{y}':" if os.path.exists(y) else ""
+
+
+def _alt_band_filtre(sahne, fps, F):
+    """Alt band (lower third) — Video.tsx'teki AltBand'in ffmpeg karsiligi.
+    OLCULEN degerler: en yaygin yazi turu (%33), omur 4.7 sn, giris 0.28 sn.
+    Sol kenardaki sari dikey cubuk drawbox ile, yazi drawtext ile."""
+    ab = sahne.get("altBand")
+    if not isinstance(ab, dict) or not str(ab.get("baslik") or "").strip():
+        return ""
+    b = _ffmpeg_kacir(str(ab["baslik"]).strip()[:34])
+    a = _ffmpeg_kacir(str(ab.get("alt") or "").strip()[:40])
+    gir, omur = 0.28, min(4.7, max(1.0, F / fps - 0.4))
+    son = 0.3 + omur
+    # alpha: 0.3'te girer, omur boyunca kalir, 0.28 sn'de soner
+    alfa = (f"if(lt(t\\,0.3)\\,0\\,if(lt(t\\,{0.3 + gir:.2f})\\,(t-0.3)/{gir:.2f}\\,"
+            f"if(lt(t\\,{son:.2f})\\,1\\,max(0\\,({son + gir:.2f}-t)/{gir:.2f}))))")
+    f = ""
+    # Sari dikey vurgu cubugu (AltBand'deki 6px'lik cubuk)
+    f += (f",drawbox=x=100:y=ih*0.78:w=6:h=76:color=#F5E14B@1:t=fill:"
+          f"enable='between(t\\,0.3\\,{son + gir:.2f})'")
+    f += (f",drawtext={_font()}text='{b}':fontcolor=white:fontsize=44:"
+          f"borderw=4:bordercolor=black@0.8:shadowcolor=black@0.9:shadowx=0:shadowy=3:"
+          f"x=122:y=h*0.78:alpha='{alfa}'")
+    if a:
+        f += (f",drawtext={_font()}text='{a}':fontcolor=white@0.9:fontsize=26:"
+              f"borderw=3:bordercolor=black@0.8:shadowcolor=black@0.9:shadowx=0:shadowy=2:"
+              f"x=122:y=h*0.78+52:alpha='{alfa}'")
+    return f
+
+
+def _etiket_filtre(sahne, fps, F):
+    """Saha etiketleri — SahaEtiketleri'nin ffmpeg karsiligi.
+    OLCULEN omur 1.8 sn, giris 0.28 sn. Nokta+cizgi drawbox ile."""
+    et = sahne.get("etiketler")
+    if not isinstance(et, list) or not et:
+        return ""
+    f = ""
+    for i, e in enumerate(et[:2]):
+        if not isinstance(e, dict):
+            continue
+        m = _ffmpeg_kacir(str(e.get("metin") or "").strip()[:26])
+        try:
+            x, y = float(e.get("x")), float(e.get("y"))
+        except Exception:
+            continue
+        if not m or not (0 < x < 1 and 0 < y < 1):
+            continue
+        bas = 0.35 + i * 0.5
+        son = bas + 1.8
+        gir = 0.28
+        alfa = (f"if(lt(t\\,{bas:.2f})\\,0\\,if(lt(t\\,{bas + gir:.2f})\\,"
+                f"(t-{bas:.2f})/{gir:.2f}\\,if(lt(t\\,{son:.2f})\\,1\\,"
+                f"max(0\\,({son + gir:.2f}-t)/{gir:.2f}))))")
+        saga = x < 0.5
+        # nokta
+        # Koyu halka + beyaz nokta: acik zeminde beyaz nokta tek basina kayboluyor
+        f += (f",drawbox=x=iw*{x:.3f}-7:y=ih*{y:.3f}-7:w=14:h=14:color=black@0.55:t=fill:"
+              f"enable='between(t\\,{bas:.2f}\\,{son + gir:.2f})'"
+              f",drawbox=x=iw*{x:.3f}-5:y=ih*{y:.3f}-5:w=10:h=10:color=white@0.95:t=fill:"
+              f"enable='between(t\\,{bas:.2f}\\,{son + gir:.2f})'")
+        # cizgi
+        cx = f"iw*{x:.3f}" if saga else f"iw*{x:.3f}-78"
+        f += (f",drawbox=x={cx}:y=ih*{y:.3f}-1:w=78:h=3:color=white@0.95:t=fill:"
+              f"enable='between(t\\,{bas:.2f}\\,{son + gir:.2f})'")
+        # yazi
+        tx = f"w*{x:.3f}+92" if saga else f"w*{x:.3f}-92-tw"
+        f += (f",drawtext={_font()}text='{m.upper()}':fontcolor=white:fontsize=30:"
+              f"borderw=3:bordercolor=black@0.85:shadowcolor=black@0.9:shadowx=0:shadowy=2:"
+              f"x={tx}:y=h*{y:.3f}-15:alpha='{alfa}'")
+    return f
+
+
+def _vurgu_kutu_filtre(sahne, fps, F):
+    """Cerceve vurgusu — CerceveVurgusu'nun ffmpeg karsiligi.
+    Kose isaretleri yerine ince tam cerceve (drawbox tek dikdortgen cizer)."""
+    k = sahne.get("vurguKutu")
+    if not isinstance(k, dict):
+        return ""
+    try:
+        x, y, w, h = float(k["x"]), float(k["y"]), float(k["w"]), float(k["h"])
+    except Exception:
+        return ""
+    if not (0 <= x < 1 and 0 <= y < 1 and 0 < w <= 1 and 0 < h <= 1):
+        return ""
+    bas = 0.5
+    son = max(bas + 1.5, F / fps - 0.4)
+    # Koyu kalin cerceve ALTA, beyaz ince cerceve USTE -> her zeminde okunur
+    return (f",drawbox=x=iw*{x:.3f}-2:y=ih*{y:.3f}-2:w=iw*{w:.3f}+4:h=ih*{h:.3f}+4:"
+            f"color=black@0.55:t=8:enable='between(t\\,{bas:.2f}\\,{son:.2f})'"
+            f",drawbox=x=iw*{x:.3f}:y=ih*{y:.3f}:w=iw*{w:.3f}:h=ih*{h:.3f}:"
+            f"color=white@0.95:t=4:enable='between(t\\,{bas:.2f}\\,{son:.2f})'")
+
+
+def _bolum_filtre(sahne, fps, F):
+    """Bolum basligi — BolumBasligi'nin ffmpeg karsiligi.
+    ust: sol ust 46px cumle duzeni | orta: ortali 68px BUYUK HARF."""
+    b = str(sahne.get("bolum") or "").strip()
+    if not b:
+        return ""
+    yer = str(sahne.get("bolumYeri") or "orta")
+    metin = _ffmpeg_kacir(b.upper() if yer == "orta" else b)
+    gir, omur = 0.28, 4.5
+    son = 0.2 + omur
+    alfa = (f"if(lt(t\\,0.2)\\,0\\,if(lt(t\\,{0.2 + gir:.2f})\\,(t-0.2)/{gir:.2f}\\,"
+            f"if(lt(t\\,{son:.2f})\\,1\\,max(0\\,({son + gir:.2f}-t)/{gir:.2f}))))")
+    if yer == "ust":
+        return (f",drawtext={_font()}text='{metin}':fontcolor=white:fontsize=46:"
+                f"borderw=4:bordercolor=black@0.8:shadowcolor=black@0.9:shadowx=0:shadowy=4:"
+                f"x=w*0.032:y=h*0.044:alpha='{alfa}'")
+    return (f",drawtext={_font()}text='{metin}':fontcolor=white:fontsize=68:"
+            f"borderw=3:bordercolor=black@0.62:shadowcolor=black@0.85:shadowx=0:shadowy=6:"
+            f"x=(w-text_w)/2:y=h*0.52:alpha='{alfa}'")
+
+
 def _overlay_filtre(sahne, fps, F):
     """Overlay basligini drawtext ile ciz (4 Agu 2026 — bu eksik oldugu icin overlay'li
     isler Remotion'a dusuyordu ve 15 dk video 2 saat suruyordu).
@@ -246,8 +373,11 @@ def _segment_uret(sahne, gecis, fps, crf, seg_yol):
     F = max(1, int(round(sure * fps)))
     if sahne.get("tur") == "video":
         # Gercek video: Ken Burns YOK (klibin kendi hareketi var). Kisa klip donguyle uzar.
-        vf = (f"scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,"
-              f"fps={fps}") + _overlay_filtre(sahne, fps, F) + ",format=yuv420p"
+        vf = ((f"scale=1920:1080:force_original_aspect_ratio=increase,crop=1920:1080,"
+               f"fps={fps}") + _overlay_filtre(sahne, fps, F)
+              + _bolum_filtre(sahne, fps, F) + _alt_band_filtre(sahne, fps, F)
+              + _etiket_filtre(sahne, fps, F) + _vurgu_kutu_filtre(sahne, fps, F)
+              + ",format=yuv420p")
         komut = ["ffmpeg", "-y", "-loglevel", "error",
                  "-stream_loop", "-1", "-i", medya, "-i", ses,
                  "-filter_complex", f"[0:v]{vf}[v]",
@@ -272,7 +402,33 @@ def _segment_uret(sahne, gecis, fps, crf, seg_yol):
           f"zoompan=z='{z}':x='{x}':y='{y}':d={F}:s=1920x1080:fps={fps}")
     if gecis in ("anlati", "hizli", "hikaye"):
         vf += ",vignette=angle=PI/5"   # Video.tsx'teki radial-gradient vinyetin karsiligi
+    # ── EFEKT KARSILIKLARI (11 Agu 2026) ──
+    # grain ve vinyet Efektler.tsx'te TEMEL efekt (her sahnede acik). Hizli motorda
+    # karsiligi olmazsa bu isler ya Remotion'a duser (yavas) ya da efekt SESSIZCE
+    # kaybolur. ffmpeg'in kendi noise/vignette filtreleri var, bedava.
+    _ef = {str(e.get("ad")): float(e.get("siddet") or 1)
+           for e in (sahne.get("efektler") or []) if isinstance(e, dict)}
+    if "grain" in _ef:
+        vf += f",noise=alls={int(6 + 6 * _ef['grain'])}:allf=t+u"
+    if "vinyet" in _ef and gecis not in ("anlati", "hizli", "hikaye"):
+        vf += ",vignette=angle=PI/5"
+    if "siyah-beyaz" in _ef:
+        vf += ",hue=s=0"
+    if "kontrast-grade" in _ef:
+        vf += f",eq=contrast={1 + 0.18 * _ef['kontrast-grade']:.3f}"
+    if "sicak-grade" in _ef:
+        vf += f",colortemperature=temperature={int(6500 - 700 * _ef['sicak-grade'])}"
+    if "soguk-grade" in _ef:
+        vf += f",colortemperature=temperature={int(6500 + 900 * _ef['soguk-grade'])}"
     vf += _overlay_filtre(sahne, fps, F)
+    # ── EDIT KATMANLARI (11 Agu 2026) ──
+    # Bu katmanlar sadece Remotion'da cizilebiliyordu, o yuzden katmanli isler hizli
+    # motoru ATLIYORDU ve render ~7x gercek zamana cikiyordu (40 dk video = 4 saat).
+    # Artik ffmpeg karsiliklari var: 40 dk video ~15 dk.
+    vf += _bolum_filtre(sahne, fps, F)
+    vf += _alt_band_filtre(sahne, fps, F)
+    vf += _etiket_filtre(sahne, fps, F)
+    vf += _vurgu_kutu_filtre(sahne, fps, F)
     vf += ",format=yuv420p"
     komut = ["ffmpeg", "-y", "-loglevel", "error",
              "-loop", "1", "-i", gorsel, "-i", ses,
@@ -321,15 +477,11 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
         # karsiligi yok. Engel OLMAZSA bu isler hizli motorda render edilir ve basliklar
         # SESSIZCE KAYBOLUR — RENDER_MOTOR=ffmpeg varsayilan oldugu icin bu durum
         # belgesel islerinin cogunda yasanirdi.
-        if str(s.get("bolum") or "").strip():
-            print("  hizli motor: bolum basligi var -> Remotion", file=sys.stderr)
-            return False
+
         # Saha etiketi / cerceve vurgusu da SVG+React ile ciziliyor (nokta+cizgi+yazi,
         # kose isaretli kutu, dash-offset ile cizilen daire). ffmpeg drawtext/drawbox ile
         # taklidi yarim kalir; engel olmazsa etiketler SESSIZCE kaybolur.
-        if s.get("etiketler") or s.get("vurguKutu"):
-            print("  hizli motor: saha etiketi/vurgu var -> Remotion", file=sys.stderr)
-            return False
+
 
     fps = int(props.get("fps", 24))
     gecis = str(props.get("gecis", "sinematik"))
