@@ -18,6 +18,14 @@ import requests
 
 import medya_kapisi   # Faz H: biyom/donem celiski kapisi (bkz. modul basligi)
 
+# Faz I-1: kare tabanli yer/donem/biyom kapisi. Import basarisiz olursa hat
+# CALISMAYA DEVAM EDER — kapi yoksa eski davranis gecerlidir (sessiz cokme yok).
+try:
+    from medya import kare_kapisi as _kare_kapisi
+except Exception as _e:                                    # pragma: no cover
+    _kare_kapisi = None
+    print(f"  kare kapisi yuklenemedi ({str(_e)[:60]}) — eski akis", file=sys.stderr)
+
 # ── ANAHTAR OKUMA: ortam degiskeni VEYA dosya ──
 # Neden dosya secenegi: mevcut anahtarlar konteynerin Config.Env'ine gomulu. Yeni bir
 # ortam degiskeni eklemek konteyneri YENIDEN YARATMAYI gerektirir; bu, uzerinde calisan
@@ -420,6 +428,10 @@ def klip_gecmisi_sifirla():
         _ATIFLAR.clear()
     # Faz H: biyom kapisinin is-basina durumu da sifirlanir
     _KAPI_REDLERI.clear()
+    # Faz I-1: kare kapisinin butcesi/onbellegi de is basina sifirlanir.
+    # ⚠ Sifirlanmazsa onceki isin USD/cagri harcamasi tasinir ve yeni is
+    # daha ilk klipte "butce doldu" der (kapi sessizce devre disi kalir).
+    kare_butce_kur()
 
 
 # ⚠ FAZ H: tum videonun konu metni. Biyom kapisi, sahne sorgusu biyom
@@ -873,6 +885,148 @@ def _vision_yer_uygun(video_yolu: str, sorgu: str, yerler: list, kimlik: str = "
         return True
 
 
+# ═════════════ FAZ I-1: KARE KAPISI — tablo BAGIMSIZ yer/donem/biyom ═════════════
+# ⚠ NEDEN: `_vision_yer_uygun` yalnizca `yerler` DOLUYKEN calisir; `_etkin_yer()`
+# ise YER_TAKMA_AD'daki 19 ulkeye bagli. "South Georgia" tabloda YOK -> kare bakan
+# katman tam da gerektigi vakada DEVRE DISIYDI (FAZ-H-HANDOFF §13 "Bilinen sinir":
+# "small boat South Georgia sea storm" sorgusuna gelen "maltese pilot motorboat").
+# Bu kapi bolge/havza tablosuyla calisir; kapsami `kare_kapisi.kapsam_ozeti()`.
+KARE_KAPISI = os.environ.get("KARE_KAPISI", "1").lower() not in ("0", "false", "")
+KARE_MAKS_CAGRI = int(os.environ.get("KARE_MAKS_CAGRI", "60"))
+KARE_MAKS_USD = float(os.environ.get("KARE_MAKS_USD", "0.08"))
+KARE_MAKS_SN = float(os.environ.get("KARE_MAKS_SN", "180"))
+KARE_ZAMAN_ASIMI = int(os.environ.get("KARE_ZAMAN_ASIMI", "30"))
+
+_kare_butce = [None]           # is basina butce (klip_gecmisi_sifirla ile kurulur)
+_kare_onbellek = {}            # klip kimligi -> (ok, kod, gerekce)
+_KARE_REDLERI = []
+# ⚠ `_sahne_medya` PARALEL thread'lerde kosar (bkz. _KULLANILAN_KILIT gerekcesi).
+# Onbellek/red listesi kilitsiz olsaydi hem kayit kaybi hem is-ortasi butce
+# sifirlanmasi olurdu.
+_KARE_KILIT = _th.Lock()
+
+
+def kare_butce_kur():
+    """Is basinda butceyi sifirla. ⚠ Sinirsiz butce YASAK (Faz H kurali 2)."""
+    with _KARE_KILIT:
+        if _kare_kapisi is None:
+            _kare_butce[0] = None
+            return None
+        _kare_butce[0] = _kare_kapisi.KareButce(
+            maks_cagri=KARE_MAKS_CAGRI, maks_usd=KARE_MAKS_USD, maks_sn=KARE_MAKS_SN)
+        _kare_onbellek.clear()
+        _KARE_REDLERI.clear()
+        return _kare_butce[0]
+
+
+def kare_ozet() -> dict:
+    """Ise yazilacak olculmus ozet — uydurma sayi yok.
+
+    Kapi hic calismadiysa bunu `butce.cagri == 0` ile GORUNUR kilar; "her kare
+    dogrulandi" gibi kanitsiz bir iddia URETMEZ.
+    """
+    with _KARE_KILIT:
+        b = _kare_butce[0]
+        return {"acik": bool(KARE_KAPISI and _kare_kapisi is not None
+                             and VISION_DOGRULA),
+                "kapsam": (_kare_kapisi.kapsam_ozeti() if _kare_kapisi else {}),
+                "butce": (b.ozet() if b else {}),
+                "red_sayisi": len(_KARE_REDLERI),
+                "redler": list(_KARE_REDLERI[:20])}
+
+
+def _kare_gozlem_oku(video_yolu: str) -> dict:
+    """Kareyi TEK vision cagrisiyla YAPILI gozleme cevir.
+
+    ⚠ Tek cagri: eski `_vision_yer_uygun` ile birlikte kosulsa klip basina IKI
+    vision faturasi cikardi. Bu okuma her ikisinin sordugunu birden dondurur;
+    `_kare_dogrula` eski katmani yalnizca bu kapi UYGULANAMADIGINDA cagirir.
+
+    Model kararsizsa `guven` dusuk doner ve `kare_kapisi.karar()` GECIRIR.
+    """
+    anahtar = _anahtar_oku("OPENAI_KEY", "openai_key.txt")
+    if not anahtar:
+        raise RuntimeError("OPENAI_KEY yok")
+    b64 = _kare_base64(video_yolu)
+    if not b64:
+        raise RuntimeError("kare cikarilamadi")
+    sistem = (
+        "You inspect a single frame from stock footage for a documentary. "
+        "Report ONLY what the image shows — do not guess from the scene brief. "
+        "Name the most likely real-world region using well-known place names "
+        "(country, sea, island group). Use architecture, signage script, "
+        "vehicles, vegetation, light and terrain. "
+        "If the frame is a tight close-up or has no geographic cue at all, set "
+        "yakin_plan true and guven low. Be honest about uncertainty: guven is "
+        "your confidence 0..1 that your region guess is right. "
+        'Reply ONLY as JSON: {"yer_tahmini":"<place names, max 8 words>",'
+        '"biyom":"<polar|tropical|desert|temperate|unknown>",'
+        '"isaretler":["<cue>","<cue>"],"modern_isaret":["<modern tech seen>"],'
+        '"yakin_plan":true|false,"insan":true|false,"guven":0.0}')
+    r = requests.post(
+        "https://api.openai.com/v1/chat/completions",
+        headers={"Authorization": f"Bearer {anahtar}", "Content-Type": "application/json"},
+        json={"model": "gpt-4.1-mini",
+              "messages": [
+                  {"role": "system", "content": sistem},
+                  {"role": "user", "content": [
+                      {"type": "image_url",
+                       "image_url": {"url": f"data:image/jpeg;base64,{b64}",
+                                     "detail": "low"}}]}],
+              "response_format": {"type": "json_object"},
+              "temperature": 0,
+              "max_tokens": 160},
+        timeout=KARE_ZAMAN_ASIMI)
+    if r.status_code != 200:
+        raise RuntimeError(f"vision {r.status_code}")
+    icerik = (r.json().get("choices") or [{}])[0].get("message", {}).get("content") or "{}"
+    d = json.loads(icerik)
+    # Ingilizce biyom adlarini modulun sozluguyle hizala (kare_kapisi biyom_bul
+    # zaten metinde arar; burada yalnizca dogrudan kimlik eslemesi yapilir).
+    esle = {"polar": "kutup", "tropical": "tropik", "desert": "col",
+            "temperate": "iliman", "unknown": ""}
+    d["biyom"] = esle.get(str(d.get("biyom") or "").strip().lower(),
+                          str(d.get("biyom") or ""))
+    return d
+
+
+def _kare_dogrula(video_yolu: str, sorgu: str, yer_terim: list,
+                  kimlik: str = "", saglayici: str = "") -> bool:
+    """Indirilmis klibin karesi sahneyle uyumlu mu? Uyumsuzsa False (klip DUSER).
+
+    Sira:
+      1) Kare kapisi (tablo bagimsiz). Uygulanabildiyse KARARI O VERIR.
+      2) Uygulanamadiysa (beklenti yok / butce / anahtar yok) ve `yer_terim`
+         doluysa ESKI `_vision_yer_uygun` katmani calisir — gerileme yok.
+    """
+    if _kare_kapisi is None or not KARE_KAPISI:
+        return _vision_yer_uygun(video_yolu, sorgu, yer_terim, kimlik)
+    if not VISION_DOGRULA:
+        return True
+    with _KARE_KILIT:
+        # ⚠ Is ortasinda ASLA yeniden kurma: paralel thread'ler ayni anda
+        # gorse butce sifirlanir ve tavan anlamini yitirir.
+        butce = _kare_butce[0]
+    if butce is None:
+        butce = kare_butce_kur()
+    ok, kod, gerekce = _kare_kapisi.kare_kapisi(
+        sorgu, _VIDEO_BAGLAM_METNI,
+        (lambda: _kare_gozlem_oku(video_yolu)),
+        butce=butce, onbellek=_kare_onbellek, kimlik=kimlik)
+    if not ok:
+        print(f"  KARE RED [{saglayici}] {os.path.basename(video_yolu)}: {gerekce}",
+              file=sys.stderr)
+        with _KARE_KILIT:
+            if len(_KARE_REDLERI) < 50:
+                _KARE_REDLERI.append({"saglayici": saglayici, "sorgu": str(sorgu)[:90],
+                                      "kod": kod, "gerekce": gerekce})
+        return False
+    # Kapi UYGULANAMADI -> eski katmana dus (gerileme yok)
+    if kod in ("BEKLENTI-YOK", "BUTCE", "OKUMA-HATASI", "OKUYUCU-YOK"):
+        return _vision_yer_uygun(video_yolu, sorgu, yer_terim, kimlik)
+    return True
+
+
 def _etkin_yer(sorgu: str) -> list:
     """Bu sorgu icin gecerli yer kisiti: sorgununki varsa o, yoksa VIDEONUN yeri."""
     return _sorgu_yer_terimleri(sorgu) or list(_YER_BAGLAM)
@@ -1018,6 +1172,15 @@ def coverr_video(sorgu: str, hedef: str) -> bool:
             continue
         for h in secilmis[:4]:
             if _indir_ve_hazirla(_coverr_mp4(h), hedef):
+                # Faz I-1: Coverr'da indirme sonrasi kare kapisi HIC YOKTU —
+                # metin kapilarini gecen yanlis-yer klibi buradan gecebiliyordu.
+                if not _kare_dogrula(hedef, sorgu, _etkin_yer(sorgu),
+                                     str(h.get("id") or _coverr_mp4(h)), "coverr"):
+                    try:
+                        os.remove(hedef)
+                    except Exception:
+                        pass
+                    continue
                 print(f"  coverr OK [{q}]: {str(h.get('title'))[:40]} "
                       f"({h.get('max_width')}x{h.get('max_height')})", file=sys.stderr)
                 return True
@@ -1118,7 +1281,8 @@ def pexels_video(sorgu: str, hedef: str) -> bool:
                     # KAREYE BAK: slug "japanese" diyor olabilir ama iceride Batili
                     # oyuncu olan reklam stogu olabilir. Reddedilirse dosya silinip
                     # siradaki aday denenir.
-                    if not _vision_yer_uygun(hedef, sorgu, yer_terim, str(v.get("id"))):
+                    if not _kare_dogrula(hedef, sorgu, yer_terim,
+                                         str(v.get("id")), "pexels"):
                         _klip_isaretle(v.get("id"))     # bir daha denenmesin
                         try:
                             os.remove(hedef)
@@ -1183,7 +1347,7 @@ def pixabay_video(sorgu: str, hedef: str) -> bool:
                 break
         for url, w, h, etiket in (dortk + fullhd)[:4]:
             if _indir_ve_hazirla(url, hedef):
-                if not _vision_yer_uygun(hedef, sorgu, yer_terim, url):
+                if not _kare_dogrula(hedef, sorgu, yer_terim, url, "pixabay"):
                     try:
                         os.remove(hedef)
                     except Exception:
@@ -1248,6 +1412,16 @@ def freepik_video(sorgu: str, hedef: str) -> bool:
                 url = (dr.json().get("data") or {}).get("url")
                 if url and _indir_ve_hazirla(url, hedef):
                     freepik_sayac_artir(anahtar)   # SADECE basarili indirme kota yer
+                    # ⚠ Kota ZATEN yendi (indirme oldu); kare reddederse klip
+                    # silinir ama sayac geri alinmaz — saglayici tarafinda
+                    # indirme gerceklesti, sahte muhasebe yapmiyoruz.
+                    if not _kare_dogrula(hedef, sorgu, _etkin_yer(sorgu),
+                                         str(vid), "freepik"):
+                        try:
+                            os.remove(hedef)
+                        except Exception:
+                            pass
+                        continue
                     return True
             else:
                 return False       # aramada sonuc vardi ama hicbiri inmedi: anahtar sorunu degil

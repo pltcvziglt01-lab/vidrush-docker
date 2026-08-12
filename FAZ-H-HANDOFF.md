@@ -163,7 +163,8 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **CANLIYA ÇIKILDI** + Shackleton pilotu | `ee318ca` | ✅ |
 | 12 Ağu | H5 medya doğruluk kapısı (biyom/dönem) | `da44489` | ✅ |
 | 12 Ağu | H6 render sonrası QA kapısı | `171737c` | ✅ |
-| 12 Ağu | H4 otomatik girdi analizi | bu commit | ✅ **CANLI** |
+| 12 Ağu | H4 otomatik girdi analizi | `d40936f` | ✅ **CANLI** |
+| 12 Ağu | **I-1 kare kapısı** — medya seçim akışına bağlandı | bu commit | ✅ yerel yeşil, **deploy YOK** |
 
 ---
 
@@ -400,8 +401,130 @@ doğrulaması gerekir (§10 madde 1'in kalan yarısı).
 ```bash
 python3 -m venv .venv-test
 .venv-test/bin/pip install fastapi python-multipart httpx pillow requests edge-tts
-for t in a b c d e f g; do python3 webapp/testler/test_faz_$t.py; done
+for t in a b c d e f g i; do python3 webapp/testler/test_faz_$t.py; done
 .venv-test/bin/python webapp/testler/test_faz_h.py
 ```
 
 Faz H fastapi olmadan da koşar; gerçek uç bloğu **BLOKE** yazar ve başarı saymaz.
+Faz I ağ/para harcamaz — kapı kararı saf fonksiyondur, entegrasyon sahte okuyucuyla koşar.
+
+---
+
+## 15. FAZ I-1 — KARE KAPISI gerçek medya seçim akışına bağlandı (12 Ağu, ölçüldü)
+
+### Kapatılan açık
+
+§13'ün son satırı ("Bilinen sınır") bu maddeyi açık bırakmıştı:
+
+```
+sorgu   : "small boat South Georgia sea storm"
+gelen   : "maltese pilot motorboat"     (Pexels)
+kapı    : TETİKLENMEDİ
+```
+
+**Kök neden ölçüldü — kare bakan katman zaten vardı ama devre dışıydı:**
+
+| Katman | Neden yakalayamadı |
+|---|---|
+| `kaynak._yer_dogru_mu` | `YER_TAKMA_AD` = **19 ülke**. Ne Malta ne South Georgia tabloda. |
+| `medya_kapisi.biyom_kapisi` | "maltese pilot motorboat" metni ne tropik ne çöl işareti taşıyor → çelişki çıkmıyor. Testte kilitli: bu vaka **hâlâ** metin kapısından geçiyor. |
+| `kaynak._vision_yer_uygun` | **Yalnızca `yer_terim` doluyken** çalışır. Tablo dışı yerde `_etkin_yer()` boş döner → **vision hiç çağrılmaz.** |
+
+Yani kare bakan katman tam da gerektiği vakada kapalıydı.
+
+### Yeni: `webapp/medya/kare_kapisi.py` (tablo BAĞIMSIZ)
+
+- **Bölge/havza tablosu:** 17 bölge · 266 yer terimi · 14 havza · 7 komşuluk grubu
+  (`kare_kapisi.kapsam_ozeti()` ile **ölçülebilir** — "her yeri biliyoruz" iddiası yok).
+- **Havza kuralı, ülke kuralı değil.** Red yalnızca kabaca kıta/deniz havzası
+  farklıysa verilir. Malta → `avrupa_akdeniz`, South Georgia → `guney_kutup` → **RED**.
+- **`karar()` SAF fonksiyon** — ağ/dosya/saat görmez. Pilot vakası testte doğrudan kilitli.
+
+### Yanlış pozitif korumaları (hepsi testli)
+
+| Durum | Davranış | Kod |
+|---|---|---|
+| Gözlem güveni < 0.6 | GEÇER | `DUSUK-GUVEN` |
+| Boş/okunamayan gözlem | GEÇER | `GOZLEM-YOK` |
+| Kültürel ipucusuz yakın plan | GEÇER | `YAKIN-PLAN` |
+| Karede tanınan bölge yok | GEÇER | `BOLGE-CIKMADI` |
+| Sahneden beklenti çıkmıyor | GEÇER, **okuma bile yapılmaz** | `BEKLENTI-YOK` |
+| Komşu havza (Fransa ↔ Akdeniz, Patagonya ↔ Ge. Amerika) | GEÇER | — |
+| Aday hem beklenen hem başka bölge işareti taşıyor | GEÇER | — |
+| Okuyucu istisna fırlattı | GEÇER, gerekçe görünür | `OKUMA-HATASI` |
+| Bütçe doldu | GEÇER + işe **dürüstçe** yazılır | `BUTCE` |
+
+### Katı süre ve maliyet sınırı
+
+`KareButce(maks_cagri, maks_usd, maks_sn)` — **üçü de zorunlu**, `None` geçmek
+`ValueError`. Varsayılan: **60 çağrı / $0.08 / 180 sn** (env: `KARE_MAKS_*`).
+
+- `yer_ayir()` kontrol + harcamayı **tek kilit altında** yapar. Kilitsiz sayaçla
+  paralel `_sahne_medya` thread'leri tavanı aşıyordu — test 8 thread × 20 deneme
+  ile bunu kilitliyor (tavan 10 → tam 10 verildi).
+- **Tek vision çağrısı/klip.** Eski `_vision_yer_uygun` ile birlikte koşsa klip
+  başına iki fatura çıkardı; yeni okuma ikisinin sorduğunu birden döndürür.
+
+### kaynak.py entegrasyonu
+
+`_kare_dogrula()` tek giriş noktası. **Dört sağlayıcı da** indirme sonrası bağlı:
+
+| Sağlayıcı | Önce | Şimdi |
+|---|---|---|
+| pexels | `_vision_yer_uygun` (tablo bağımlı) | `_kare_dogrula` |
+| pixabay | `_vision_yer_uygun` (tablo bağımlı) | `_kare_dogrula` |
+| coverr | **kare kapısı YOKTU** | `_kare_dogrula` |
+| freepik | **kare kapısı YOKTU** | `_kare_dogrula` |
+
+**Gerileme yok:** kapı uygulanamazsa (`BEKLENTI-YOK` / `BUTCE` / `OKUMA-HATASI` /
+`OKUYUCU-YOK`) eski `_vision_yer_uygun` katmanı çalışır. Reddedilen klip diskten
+silinir, sıradaki aday denenir. `KARE_KAPISI=0` ile tek env'den kapatılır.
+
+⚠ Freepik'te kota sayacı geri alınmaz — indirme sağlayıcı tarafında **gerçekten**
+oldu; sahte muhasebe yapılmıyor.
+
+### pipeline.py
+
+`sonuc["kare_kapisi"]` = `{acik, kapsam, butce, red_sayisi, redler}`.
+Redler `dususler`'e yazılır. **Bütçe engeli de yazılır** — "kalan klipler kare
+doğrulaması OLMADAN geçti, yer isabeti bu klipler için garanti değil".
+Kapı hiç çalışmadıysa `butce.cagri == 0` bunu görünür kılar; "her kare doğrulandı"
+gibi kanıtsız iddia üretilmez.
+
+### Ölçülen test sonucu (12 Ağu)
+
+| Paket | Geçen | Başarısız |
+|---|---|---|
+| A | 125 | 0 |
+| B | 200 | 0 |
+| C | 148 | 0 |
+| D | 95 | 0 |
+| E | 127 | 0 |
+| F | 242 | 0 |
+| G | 217 | 0 |
+| H | 203 | 0 (2 BLOKE) |
+| **I (yeni)** | **81** | **0** |
+| **TOPLAM** | **1438** | **0** |
+
+**BLOKE (gizlenmiyor):** Faz H'de 2 blok — `QA_TEST_VIDEO` ayarlanmadı (opsiyonel)
+ve gerçek uç testi için `fastapi` yerelde kurulu değil (`.venv-test` bu oturumda
+yok). İkisi de **başarı sayılmıyor**. Faz I-1 `server.py`'ye dokunmuyor; import
+sağlığı `test_faz_i` §7 (gerçek `import kaynak`) ve `test_faz_h` §9 (51 dosya
+derleniyor) ile kapsanıyor.
+
+### Bu adımda düzelttiğim iki şey
+
+1. `KareButce` ilk yazımda kilitsizdi. `_sahne_medya` **paralel** koşuyor;
+   "kontrol et sonra harca" yarışı tavanı aşırırdı — yani "katı sınır" iddiası
+   karşılıksız kalırdı. Kilit + `yer_ayir()` eklendi, thread testi kilitledi.
+2. Statik entegrasyon testi `_kare_dogrula\([^)]*"pexels"` deseniyle yazılmıştı;
+   `_etkin_yer(sorgu)` iç parantezi yüzünden desen ilk `)`de duruyor ve **kod
+   doğruyken test kırmızı yanıyordu**. Desen düzeltildi (kod değil).
+
+### Henüz YAPILMADI (I-1'in kalan borcu)
+
+- **Gerçek ücretli pilot yok.** Kapının canlı isabet oranı ölçülmedi; iddia
+  yalnızca "karar mantığı doğru", "model doğru okuyor" **değil**.
+- Bölge tablosu 17 satır — dünya haritası değil. Tablo dışı yerde kapı biyoma düşer.
+- `medya/vision.py` (Faz B enjekte edilebilir puanlayıcı) hâlâ sıralama tarafında
+  bağlı değil; I-1 yalnızca **kapı** yolunu bağladı.

@@ -4379,6 +4379,27 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                         "uygun klip ya da kapsam bosluğu olarak islendi."})
     except Exception as e:
         print(f"  kapi redleri okunamadi: {str(e)[:80]}", file=sys.stderr)
+
+    # Faz I-1: KARE KAPISI ozeti — olculmus, uydurma yok. Kapi kapaliysa ya da
+    # hic cagri yapilmadiysa bunu DURUSTCE yazar; "her kare dogrulandi" demez.
+    try:
+        _kare = kaynak.kare_ozet()
+        sonuc["kare_kapisi"] = _kare
+        if _kare.get("red_sayisi"):
+            sonuc["dususler"].append({
+                "asama": "medya",
+                "neden": f"{_kare['red_sayisi']} aday KARE dogrulamasinda reddedildi "
+                         f"(yer/donem/biyom celiskisi)",
+                "etki": "Metin kapilarindan gecen ama karesi sahneyle celisen "
+                        "klipler kullanilmadi."})
+        for _eng in (_kare.get("butce") or {}).get("engel", [])[:1]:
+            sonuc["dususler"].append({
+                "asama": "medya",
+                "neden": f"kare kapisi butcesi: {_eng}",
+                "etki": "Kalan klipler kare dogrulamasi OLMADAN gecti — "
+                        "yer isabeti bu klipler icin garanti degil."})
+    except Exception as e:
+        print(f"  kare ozeti okunamadi: {str(e)[:80]}", file=sys.stderr)
     uyarilar = []
     if plan.get("_eksik_oran"):
         uyarilar.append(f"İçerik planı beklenenden kısa çıktı (~%{int(plan['_eksik_oran']*100)}).")
