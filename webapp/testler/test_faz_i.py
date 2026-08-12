@@ -64,6 +64,26 @@ def oku(*p):
         return f.read()
 
 
+def _kaldirilan_hata(fn, tip) -> bool:
+    """`fn()` beklenen tipte istisna FIRLATIYOR mu? Sessiz kabul yakalanir."""
+    try:
+        fn()
+    except tip:
+        return True
+    except Exception:
+        return False
+    return False
+
+
+def _derlenir(yol: str) -> bool:
+    import py_compile as _pc
+    try:
+        _pc.compile(yol, doraise=True)
+        return True
+    except Exception:
+        return False
+
+
 from medya import kare_kapisi as kk          # noqa: E402
 import medya_kapisi as mk                    # noqa: E402
 
@@ -1421,6 +1441,382 @@ for _f in ("js/basit.js", "js/wizard.js", "js/durum.js"):
     if _r is not None:
         kontrol(f"sozdizimi temiz: {_f}", _r.returncode == 0,
                 (_r.stderr or "").strip().splitlines()[:1])
+
+
+# ═══════════════ 17. FAZ I-4 — REFERANS VIDEO PARMAK IZI SOZLESMESI ═══════════════
+# ⚠ BU BOLUMUN IDDIASI: surumlu/genisletilebilir bir STIL OZELLIK SOZLESMESI ve
+# GUVENLI ANALIZ KAPISI var. Tam vision modeli ya da ucretli analiz BU ADIMDA
+# YOK — testler de bunu kilitliyor (ag kutuphanesi yok, varsayilan USD tavani 0).
+blok("17. I-4 — referans parmak izi sozlesmesi: kapsam ve genisletilebilirlik")
+
+import shutil as _sh                                  # noqa: E402
+import tempfile                                       # noqa: E402
+
+import referans_parmak as rp                          # noqa: E402
+
+_rk = rp.kapsam_ozeti()
+kontrol("kapsam_ozeti sayilabilir",
+        all(isinstance(_rk.get(k), int) for k in
+            ("boyut", "alan", "yasak_alan", "durdurma_nedeni", "lisans",
+             "kaynak_turu", "arsiv")), str(_rk))
+kontrol("7 soyut boyut var", _rk["boyut"] >= 7, str(_rk["boyut"]))
+kontrol("en az 25 ozellik alani", _rk["alan"] >= 25, str(_rk["alan"]))
+kontrol("istenen boyutlarin hepsi tanimli",
+        {"ritim", "cekim", "gecis", "tipografi", "renk", "kamera", "ses"}
+        <= set(rp.OZELLIK_SEMASI), str(sorted(rp.OZELLIK_SEMASI)))
+_bicim = [f"{b}.{a}" for b, al in rp.OZELLIK_SEMASI.items()
+          for a, v in al.items()
+          if not (isinstance(v, tuple) and len(v) == 4
+                  and v[0] in (float, str, bool) and isinstance(v[3], str))]
+kontrol("her alan (tip, birim, fallback, aciklama) bicimli", not _bicim,
+        str(_bicim))
+_fb = [f"{b}.{a}" for b, al in rp.OZELLIK_SEMASI.items()
+       for a, (t, _br, fb, _ac) in al.items() if not rp._tip_uygun(fb, t)]
+kontrol("fallback degerleri semadaki tiple UYUMLU", not _fb, str(_fb))
+
+# Cekirdek kod alan adi BILMIYOR: semaya satir eklemek yeter
+_ek_boyut = "ritim"
+rp.OZELLIK_SEMASI[_ek_boyut]["_gecici_alan"] = (float, "sn", 1.5, "gecici")
+try:
+    _p_ek = rp.parmak_kur({"acik": True}, {})
+    kontrol("YENI ALAN cekirdek kod DEGISMEDEN uretiliyor",
+            "_gecici_alan" in _p_ek["ozellik"][_ek_boyut]
+            and _p_ek["ozellik"][_ek_boyut]["_gecici_alan"]["deger"] == 1.5)
+    kontrol("yeni alan dogrulamadan da geciyor", not rp.dogrula(_p_ek))
+finally:
+    del rp.OZELLIK_SEMASI[_ek_boyut]["_gecici_alan"]
+
+# Surumleme
+_ars_p = rp.bos_parmak("VIDEO-YOK")
+_anahtar = rp.arsivle("ref-abc", _ars_p)
+kontrol("arsivlenen surum AYNEN geri geliyor",
+        rp.arsivden_al("ref-abc", rp.SEMA_SURUM)["sema_surum"] == rp.SEMA_SURUM)
+kontrol("olmayan surum SESSIZCE baskasini DONDURMUYOR",
+        _kaldirilan_hata(lambda: rp.arsivden_al("ref-abc", "9.9.9"), KeyError))
+kontrol("arsiv DERIN KOPYA (kayit disaridan bozulamaz)",
+        (lambda a: (a["ozellik"].clear(),
+                    rp.arsivden_al("ref-abc", rp.SEMA_SURUM)["ozellik"] != {})[1])(
+            rp.arsivden_al("ref-abc", rp.SEMA_SURUM)))
+
+
+blok("17b. I-4 — YASAK ALANLAR (kaynak video KOPYALANMAZ)")
+
+kontrol("en az 8 yasak alan tanimli", len(rp.YASAK_ALAN) >= 8,
+        str(len(rp.YASAK_ALAN)))
+kontrol("her yasak alanin aciklamasi var",
+        all(isinstance(v, str) and len(v) > 10 for v in rp.YASAK_ALAN.values()))
+for _y in ("kisi_kimligi", "marka_logo", "ozgun_metin", "sahne_kopyasi",
+           "ses_kopyasi"):
+    kontrol(f"yasak alan tanimli: {_y}", _y in rp.YASAK_ALAN)
+kontrol("SEMA kendi yasagini ihlal ETMIYOR",
+        not rp.yasak_denetle(rp.OZELLIK_SEMASI),
+        str(rp.yasak_denetle(rp.OZELLIK_SEMASI)[:2]))
+kontrol("parmak izi yasak beyanini TASIYOR",
+        set(rp.bos_parmak("VIDEO-YOK")["yasak_beyani"]) == set(rp.YASAK_ALAN))
+
+_ihlal = rp.bos_parmak("VIDEO-YOK")
+_ihlal["kisi_kimligi"] = "Ahmet Y."
+kontrol("yasak alan ENJEKSIYONU reddediliyor",
+        any("SOZLESME IHLALI" in h for h in rp.dogrula(_ihlal)),
+        str(rp.dogrula(_ihlal)[:1]))
+_ic = rp.bos_parmak("VIDEO-YOK")
+_ic["kimlik"] = {"ek": {"derin": {"marka_logo": "X"}}}
+kontrol("IC ICE yasak alan da yakalaniyor",
+        any("marka_logo" in h for h in rp.dogrula(_ic)))
+kontrol("gomulu veri (data URI) reddediliyor",
+        rp.yasak_denetle({"a": "data:image/png;base64,AAAA"}))
+kontrol("ham ikili veri reddediliyor", rp.yasak_denetle({"a": b"\x00\x01"}))
+kontrol("asiri uzun metin (ozgun icerik kopyasi) reddediliyor",
+        rp.yasak_denetle({"a": "x" * 500}))
+kontrol("normal kisa metin reddedilMIYOR (yanlis pozitif yok)",
+        not rp.yasak_denetle({"baskin_tur": "hard-cut", "sinif": "orta"}))
+
+
+blok("17c. I-4 — GUVENLI KAPI: normal / hata / guvenlik / fallback")
+
+_PROBE_OK = json.dumps({
+    "streams": [{"width": 1920, "height": 1080, "r_frame_rate": "30/1",
+                 "codec_name": "h264"}],
+    "format": {"duration": "120.5", "size": "4096",
+               "format_name": "mov,mp4,m4a"}})
+_BEYAN = {"kaynak_turu": "yukleme", "lisans": "sahibiyim", "stil_izni": True}
+
+
+def _yeni_butce(**ez):
+    ayar = {"maks_kare": 6, "maks_sn": 30.0, "maks_usd": 0.0}
+    ayar.update(ez)
+    return rp.ParmakButce(**ayar)
+
+
+_kok = tempfile.mkdtemp(prefix="i4_ref_")
+try:
+    _vid = os.path.join(_kok, "ref.mp4")
+    with open(_vid, "wb") as _f:
+        _f.write(b"x" * 4096)
+
+    # ── NORMAL ──
+    _k = rp.kapi(_vid, beyan=_BEYAN, butce=_yeni_butce(), izinli_kok=_kok,
+                 probe_fn=lambda c: _PROBE_OK)
+    kontrol("gecerli video + beyan -> kapi ACIK", _k["acik"], str(_k["neden"]))
+    kontrol("codec/cozunurluk/sure OKUNUYOR",
+            _k["medya"]["codec"] == "h264" and _k["medya"]["genislik"] == 1920
+            and _k["medya"]["yukseklik"] == 1080
+            and _k["medya"]["sure_sn"] == 120.5, str(_k["medya"]))
+    kontrol("fps okunuyor", _k["medya"]["fps"] == 30.0)
+    kontrol("kimlik/provenance hash iceriyor",
+            len(_k["kimlik"]["sha256"]) == 64 and _k["kimlik"]["bayt"] == 4096)
+    kontrol("kimlik lisans ve kaynak turunu TASIYOR",
+            _k["kimlik"]["lisans"] == "sahibiyim"
+            and _k["kimlik"]["kaynak_turu"] == "yukleme")
+    kontrol("ornekleme plani uretiliyor", _k["plan"]["adet"] == 6)
+    kontrol("ffprobe komutu YEREL ve ucretsiz",
+            rp.medya_probe_komutu(_vid)[0] == "ffprobe")
+
+    # ── HATA / GUVENLIK ──
+    _vak = [
+        ("video verilmedi", "", _BEYAN, _kok, "VIDEO-YOK"),
+        ("dosya yok", os.path.join(_kok, "yok.mp4"), _BEYAN, _kok, "DOSYA-YOK"),
+        ("dizin verildi", _kok, _BEYAN, _kok, "DOSYA-TURU"),
+        ("traversal", os.path.join(_kok, "..", "..", "etc", "passwd"),
+         _BEYAN, _kok, "YOL-GUVENSIZ"),
+        ("izinli kok disi", "/etc/hosts", _BEYAN, _kok, "YOL-GUVENSIZ"),
+        ("provenance yok", _vid, {}, _kok, "PROVENANCE-EKSIK"),
+        ("kaynak turu gecersiz", _vid,
+         {"kaynak_turu": "internetten-buldum", "lisans": "sahibiyim",
+          "stil_izni": True}, _kok, "PROVENANCE-EKSIK"),
+        ("lisans yok", _vid, {"kaynak_turu": "yukleme"}, _kok, "LISANS-EKSIK"),
+        ("lisans 'bilinmiyor' KABUL EDILMIYOR", _vid,
+         {"kaynak_turu": "yukleme", "lisans": "bilinmiyor", "stil_izni": True},
+         _kok, "LISANS-EKSIK"),
+        ("stil izni verilmemis", _vid,
+         {"kaynak_turu": "yukleme", "lisans": "sahibiyim"}, _kok,
+         "LISANS-EKSIK"),
+    ]
+    for _ad, _y, _b, _kk, _bek in _vak:
+        _s = rp.kapi(_y, beyan=_b, butce=_yeni_butce(), izinli_kok=_kk,
+                     probe_fn=lambda c: _PROBE_OK)
+        kontrol(f"kontrollu dur: {_ad} -> {_bek}",
+                not _s["acik"] and _s["neden"] == _bek, str(_s["neden"]))
+
+    # Sembolik baglanti izinli kokte ama HEDEFI disarida
+    _sym = os.path.join(_kok, "kacak.mp4")
+    try:
+        os.symlink("/etc/hosts", _sym)
+        _s = rp.kapi(_sym, beyan=_BEYAN, butce=_yeni_butce(), izinli_kok=_kok,
+                     probe_fn=lambda c: _PROBE_OK)
+        kontrol("SYMLINK ile kok disina kacis engelleniyor",
+                not _s["acik"] and _s["neden"] == "YOL-GUVENSIZ", str(_s["neden"]))
+    except (OSError, NotImplementedError):
+        bloke_yaz("symlink kacis testi", "symlink olusturulamadi")
+
+    # Bozuk / eksik medya
+    _bos = os.path.join(_kok, "bos.mp4")
+    open(_bos, "wb").close()
+    kontrol("bos dosya -> BOZUK-MEDYA",
+            rp.kapi(_bos, beyan=_BEYAN, butce=_yeni_butce(), izinli_kok=_kok,
+                    probe_fn=lambda c: _PROBE_OK)["neden"] == "BOZUK-MEDYA")
+    for _ad, _fn in [("probe bozuk JSON", lambda c: "bu json degil"),
+                     ("probe bos", lambda c: ""),
+                     ("video akisi yok",
+                      lambda c: json.dumps({"streams": [],
+                                            "format": {"duration": "60"}}))]:
+        kontrol(f"kontrollu dur: {_ad} -> BOZUK-MEDYA",
+                rp.kapi(_vid, beyan=_BEYAN, butce=_yeni_butce(),
+                        izinli_kok=_kok, probe_fn=_fn)["neden"] == "BOZUK-MEDYA")
+
+    def _patlayan(c):
+        raise RuntimeError("kasitli probe patlamasi")
+
+    _s = rp.kapi(_vid, beyan=_BEYAN, butce=_yeni_butce(), izinli_kok=_kok,
+                 probe_fn=_patlayan)
+    kontrol("probe PATLARSA kapi cokmuyor, kontrollu duruyor",
+            not _s["acik"] and _s["neden"] == "BOZUK-MEDYA")
+    kontrol("olcum araci yoksa ARAC-YOK",
+            rp.kapi(_vid, beyan=_BEYAN, butce=_yeni_butce(), izinli_kok=_kok,
+                    probe_fn=None, arac_var=False)["neden"] == "ARAC-YOK")
+
+    # Sure / boyut tavanlari
+    _uzun = json.dumps({"streams": [{"width": 1920, "height": 1080,
+                                     "r_frame_rate": "30/1",
+                                     "codec_name": "h264"}],
+                        "format": {"duration": "99999"}})
+    kontrol("cok uzun video -> SURE-ASIMI",
+            rp.kapi(_vid, beyan=_BEYAN, butce=_yeni_butce(), izinli_kok=_kok,
+                    probe_fn=lambda c: _uzun)["neden"] == "SURE-ASIMI")
+    _kisa = json.dumps({"streams": [{"width": 1920, "height": 1080,
+                                     "r_frame_rate": "30/1",
+                                     "codec_name": "h264"}],
+                        "format": {"duration": "3"}})
+    kontrol("cok kisa video -> SURE-YETERSIZ",
+            rp.kapi(_vid, beyan=_BEYAN, butce=_yeni_butce(), izinli_kok=_kok,
+                    probe_fn=lambda c: _kisa)["neden"] == "SURE-YETERSIZ")
+    kontrol("buyuk dosya -> BOYUT-ASIMI",
+            rp.kapi(_vid, beyan=_BEYAN, butce=_yeni_butce(maks_bayt=10),
+                    izinli_kok=_kok,
+                    probe_fn=lambda c: _PROBE_OK)["neden"] == "BOYUT-ASIMI")
+    kontrol("butce kapaliysa -> BUTCE",
+            rp.kapi(_vid, beyan=_BEYAN, butce=_yeni_butce(maks_kare=0),
+                    izinli_kok=_kok,
+                    probe_fn=lambda c: _PROBE_OK)["neden"] == "BUTCE")
+    kontrol("butce siniri ustunde HASH ALINMIYOR (buyuk dosya okunmaz)",
+            rp.dosya_ozeti(_vid, 10)["hash_alindi"] is False)
+
+    kontrol("her durdurma nedeninin ACIKLAMASI var",
+            all(isinstance(v, str) and v for v in rp.DURDURMA_NEDENI.values()))
+    _tanimsiz = {v[4] for v in _vak} - set(rp.DURDURMA_NEDENI)
+    kontrol("uretilen tum nedenler tabloda tanimli", not _tanimsiz,
+            str(_tanimsiz))
+
+    # ── PARMAK IZI: FALLBACK ve UYDURMA YASAGI ──
+    blok("17d. I-4 — parmak izi: fallback gorunur, UYDURMA yok")
+
+    _b = _yeni_butce()
+    _kapali = rp.kapi("", beyan=_BEYAN, butce=_b, izinli_kok=_kok)
+    _p0 = rp.parmak_kur(_kapali, butce=_b)
+    kontrol("kapi kapaliyken durum OLCULMEDI", _p0["durum"] == "OLCULMEDI")
+    kontrol("kapali kapida HICBIR alan 'olculdu' degil",
+            all(v["kaynak"] != "olculdu" for blk in _p0["ozellik"].values()
+                for v in blk.values()))
+    kontrol("kapali kapida guven 0.0 (uydurma yok)", _p0["guven"] == 0.0)
+    kontrol("durdurma sebebi parmak izinde GORUNUR",
+            _p0["neden"] == "VIDEO-YOK" and _p0["aciklama"])
+    kontrol("butce ozeti parmak izine yaziliyor", "engel" in _p0["butce"])
+    kontrol("bos parmak izi semaya UYUYOR", not rp.dogrula(_p0))
+
+    _k2 = rp.kapi(_vid, beyan=_BEYAN, butce=_b, izinli_kok=_kok,
+                  probe_fn=lambda c: _PROBE_OK)
+    _p1 = rp.parmak_kur(_k2, {}, _b)
+    kontrol("kapi ACIK ama olcum YOKSA yine OLCULMEDI",
+            _p1["durum"] == "OLCULMEDI" and _p1["olculen_alan"] == 0)
+
+    _olc = {"ritim": {"kesme_dk": (12.4, 0.8, "25 kesme / 120.5 sn"),
+                      "tempo_sinifi": ("hizli", 0.6, "kesme yogunlugu")},
+            "cekim": {"medyan_sn": (4.2, 0.7, "olculen dagilim")}}
+    _p2 = rp.parmak_kur(_k2, _olc, _b)
+    kontrol("olculen alanlar 'olculdu' kaynagini tasiyor",
+            _p2["ozellik"]["ritim"]["kesme_dk"]["kaynak"] == "olculdu"
+            and _p2["ozellik"]["ritim"]["kesme_dk"]["deger"] == 12.4)
+    kontrol("olculen alanda KANIT metni var",
+            "25 kesme" in _p2["ozellik"]["ritim"]["kesme_dk"]["kanit"])
+    kontrol("olculmeyen alan 'varsayilan' + guven 0.0 (gizlenmiyor)",
+            _p2["ozellik"]["renk"]["parlaklik_ort"]["kaynak"] == "varsayilan"
+            and _p2["ozellik"]["renk"]["parlaklik_ort"]["guven"] == 0.0)
+    kontrol("kac alanin olculdugu SAYILABILIR",
+            _p2["olculen_alan"] == 3 and _p2["toplam_alan"] == _rk["alan"],
+            f"{_p2['olculen_alan']}/{_p2['toplam_alan']}")
+    kontrol("durum OLCULDU ve genel guven ortalamadan",
+            _p2["durum"] == "OLCULDU" and 0 < _p2["guven"] <= 1)
+    kontrol("dolu parmak izi semaya UYUYOR", not rp.dogrula(_p2))
+    kontrol("kimlik/medya/plan parmak izine tasiniyor",
+            _p2["kimlik"].get("sha256") and _p2["medya"].get("codec")
+            and _p2["plan"].get("adet"))
+
+    _kotu = rp.parmak_kur(_k2, {"ritim": {"kesme_dk": ("cok hizli", 0.9, "x"),
+                                          "tempo_sinifi": (3.5, 0.9, "x")}}, _b)
+    kontrol("YANLIS TIPTE olcum sessizce kabul EDILMIYOR",
+            _kotu["ozellik"]["ritim"]["kesme_dk"]["kaynak"] == "varsayilan"
+            and _kotu["ozellik"]["ritim"]["tempo_sinifi"]["kaynak"] == "varsayilan")
+    _asiri = rp.parmak_kur(_k2, {"ritim": {"kesme_dk": (9.0, 7.5, "x")}}, _b)
+    kontrol("guven 0-1 araligina KIRPILIYOR",
+            _asiri["ozellik"]["ritim"]["kesme_dk"]["guven"] == 1.0)
+    _sahte = rp.bos_parmak("VIDEO-YOK")
+    _sahte["ozellik"]["ritim"]["kesme_dk"]["guven"] = 0.9
+    kontrol("olculmedigi halde guven>0 DOGRULAMADAN GECMIYOR",
+            any("guven > 0" in h for h in rp.dogrula(_sahte)))
+
+    # ── ORNEKLEME PLANI ──
+    blok("17e. I-4 — ornekleme plani ve butce")
+
+    _pl1 = rp.ornekleme_plani(120.0, _yeni_butce())
+    _pl2 = rp.ornekleme_plani(120.0, _yeni_butce())
+    kontrol("plan DETERMINISTIK (ayni girdi -> ayni plan)", _pl1 == _pl2)
+    kontrol("plan butce tavanini ASMIYOR", _pl1["adet"] <= 6)
+    kontrol("kenar kirpmasi uygulaniyor (jenerik stil degildir)",
+            _pl1["kirpma_sn"] > 0 and _pl1["saniyeler"][0] >= _pl1["kirpma_sn"])
+    kontrol("son ornek video sonunu ASMIYOR", _pl1["saniyeler"][-1] <= 120.0)
+    kontrol("tek kare butcesinde ORTA nokta secilir",
+            rp.ornekleme_plani(100.0, _yeni_butce(maks_kare=1))["adet"] == 1)
+    kontrol("kare butcesi 0 -> BOS plan (uydurma ornek yok)",
+            rp.ornekleme_plani(120.0, _yeni_butce(maks_kare=0))["adet"] == 0)
+    kontrol("sure 0 -> BOS plan",
+            rp.ornekleme_plani(0, _yeni_butce())["adet"] == 0)
+    kontrol("plan gerekcesi yaziliyor", "deterministik" in _pl1["gerekce"])
+
+    for _alan_ad in ("maks_kare", "maks_sn", "maks_usd", "maks_bayt",
+                     "maks_sure_sn"):
+        kontrol(f"SINIRSIZ butce yasak: {_alan_ad}=None -> ValueError",
+                _kaldirilan_hata(lambda a=_alan_ad: rp.ParmakButce(**{a: None}),
+                                 ValueError))
+    kontrol("negatif tavan reddediliyor",
+            _kaldirilan_hata(lambda: rp.ParmakButce(maks_kare=-1), ValueError))
+    kontrol("VARSAYILAN USD tavani 0 (bu adimda ucretli cagriya yer YOK)",
+            rp.varsayilan_butce().maks_usd == 0.0)
+    kontrol("ucretli birim istenirse butce KAPALI kalir",
+            rp.varsayilan_butce().uygun_mu(0.01)[0] is False)
+
+    # Thread guvenligi: kilitsiz sayacla tavan asilirdi
+    _tb = rp.ParmakButce(maks_kare=10, maks_sn=30, maks_usd=0.0)
+    _verilen = []
+    _kilit = threading.Lock()
+
+    def _yaris():
+        for _ in range(20):
+            ok, _n = _tb.yer_ayir(0.0)
+            if ok:
+                with _kilit:
+                    _verilen.append(1)
+
+    _th = [threading.Thread(target=_yaris) for _ in range(8)]
+    [t.start() for t in _th]
+    [t.join() for t in _th]
+    kontrol("THREAD GUVENLI: paralel istekte tavan ASILMIYOR",
+            len(_verilen) == 10, f"{len(_verilen)} verildi (tavan 10)")
+    kontrol("butce engeli SESSIZ degil, kayda yaziliyor", bool(_tb.ozet()["engel"]))
+finally:
+    _sh.rmtree(_kok, ignore_errors=True)
+
+
+blok("17f. I-4 — ag/ucret yok ve mevcut sozlesmeler KORUNDU")
+
+_RP_KAYNAK = oku(KOK, "referans_parmak.py")
+kontrol("modul AG KULLANMIYOR (ucretsiz)",
+        all(x not in _RP_KAYNAK for x in
+            ("requests", "urllib", "http://", "https://", "openai",
+             "socket")), "ag izi bulundu")
+# ⚠ "vision cagrilmiyor" iddiasi DIZE TARAMASIYLA yetinmez: modul kendi
+# dokumantasyonunda zaten "tam vision modeli YAPILMIYOR" diyor. Olculen sey
+# CAGRI IZI: model kimligi, sohbet ucu ya da ffprobe disinda bir dis komut.
+kontrol("MODEL KIMLIGI ya da sohbet ucu izi YOK",
+        not re.search(r"gpt-|claude-|gemini|chat\.completions|oai_chat|"
+                      r"\.messages\.create", _RP_KAYNAK, re.I))
+_komutlar = set(re.findall(r'^\s*return \["(\w+)"', _RP_KAYNAK, re.M))
+kontrol("TEK dis komut ffprobe (ucretsiz, yerel)", _komutlar == {"ffprobe"},
+        str(_komutlar))
+kontrol("modul kendisi ALT SUREC baslatmiyor (komutu yalnizca URETIYOR)",
+        "subprocess" not in _RP_KAYNAK)
+kontrol("olcum DISARIDAN enjekte ediliyor (motor bu adimda yazilmadi)",
+        "def parmak_kur(kapi_sonucu: dict, olcumler: dict = None" in _RP_KAYNAK)
+kontrol("referans_parmak.py derleniyor",
+        _derlenir(os.path.join(KOK, "referans_parmak.py")))
+
+# ⚠ MEVCUT SOZLESMELER: bu adim hicbirine dokunmadi
+_SRV = oku(KOK, "server.py")
+kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("server.py referans_parmak'i HENUZ import etmiyor (baglanti sonraki adim)",
+        "referans_parmak" not in _SRV)
+kontrol("pipeline.py referans_parmak'i HENUZ import etmiyor",
+        "referans_parmak" not in oku(KOK, "pipeline.py"))
+kontrol("basit mod KORUNDU", "basitGovde" in oku(KOK, "static/js/wizard.js"))
+kontrol("sure secici KORUNDU", "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js"))
+kontrol("unlu modu KORUNDU",
+        "d.unlu = t.unlu ? '1' : '0'" in oku(KOK, "static/js/wizard.js"))
+kontrol("ses kutuphanesi KORUNDU",
+        "sesBolumu({" in oku(KOK, "static/js/basit.js"))
+kontrol("deploy.sh ezme korumasi KORUNDU",
+        "GERIDE" in open(os.path.join(KOK, "..", "deploy.sh"),
+                         encoding="utf-8").read())
 
 
 print(f"\n{'=' * 60}")

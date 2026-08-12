@@ -168,7 +168,8 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-2a hiyerarşik konsept taksonomisi** | `687e004` | ✅ yerel yeşil, **deploy YOK** |
 | 12 Ağu | **I-2b sürümlü bileşik stil profilleri** | `fff3f36` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-2c akışa bağlama** (taksonomi + stil profili → `analiz()`) | `0945a2f` | ✅ **origin'e push edildi**, deploy YOK |
-| 12 Ağu | **I-3 basit "Metin + Stil + Auto" arayüzü** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
+| 12 Ağu | **I-3 basit "Metin + Stil + Auto" arayüzü** | `37b0b04` | ✅ **origin'e push edildi**, deploy YOK |
+| 12 Ağu | **I-4 referans video parmak izi sözleşmesi** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
 
 ---
 
@@ -934,8 +935,7 @@ dahil. Kalan tek BLOKE `QA_TEST_VIDEO` (opsiyonel, ölçüm videosu yok).
 
 ## 19. FAZ I-3 — BASİT "METİN + STİL + AUTO" ARAYÜZÜ (12 Ağu, ölçüldü)
 
-> **Durum: yazıldı + testlendi + tarayıcıda doğrulandı, dosyalar staged.**
-> **Commit YOK, deploy YOK.**
+> **Durum: commit `37b0b04`, `origin/arastirma-motoru`'na PUSH EDİLDİ. Deploy YOK.**
 > Yeni: `webapp/static/js/basit.js`.
 > Değişen: `webapp/static/js/wizard.js`, `js/durum.js`, `app.css`,
 > `webapp/testler/test_faz_i.py` (+ bu handoff).
@@ -1076,3 +1076,145 @@ tarayıcı URL'ye açıldı — `.claude/` oluşturulmadı.
    üretiyor" iddiası **ölçülmedi**.
 6. **Ücretli uçtan uca üretim denenmedi.** `edit` alanının doğru gittiği
    ölçüldü; o kimlikle çıkan videonun kalitesi bu adımın iddiası değil.
+
+---
+
+## 20. FAZ I-4 — REFERANS VİDEO PARMAK İZİ SÖZLEŞMESİ (12 Ağu, ölçüldü)
+
+> **Durum: yazıldı + testlendi, dosyalar staged. Commit YOK, deploy YOK.**
+> Yeni: `webapp/referans_parmak.py`.
+> Değişen: `webapp/testler/test_faz_i.py` (+ bu handoff).
+> **Dokunulmadı:** `server.py`, `pipeline.py`, `deploy.sh`, tüm arayüz.
+
+### Bu adımda NE YAPILMADI (kasıtlı)
+
+**Tam vision modeli yok. Ücretli analiz yok. Kare okuma yok.** Bu adım
+yalnızca **sözleşme + güvenli kapı**. Gerçek ölçüm `parmak_kur(..., olcumler)`
+ile **dışarıdan enjekte** edilir; verilmezse modül uydurma üretmez.
+
+Ölçülen kilit: modülde model kimliği / sohbet ucu izi **yok**, tek dış komut
+`ffprobe` (ücretsiz, yerel), modül **alt süreç bile başlatmıyor** — komutu
+yalnızca üretiyor. Varsayılan bütçede `maks_usd = 0.0`, yani ücretli çağrıya
+**yer ayrılmıyor**; açmak açık bir karar.
+
+### Sözleşme kapsamı (ölçülebilir)
+
+`kapsam_ozeti()` → **7 boyut · 30 alan · 8 yasak alan · 12 durdurma nedeni ·
+6 lisans · 3 kaynak türü**, şema sürümü `1.0.0`.
+
+| Boyut | Örnek alanlar |
+|---|---|
+| `ritim` | kesme/dk, tempo sınıfı, ritim düzenliliği |
+| `cekim` | medyan/ortalama/p90 sn, kısa-uzun pay %, dağılım sınıfı |
+| `gecis` | geçişli pay %, baskın tür, ortalama süre |
+| `tipografi` | yazı kapsama %, konum eğilimi, kalış süresi, hareket sınıfı |
+| `renk` | parlaklık, kontrast/doygunluk sınıfı, sıcaklık, koyu kare payı |
+| `kamera` | hareket yoğunluğu, baskın hareket, sabit kare payı |
+| `ses` | konuşma yoğunluğu, sessizlik payı, müzik yatağı, ducking dB, ritim hizalanması |
+
+Hepsi **soyut istatistik**. Yeni alan eklemek = `OZELLIK_SEMASI`ya bir satır;
+`parmak_kur()` alan adı bilmez (testle kanıtlı: şemaya geçici alan eklendi,
+çekirdek kod değişmeden üretildi ve doğrulamadan geçti).
+
+### YASAK ALANLAR — sözleşmenin kalbi
+
+Bunlar "yapmamaya çalışırız" değil, **sözleşme ihlali**. `dogrula()` bu izleri
+taşıyan parmak izini **reddeder**:
+
+`kisi_kimligi` · `yuz_bicimi` · `marka_logo` · `ozgun_metin` ·
+`sahne_kopyasi` · `kare_verisi` · `ses_kopyasi` · `seslendirme_klonu`
+
+`yasak_denetle()` yalnızca anahtar adına bakmaz: iç içe sözlüklerde arar,
+`data:`/`base64,` gömülü veriyi, ham `bytes`'ı ve **400 karakteri aşan metni**
+(özgün içerik kopyası olabilir) de reddeder. Kısa sınıf adları
+(`"hard-cut"`, `"orta"`) yanlış pozitif üretmiyor — testli.
+
+Şemanın kendisi de denetleniyor: **sözleşme kendi yasağını ihlal etmiyor.**
+
+### Kaynak kimliği / provenance
+
+Kapı açılmadan önce: yol güvenliği (traversal + symlink çözümü) → düz dosya mı
+→ boyut tavanı → **provenance beyanı** → bütçe → `ffprobe` ile
+codec/çözünürlük/fps/süre → süre tavanı/asgarisi → sha256 + bayt.
+
+⚠ Hash **kimlik** içindir, içerik saklamak için değil: kayıtta yalnızca özet
+durur, videonun kendisi değil. Bütçe sınırı üstündeki dosyanın hash'i
+**alınmaz** (büyük dosya okunmaz).
+
+**Provenance zorunlu, "bilinmiyor" kabul edilmez:** `kaynak_turu` ∈
+{yukleme, kendi-arsivim, lisansli-arsiv}, `lisans` ∈ {sahibiyim, izinli, cc0,
+cc-by, cc-by-sa, public-domain} ve `stil_izni: True`. Üçü de olmadan analiz
+**başlamaz** — sessiz varsayım yok.
+
+### Örnekleme planı — deterministik
+
+`ornekleme_plani(sure, butce)`: kenarlardan %2 kırpar (açılış logosu ve
+kapanış jeneriği stilin kendisi değildir, istatistiği bozar), kalan aralığı
+bütçe kadar eşit böler. **Rastgelelik yok** — aksi halde aynı video iki farklı
+parmak izi üretir ve "tekrar üretilebilir" iddiası karşılıksız kalırdı.
+
+### Kontrollü durma — 12 neden, uydurma yok
+
+`VIDEO-YOK · DOSYA-YOK · DOSYA-TURU · YOL-GUVENSIZ · BOYUT-ASIMI ·
+BOZUK-MEDYA · SURE-ASIMI · SURE-YETERSIZ · PROVENANCE-EKSIK · LISANS-EKSIK ·
+BUTCE · ARAC-YOK`
+
+Her biri için test var. Kapı kapalıysa `bos_parmak()` döner:
+`durum="OLCULMEDI"`, **hiçbir alan `olculdu` değil**, genel güven `0.0`,
+sebep görünür. Probe patlarsa kapı **çökmez**, kontrollü durur.
+
+### Fallback görünür, uydurma yasak
+
+Her alan `kaynak` taşır: `olculdu | varsayilan | olculemedi` + `guven` + `kanit`.
+
+- Ölçülmeyen alan: `varsayilan`, güven **0.0** — gizlenmiyor.
+- `olculen_alan / toplam_alan` sayılabilir (ör. `3/30`).
+- **Yanlış tipte ölçüm sessizce kabul edilmiyor** → fallback'e düşer.
+- Güven 0–1 aralığına kırpılır.
+- `dogrula()`: *ölçülmediği halde güven > 0* olan alan **geçmez**.
+
+### Bütçe
+
+`ParmakButce(maks_kare, maks_sn, maks_usd, maks_bayt, maks_sure_sn)` —
+**beşi de zorunlu**, `None` geçmek `ValueError`, negatif tavan `ValueError`.
+Thread güvenli: 8 thread × 20 deneme ile tavan 10 → **tam 10** verildi
+(kilitsiz sayaç tavanı aşardı). Engeller sessiz değil, `ozet()["engel"]`e yazılır.
+
+### Ölçülen test sonucu (12 Ağu) — İKİ ORTAM AYRI
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Zengin venv** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **257** | **515** | **1929** |
+| **Sistem Python** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **203** | **515** | **1875** |
+
+0 hata. Faz I 409 → **515** (+106 yeni kontrol). Zengin venv'de 1 BLOKE
+(`QA_TEST_VIDEO`), sistem Python'da 2 çevresel BLOKE. **BLOKE'ler PASS
+sayılmadı.** `deploy.sh` pyflakes taraması → temiz.
+
+**Mevcut konsept testleri korundu:** §11'de 19 konsept · 97 kontrol aynen
+duruyor (≥12 şartı sağlanıyor).
+
+### BİLİNEN SINIRLAR (dürüstçe)
+
+1. **Ölçüm motoru YAZILMADI.** Bu adım sözleşme + kapı. `parmak_kur()` şu an
+   yalnızca enjekte edilen değerleri kabul ediyor; gerçek kesme/renk/ses
+   ölçümü sonraki adımın işi.
+2. **Hiçbir yerden import edilmiyor.** `server.py`/`pipeline.py` bağlanmadı
+   (testli). Arayüzde referans video yükleme akışı **yok**.
+3. **Şema değerleri ölçülmedi.** 30 alanın fallback değerleri tür
+   konvansiyonundan türetilmiş tasarım kararları; gerçek videoyla kalibrasyon
+   yapılmadı.
+4. **Gerçek videoyla uçtan uca koşulmadı.** ffprobe çıktısı testlerde sahte
+   veriyle sağlandı; komut planı doğru ama gerçek dosyada ölçüm alınmadı.
+5. **Yasak denetimi sezgisel eşiklere dayanıyor** (400 karakter metin sınırı).
+   Kötü niyetli bir çağıran, yasağı 399 karakterlik parçalara bölerek
+   aşabilir — bu kapı dürüstlük içindir, düşman modeli değildir.
+6. **Ses/tipografi boyutları en zayıf halka.** ffprobe bunları vermiyor;
+   ölçmek için ek araç (ffmpeg filtreleri, OCR) gerekecek ve OCR'ın
+   `ozgun_metin` yasağını ihlal etmemesi ayrıca tasarlanmalı.
+
+### SONRAKİ ADIM (I-5 — bu adımda YAPILMADI)
+
+Ölçüm motoru (ffmpeg `select/scene` + `blackdetect` + `silencedetect` ile
+ritim/çekim/ses; renk için kare histogramı), `/api/generate` veya ayrı bir uçla
+bağlama, ve arayüzde referans video yükleme + parmak izi özeti.
