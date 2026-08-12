@@ -113,6 +113,8 @@ class IsButcesi:
         self.denenen = 0
         self.secilen = 0
         self._dususler = []
+        self._secimler = []      # Faz I-10: manifest icin
+        self._bosluklar = []     # Faz I-10: kapsam bosluklari
         # Faz A/B nesneleri — avciya GECIRILIR, boylece para tavani gercekten
         # saglayici katmaninda uygulanir (I-6'da `defter=None` geciyordu).
         self.defter = None
@@ -192,9 +194,31 @@ class IsButcesi:
         with self._kilit:
             self.denenen += 1
 
-    def secildi(self) -> None:
+    def secildi(self, kayit: dict = None) -> None:
+        """Secimi say ve — verilmisse — MANIFEST icin kaydet (Faz I-10).
+
+        ⚠ Kayit IS BASINA tutulur; paralel isler birbirinin secimini gormez.
+        """
         with self._kilit:
             self.secilen += 1
+            if isinstance(kayit, dict) and len(self._secimler) < 400:
+                self._secimler.append(dict(kayit))
+
+    def secimler(self) -> list:
+        """Bu iste GERCEKTEN secilmis (lisansli + kare dogrulanmis) kayitlar."""
+        with self._kilit:
+            return [dict(k) for k in self._secimler]
+
+    def bosluk_ekle(self, scene_id: str, neden: str) -> None:
+        """Kapsam boslugu — RASTGELE STOKLA KAPANMAZ, kayda gecer."""
+        with self._kilit:
+            if len(self._bosluklar) < 200:
+                self._bosluklar.append({"scene_id": str(scene_id or ""),
+                                        "neden": str(neden or "")[:160]})
+
+    def bosluklar(self) -> list:
+        with self._kilit:
+            return [dict(b) for b in self._bosluklar]
 
     def dusus(self, neden_kodu: str, ayrinti: str = "", sahne: str = "") -> dict:
         kayit = {"asama": "medya-avcisi", "neden": neden_kodu,
@@ -227,6 +251,8 @@ class IsButcesi:
                 "maks_sure_sn": self.maks_sure_sn,
                 "tavan_doldu": bitti, "durma_nedeni": neden,
                 "dusus_sayisi": len(self._dususler),
+                "secim_kaydi": len(self._secimler),
+                "kapsam_boslugu": len(self._bosluklar),
                 "dususler": list(self._dususler[:20]),
             }
 
@@ -448,7 +474,31 @@ def sahne_medyasi(*, sorgu: str, hedef_yol: str, sahne_amaci: str = "",
             _sil(hedef_yol)
             continue
 
-        b.secildi()
+        _kayit = {
+            "scene_id": str(scene_id or ""),
+            "fact_id": str(fact_id or getattr(aday, "fact_id", "") or ""),
+            "asset_id": str(getattr(aday, "asset_id", "")),
+            "saglayici": str(getattr(aday, "saglayici", "")),
+            "lisans": str(getattr(aday, "lisans", "")),
+            "orijinal_url": str(getattr(aday, "orijinal_url", "")),
+            "eser_sahibi": str(getattr(aday, "eser_sahibi", "")),
+            "atif_metni": str(getattr(aday, "atif_metni", "") or ""),
+            "atif_gerekli": bool(getattr(aday, "atif_gerekli", True)),
+            "sorgu": str(getattr(aday, "sorgu", "") or ""),
+            "medya_yolu": hedef_yol,
+            "medya_turu": medya_turu,
+            "tur": medya_turu,
+            "sahne_amaci": str(sahne_amaci or ""),
+            "baslik": str(getattr(aday, "baslik", "") or ""),
+            "genislik": int(getattr(aday, "genislik", 0) or 0),
+            "yukseklik": int(getattr(aday, "yukseklik", 0) or 0),
+            "sure_sn": float(getattr(aday, "sure_sn", 0) or 0),
+            "toplam_skor": getattr(aday, "toplam_skor", 0),
+            # ⚠ Bu kayit YALNIZCA lisans duvarindan VE kare kapisindan
+            # gecmis adaylar icin olusur; bayrak burada dogrudur.
+            "render_kullanilabilir": True,
+        }
+        b.secildi(_kayit)
         return {"ok": True, "yol": hedef_yol, "neden": "",
                 # ⚠ FAZ I-8: ATIF ZINCIRI fact_id'yi KORUR. Aday, sorgu ve
                 # atif ayni olguya baglidir; "hangi iddia icin hangi klip"
@@ -472,6 +522,51 @@ def sahne_medyasi(*, sorgu: str, hedef_yol: str, sahne_amaci: str = "",
             "dususler": [b.dusus(
                 son_neden,
                 "tum adaylar denendi; son sebep yukarida", scene_id)]}
+
+
+def manifest_kur(butce, *, kapsam_bosluklari=None) -> dict:
+    """Is butcesindeki SECIMLERI `editor.plan` medya manifestine cevir (I-10).
+
+    ⚠ YALNIZCA GERCEKTEN SECILMIS kayitlar girer. Bir kayit ancak lisans
+    duvarindan VE kare kapisindan gectikten sonra olusur; yani bu manifest
+    tanim geregi lisansli + kare dogrulanmis adaylar icerir.
+    ⚠ fact_id / provenance / lisans / atif KAYBOLMAZ — hepsi tasinir.
+    ⚠ KAPSAM BOSLUGU RASTGELE STOKLA KAPANMAZ: bosluklar aynen tasinir.
+    ⚠ ISTISNA FIRLATMAZ; bozuk girdide bos manifest doner.
+    """
+    bos = {"adaylar": [], "kapsam_bosluklari": [], "ozet": {
+        "aday": 0, "bosluk": 0, "kaynak": "medya-avcisi"}}
+    try:
+        secimler = butce.secimler() if hasattr(butce, "secimler") else []
+    except Exception:
+        return bos
+    adaylar = []
+    for k in secimler:
+        if not isinstance(k, dict) or not k.get("asset_id"):
+            continue
+        if k.get("render_kullanilabilir") is not True:
+            # Savunma: kayit yalnizca gecen adaylar icin olusur; yine de
+            # bayragi olmayan bir kayit MANIFESTE ALINMAZ.
+            continue
+        adaylar.append(dict(k))
+    bosluk = list(kapsam_bosluklari or [])
+    try:
+        bosluk += butce.bosluklar() if hasattr(butce, "bosluklar") else []
+    except Exception:
+        pass
+    # Ayni sahne icin tekrar eden bosluk kaydini teke indir (gorunurluk kaybi yok)
+    gorulen, temiz_bosluk = set(), []
+    for b in bosluk:
+        if not isinstance(b, dict):
+            continue
+        anahtar = (str(b.get("scene_id") or ""), str(b.get("neden") or ""))
+        if anahtar in gorulen:
+            continue
+        gorulen.add(anahtar)
+        temiz_bosluk.append(dict(b))
+    return {"adaylar": adaylar, "kapsam_bosluklari": temiz_bosluk,
+            "ozet": {"aday": len(adaylar), "bosluk": len(temiz_bosluk),
+                     "kaynak": "medya-avcisi"}}
 
 
 def _sil(yol: str) -> None:

@@ -175,7 +175,8 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-6 medya avcısı canlı hatta (opt-in)** | `1e9c288` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-7 iş başına bütçe + paralel izolasyon** | `6294369` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-8 doğrulanmış olgu → sahne/medya bağı** | `e450aa0` | ✅ **origin'e push edildi**, deploy YOK |
-| 12 Ağu | **I-9 uçtan uca edit planı orkestrasyonu** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
+| 12 Ağu | **I-9 uçtan uca edit planı orkestrasyonu** | `a0294d0` | ✅ **origin'e push edildi**, deploy YOK |
+| 12 Ağu | **I-10 edit köprüsü pipeline'a bağlı + manifest dönüşümü** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
 
 ---
 
@@ -1769,7 +1770,7 @@ lisansla"* sorusu sonradan cevaplanabilir.
 
 ## 26. FAZ I-9 — UÇTAN UCA EDİT PLANI ORKESTRASYONU (12 Ağu, ölçüldü)
 
-> **Durum: yazıldı + testlendi, dosyalar staged. Commit YOK, deploy YOK.**
+> **Durum: commit `a0294d0`, `origin/arastirma-motoru`'na PUSH EDİLDİ. Deploy YOK.**
 > **Bayrak varsayılan KAPALI.**
 > Yeni: `webapp/edit_kopru.py`.
 > Değişen: `webapp/testler/test_faz_i.py` (+ bu handoff).
@@ -1848,9 +1849,7 @@ gerileme yok. pyflakes temiz.
 
 ### BİLİNEN SINIRLAR (dürüstçe)
 
-1. **Pipeline'a bağlanmadı.** Köprü yazıldı ve fixture ile kanıtlandı ama
-   `pipeline.py` onu çağırmıyor — yani canlı bir işte **hâlâ çalışmıyor**.
-   Bağlamak ayrı bir atom.
+1. ~~**Pipeline'a bağlanmadı.**~~ → ✅ **§27'de (I-10) opt-in bağlandı.**
 2. **Gerçek render denenmedi.** `render_edilebilir` bir **karardır**;
    `remotion_v2.render()` çağrılmadı, çıktı videosu görülmedi.
 3. **Altyazı dizisi fixture'da boş** (TTS zamanlamasından gelir); tipografi
@@ -1859,5 +1858,91 @@ gerileme yok. pyflakes temiz.
    konvansiyonuyla kuruldu.
 5. **QA FAIL senaryosu sahte FAIL ile sınandı** — gerçek bir FAIL üreten plan
    girdisiyle değil.
-6. `medya_kopru` çıktısı doğrudan `medya_manifest` biçiminde değil; bu adımda
-   fixture manifest kullanıldı, gerçek dönüşüm yazılmadı.
+
+---
+
+## 27. FAZ I-10 — EDİT KÖPRÜSÜ PIPELINE'A BAĞLI + MANİFEST DÖNÜŞÜMÜ (12 Ağu)
+
+> **Durum: yazıldı + testlendi, dosyalar staged. Commit YOK, deploy YOK.**
+> **Her iki bayrak da varsayılan KAPALI.**
+> Değişen: `webapp/medya_kopru.py`, `webapp/pipeline.py`,
+> `webapp/testler/test_faz_i.py` (+ bu handoff).
+> **Dokunulmadı:** `edit_kopru.py`, `server.py`, tüm arayüz, 22 alanlık
+> generate sözleşmesi, `editor/` paketi, `medya/lisans.py`,
+> `medya/guvenlik.py`, `medya/kare_kapisi.py`, `deploy.sh`.
+
+### Kapatılan iki açık (§26 sınır 1 ve 6)
+
+1. `edit_kopru` **pipeline'a bağlı değildi** — canlı bir işte hiç çalışmıyordu.
+2. `medya_kopru` çıktısı **`medya_manifest` biçiminde değildi** — fixture
+   manifest kullanılmıştı, gerçek dönüşüm yoktu.
+
+### `manifest_kur()` — yalnızca gerçekten geçmiş adaylar
+
+Seçim kaydı **iş bütçesinde** tutulur (`IsButcesi.secildi(kayit)`), yani iş
+başına izole. Kayıt **ancak** lisans duvarından **ve** kare kapısından geçmiş
+bir aday için oluşur — manifest tanım gereği lisanslı + kare-doğrulanmış.
+
+**Kaybolmayan alanlar (her biri testli):** `fact_id` · `asset_id` ·
+`saglayici` · `lisans` · `orijinal_url` · `eser_sahibi` · `atif_metni` ·
+`scene_id` · `medya_yolu`.
+
+**Savunma katmanı:** `render_kullanilabilir` bayrağı olmayan ya da
+`asset_id`'siz kayıt manifeste **girmez** (testli). Bozuk girdide çökmez.
+
+**Kapsam boşluğu aynen taşınır**, rastgele stokla kapanmaz; tekrar eden boşluk
+kaydı teke iner ama görünürlük kaybolmaz. Avcı bir sahnede aday veremezse
+pipeline `bosluk_ekle()` ile bunu **kayda geçirir** — eski yol klip bulsa bile
+o sahne avcı zincirinden geçmemiştir.
+
+### Pipeline bağlantısı — opt-in, RENDER YOK
+
+`EDITOR_V2=1` veya dahili `{"editor_v2": True}` iken:
+manifest kurulur → lisanslı aday yoksa `MEDYA-YOK` ile **plan denenmez** →
+varsa `edit_kopru.plan_kur()` çağrılır → özet `sonuc["edit_plani"]`e yazılır.
+
+⚠ **Bu atomda gerçek render YOK.** `pipeline.py` `remotion_v2`'yi import bile
+etmiyor (testli); mevcut `hizli_render` yolu aynen çalışıyor. QA FAIL ise
+`render_edilebilir=False` döner ve zaten hiçbir render fonksiyonu çağrılmaz.
+
+Hata durumunda **kontrollü fallback**: `{"ok": False, "neden": "HATA"}` yazılır,
+üretim bozulmaz.
+
+### Fixture çağrı zinciri — dört senaryo (testli)
+
+| Senaryo | Sonuç |
+|---|---|
+| Kapalı yol | plan **üretilmiyor** (`KAPALI`) |
+| Açık + lisanslı manifest | plan oluşuyor, `fact_id`+`lisans` props'a kadar geliyor |
+| Açık + QA FAIL | `render_edilebilir=False`, `neden="QA-FAIL"` |
+| Kötü (lisanssız) medya | `MEDYA-YOK`, props boş, red gerekçeli |
+
+### Ölçülen test sonucu (12 Ağu) — İKİ ORTAM AYRI
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Zengin venv** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **257** | **879** | **2293** |
+| **Sistem Python** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **203** | **879** | **2239** |
+
+0 hata. Faz I 823 → **879** (+56). pyflakes temiz.
+
+⚠ §23b'deki bir kontrol **güncellendi, silinmedi**: I-9 döneminde "pipeline
+`edit_kopru`'yu import etmiyor" bir *bilinen sınırı* kilitliyordu; I-10 onu
+kasıtlı kapattı. Kuralın niyeti (mevcut hızlı render yolu korunmalı, yeni yol
+opt-in olmalı) aynı kaldı, ölçüm ona göre yeniden yazıldı.
+
+### BİLİNEN SINIRLAR (dürüstçe)
+
+1. **Gerçek render hâlâ denenmedi** (kasıtlı, bu atomun kapsamı değil).
+   `render_edilebilir=True` çıksa bile hiçbir şey render edilmiyor.
+2. **Canlı bir işle koşulmadı.** Her iki bayrak kapalı; kanıt yalnızca fixture.
+3. **Cümleler `props_sahneler`den türetiliyor**; `anlatim` alanı boşsa plan
+   zayıf beat üretir. Gerçek anlatım metniyle kalibrasyon yapılmadı.
+4. **Stil profili pipeline'dan geçirilmiyor** (`stil=None`) — bu yüzden edit
+   profili şu an hep varsayılana düşüyor. Bağlamak ayrı bir adım.
+5. **Manifest yalnızca avcı yolundan beslenir.** Eski `kaynak.py` yoluyla inen
+   klipler manifeste **girmez**; yani avcı kapalıyken plan hiç kurulamaz.
+6. `edit_plani` özeti iş sözleşmesine değil yalnızca `sonuc` sözlüğüne yazılır;
+   `server.py` bu alanı okumadığı için arayüzde **görünmez**.
+6. ~~`medya_kopru` çıktısı `medya_manifest` biçiminde değil.~~ →
+   ✅ **§27'de (I-10) `manifest_kur()` ile çözüldü.**

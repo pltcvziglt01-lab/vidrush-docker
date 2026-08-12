@@ -3330,8 +3330,15 @@ kontrol("kopru ALT SUREC baslatmiyor",
 kontrol("kopru AG CAGIRMIYOR",
         not re.search(r"^\s*(import|from)\s+(requests|urllib|socket)\b",
                       _EK, re.M))
-kontrol("pipeline MEVCUT hizli render yolunu KORUYOR (VidrushVideo)",
-        "edit_kopru" not in oku(KOK, "pipeline.py"))
+# ⚠ I-9'da bu kontrol "pipeline edit_kopru'yu import ETMIYOR" diyordu — o
+# bir BILINEN SINIRDI (§26 sinir 1) ve I-10 onu KASITLI kapatti. Kuralin
+# NIYETI degismedi: mevcut hizli render yolu KORUNMALI ve yeni yol yalnizca
+# OPT-IN olmali. Olcum bu niyete gore guncellendi.
+_PP_I9 = oku(KOK, "pipeline.py")
+kontrol("pipeline MEVCUT hizli render yolunu KORUYOR",
+        "hizli_render" in _PP_I9 and "remotion_v2" not in _PP_I9)
+kontrol("edit_kopru pipeline'da YALNIZCA opt-in cagriliyor",
+        "if _ed_acik:" in _PP_I9)
 kontrol("remotion_v2 opt-in oldugunu HALA soyluyor",
         "MEVCUT RENDER YOLUNA DOKUNMUYOR" in oku(KOK, "editor/remotion_v2.py"))
 kontrol("editor paketi bu adimda DEGISMEDI",
@@ -3351,6 +3358,211 @@ kontrol("UI DEGISMEDI",
 kontrol("server.py editor_v2 alanini OKUMUYOR",
         "editor_v2" not in oku(KOK, "server.py"))
 kontrol("edit_kopru.py derleniyor", _derlenir(os.path.join(KOK, "edit_kopru.py")))
+
+
+# ═══ 24. FAZ I-10 — EDIT KOPRUSU PIPELINE'A BAGLI + MANIFEST DONUSUMU ═══
+# ⚠ KAPATILAN ACIK (§26 sinir 1 ve 6): edit_kopru pipeline'a bagli DEGILDI ve
+# medya_kopru ciktisi medya_manifest bicimine CEVRILMIYORDU.
+# ⚠ HER IKI BAYRAK DA VARSAYILAN KAPALI. Gercek render/ag/ucretli API YOK.
+blok("24. I-10 — manifest donusumu: yalnizca lisansli + kare dogrulanmis")
+
+_mb = mkp.is_butcesi_kur("i10")
+kontrol("bos butcede manifest BOS (uydurma aday yok)",
+        mkp.manifest_kur(_mb)["ozet"]["aday"] == 0)
+
+_SECIM = {"scene_id": "s001", "fact_id": "f001", "asset_id": "a1",
+          "saglayici": "wikimedia", "lisans": "cc-by",
+          "orijinal_url": "https://commons.wikimedia.org/a1",
+          "eser_sahibi": "X", "atif_metni": "X / CC BY", "atif_gerekli": True,
+          "medya_yolu": "/tmp/a1.mp4", "medya_turu": "video", "tur": "video",
+          "sorgu": "pack ice", "baslik": "ship", "genislik": 1920,
+          "yukseklik": 1080, "sure_sn": 12.0, "toplam_skor": 80,
+          "sahne_amaci": "ortam", "render_kullanilabilir": True}
+_mb.secildi(dict(_SECIM))
+_mb.bosluk_ekle("s002", "avci aday veremedi")
+_M10 = mkp.manifest_kur(_mb)
+kontrol("secim manifeste ADAY olarak giriyor", _M10["ozet"]["aday"] == 1)
+for _alan in ("fact_id", "asset_id", "saglayici", "lisans", "orijinal_url",
+              "eser_sahibi", "atif_metni", "scene_id", "medya_yolu"):
+    kontrol(f"manifest {_alan} KAYBETMIYOR",
+            _M10["adaylar"][0].get(_alan) == _SECIM[_alan], _alan)
+kontrol("manifest adayi render_kullanilabilir bayragini tasiyor",
+        _M10["adaylar"][0]["render_kullanilabilir"] is True)
+kontrol("KAPSAM BOSLUGU manifeste aynen tasiniyor",
+        any(b["scene_id"] == "s002" for b in _M10["kapsam_bosluklari"]),
+        str(_M10["kapsam_bosluklari"]))
+kontrol("bosluk RASTGELE STOKLA kapanmiyor (aday sayisi artmadi)",
+        _M10["ozet"]["aday"] == 1 and _M10["ozet"]["bosluk"] == 1)
+
+# ⚠ SAVUNMA: bayraksiz kayit manifeste GIREMEZ
+_mb.secildi({"asset_id": "kotu", "render_kullanilabilir": False})
+kontrol("render_kullanilabilir OLMAYAN kayit manifeste GIRMIYOR",
+        mkp.manifest_kur(_mb)["ozet"]["aday"] == 1,
+        str(mkp.manifest_kur(_mb)["ozet"]))
+_mb.secildi({"render_kullanilabilir": True})          # asset_id yok
+kontrol("asset_id'siz kayit manifeste GIRMIYOR",
+        mkp.manifest_kur(_mb)["ozet"]["aday"] == 1)
+kontrol("manifest_kur bozuk girdide COKMUYOR",
+        all(isinstance(mkp.manifest_kur(x), dict)
+            for x in (None, "x", 5, object())))
+kontrol("disaridan bosluk da birlestiriliyor",
+        mkp.manifest_kur(_mb, kapsam_bosluklari=[
+            {"scene_id": "s009", "neden": "dis"}])["ozet"]["bosluk"] == 2)
+kontrol("tekrar eden bosluk kaydi TEKE iniyor",
+        mkp.manifest_kur(_mb, kapsam_bosluklari=[
+            {"scene_id": "s002", "neden": "avci aday veremedi"}]
+        )["ozet"]["bosluk"] == 1)
+
+# ── SECIM KAYDI IS BASINA IZOLE ──
+_mA = mkp.is_butcesi_kur("A")
+_mB = mkp.is_butcesi_kur("B")
+_mA.secildi(dict(_SECIM))
+_mA.secildi({**_SECIM, "asset_id": "a2"})
+_mB.secildi({**_SECIM, "asset_id": "b1"})
+kontrol("secim kayitlari IS BASINA izole",
+        mkp.manifest_kur(_mA)["ozet"]["aday"] == 2
+        and mkp.manifest_kur(_mB)["ozet"]["aday"] == 1)
+kontrol("bir isin bosluklari digerine SIZMIYOR",
+        (_mA.bosluk_ekle("x", "y"), len(_mB.bosluklar()) == 0)[1])
+kontrol("ozet secim/bosluk sayilarini GOSTERIYOR",
+        _mA.ozet()["secim_kaydi"] == 2 and _mA.ozet()["kapsam_boslugu"] == 1,
+        str({k: v for k, v in _mA.ozet().items()
+             if k in ("secim_kaydi", "kapsam_boslugu")}))
+
+
+blok("24b. I-10 — pipeline cagri zinciri (FIXTURE, render YOK)")
+
+_PP6 = oku(KOK, "pipeline.py")
+kontrol("pipeline edit_kopru'yu import ediyor", "import edit_kopru" in _PP6)
+kontrol("plan YALNIZCA opt-in oldugunda kuruluyor",
+        "_ed_acik, _ed_gerekce = edit_kopru.acik_mi(_is_ayar)" in _PP6
+        and "if _ed_acik:" in _PP6)
+kontrol("manifest medya_kopru'dan kuruluyor",
+        "medya_kopru.manifest_kur(_avci_butce)" in _PP6)
+kontrol("lisansli aday YOKSA plan DENENMIYOR",
+        'if not (_manifest.get("adaylar") or []):' in _PP6
+        and '"neden": "MEDYA-YOK"' in _PP6)
+kontrol("avci basarisizliginda KAPSAM BOSLUGU kaydediliyor",
+        "_avci_butce.bosluk_ekle(" in _PP6)
+kontrol("pipeline GERCEK RENDER cagirmiyor (bu atomda)",
+        "remotion_v2" not in _PP6 and "edit_kopru.plan_kur(" in _PP6)
+kontrol("hata KONTROLLU FALLBACK ile yakalaniyor",
+        '"neden": "HATA"' in _PP6 and "edit plani kurulamadi" in _PP6)
+kontrol("ozet YALNIZCA opt-in oldugunda ise yaziliyor",
+        _PP6.count('sonuc["edit_plani"]') >= 1
+        and _PP6.index("if _ed_acik:") < _PP6.index('sonuc["edit_plani"]'))
+kontrol("QA karari ise TASINIYOR",
+        '"render_edilebilir": _ep["render_edilebilir"]' in _PP6
+        and '"qa": _ep["qa"]' in _PP6)
+
+# ── FIXTURE: kapali yol / acik+basarili / acik+QA FAIL / kotu medya ──
+_i10_kok = tempfile.mkdtemp(prefix="i10_")
+try:
+    _C10 = [{"scene_id": "s001", "fact_id": "f001", "sure_sn": 3.2,
+             "metin": "The Endurance became trapped in pack ice in 1915 "
+                      "near Antarctica."},
+            {"scene_id": "s002", "fact_id": "f002", "sure_sn": 4.0,
+             "metin": "The crew camped on Elephant Island awaiting rescue."}]
+    _bb = mkp.is_butcesi_kur("fix10")
+    _bb.secildi({**_SECIM, "asset_id": "a1", "scene_id": "s001",
+                 "fact_id": "f001"})
+    _bb.secildi({**_SECIM, "asset_id": "a2", "scene_id": "s002",
+                 "fact_id": "f002", "saglayici": "pexels",
+                 "lisans": "pexels",
+                 "orijinal_url": "https://pexels.com/a2"})
+    _bb.bosluk_ekle("s003", "avci aday veremedi")
+    _MF = mkp.manifest_kur(_bb)
+
+    # (1) KAPALI YOL — hicbir sey uretilmez
+    kontrol("KAPALI yolda plan URETILMIYOR",
+            ekp.plan_kur(cumleler=_C10, medya_manifest=_MF,
+                         cikti_dizin=_i10_kok)["neden"] == "KAPALI")
+
+    # (2) ACIK + BASARILI
+    _RA = ekp.plan_kur(cumleler=_C10, medya_manifest=_MF, olgular=_OLGU9,
+                       stil=_STIL9, cikti_dizin=_i10_kok, is_ayar=_EK_AC)
+    kontrol("ACIK + lisansli manifest -> plan OLUSUYOR", _RA["ok"] is True,
+            str(_RA["neden"]))
+    _zA = ekp.sahne_zinciri(_RA["props"])
+    kontrol("manifest zinciri props'a KADAR geliyor (fact + lisans)",
+            all(z["fact_id"] and z["lisans"] for z in _zA if z["asset_id"]),
+            str(_zA[:1]))
+    kontrol("avci kaynakli KAPSAM BOSLUGU plana tasindi",
+            any(b.get("scene_id") == "s003"
+                for b in _RA["kapsam_bosluklari"]),
+            str(_RA["kapsam_bosluklari"]))
+    kontrol("PASS/WARN'da render_edilebilir True",
+            _RA["render_edilebilir"] is True if _RA["qa"]["durum"] in
+            ("PASS", "WARN") else True)
+
+    # (3) ACIK + QA FAIL -> RENDER KAPALI
+    _asil_uret2 = _eplan.uret
+
+    def _fail2(**kw):
+        c = dict(_asil_uret2(**kw))
+        c["editor_qa"] = {"durum": "FAIL", "fail": 1, "warn": 0,
+                          "sorunlar": [{"kod": "Z"}]}
+        return c
+
+    try:
+        _eplan.uret = _fail2
+        _RQ = ekp.plan_kur(cumleler=_C10, medya_manifest=_MF, olgular=_OLGU9,
+                           stil=_STIL9, cikti_dizin=_i10_kok, is_ayar=_EK_AC)
+        kontrol("QA FAIL -> render_edilebilir False",
+                _RQ["render_edilebilir"] is False and _RQ["neden"] == "QA-FAIL")
+    finally:
+        _eplan.uret = _asil_uret2
+
+    # (4) KOTU MEDYA REDDEDILIYOR
+    _kotu_manifest = {"adaylar": [{"asset_id": "BAD", "scene_id": "s001",
+                                   "lisans": "unknown",
+                                   "render_kullanilabilir": False}],
+                      "kapsam_bosluklari": []}
+    _RB = ekp.plan_kur(cumleler=_C10, medya_manifest=_kotu_manifest,
+                       cikti_dizin=_i10_kok, is_ayar=_EK_AC)
+    kontrol("KOTU (lisanssiz) medya plana GIREMIYOR",
+            _RB["neden"] == "MEDYA-YOK" and not _RB["props"])
+    kontrol("kotu medya reddi GEREKCELI",
+            any(e["asset_id"] == "BAD" for e in _RB["elenen_medya"]))
+finally:
+    _sh.rmtree(_i10_kok, ignore_errors=True)
+
+
+blok("24c. I-10 — kapali yol BIT-BIT ayni, korumalar aynen")
+
+kontrol("EDITOR_V2 bayragi varsayilan KAPALI", ekp.ACIK is False)
+kontrol("MEDYA_AVCISI bayragi varsayilan KAPALI", mkp.ACIK is False)
+kontrol("kapaliyken pipeline `edit_plani` anahtari EKLEMIYOR",
+        "if _ed_acik:" in _PP6
+        and _PP6.split("if _ed_acik:")[0].count('sonuc["edit_plani"]') == 0)
+kontrol("kapaliyken `medya_avcisi` anahtari EKLEMIYOR",
+        "if _avci_acik and _avci_butce is not None:" in _PP6)
+kontrol("MEVCUT hizli render yolu KORUNDU (VidrushVideo)",
+        "VidrushVideo" in _PP6 or "hizli_render" in _PP6)
+kontrol("kopru HALA render cagirmiyor",
+        "render" not in {n.func.attr for n in ast.walk(ast.parse(
+            oku(KOK, "edit_kopru.py"))) if isinstance(n, ast.Call)
+            and isinstance(n.func, ast.Attribute)})
+kontrol("kare kapisi fail-closed KORUNDU",
+        "if not callable(kare_dogrula)" in oku(KOK, "medya_kopru.py"))
+kontrol("lisans duvari KORUNDU",
+        'getattr(a, "render_kullanilabilir", False)' in oku(KOK, "medya_kopru.py"))
+kontrol("SSRF korumasi KORUNDU (kopru dogrudan ag cagirmiyor)",
+        not re.search(r"^\s*(import|from)\s+(requests|urllib|socket)\b",
+                      oku(KOK, "medya_kopru.py"), re.M))
+kontrol("butce korumalari KORUNDU", mkp.VARSAYILAN_MAKS_USD == 0.0)
+kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("UI ve kullanici secimleri DEGISMEDI",
+        "basitGovde" in oku(KOK, "static/js/wizard.js")
+        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js")
+        and "d.unlu = t.unlu ? '1' : '0'" in oku(KOK, "static/js/wizard.js"))
+kontrol("server.py editor_v2/medya_avcisi OKUMUYOR",
+        "editor_v2" not in oku(KOK, "server.py")
+        and "medya_avcisi" not in oku(KOK, "server.py"))
+for _f6 in ("medya_kopru.py", "edit_kopru.py", "pipeline.py"):
+    kontrol(f"{_f6} derleniyor", _derlenir(os.path.join(KOK, _f6)))
 
 
 print(f"\n{'=' * 60}")

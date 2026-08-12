@@ -33,6 +33,7 @@ import kaynak  # YT/Pexels footage + Magnific upscale
 import arastirma_kopru  # Faz H: arastirma motorunu bu hatta baglar (bkz. modul basligi)
 import qa_kopru         # Faz H: render sonrasi kalite kapisi (bkz. modul basligi)
 import medya_kopru      # Faz I-6: Faz B medya avcisi (OPT-IN, varsayilan KAPALI)
+import edit_kopru       # Faz I-10: EditorV2 plan orkestrasyonu (OPT-IN, KAPALI)
 
 # ⚠ FAZ I-2c — BILESIK STIL PROFILI KOPRUSU (OPSIYONEL, HATTI COKERTMEZ).
 # `stil_profili.py` (Faz I-2b) surumlu/bilesik profil kaydidir. Bu hat onu
@@ -4241,6 +4242,13 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                           f"{_av['aday'].get('lisans')}", file=sys.stderr)
                     return ("video", f"isler/{is_adi}/sahne_{n}.mp4")
                 # Basarisizlik SESSIZ degil; sebep dususlere yaziliyor.
+                # ⚠ FAZ I-10: kapsam boslugu KAYDA GECER. Eski yol klip
+                # bulsa bile bu sahne AVCI zincirinden gecmemistir; edit
+                # plani bunu bosluk olarak gormeli (rastgele stok sayilmaz).
+                if _avci_butce is not None:
+                    _avci_butce.bosluk_ekle(
+                        str(s.get("scene_id") or f"s{n:03d}"),
+                        _av.get("neden") or "avci aday veremedi")
             if kaynak.footage_getir(s["footage_sorgu"].strip(), vyol_full, yt_once=yt_once):
                 # CC klip geldiyse ekrana kucuk kaynak yazisi — lisans ATIF ISTIYOR.
                 atif = kaynak.atif_al(vyol_full)
@@ -4693,6 +4701,55 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     if _avci_acik and _avci_butce is not None:
         sonuc["medya_avcisi"] = _avci_butce.ozet()
         sonuc["dususler"].extend(_avci_butce.dususler())
+    # ── FAZ I-10: EDITORV2 PLAN ORKESTRASYONU (OPT-IN, RENDER YOK) ──
+    # ⚠ Bu blok RENDER ETMEZ. Yalnizca plan/props ve karar ozeti uretir;
+    # gercek render MEVCUT `VidrushVideo` yoluyla zaten yapildi.
+    # ⚠ Manifest YALNIZCA avci GERCEKTEN lisansli + kare-dogrulanmis aday
+    # verdiyse kurulur; aksi halde plan denenmez (uydurma manifest yok).
+    _ed_acik, _ed_gerekce = edit_kopru.acik_mi(_is_ayar)
+    if _ed_acik:
+        try:
+            _manifest = (medya_kopru.manifest_kur(_avci_butce)
+                         if _avci_butce is not None else
+                         {"adaylar": [], "kapsam_bosluklari": []})
+            if not (_manifest.get("adaylar") or []):
+                sonuc["edit_plani"] = {
+                    "ok": False, "neden": "MEDYA-YOK",
+                    "aciklama": ("avci lisansli + kare dogrulanmis aday "
+                                 "vermedi; plan denenmedi"),
+                    "render_edilebilir": False}
+            else:
+                _ep = edit_kopru.plan_kur(
+                    cumleler=[{"scene_id": str(x.get("scene_id") or ""),
+                               "fact_id": str(x.get("fact_id") or ""),
+                               "sure_sn": float(x.get("sure") or 0),
+                               "metin": str(x.get("anlatim") or "")}
+                              for x in props_sahneler],
+                    medya_manifest=_manifest,
+                    olgular=list(getattr(arastirma_sonuc, "olgular", None)
+                                 or []),
+                    stil=None, cikti_dizin=CIKTI_DIR, is_ayar=_is_ayar)
+                sonuc["edit_plani"] = {
+                    "ok": _ep["ok"], "neden": _ep["neden"],
+                    "render_edilebilir": _ep["render_edilebilir"],
+                    "qa": _ep["qa"], "profil": _ep["profil_adi"],
+                    "elenen_medya": len(_ep["elenen_medya"]),
+                    "kapsam_boslugu": len(_ep["kapsam_bosluklari"]),
+                    "efekt_kapsami": (_ep["efekt_kapsami"] or {}).get("sayim"),
+                    "sahne": len((_ep["props"] or {}).get("sahneler") or []),
+                    "uyarilar": _ep["uyarilar"][:10]}
+                _qa_durum = (_ep["qa"] or {}).get("durum", "?")
+                print(f"  EDIT PLANI ({_ed_gerekce}): QA={_qa_durum} "
+                      f"render_edilebilir={_ep['render_edilebilir']} "
+                      f"sahne={sonuc['edit_plani']['sahne']}",
+                      file=sys.stderr)
+        except Exception as e:
+            # ⚠ KONTROLLU FALLBACK: plan hatasi uretimi BOZMAZ.
+            sonuc["edit_plani"] = {"ok": False, "neden": "HATA",
+                                   "aciklama": f"{type(e).__name__}",
+                                   "render_edilebilir": False}
+            print(f"  edit plani kurulamadi: {type(e).__name__}",
+                  file=sys.stderr)
     # ── FAZ I-2c: BILESIK STIL PROFILI KUNYESI (yalnizca VARSA yazilir) ──
     # ⚠ I-2b'nin kapattigi acik: "bir stilin sahne_sn'i degisince dun uretilmis
     # is yeniden uretilemez; hangi ayarla ciktigi kayitli degildi." Kunye o
