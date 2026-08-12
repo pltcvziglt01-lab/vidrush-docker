@@ -3891,6 +3891,17 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         kaynak.yer_baglami_kur(story)
     except Exception as e:
         print(f"  yer baglami kurulamadi: {str(e)[:80]}", file=sys.stderr)
+    # ⚠ FAZ H — BIYOM KAPISI BAGLAMI. `yer_baglami_kur` YER_TAKMA_AD'daki 19
+    # ulkeyle sinirli; tablonun disindaki yerlerde (South Georgia, Antarktika,
+    # Elephant Island...) hicbir kapi calismiyordu. Shackleton pilotunda tam
+    # bu bosluktan tropik sahil klibi "GUNEY GEORGIA" diye gecti.
+    # Biyom kapisi ulke tablosundan BAGIMSIZ; genel konu metnini burada alir.
+    try:
+        # Planin ozeti + kullanici metni: ikisi birlikte iklim kusagini verir.
+        _baglam = f"{story}\n{plan.get('ozet') or ''}"
+        kaynak.video_baglami_kur(_baglam)
+    except Exception as e:
+        print(f"  biyom baglami kurulamadi: {str(e)[:80]}", file=sys.stderr)
 
     def _sahne_medya(n, s):
         """Tek sahnenin medyasini (footage / AI gorsel / Sora video) uretir. Thread'de kosar."""
@@ -4330,6 +4341,21 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                  CIKTI_DIR, arastirma_sonuc.manifest_dosya),
              # Gorunur dusus kayitlari: hangi asamada neden geri duselduği.
              "dususler": list(arastirma_sonuc.dususler)}
+    # ── FAZ H: MEDYA KAPISI — reddedilen adaylar GORUNUR olur ──
+    # Sessiz dusus yasak: kapi bir klibi attiysa kullanici NEDEN atildigini
+    # gorebilmeli. Uydurma yok, gercek red kayitlari.
+    try:
+        _redler = kaynak.kapi_redleri()
+        if _redler:
+            sonuc["medya_kapisi"] = {"red_sayisi": len(_redler),
+                                     "redler": _redler[:12]}
+            sonuc["dususler"].append({
+                "asama": "medya",
+                "neden": f"{len(_redler)} aday biyom/donem celiskisi ile reddedildi",
+                "etki": "Yanlis iklim/donem gorseli kullanilmadi; sahneler "
+                        "uygun klip ya da kapsam bosluğu olarak islendi."})
+    except Exception as e:
+        print(f"  kapi redleri okunamadi: {str(e)[:80]}", file=sys.stderr)
     uyarilar = []
     if plan.get("_eksik_oran"):
         uyarilar.append(f"İçerik planı beklenenden kısa çıktı (~%{int(plan['_eksik_oran']*100)}).")

@@ -16,6 +16,8 @@ import threading
 
 import requests
 
+import medya_kapisi   # Faz H: biyom/donem celiski kapisi (bkz. modul basligi)
+
 # ── ANAHTAR OKUMA: ortam degiskeni VEYA dosya ──
 # Neden dosya secenegi: mevcut anahtarlar konteynerin Config.Env'ine gomulu. Yeni bir
 # ortam degiskeni eklemek konteyneri YENIDEN YARATMAYI gerektirir; bu, uzerinde calisan
@@ -302,6 +304,8 @@ def _yt_aday_uygun(aday: dict, sorgu: str) -> bool:
     # YER KAPISI — stok kaynaklarla ayni kural (11 Agu 2026). Bu olmadan Japonya
     # metnine Avrupa CC klibi girebiliyordu; kapiyi sadece Pexels'e koymak yetmez.
     bilgi = {"title": baslik, "description": ""}
+    if not _kapi_gecti_mi(bilgi, sorgu, "youtube"):
+        return False                       # biyom/donem celiskisi (Faz H)
     yer = _etkin_yer(sorgu)
     if yer and not (_yer_dogru_mu(bilgi, yer) or _notr_cekim_mi(bilgi)):
         print(f"  YT atlandi (yanlis ulke riski): {baslik[:56]}", file=sys.stderr)
@@ -409,6 +413,57 @@ def klip_gecmisi_sifirla():
     """Yeni is baslarken cagrilir — onceki videonun klip gecmisi tasinmasin."""
     global _YER_BAGLAM
     _YER_BAGLAM = []
+    _vision_sayac[0] = 0
+    _vision_onbellek.clear()
+    with _KULLANILAN_KILIT:
+        _KULLANILAN.clear()
+        _ATIFLAR.clear()
+    # Faz H: biyom kapisinin is-basina durumu da sifirlanir
+    _KAPI_REDLERI.clear()
+
+
+# ⚠ FAZ H: tum videonun konu metni. Biyom kapisi, sahne sorgusu biyom
+# vermediginde buraya duser. Shackleton pilotunda kok neden tam buydu:
+# yer kapisi YER_TAKMA_AD'daki 19 ulkeye bagli, "South Georgia" tabloda YOK
+# -> hicbir kapi calismadi -> tropik sahil klibi "GUNEY GEORGIA" diye gecti.
+_VIDEO_BAGLAM_METNI = ""
+# Kapinin reddettigi adaylar — ise `dususler` olarak yazilir (sessiz dusus yok)
+_KAPI_REDLERI = []
+_KAPI_KILIT = _th.Lock()
+
+
+def video_baglami_kur(metin: str) -> None:
+    """Is basinda cagrilir: biyom kapisinin dusecegi genel konu metni."""
+    global _VIDEO_BAGLAM_METNI
+    _VIDEO_BAGLAM_METNI = str(metin or "")[:4000]
+    _KAPI_REDLERI.clear()
+
+
+def kapi_redleri() -> list:
+    """Bu iste kapinin reddettigi adaylar (gerekceleriyle)."""
+    with _KAPI_KILIT:
+        return list(_KAPI_REDLERI)
+
+
+def _kapi_gecti_mi(bilgi: dict, sorgu: str, saglayici: str = "") -> bool:
+    """BIYOM/DONEM KAPISI — ulke tablosundan BAGIMSIZ calisir.
+
+    `_yer_dogru_mu` yalnizca YER_TAKMA_AD'daki 19 ulkeyi bilir; tablonun
+    disindaki her yer icin kapi YOKTU. Bu kapi iklim kusagi celiskisine
+    bakar, dolayisyla tablodan bagimsizdir.
+    """
+    aday_metni = f"{bilgi.get('title') or ''} {bilgi.get('description') or ''}"
+    ok, gerekce = medya_kapisi.kapi(sorgu, aday_metni, _VIDEO_BAGLAM_METNI)
+    if not ok:
+        print(f"  KAPI RED [{saglayici}] {aday_metni[:52]!r}: {gerekce}",
+              file=sys.stderr)
+        with _KAPI_KILIT:
+            if len(_KAPI_REDLERI) < 50:
+                _KAPI_REDLERI.append({"saglayici": saglayici,
+                                      "sorgu": sorgu[:90],
+                                      "aday": aday_metni[:110],
+                                      "gerekce": gerekce})
+    return ok
     _vision_sayac[0] = 0
     _vision_onbellek.clear()
     with _KULLANILAN_KILIT:
@@ -691,6 +746,9 @@ INSAN_KELIME = {
 _YER_BAGLAM = []
 
 
+_YER_BAGLAM = []
+
+
 def yer_baglami_kur(metin: str) -> list:
     """Videonun tamaminin gectigi yer(ler)i metinden tespit et ve is boyunca sabitle."""
     global _YER_BAGLAM
@@ -948,6 +1006,8 @@ def coverr_video(sorgu: str, hedef: str) -> bool:
                 return False               # konu kaymasi: alakasiz klip kullanilmaz
             if _reklam_stogu_mu(h):
                 return False               # kurumsal tanitim havuzu
+            if not _kapi_gecti_mi(h, sorgu, "coverr"):
+                return False               # biyom/donem celiskisi (Faz H)
             if not (_yer_dogru_mu(h, _etkin_yer(sorgu)) or _notr_cekim_mi(h)):
                 return False               # yanlis ulke riski
             return bool(_coverr_mp4(h))
@@ -1027,6 +1087,8 @@ def pexels_video(sorgu: str, hedef: str) -> bool:
                     continue               # kurumsal tanitim havuzu — belgesele oturmaz
                 if not _tekrara_izin_var() and _klip_kullanildi_mi(v.get("id")):
                     continue               # bu klip videoda zaten var
+                if not _kapi_gecti_mi(h, sorgu, "pexels"):
+                    continue               # biyom/donem celiskisi (Faz H)
                 if _yer_dogru_mu(h, yer_terim):
                     kademe = kademe1
                 elif _notr_cekim_mi(h):
@@ -1107,6 +1169,8 @@ def pixabay_video(sorgu: str, hedef: str) -> bool:
                 continue
             if _reklam_stogu_mu(bilgi):
                 continue
+            if not _kapi_gecti_mi(bilgi, sorgu, "pixabay"):
+                continue                   # biyom/donem celiskisi (Faz H)
             if not (_yer_dogru_mu(bilgi, yer_terim) or _notr_cekim_mi(bilgi)):
                 continue
             for boyut in ("large", "medium"):

@@ -322,6 +322,134 @@ kontrol("alan_adi www ayikliyor",
 kontrol("alan_adi bozuk URL'de cokmuyor",
         arastirma_kopru.alan_adi("////") == "")
 
+# ═══════════════ 6b. MEDYA DOGRULUK KAPISI (Faz H4) ═══════════════
+blok("6b. Medya dogruluk kapisi — CANLI PILOT REGRESYONU")
+
+import medya_kapisi  # noqa: E402
+
+# ⚠ BU TEST CANLI BIR HATAYI KILITLIYOR (12 Agu 2026, Shackleton pilotu
+# job_1786491521724_fazh15_102297): "South Georgia island approach boat"
+# sorgusu "aerial view of boat approaching TROPICAL shore" klibini secti ve
+# klip videoda "GUNEY GEORGIA / SAHIL" alt bandiyla gosterildi.
+PILOT_SORGU = "South Georgia island approach boat"
+PILOT_ADAY = "aerial view of boat approaching tropical shore"
+PILOT_BAGLAM = "Shackleton Endurance seferi Antarktika buz Guney Georgia"
+
+_ok, _g = medya_kapisi.kapi(PILOT_SORGU, PILOT_ADAY, PILOT_BAGLAM)
+kontrol("PILOT REGRESYONU: Guney Georgia -> tropik kiyi REDDEDILIYOR",
+        not _ok, f"gecti! gerekce={_g}")
+kontrol("red gerekcesi biyom celiskisini SOYLUYOR",
+        "BIYOM CELISKISI" in _g, _g)
+
+# Yanlis pozitif kontrolu: pilotta GERCEKTEN kullanilan mesru klipler gecmeli
+MESRU = ["icebreaker ship navigating frozen sea",
+         "people hiking on a snowy mountain",
+         "small fishing boat navigating rocky waves",
+         "penguins on a rocky beach south georgia",
+         "aerial view of boat approaching shore"]
+for _a in MESRU:
+    _o, _r = medya_kapisi.kapi(PILOT_SORGU, _a, PILOT_BAGLAM)
+    kontrol(f"mesru aday GECIYOR: {_a[:38]}", _o, _r)
+
+# Diger celiski ciftleri
+for _s, _a, _bek in (("Sahara desert caravan", "tropical rainforest jungle", False),
+                     ("Antarctic research station", "sand dunes of the sahara", False),
+                     ("Maldives coral reef", "glacier and pack ice", False),
+                     ("city street traffic", "downtown skyscraper", True),
+                     ("office meeting", "tropical beach", True)):
+    _o, _ = medya_kapisi.kapi(_s, _a)
+    kontrol(f"kapi: {_s[:24]} vs {_a[:24]} -> {'gecer' if _bek else 'red'}",
+            _o == _bek)
+
+# EMIN DEGILSEN GECIR kurali
+kontrol("biyom cikmiyorsa kapi UYGULANMAZ",
+        medya_kapisi.kapi("bir sey", "baska sey")[0] is True)
+kontrol("aday hem kutup hem tropik ise celiski SAYILMAZ",
+        medya_kapisi.kapi("antarctic ice", "from the tropics to the antarctic")[0])
+kontrol("kelime siniri: 'ice' 'service' icinde eslesmiyor",
+        "kutup" not in medya_kapisi.biyom_bul("customer service desk"))
+kontrol("MEDYA_KAPISI=0 ile kapatilabilir",
+        'os.environ.get("MEDYA_KAPISI"' in oku(KOK, "medya_kapisi.py"))
+
+# Donem kapisi
+kontrol("tarihsel sahnede modern isaret REDDEDILIYOR",
+        not medya_kapisi.donem_kapisi("1915 expedition wooden ship",
+                                      "man using smartphone on deck")[0])
+kontrol("modern sahnede modern isaret SORUN DEGIL",
+        medya_kapisi.donem_kapisi("2024 city tour", "man using smartphone")[0])
+
+# kaynak.py baglantisi
+KAYNAK = oku(KOK, "kaynak.py")
+kontrol("kaynak.py medya_kapisi'ni import ediyor",
+        "import medya_kapisi" in KAYNAK)
+kontrol("kapi 4 saglayiciya da bagli",
+        all(f'"{p}"' in KAYNAK for p in ("pexels", "pixabay", "coverr", "youtube"))
+        and KAYNAK.count("_kapi_gecti_mi(") >= 5,
+        f"cagri sayisi={KAYNAK.count('_kapi_gecti_mi(')}")
+kontrol("video_baglami_kur pipeline'dan cagriliyor",
+        "kaynak.video_baglami_kur" in oku(KOK, "pipeline.py"))
+kontrol("kapi redleri ise GORUNUR yaziliyor",
+        "medya_kapisi" in oku(KOK, "pipeline.py")
+        and "kapi_redleri()" in oku(KOK, "pipeline.py"))
+
+# Cesitlilik olcumu — uydurma yok
+_c = medya_kapisi.cesitlilik_olc([
+    {"saglayici": "pexels", "kimlik": "a"}, {"saglayici": "pexels", "kimlik": "a"},
+    {"saglayici": "coverr", "kimlik": "b"}])
+kontrol("cesitlilik: klip sayisi", _c["klip"] == 3)
+kontrol("cesitlilik: tekil klip", _c["tekil_klip"] == 2, str(_c))
+kontrol("cesitlilik: tekrar orani gercek", abs(_c["tekrar_orani"] - 0.333) < 0.01)
+kontrol("cesitlilik: bos girdide cokmuyor",
+        medya_kapisi.cesitlilik_olc([])["klip"] == 0)
+
+# ⚠ 12 Agu 2026: kapi baglanirken `klip_gecmisi_sifirla()` GOVDESI kazara
+# ezildi (blok `_YER_BAGLAM = []` satirini fonksiyon ICINDE yakaladi).
+# pyflakes yakaladi ve deploy'u blokladi. Bu testler o sinifi kalici kilitler.
+import kaynak as _kaynak  # noqa: E402
+kontrol("klip_gecmisi_sifirla govdesi SAGLAM",
+        all(x in oku(KOK, "kaynak.py") for x in
+            ("_vision_sayac[0] = 0", "_KULLANILAN.clear()", "_ATIFLAR.clear()")),
+        "fonksiyon govdesi bozulmus")
+try:
+    _kaynak.klip_gecmisi_sifirla()
+    kontrol("klip_gecmisi_sifirla GERCEKTEN kosuyor", True)
+except Exception as _e:
+    kontrol("klip_gecmisi_sifirla GERCEKTEN kosuyor", False,
+            f"{type(_e).__name__}: {_e}")
+kontrol("medya_kapisi MODUL duzeyinde import ediliyor",
+        any(l.startswith("import medya_kapisi")
+            for l in oku(KOK, "kaynak.py").splitlines()),
+        "fonksiyon icine kacmis import pyflakes'te undefined name verir")
+_kaynak.video_baglami_kur("Shackleton Antarktika buz Guney Georgia")
+kontrol("CALISMA ZAMANI: tropik aday reddediliyor",
+        _kaynak._kapi_gecti_mi(
+            {"title": "aerial view of boat approaching tropical shore"},
+            "South Georgia island approach boat", "pexels") is False)
+kontrol("CALISMA ZAMANI: mesru aday geciyor",
+        _kaynak._kapi_gecti_mi(
+            {"title": "icebreaker ship navigating frozen sea"},
+            "South Georgia island approach boat", "pexels") is True)
+kontrol("red kaydi gerekceyle tutuluyor",
+        len(_kaynak.kapi_redleri()) == 1
+        and "BIYOM" in _kaynak.kapi_redleri()[0]["gerekce"])
+_kaynak.klip_gecmisi_sifirla()
+kontrol("yeni iste redler sifirlaniyor", _kaynak.kapi_redleri() == [])
+
+# pyflakes kapisi: deploy.sh bunu kosuyor, testte de kosalim
+if shutil.which("python3"):
+    _pf = subprocess.run([sys.executable, "-m", "pyflakes",
+                          os.path.join(KOK, "kaynak.py"),
+                          os.path.join(KOK, "pipeline.py"),
+                          os.path.join(KOK, "server.py"),
+                          os.path.join(KOK, "medya_kapisi.py")],
+                         capture_output=True, text=True)
+    _tanimsiz = [l for l in _pf.stdout.splitlines() if "undefined name" in l]
+    if _pf.returncode == 0 or _pf.stdout or _pf.stderr:
+        if "No module named" in _pf.stderr:
+            bloke_yaz("pyflakes taramasi", "pyflakes kurulu degil")
+        else:
+            kontrol("pyflakes: tanimsiz isim YOK", not _tanimsiz, str(_tanimsiz[:3]))
+
 # ═══════════════ 7. DERIN SAGLIK ═══════════════
 blok("7. Derin saglik (gercek olcum, anahtar sizmaz)")
 
