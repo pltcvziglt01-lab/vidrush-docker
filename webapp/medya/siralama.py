@@ -45,6 +45,87 @@ AMAC_KELIME = {
 }
 
 
+# ═══════════════ FAZ I-5 — KONSEPT FARKINDALIGI (EK BILGI) ═══════════════
+# ⚠ NEDEN VAR: `AMAC_KELIME` sahne amacini biliyordu ama KONSEPTI bilmiyordu.
+# "close up" araniyorsa bir URUN videosunda studyo cekimi, bir KORKU
+# hikayesinde loş atmosfer dogru adaydir; ikisi ayni puani aliyordu ve
+# saglayici havuzundan AYNI JENERIK klip seciliyordu.
+#
+# ⚠ GERIYE UYUMLULUK: `konsept=None` iken bu blogun HICBIRI calismaz ve
+# `puanla()` eskisiyle BIREBIR ayni skoru uretir (testli).
+# ⚠ AGIRLIK VEKTORU DEGISMEDI. Konsept yalnizca `amac` bilesenini SINIRLI
+# olcude kaydirir (en fazla +-KONSEPT_KAYMA puan). Yeni bir agirlik eklemek
+# tum eski skorlari degistirirdi.
+# ⚠ ALAKA KAPISI ve LISANS DUVARI BU ADIMDA DEGISMEDI — konsept puani bir
+# adayi kapidan GECIREMEZ, yalnizca gecenler arasinda siralamayi degistirir.
+KONSEPT_KAYMA = 12.0
+
+# Aile -> (tercih edilen cekim kelimeleri, cezalandirilan kelimeler)
+KONSEPT_TERIM = {
+    "seyahat": (("aerial", "drone", "scenic", "coastline", "landscape",
+                 "travel", "viewpoint", "old town", "market", "hiking"),
+                ("studio", "white background", "office", "laboratory",
+                 "isolated")),
+    "urun": (("product", "studio", "packshot", "white background", "macro",
+              "unboxing", "showroom", "retail"),
+             ("archive", "historical", "newsreel", "vintage film", "map")),
+    "egitim": (("diagram", "chart", "infographic", "data", "laboratory",
+                "research", "classroom", "whiteboard", "microscope"),
+               ("party", "nightlife", "fashion", "dance")),
+    "hikaye": (("moody", "atmosphere", "silhouette", "fog", "dim", "night",
+                "shadow", "cinematic", "dramatic"),
+               ("infographic", "chart", "document scan", "product", "studio")),
+    "kultur": (("concert", "stage", "musician", "instrument", "festival",
+                "performance", "audience"),
+               ("laboratory", "document scan", "chart")),
+    "yasam": (("home", "kitchen", "routine", "lifestyle", "cozy", "morning",
+               "family"),
+              ("archive", "newsreel", "laboratory")),
+    "belgesel": (("archive", "archival", "historical", "documentary",
+                  "newsreel", "vintage"),
+                 ("packshot", "white background", "unboxing")),
+}
+
+
+def konsept_ailesi(konsept) -> str:
+    """`taksonomi.siniflandir()` ciktisindan AILE adi. Cozulemezse "".
+
+    ⚠ Bu modul `taksonomi`yi IMPORT ETMEZ; yalnizca sozluk alanlarini okur.
+    Bilinmeyen/belirsiz -> "" -> eski davranis (konsept etkisi YOK).
+    """
+    try:
+        if not isinstance(konsept, dict):
+            return ""
+        yol = str(konsept.get("yol") or "")
+        if not yol or yol == "belirsiz":
+            return ""
+        aile = str(konsept.get("aile") or yol.split(".")[0])
+        return aile if aile in KONSEPT_TERIM else ""
+    except Exception:
+        return ""
+
+
+def konsept_kaymasi(aday, konsept) -> tuple:
+    """Konsepte gore `amac` puanina uygulanacak kayma. Doner (kayma, gerekce).
+
+    ⚠ SINIRLI: en fazla +-`KONSEPT_KAYMA`. Bir adayi kapidan gecirmez,
+    yalnizca GECENLER arasinda siralamayi degistirir.
+    """
+    aile = konsept_ailesi(konsept)
+    if not aile:
+        return 0.0, ""
+    tercih, ceza = KONSEPT_TERIM[aile]
+    havuz = f"{aday.baslik} {aday.aciklama} {aday.sorgu}".lower()
+    art = sum(1 for k in tercih if k in havuz)
+    eksi = sum(1 for k in ceza if k in havuz)
+    kayma = max(-KONSEPT_KAYMA, min(KONSEPT_KAYMA,
+                                    4.0 * art - 6.0 * eksi))
+    if not art and not eksi:
+        return 0.0, f"konsept '{aile}': notr (isaret yok)"
+    return round(kayma, 1), (f"konsept '{aile}': {art} tercih, {eksi} ceza "
+                             f"-> {kayma:+.1f}")
+
+
 def _kelime_kumesi(metin: str) -> set:
     return {k for k in re.findall(r"[a-z0-9]{3,}", str(metin or "").lower())}
 
@@ -257,11 +338,19 @@ def alaka_kapisi(aday, varliklar: dict, iddia_metni: str = "") -> tuple:
 
 def puanla(aday, *, varliklar: dict, amac: str, iddia_metni: str = "",
            gorulen_hashler: Optional[set] = None,
-           vision_puanlayici=None) -> "object":
-    """Adayin tum puanlarini hesapla ve uzerine yaz."""
+           vision_puanlayici=None, konsept=None) -> "object":
+    """Adayin tum puanlarini hesapla ve uzerine yaz.
+
+    ⚠ FAZ I-5: `konsept` verilirse `amac` bileseni SINIRLI olcude kaydirilir
+    (bkz. `konsept_kaymasi`). `konsept=None` ise skor ESKISIYLE BIREBIR AYNI.
+    Agirlik vektoru DEGISMEDI; alaka kapisi ve lisans duvari DOKUNULMADI.
+    """
     gorulen_hashler = gorulen_hashler or set()
     sem, sem_detay = semantik_puan(aday, varliklar, iddia_metni)
     am = amac_puan(aday, amac)
+    k_kayma, k_gerekce = konsept_kaymasi(aday, konsept) if konsept else (0.0, "")
+    if k_kayma:
+        am = round(max(0.0, min(100.0, am + k_kayma)), 1)
     tek, tek_uyari = teknik_puan(aday)
     ceza, ceza_neden = ceza_puan(aday, gorulen_hashler)
     vis = 50.0
@@ -283,6 +372,9 @@ def puanla(aday, *, varliklar: dict, amac: str, iddia_metni: str = "",
     aday.skor_detay = {"semantik": sem_detay, "amac": am, "teknik": tek,
                        "teknik_uyari": tek_uyari, "vision": vis_detay,
                        "ceza_neden": ceza_neden, "alaka": alaka_sebep}
+    # Konsept kaymasi SESSIZ degil: neden uygulandigi kayda gecer.
+    if k_gerekce:
+        aday.skor_detay["konsept"] = k_gerekce
     if not alaka_ok:
         # Lisans duvarindan gecse bile ALAKA kapisindan gecemeyen oge render'a
         # giremez; referans olarak kalir.

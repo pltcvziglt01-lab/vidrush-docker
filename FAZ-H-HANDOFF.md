@@ -170,7 +170,8 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-2c akışa bağlama** (taksonomi + stil profili → `analiz()`) | `0945a2f` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-3 basit "Metin + Stil + Auto" arayüzü** | `37b0b04` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-4 referans video parmak izi sözleşmesi** | `0d45fc8` | ✅ **origin'e push edildi**, deploy YOK |
-| 12 Ağu | **I-2d görsel imza boşluğu kapatıldı** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
+| 12 Ağu | **I-2d görsel imza boşluğu kapatıldı** | `243bad5` | ✅ **origin'e push edildi**, deploy YOK |
+| 12 Ağu | **I-5 konsept farkındalıklı medya seçimi** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
 
 ---
 
@@ -1227,7 +1228,7 @@ bağlama, ve arayüzde referans video yükleme + parmak izi özeti.
 
 ## 21. FAZ I-2d — GÖRSEL İMZA BOŞLUĞU KAPATILDI (12 Ağu, ölçüldü)
 
-> **Durum: yazıldı + testlendi, dosyalar staged. Commit YOK, deploy YOK.**
+> **Durum: commit `243bad5`, `origin/arastirma-motoru`'na PUSH EDİLDİ. Deploy YOK.**
 > Değişen: `webapp/pipeline.py`, `webapp/testler/test_faz_i.py` (+ bu handoff).
 > **Dokunulmadı:** `server.py`, `stil_profili.py`, `referans_parmak.py`,
 > `deploy.sh`, tüm arayüz, 22 alanlık generate sözleşmesi.
@@ -1342,3 +1343,123 @@ I-2d o sınırı kapattığı için kontrol artık türetmenin varlığını kil
 
 §19 sınır 1–3 ve §20 sınır 1–2 hâlâ açık: adım adım modda Auto paneli,
 melez stillerin üretime taşınması, referans ölçüm motoru.
+
+---
+
+## 22. FAZ I-5 — KONSEPT FARKINDALIKLI MEDYA SEÇİMİ (12 Ağu, ölçüldü)
+
+> **Durum: yazıldı + testlendi, dosyalar staged. Commit YOK, deploy YOK.**
+> Değişen: `webapp/medya/sorgu_planlayici.py`, `webapp/medya/siralama.py`,
+> `webapp/medya/avci.py`, `webapp/testler/test_faz_i.py` (+ bu handoff).
+> **Dokunulmadı:** `medya/lisans.py`, `medya/guvenlik.py` (SSRF),
+> `medya/kare_kapisi.py`, `medya/indirme.py`, `pipeline.py`, `server.py`,
+> tüm arayüz, 22 alanlık generate sözleşmesi, `deploy.sh`.
+
+### Kapatılan açık — ÖLÇÜLDÜ
+
+`sorgu_planlayici.KALIP` ve `AMAC_DAGILIMI` **tamamen belgesel biçimliydi**.
+Bir seyahat videosu da, bir ürün tanıtımı da, bir ders anlatımı da aynı
+`{yer} city aerial view / close up {konu} / {kurum} document scan`
+kalıplarına giriyordu.
+
+**Çekim-niyeti çakışması** (6 farklı konsept, 8 sahne, çift çift Jaccard):
+
+```
+KONSEPTSIZ (eski)  = %100.0     ← her konsept AYNI çekimi istiyor
+KONSEPTLI  (yeni)  = %43.2
+```
+
+Test bunu kilitliyor: eski hâlin >%95, yeninin en az 25 puan altında olması.
+
+### `sorgu_planlayici.py` — ek bilgi, geriye uyumlu
+
+- `KONSEPT_KALIP`: 6 aile (seyahat · urun · egitim · hikaye · kultur · yasam)
+  için sahne amacına **eklenen** sorgu kalıpları. Aile kalıpları **önce**
+  denenir, genel `KALIP` yedek kalır — hiçbir kalıp silinmedi.
+  ⚠ `belgesel` kasıtlı olarak yok: mevcut `KALIP` zaten belgesel için yazıldı.
+- `KONSEPT_AMAC_DAGILIMI`: ailenin kendi sahne amacı dağılımı. Seyahatte
+  `belge` yok, üründe `arsiv`/`harita` yok, hikâyede `belge`/`harita` yok,
+  eğitimde `harita`/`belge` ağırlıklı. Hepsi 1.0'a topluyor (testli).
+- `sorgu_plani(..., konsept=None)` ve `amac_ata(indeks, kategori, konsept=None)`.
+- Çıktıya `konsept_ailesi` alanı **eklendi**; gerekçe hangi ailenin
+  kullanıldığını yazıyor.
+
+**Somut sonuç (testli):** üründe 10 sahnenin ≥4'ü `detay`; üründe hiç `arsiv`
+istenmiyor; hikâyede hiç `belge`/`harita` istenmiyor; eğitimde `harita`+`belge`
+gerçekten isteniyor; seyahat sorguları `drone`/`scenic`/`coastline` taşıyor;
+ürün sorguları `product`/`studio`/`macro` taşıyor.
+
+### `siralama.py` — sınırlı kayma, kapıya dokunmadan
+
+- `KONSEPT_TERIM`: 7 aile için (tercih edilen, cezalandırılan) çekim kelimeleri.
+- `konsept_kaymasi(aday, konsept)` → **en fazla ±12 puan**, yalnızca `amac`
+  bileşenine uygulanır.
+- ⚠ **`AGIRLIK` vektörü DEĞİŞMEDİ** (`0.34/0.18/0.22/0.26`). Yeni bir ağırlık
+  eklemek tüm eski skorları değiştirirdi.
+- ⚠ **`alaka_kapisi` ve lisans duvarı bu adımda DEĞİŞMEDİ.** Konsept puanı bir
+  adayı kapıdan **geçiremez**; yalnızca geçenler arasında sıralamayı değiştirir.
+  Test bunu doğrudan ölçüyor: alakasız bir aday konseptli ve konseptsiz
+  puanlamada **aynı** `render_kullanilabilir` kararını alıyor.
+- Kayma sessiz değil: `skor_detay["konsept"]` gerekçeyi yazıyor.
+
+### `avci.py` — opsiyonel taşıma
+
+`sahne_ara(..., konsept=None)` ve `avla(..., konsept=None)`; konsept sorgu
+planına ve puanlamaya geçiriliyor. Diff **tamamen ek**: 6 satır yerinde
+genişletildi, silme yok.
+
+### Geriye uyumluluk — BİT-BİT
+
+| Kilit | Kanıt |
+|---|---|
+| `sorgu_plani(konsept=None)` | 5 metin × 7 amaç → eskiyle aynı |
+| `amac_ata(konsept=None)` | **300 sahne × 6 kategori**, dokunulmamış tablodan kurulan bağımsız referans uygulamayla karşılaştırıldı → fark yok |
+| `puanla(konsept=None)` | skor ve `amac` bileşeni aynı; `skor_detay`'a `konsept` **eklenmiyor** |
+| Sağlayıcı tavanı %40 | değişmedi |
+| Faz B paketi | **200/0** — gerileme yok |
+
+### Bilinmeyende güvenli davranış
+
+`None` · boş sözlük · sözlük değil · `belirsiz` konsept · bilinmeyen aile ·
+boş aile → hepsinde `konsept_ailesi` `""` döndürüyor, `amac_ata` eski
+dağılıma düşüyor, kayma `0.0`. **Rastgele stok yok:** bilinmeyen ailede
+sorgular eskiyle **birebir aynı**. `konsept_ailesi` hiçbir girdide istisna
+fırlatmıyor (`None`, `5`, `[]`, `"x"`, `{"yol": 1}` testli).
+
+### Kullanıcının açık seçimi her zaman kazanır
+
+- `avla()` içinde açık `sahne_amaci` verilmişse `amac_ata` **çağrılmıyor**.
+- İddia kategorisi (`alinti`/`cografya`/`isim`/`tarih`) tür konvansiyonunu
+  **yeniyor**: seyahat konseptinde bile `alinti` → `belge`, ürün konseptinde
+  `cografya` → `harita` (testli).
+
+### Ölçülen test sonucu (12 Ağu) — İKİ ORTAM AYRI
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Zengin venv** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **257** | **614** | **2028** |
+| **Sistem Python** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **203** | **614** | **1974** |
+
+0 hata. Faz I 562 → **614** (+52). Konsept matrisi §11'in **19 metninin
+tamamı** kullanıldı (≥12 şartı fazlasıyla sağlanıyor). Test **ağ kullanmıyor**:
+gerçek indirme yok, sağlayıcıya istek yok — çağrı izi taramasıyla kilitli.
+pyflakes temiz.
+
+### BİLİNEN SINIRLAR (dürüstçe)
+
+1. **`medya/avci` hâlâ canlı `/api/generate` hattına bağlı değil** (§10 madde 1
+   açık). Bu adım Faz B paketinin **kalitesini** artırdı; canlı hat hâlâ
+   `kaynak.py` üzerinden çalışıyor. Yani ölçülen iyileşme **canlı videoda
+   henüz görünmüyor**.
+2. **Aile dağılımları ölçüm değil**, tür konvansiyonundan türetilmiş tasarım
+   kararları; gerçek kanal ölçümüyle doğrulanmadı.
+3. **%43.2 kalan çakışma** giderilmedi: aileler `establishing`/`ortam`/`detay`
+   gibi ortak amaçları paylaşıyor. Sıfıra indirmek tür konvansiyonunu zorlamak
+   olurdu.
+4. **Kelime tabanlı eşleşme.** `KONSEPT_TERIM` İngilizce stok başlıklarına göre
+   yazıldı; sağlayıcı başlığı Türkçe/boş gelirse kayma `0.0` (nötr) kalır.
+5. **Gerçek stok sonucuyla A/B yapılmadı.** İddia "istenen çekim niyeti
+   ayrışıyor"; "seçilen klipler gerçekten daha iyi" **ölçülmedi**.
+6. **`belgesel` ailesi sorgu tarafında ayrışmıyor** (kasıtlı) ama sıralama
+   tarafında `KONSEPT_TERIM["belgesel"]` var — iki modüldeki `konsept_ailesi`
+   fonksiyonları bu yüzden farklı üyelik tablosuna bakıyor.

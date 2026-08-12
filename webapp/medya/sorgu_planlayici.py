@@ -71,6 +71,104 @@ KALIP = {
 }
 
 
+# ═══════════════════ FAZ I-5 — KONSEPT FARKINDALIGI (EK BILGI) ═══════════════════
+# ⚠ NEDEN VAR (olculdu): `KALIP` ve `AMAC_DAGILIMI` tamamen BELGESEL bicimliydi.
+# Bir seyahat videosu da, bir urun tanitimi da, bir ders anlatimi da AYNI
+# "{yer} city aerial view / close up {konu} / {kurum} document scan" kaliplarina
+# giriyordu -> farkli konseptler AYNI JENERIK STOK sonuclarini seciyordu.
+#
+# ⚠ GERIYE UYUMLULUK: `konsept=None` verildiginde bu blogun HICBIRI calismaz;
+# `sorgu_plani()` ve `amac_ata()` eskisiyle BIREBIR ayni sonucu dondurur (testli).
+#
+# ⚠ BILINMEYENDE RASTGELE STOK YOK: konsept cozulemezse ya da aile tabloda
+# yoksa eski belgesel davranisina DUSULUR — uydurma sorgu uretilmez.
+
+# Taksonomi ailesi -> sahne amacina EKLENEN sorgu kaliplari.
+# Var olan kaliplar SILINMEZ; aile kaliplari ONCE denenir (daha spesifik).
+KONSEPT_KALIP = {
+    "seyahat": {
+        "establishing": ["{yer} aerial drone 4k", "{yer} scenic viewpoint",
+                         "{yer} coastline aerial"],
+        "ortam": ["{yer} local market street", "{yer} cafe terrace people",
+                  "{yer} old town walking"],
+        "detay": ["{yer} local food close up", "traditional {konu} detail"],
+        "harita": ["{yer} travel route map"],
+    },
+    "urun": {
+        "detay": ["{konu} product close up studio", "{konu} texture macro",
+                  "hands using {konu}"],
+        "establishing": ["{konu} product on clean background",
+                         "modern studio product shot"],
+        "ortam": ["customer using {konu} lifestyle", "retail store interior"],
+    },
+    "egitim": {
+        "detay": ["{konu} diagram animation", "laboratory {konu} close up"],
+        "belge": ["scientific paper {konu}", "research data chart {konu}"],
+        "harita": ["{konu} infographic chart", "data visualization {konu}"],
+        "establishing": ["research laboratory wide shot",
+                         "university campus exterior"],
+        "ortam": ["classroom lecture people", "engineer working workspace"],
+    },
+    "hikaye": {
+        "ortam": ["{yer} empty corridor night", "moody atmosphere fog",
+                  "silhouette walking alone"],
+        "detay": ["hand on door handle close up", "eyes close up dim light"],
+        "establishing": ["lonely house exterior dusk", "empty street night wide"],
+    },
+    "kultur": {
+        "ortam": ["live concert crowd", "musician playing close up"],
+        "detay": ["instrument strings macro", "stage lights close up"],
+        "establishing": ["concert hall wide shot", "festival stage aerial"],
+    },
+    "yasam": {
+        "ortam": ["home kitchen daily life", "morning routine sunlight"],
+        "detay": ["hands preparing {konu} close up"],
+        "establishing": ["modern living room interior"],
+    },
+    # `belgesel` KASITLI OLARAK YOK: mevcut KALIP zaten belgesel icin yazildi.
+}
+
+# Ailenin sahne amaci dagilimi. Toplamlari 1.0 olmak ZORUNDA (testli).
+# ⚠ Bu dagilimlar OLCUM DEGIL, TUR KONVANSIYONUNDAN turetilmis tasarim
+# kararlaridir; gercek kanal olcumuyle dogrulanmadi (bilinen sinir).
+KONSEPT_AMAC_DAGILIMI = {
+    # Seyahat: yer gostermek esas; belge/kisi neredeyse yok.
+    "seyahat": (("establishing", 0.34), ("ortam", 0.34), ("detay", 0.20),
+                ("harita", 0.08), ("arsiv", 0.04)),
+    # Urun: cekim detayda; arsiv/harita/belge anlamsiz.
+    "urun": (("detay", 0.46), ("ortam", 0.28), ("establishing", 0.22),
+             ("kisi", 0.04)),
+    # Egitim/veri: sema, belge ve detay agirlikli.
+    "egitim": (("detay", 0.30), ("harita", 0.22), ("belge", 0.18),
+               ("establishing", 0.16), ("ortam", 0.14)),
+    # Hikaye: atmosfer ve detay; belge/harita YOK.
+    "hikaye": (("ortam", 0.42), ("detay", 0.30), ("establishing", 0.24),
+               ("kisi", 0.04)),
+    "kultur": (("ortam", 0.38), ("detay", 0.30), ("establishing", 0.26),
+               ("kisi", 0.06)),
+    "yasam": (("ortam", 0.40), ("detay", 0.34), ("establishing", 0.26)),
+}
+
+
+def konsept_ailesi(konsept) -> str:
+    """`taksonomi.siniflandir()` ciktisindan AILE adi. Cozulemezse "".
+
+    ⚠ Bu modul `taksonomi`yi IMPORT ETMEZ (Faz B paketi bagimsiz kalsin);
+    yalnizca sozluk alanlarini okur. Bilinmeyen/belirsiz -> "" -> eski yol.
+    """
+    try:
+        if not isinstance(konsept, dict):
+            return ""
+        yol = str(konsept.get("yol") or "")
+        if not yol or yol == "belirsiz":
+            return ""
+        aile = str(konsept.get("aile") or yol.split(".")[0])
+        return aile if aile in KONSEPT_AMAC_DAGILIMI or aile in KONSEPT_KALIP \
+            else ""
+    except Exception:
+        return ""
+
+
 @dataclass
 class Varliklar:
     kisiler: list = field(default_factory=list)
@@ -169,15 +267,24 @@ def _doldur(kalip: str, v: Varliklar, konu: str) -> str:
 
 def sorgu_plani(iddia_metni: str, sahne_amaci: str = "establishing", *,
                 konu: str = "", bilinen_yerler: list = None,
-                maks: int = 4) -> dict:
+                maks: int = 4, konsept=None) -> dict:
     """Tek iddia + sahne amaci -> sorgu varyantlari.
 
-    Doner: {"amac", "varliklar", "sorgular": [...], "gerekce": "..."}
+    Doner: {"amac", "varliklar", "sorgular": [...], "gerekce": "...",
+            "konsept_ailesi": "..."}
+
+    ⚠ FAZ I-5: `konsept` verilirse (taksonomi ciktisi) ONCE ailenin kendi
+    kaliplari denenir, sonra genel `KALIP`. `konsept=None` ise davranis
+    ESKISIYLE BIREBIR AYNI (testli).
     """
     amac = sahne_amaci if sahne_amaci in SAHNE_AMACLARI else "establishing"
     v = varlik_cikar(iddia_metni, bilinen_yerler)
+    aile = konsept_ailesi(konsept)
+    # Aile kaliplari ONCE: daha spesifik olan once denenir, jenerik olan yedek.
+    kaliplar = list(KONSEPT_KALIP.get(aile, {}).get(amac, [])) + list(
+        KALIP.get(amac, []))
     sorgular, gorulen = [], set()
-    for kalip in KALIP.get(amac, []):
+    for kalip in kaliplar:
         # Kalibin gerektirdigi varlik yoksa o kalip atlanir (bos sorgu uretmeyiz)
         if "{kisi}" in kalip and not v.kisiler:
             continue
@@ -202,8 +309,11 @@ def sorgu_plani(iddia_metni: str, sahne_amaci: str = "establishing", *,
             sorgular.append(str(konu)[:60])
     return {"amac": amac, "varliklar": v.__dict__.copy(),
             "sorgular": sorgular[:maks],
+            "konsept_ailesi": aile,
             "gerekce": (f"{len(v.yerler)} yer, {len(v.kurumlar)} kurum, "
-                        f"{len(v.kisiler)} kisi, {len(v.onyillar)} on yil")}
+                        f"{len(v.kisiler)} kisi, {len(v.onyillar)} on yil"
+                        + (f"; konsept ailesi '{aile}' kaliplari once denendi"
+                           if aile else "; konsept yok -> genel kaliplar"))}
 
 
 # Sahne amaci dagilimi: bir belgeselde her sahne "establishing" olmamali.
@@ -215,11 +325,18 @@ AMAC_DAGILIMI = (
 )
 
 
-def amac_ata(indeks: int, kategori: str = "") -> str:
+def amac_ata(indeks: int, kategori: str = "", konsept=None) -> str:
     """Sahne indeksinden DETERMINISTIK sahne amaci.
 
     Iddia kategorisi belirleyiciyse onu kullanir (rakam -> belge/harita gibi),
-    aksi halde olculen dagilimdan secer."""
+    aksi halde olculen dagilimdan secer.
+
+    ⚠ FAZ I-5: `konsept` verilirse ailenin KENDI dagilimi kullanilir — seyahatte
+    belge sahnesi, urunde arsiv sahnesi aramak jenerik sonuc uretiyordu.
+    `konsept=None` ise dagilim ESKISIYLE BIREBIR AYNI (testli).
+    ⚠ Iddia kategorisi (alinti/cografya/isim/tarih) HER ZAMAN once gelir:
+    somut sinyal, tur konvansiyonunu yener.
+    """
     kat = (kategori or "").lower()
     if kat == "alinti":
         return "belge"
@@ -229,10 +346,14 @@ def amac_ata(indeks: int, kategori: str = "") -> str:
         return "kisi"
     if kat == "tarih":
         return "arsiv"
+    aile = konsept_ailesi(konsept)
+    dagilim = KONSEPT_AMAC_DAGILIMI.get(aile) or AMAC_DAGILIMI
     esik = (indeks * 37 + 11) % 100 / 100.0
     toplam = 0.0
-    for ad, pay in AMAC_DAGILIMI:
+    for ad, pay in dagilim:
         toplam += pay
         if esik < toplam:
             return ad
-    return "ortam"
+    # Dagilimlar 1.0'a topluyor (testli) -> buraya normalde ULASILMAZ. Yine de
+    # ESKI davranis birebir korunur: varsayilan dagilimda "ortam" donerdi.
+    return "ortam" if dagilim is AMAC_DAGILIMI else dagilim[-1][0]

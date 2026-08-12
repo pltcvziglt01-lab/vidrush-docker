@@ -69,7 +69,8 @@ def sahne_ara(*, scene_id: str, iddia_metni: str, fact_id: str = "",
               toplam_secilen: int = 0,
               toplam_sahne: int = 0,
               sayac_baslangic: int = 0,
-              detay_butcesi: Optional[list] = None) -> dict:
+              detay_butcesi: Optional[list] = None,
+              konsept: Optional[dict] = None) -> dict:
     """Tek sahne icin aday topla, puanla, sec.
 
     Doner: {"adaylar": [...], "secilen": [...], "sorgular": [...],
@@ -77,8 +78,11 @@ def sahne_ara(*, scene_id: str, iddia_metni: str, fact_id: str = "",
     """
     sinir = sinir or KosuSiniri()
     gorulen_hashler = gorulen_hashler if gorulen_hashler is not None else set()
+    # ⚠ FAZ I-5: `konsept` OPSIYONEL ek bilgidir. None ise sorgu plani ve
+    # puanlama ESKISIYLE BIREBIR AYNI calisir (testli).
     plan = sorgu_planlayici.sorgu_plani(
-        iddia_metni, sahne_amaci, konu=konu, bilinen_yerler=bilinen_yerler)
+        iddia_metni, sahne_amaci, konu=konu, bilinen_yerler=bilinen_yerler,
+        konsept=konsept)
     varliklar = plan["varliklar"]
     sorgular = plan["sorgular"]
 
@@ -279,7 +283,8 @@ def sahne_ara(*, scene_id: str, iddia_metni: str, fact_id: str = "",
                 siralama.puanla(a, varliklar=varliklar, amac=plan["amac"],
                                 iddia_metni=iddia_metni,
                                 gorulen_hashler=gorulen_hashler,
-                                vision_puanlayici=vision_puanlayici)
+                                vision_puanlayici=vision_puanlayici,
+                                konsept=konsept)
                 adaylar.append(a)
 
     # ── 4) SECIM (saglayici kotasi + puan esigi) ──
@@ -311,7 +316,8 @@ def avla(sahneler: list, *, konu: str = "", erisim_tarihi: str = "",
          defter: Optional[MaliyetDefteri] = None,
          istek: Optional[Callable] = None,
          coz: Optional[Callable] = None,
-         vision_puanlayici: Optional[Callable] = None) -> AdayManifesti:
+         vision_puanlayici: Optional[Callable] = None,
+         konsept: Optional[dict] = None) -> AdayManifesti:
     """Tum sahneler icin medya avla.
 
     `sahneler`: [{"scene_id","iddia_metni","fact_id","sahne_amaci","medya_turu"}]
@@ -343,7 +349,8 @@ def avla(sahneler: list, *, konu: str = "", erisim_tarihi: str = "",
             scene_id=sh.get("scene_id") or f"s{i:03d}",
             iddia_metni=sh.get("iddia_metni") or "",
             fact_id=sh.get("fact_id") or "",
-            sahne_amaci=sh.get("sahne_amaci") or sorgu_planlayici.amac_ata(i),
+            sahne_amaci=sh.get("sahne_amaci")
+            or sorgu_planlayici.amac_ata(i, konsept=konsept),
             konu=konu, bilinen_yerler=bilinen_yerler,
             erisim_tarihi=erisim_tarihi,
             istenen_saglayicilar=istenen_saglayicilar,
@@ -353,7 +360,7 @@ def avla(sahneler: list, *, konu: str = "", erisim_tarihi: str = "",
             gorulen_hashler=gorulen, saglayici_sayaci=sayac_dag,
             toplam_secilen=len(man.secilenler()),
             toplam_sahne=len(sahneler), sayac_baslangic=sayac,
-            detay_butcesi=detay_butcesi)
+            detay_butcesi=detay_butcesi, konsept=konsept)
         sayac = sonuc["sayac"]
         for a in sonuc["adaylar"]:
             man.ekle(a)

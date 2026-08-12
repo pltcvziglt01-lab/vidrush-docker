@@ -2022,6 +2022,281 @@ kontrol("pipeline.py derleniyor (I-2d sonrasi)",
         _derlenir(os.path.join(KOK, "pipeline.py")))
 
 
+# ═══════════ 19. FAZ I-5 — KONSEPT FARKINDALIKLI MEDYA SECIMI ═══════════
+# ⚠ KAPATILAN ACIK: `sorgu_planlayici.KALIP` ve `AMAC_DAGILIMI` tamamen
+# BELGESEL bicimliydi. Seyahat de, urun de, ders de AYNI cekim niyetini
+# istiyordu -> farkli konseptler AYNI JENERIK STOK sonuclarini seciyordu.
+# ⚠ BU BOLUM AG KULLANMAZ: gercek indirme YOK, saglayiciya istek YOK.
+blok("19. I-5 — konsept farkindalikli sorgu plani ve siralama")
+
+from medya import siralama as _sr                      # noqa: E402
+from medya import sorgu_planlayici as _sp              # noqa: E402
+from medya.aday import MedyaAdayi                      # noqa: E402
+
+# ── (a) GERIYE UYUMLULUK: konsept=None -> BIT-BIT ayni ──
+_METINLER = [
+    "Tokyo Metropolitan Police reported 1987 unattended deaths in Chiba.",
+    "The Ministry of Health published a report about the 1980s housing crisis.",
+    "Interlaken and Zermatt mountain railway opened in 1912.",
+    "",
+    "kisa",
+]
+_fark = []
+for _m in _METINLER:
+    for _am in _sp.SAHNE_AMACLARI:
+        _a = _sp.sorgu_plani(_m, _am, konu="konu")
+        _b = _sp.sorgu_plani(_m, _am, konu="konu", konsept=None)
+        if _a["sorgular"] != _b["sorgular"] or _a["amac"] != _b["amac"]:
+            _fark.append((_m[:20], _am))
+kontrol("konsept=None sorgu plani ESKISIYLE ayni", not _fark, str(_fark[:3]))
+kontrol("konsept=None cikti eski anahtarlari KORUYOR",
+        {"amac", "varliklar", "sorgular", "gerekce"}
+        <= set(_sp.sorgu_plani(_METINLER[0], "ortam")))
+
+# `amac_ata` referans uygulamasi — DOKUNULMAMIS tablodan yeniden kuruldu
+def _ref_amac(indeks, kategori=""):
+    kat = (kategori or "").lower()
+    if kat == "alinti":
+        return "belge"
+    if kat == "cografya":
+        return "harita"
+    if kat == "isim":
+        return "kisi"
+    if kat == "tarih":
+        return "arsiv"
+    esik = (indeks * 37 + 11) % 100 / 100.0
+    toplam = 0.0
+    for ad, pay in _sp.AMAC_DAGILIMI:
+        toplam += pay
+        if esik < toplam:
+            return ad
+    return "ortam"
+
+
+_afark = [(i, k) for i in range(300)
+          for k in ("", "alinti", "cografya", "isim", "tarih", "bilinmeyen")
+          if _sp.amac_ata(i, k) != _ref_amac(i, k)]
+kontrol("konsept=None amac_ata BIT-BIT ayni (300 sahne x 6 kategori)",
+        not _afark, str(_afark[:3]))
+
+_BUGUN = "2026-08-12"
+
+
+def _ad(**kw):
+    d = {"asset_id": "x1", "saglayici": "wikimedia", "tur": "video",
+         "orijinal_url": "https://commons.wikimedia.org/wiki/File:A",
+         "indirme_url": "https://upload.wikimedia.org/a.webm",
+         "baslik": "Tokyo street at night", "genislik": 3840,
+         "yukseklik": 2160, "sure_sn": 10.0, "render_kullanilabilir": True,
+         "erisim_tarihi": _BUGUN}
+    d.update(kw)
+    return MedyaAdayi(**d)
+
+
+_VAR = {"yerler": ["Tokyo"], "kurumlar": [], "kisiler": [], "tarihler": ["2025"],
+        "onyillar": ["2020s"], "konu_kelimeleri": ["street", "night"]}
+_p_yok = _sr.puanla(_ad(), varliklar=_VAR, amac="ortam")
+_p_none = _sr.puanla(_ad(asset_id="x2"), varliklar=_VAR, amac="ortam",
+                     konsept=None)
+kontrol("konsept=None puanlama BIT-BIT ayni",
+        _p_yok.toplam_skor == _p_none.toplam_skor
+        and _p_yok.skor_detay["amac"] == _p_none.skor_detay["amac"])
+kontrol("konsept=None skor_detay'a 'konsept' EKLEMIYOR",
+        "konsept" not in _p_none.skor_detay)
+kontrol("agirlik vektoru DEGISMEDI",
+        _sr.AGIRLIK == {"semantik": 0.34, "amac": 0.18, "teknik": 0.22,
+                        "vision": 0.26}, str(_sr.AGIRLIK))
+
+# ── (b) 12+ KONSEPT: medya niyeti / sorgu / cekim ihtiyaci ──
+blok("19b. I-5 — 12+ konseptte medya niyeti AYRISIYOR")
+
+# ⚠ §11'deki 19 konsept matrisinden secilenler; AYNI metinler kullaniliyor.
+_MEDYA_MATRIS = [(_ad_, _mt_) for _ad_, _mt_, _a_, _t_ in MATRIS]
+kontrol("medya matrisi en az 12 konsept iceriyor", len(_MEDYA_MATRIS) >= 12,
+        str(len(_MEDYA_MATRIS)))
+
+
+def _niyet(metin, konsept):
+    """8 sahnelik CEKIM NIYETI kumesi: amac + kalip sablonu (varlik doldurmadan)."""
+    kume = set()
+    for i in range(8):
+        amac = _sp.amac_ata(i, konsept=konsept)
+        aile = _sp.konsept_ailesi(konsept)
+        for k in (list(_sp.KONSEPT_KALIP.get(aile, {}).get(amac, []))
+                  + list(_sp.KALIP.get(amac, []))):
+            kume.add(f"{amac}:{k}")
+    return kume
+
+
+_niyet_yok, _niyet_var, _aileler = {}, {}, {}
+for _kad, _kmetin in _MEDYA_MATRIS:
+    _kon = tx.siniflandir(_kmetin)
+    _aileler[_kad] = _sp.konsept_ailesi(_kon)
+    _niyet_yok[_kad] = _niyet(_kmetin, None)
+    _niyet_var[_kad] = _niyet(_kmetin, _kon)
+
+
+def _cakisma(kumeler):
+    adlar, oranlar = list(kumeler), []
+    for i in range(len(adlar)):
+        for j in range(i + 1, len(adlar)):
+            a, b = kumeler[adlar[i]], kumeler[adlar[j]]
+            if a | b:
+                oranlar.append(len(a & b) / len(a | b))
+    return sum(oranlar) / len(oranlar) if oranlar else 0.0
+
+
+_c_yok, _c_var = _cakisma(_niyet_yok), _cakisma(_niyet_var)
+kontrol("KONSEPTSIZ hali gercekten JENERIK (cakisma ~%100)", _c_yok > 0.95,
+        f"%{_c_yok * 100:.1f}")
+kontrol("KONSEPTLI halde cekim niyeti AYRISIYOR (cakisma dusuyor)",
+        _c_var < _c_yok - 0.25, f"%{_c_yok * 100:.1f} -> %{_c_var * 100:.1f}")
+kontrol("en az 4 FARKLI konsept ailesi tanindi",
+        len({a for a in _aileler.values() if a}) >= 4,
+        str(sorted({a for a in _aileler.values() if a})))
+
+# Aile bazli cekim ihtiyaci — tur konvansiyonu testle kilitli
+_SEY = tx.siniflandir("Isvicre 4K sinematik: Interlaken, Zermatt ve Luzern "
+                      "manzaralari, 60 fps drone cekimi ve yuruyus turu.")
+_URU = tx.siniflandir("iPhone 15 vs Galaxy S24 fiyat karsilastirmasi: kamera "
+                      "ozellikleri, batarya ve satin alma tavsiyesi incelemesi.")
+_EGT = tx.siniflandir("Kara delikler nasil olusur? Genel gorelilik teorisi, "
+                      "olay ufku ve NASA arastirmacilarinin uzay gozlemleri.")
+_HIK = tx.siniflandir("Kabus gibi bir gece: kapinin ardindaki golge yaklasirken "
+                      "evde tek basina kalan cocugun yasadigi korku dolu saatler.")
+kontrol("seyahat -> establishing/ortam agirlikli",
+        _sp.konsept_ailesi(_SEY) == "seyahat", str(_sp.konsept_ailesi(_SEY)))
+kontrol("urun -> DETAY agirlikli",
+        [_sp.amac_ata(i, konsept=_URU) for i in range(10)].count("detay")
+        >= 4, str([_sp.amac_ata(i, konsept=_URU) for i in range(10)]))
+kontrol("urunde ARSIV sahnesi ISTENMIYOR (anlamsiz)",
+        "arsiv" not in {_sp.amac_ata(i, konsept=_URU) for i in range(60)})
+kontrol("hikayede BELGE/HARITA sahnesi ISTENMIYOR",
+        not ({"belge", "harita"}
+             & {_sp.amac_ata(i, konsept=_HIK) for i in range(60)}))
+kontrol("egitimde harita/belge (sema-veri) GERCEKTEN isteniyor",
+        {"harita", "belge"}
+        <= {_sp.amac_ata(i, konsept=_EGT) for i in range(30)})
+kontrol("seyahat sorgulari drone/scenic gibi TUR OZEL terim tasiyor",
+        any(("drone" in s or "scenic" in s or "coastline" in s)
+            for s in _sp.sorgu_plani("Interlaken and Zermatt mountain views",
+                                     "establishing", konsept=_SEY)["sorgular"]),
+        str(_sp.sorgu_plani("Interlaken and Zermatt mountain views",
+                            "establishing", konsept=_SEY)["sorgular"]))
+kontrol("urun sorgulari studyo/urun terimi tasiyor",
+        any(("product" in s or "studio" in s or "macro" in s)
+            for s in _sp.sorgu_plani("Galaxy S24 camera battery review", "detay",
+                                     konu="phone", konsept=_URU)["sorgular"]))
+kontrol("sorgu plani hangi ailenin kullanildigini RAPORLUYOR",
+        _sp.sorgu_plani("Interlaken views", "establishing",
+                        konsept=_SEY)["konsept_ailesi"] == "seyahat")
+kontrol("aile dagilimlarinin hepsi 1.0'a topluyor",
+        all(abs(sum(p for _a, p in d) - 1.0) < 1e-9
+            for d in _sp.KONSEPT_AMAC_DAGILIMI.values()),
+        str({k: round(sum(p for _a, p in d), 4)
+             for k, d in _sp.KONSEPT_AMAC_DAGILIMI.items()}))
+kontrol("aile dagilimlari yalnizca TANIMLI sahne amaclarini kullaniyor",
+        all(a in _sp.SAHNE_AMACLARI
+            for d in _sp.KONSEPT_AMAC_DAGILIMI.values() for a, _p in d))
+kontrol("aile kaliplari yalnizca TANIMLI sahne amaclarina yaziliyor",
+        all(a in _sp.SAHNE_AMACLARI
+            for d in _sp.KONSEPT_KALIP.values() for a in d))
+
+# ── (c) SIRALAMA: konsept siralamayi degistirir ama KAPIYI ACMAZ ──
+blok("19c. I-5 — siralama: kapi ve lisans duvari KORUNDU")
+
+_studyo = _ad(asset_id="p1", baslik="smartphone product studio white background",
+              sorgu="product close up")
+_arsiv = _ad(asset_id="p2", baslik="1950s archive newsreel historical footage",
+             sorgu="archive footage")
+_u1 = _sr.puanla(_ad(**{**_studyo.__dict__}), varliklar=_VAR, amac="detay",
+                 konsept=_URU)
+_u2 = _sr.puanla(_ad(**{**_arsiv.__dict__}), varliklar=_VAR, amac="detay",
+                 konsept=_URU)
+kontrol("urun konseptinde STUDYO adayi ARSIV adayindan ustun",
+        _u1.skor_detay["amac"] > _u2.skor_detay["amac"],
+        f"{_u1.skor_detay['amac']} vs {_u2.skor_detay['amac']}")
+kontrol("konsept kaymasi SESSIZ degil (skor_detay'a yaziliyor)",
+        "konsept" in _u1.skor_detay and "urun" in _u1.skor_detay["konsept"])
+kontrol("konsept kaymasi SINIRLI (+-12 puan tavani)",
+        all(abs(_sr.konsept_kaymasi(_a2, _URU)[0]) <= _sr.KONSEPT_KAYMA
+            for _a2 in (_studyo, _arsiv, _ad())))
+
+# ⚠ EN KRITIK: konsept puani bir adayi ALAKA KAPISINDAN GECIREMEZ.
+_alakasiz = _ad(asset_id="z1", baslik="berlin office meeting product studio",
+                sorgu="product studio")
+_g_yok = _sr.puanla(_ad(**{**_alakasiz.__dict__}), varliklar=_VAR, amac="detay")
+_g_var = _sr.puanla(_ad(**{**_alakasiz.__dict__, "asset_id": "z2"}),
+                    varliklar=_VAR, amac="detay", konsept=_URU)
+kontrol("konsept ALAKA KAPISI kararini DEGISTIRMIYOR",
+        _g_yok.render_kullanilabilir == _g_var.render_kullanilabilir,
+        f"{_g_yok.render_kullanilabilir} vs {_g_var.render_kullanilabilir}")
+_SR_KAYNAK = oku(KOK, "medya/siralama.py")
+kontrol("alaka_kapisi govdesi bu adimda DEGISMEDI",
+        "def alaka_kapisi(aday, varliklar: dict, iddia_metni: str = \"\")"
+        in _SR_KAYNAK and "konsept" not in
+        _SR_KAYNAK.split("def alaka_kapisi(")[1].split("def puanla(")[0])
+kontrol("saglayici tavani (%40) DEGISMEDI", _sr.SAGLAYICI_TAVANI == 0.40)
+kontrol("lisans duvari bu adimda DOKUNULMADI",
+        "konsept" not in oku(KOK, "medya/lisans.py"))
+kontrol("SSRF/guvenlik katmani DOKUNULMADI",
+        "konsept" not in oku(KOK, "medya/guvenlik.py"))
+kontrol("kare kapisi DOKUNULMADI", "konsept" not in oku(KOK, "medya/kare_kapisi.py"))
+kontrol("indirme katmani DOKUNULMADI", "konsept" not in oku(KOK, "medya/indirme.py"))
+# ⚠ "gercek indirme yok" iddiasi DIZE TARAMASIYLA yetinmez: adaylardaki
+# `https://commons.wikimedia.org/...` bir PROVENANCE ALANIDIR, cagri degil.
+# Olculen sey CAGRI IZI: istek/soket/acma fonksiyonlari.
+_I5_BOLUM = oku(KOK, "testler/test_faz_i.py").split("19. I-5")[1]
+kontrol("bu bolum GERCEK indirme yapmiyor (cagri izi yok)",
+        not re.search(r"requests\.(get|post)\(|urlopen\(|socket\.|"
+                      r"urlretrieve\(|\.download\(", _I5_BOLUM))
+kontrol("siralama/sorgu planlayici AG KUTUPHANESI kullanmiyor",
+        all(x not in _SR_KAYNAK and x not in oku(KOK, "medya/sorgu_planlayici.py")
+            for x in ("requests", "urllib", "socket")))
+
+# ── (d) BILINMEYEN / BELIRSIZ -> ESKI GUVENLI DAVRANIS ──
+for _ad2, _kon2 in [("None", None), ("bos sozluk", {}), ("sozluk degil", "x"),
+                    ("belirsiz konsept", {"yol": "belirsiz", "aile": ""}),
+                    ("bilinmeyen aile", {"yol": "uzay.roket", "aile": "uzay"}),
+                    ("aile bos", {"yol": "x.y", "aile": ""})]:
+    kontrol(f"bilinmeyende ESKI davranis: {_ad2}",
+            _sp.konsept_ailesi(_kon2) == ""
+            and _sp.amac_ata(7, konsept=_kon2) == _ref_amac(7)
+            and _sr.konsept_kaymasi(_ad(), _kon2)[0] == 0.0)
+kontrol("bilinmeyende RASTGELE STOK yok (sorgular eskiyle ayni)",
+        _sp.sorgu_plani("Tokyo street 1987", "ortam",
+                        konsept={"yol": "uzay.roket", "aile": "uzay"})["sorgular"]
+        == _sp.sorgu_plani("Tokyo street 1987", "ortam")["sorgular"])
+kontrol("konsept ailesi cozumu ISTISNA FIRLATMIYOR",
+        all(_sp.konsept_ailesi(x) == "" for x in (None, 5, [], "x", {"yol": 1})))
+
+# ── (e) KULLANICININ ACIK SECIMI HER ZAMAN KAZANIR ──
+_AV = oku(KOK, "medya/avci.py")
+kontrol("acik sahne_amaci Auto'yu YENIYOR",
+        'sh.get("sahne_amaci")\n            or sorgu_planlayici.amac_ata(' in _AV)
+kontrol("acik kategori tur konvansiyonunu YENIYOR",
+        _sp.amac_ata(3, "alinti", konsept=_SEY) == "belge"
+        and _sp.amac_ata(3, "cografya", konsept=_URU) == "harita")
+kontrol("avci konsepti OPSIYONEL aliyor",
+        "konsept: Optional[dict] = None" in _AV)
+kontrol("avci konsepti sorgu planina ve puanlamaya GECIRIYOR",
+        "konsept=konsept)" in _AV and _AV.count("konsept=konsept") >= 3)
+
+# ── (f) SOZLESMELER KORUNDU ──
+kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("UI bu adimda DEGISMEDI",
+        "basitGovde" in oku(KOK, "static/js/wizard.js")
+        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js"))
+kontrol("referans parmak izi modulu BAGLANMADI",
+        "referans_parmak" not in _AV and "referans_parmak" not in _SR_KAYNAK)
+kontrol("hikaye/animasyon motoruna dokunulmadi",
+        "HIKAYE_STILLERI" not in _AV and "ANIMASYON_STILLERI" not in _AV)
+for _f2 in ("medya/sorgu_planlayici.py", "medya/siralama.py", "medya/avci.py"):
+    kontrol(f"{_f2} derleniyor", _derlenir(os.path.join(KOK, _f2)))
+
+
 print(f"\n{'=' * 60}")
 print(f"GECEN: {gecen}   BASARISIZ: {len(basarisiz)}   BLOKE: {len(bloke)}")
 for b in basarisiz:
