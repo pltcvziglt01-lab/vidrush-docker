@@ -1204,17 +1204,18 @@ try:
             _yeni["motion"] in {v["motion"] for v in _pl.EDIT_STILLERI.values()}
             | {"hikaye"}, str(_yeni["motion"]))
 
-    # ⚠ OLCULEN BILINEN SINIR — testle KILITLI, sessiz kalmasin:
-    # EFEKT_TEMEL / GECIS_IMZASI tablolari ESKI kimliklerle anahtarli. Yeni
-    # kimlikte gorsel imza gelmiyor; kod bunu stderr'e YAZIYOR (I-2d isi).
+    # ⚠ I-3'te burada OLCULEN bir bilinen sinir kilitliydi: yeni kimlikte
+    # EFEKT_TEMEL/GECIS_IMZASI karsiliksizdi. O acik I-2d'de KAPATILDI
+    # (bkz. §18 testleri); burada yalnizca TABLOLARIN degismedigi ve
+    # aramalarin KeyError riski tasimadigi korunuyor.
     kontrol("eski kimlik gorsel imzasini ALIYOR (karsilastirma tabani)",
             len(_pl.EFEKT_TEMEL.get("sinematik-belgesel", [])) > 0
             and _pl.GECIS_IMZASI.get("sinematik-belgesel"))
-    kontrol("yeni-nesil kimlikte gorsel imza YOK — bilinen sinir kilitlendi",
+    kontrol("eski tablolar yeni kimlikle SISIRILMEDI (turetme ayri yoldan)",
             "korku-gerilim" not in _pl.EFEKT_TEMEL
             and "korku-gerilim" not in _pl.GECIS_IMZASI)
-    kontrol("bu eksiklik SESSIZ degil, kod uyari basiyor",
-            "efekt/gecis imzasi tablosunda karsilik YOK" in _pp)
+    kontrol("yeni kimlikte gorsel imza artik TURETILIYOR (sessiz kayip yok)",
+            "def bilesik_gorsel_imza(" in _pp)
     kontrol("efekt/gecis aramalari KeyError riski tasimiyor (.get ile)",
             "EFEKT_TEMEL.get(edit_id" in _pp and "GECIS_IMZASI.get(edit_id" in _pp)
 
@@ -1817,6 +1818,208 @@ kontrol("ses kutuphanesi KORUNDU",
 kontrol("deploy.sh ezme korumasi KORUNDU",
         "GERIDE" in open(os.path.join(KOK, "..", "deploy.sh"),
                          encoding="utf-8").read())
+
+
+# ═══════════════ 18. FAZ I-2d — GORSEL IMZA BOSLUGU KAPATILDI ═══════════════
+# ⚠ §18'de OLCULEN acik: yeni-nesil stil kimliginde `EFEKT_TEMEL` ve
+# `GECIS_IMZASI` karsiliksizdi -> efekt=0, gecis=yok. Tempo/footage profilden
+# geliyordu ama gorsel imza GELMIYORDU (sessiz kalite kaybi). Bu bolum hem
+# kapanmayi hem de ESKI kimliklerin BIT-BIT korundugunu kilitler.
+blok("18. I-2d — gorsel imza: eski kimlik gerilemesi ve yeni kimlik turetmesi")
+
+_PP2 = oku(KOK, "pipeline.py")
+kontrol("gorsel imza tureticisi tanimli", "def bilesik_gorsel_imza(" in _PP2)
+kontrol("efekt_ata opsiyonel ek_profil aliyor",
+        "def efekt_ata(edit_id: str, islev: str, indeks: int, ek_profil=None)"
+        in _PP2)
+kontrol("gecis_imza_sec opsiyonel ek_profil aliyor",
+        "def gecis_imza_sec(edit_id: str, indeks: int, ek_profil=None)" in _PP2)
+kontrol("cagri noktasi bilesik profili GECIYOR",
+        "gecis_imza_sec(edit_id, i, _gorsel_ek)" in _PP2
+        and "i, _gorsel_ek)" in _PP2)
+kontrol("kunyeye gorsel imza izlenebilirligi yaziliyor",
+        '"gorsel_imza"' in _PP2 and '"gerekce": _gi_ozet["gerekce"]' in _PP2)
+kontrol("hikaye/animasyon sozluklerine TASMA yok",
+        "HIKAYE_STILLERI" not in _PP2.split("def bilesik_gorsel_imza(")[1]
+        .split("def efekt_ata(")[0])
+
+_i2d_kok = os.path.join(KOK, "..", "cikti", "_i2d_kok")
+try:
+    os.makedirs(_i2d_kok, exist_ok=True)
+    _uk = os.path.join(KOK, "..", "app", "uret.py")
+    if os.path.exists(_uk):
+        _sh.copy(_uk, os.path.join(_i2d_kok, "uret.py"))
+    os.environ["VIDRUSH_KOK"] = os.path.abspath(_i2d_kok)
+    import pipeline as _pl2                           # noqa: E402
+
+    # ── (a) ESKI KIMLIK GERILEMESI: bagimsiz referans uygulamayla karsilastir ──
+    # ⚠ Referans, DOKUNULMAMIS tablolardan yeniden kurulur; yani "kod kendi
+    # kendini dogruluyor" degil, DAVRANIS eski algoritmayla karsilastiriliyor.
+    def _ref_efekt(edit_id, islev, indeks):
+        temel = [dict(e) for e in _pl2.EFEKT_TEMEL.get(edit_id, [])]
+        vurgu = _pl2.EFEKT_ISLEV.get(islev or "", [])
+        if vurgu and (indeks * 6151 % 100) / 100.0 < _pl2.EFEKT_SEYREKLIK:
+            adlar = {e["ad"] for e in temel}
+            for e in vurgu:
+                if e["ad"] in adlar:
+                    for t in temel:
+                        if t["ad"] == e["ad"]:
+                            t["siddet"] = max(t.get("siddet", 1),
+                                              e.get("siddet", 1))
+                else:
+                    temel.append(dict(e))
+        return temel
+
+    def _ref_gecis(edit_id, indeks):
+        imza, oran = _pl2.GECIS_IMZASI.get(edit_id, ("", 0.0))
+        if not imza or oran <= 0:
+            return ""
+        return imza if (indeks * 4177 % 1000) / 1000.0 < oran else ""
+
+    _islevler = ["", "vurgu", "gecmis", "karsilastir", "sonuc", "aciklama"]
+    _ef_fark, _gz_fark = [], []
+    for _eid in _pl2.EDIT_STILLERI:
+        for _i in range(120):
+            _isl = _islevler[_i % len(_islevler)]
+            if _pl2.efekt_ata(_eid, _isl, _i) != _ref_efekt(_eid, _isl, _i):
+                _ef_fark.append((_eid, _isl, _i))
+            if _pl2.gecis_imza_sec(_eid, _i) != _ref_gecis(_eid, _i):
+                _gz_fark.append((_eid, _i))
+    kontrol("ESKI kimliklerde efekt atamasi BIT-BIT ayni (5 stil x 120 sahne)",
+            not _ef_fark, str(_ef_fark[:3]))
+    kontrol("ESKI kimliklerde gecis imzasi BIT-BIT ayni", not _gz_fark,
+            str(_gz_fark[:3]))
+    kontrol("BILINMEYEN kimlik eski davranisini KORUYOR (efekt yok, imza yok)",
+            _pl2.efekt_ata("boyle-bir-stil-yok", "", 0) == []
+            and _pl2.gecis_imza_sec("boyle-bir-stil-yok", 0) == "")
+    kontrol("gecis imzasi HALA deterministik (ayni sahne -> ayni imza)",
+            all(_pl2.gecis_imza_sec("sinematik-belgesel", _i)
+                == _pl2.gecis_imza_sec("sinematik-belgesel", _i)
+                for _i in range(50)))
+    kontrol("eski stil imzasi GERCEKTEN uretiliyor (kanit: en az bir sahne)",
+            any(_pl2.gecis_imza_sec("sinematik-belgesel", _i)
+                for _i in range(60)))
+
+    # ── (b) YENI KIMLIK: sessiz kayip KALKTI ──
+    def _ek(kimlik):
+        return sp.eski_edit_stiline(sp.profil_al(kimlik))["_profil"]
+
+    _bos = [k for k in sp.PROFIL
+            if not _pl2.bilesik_gorsel_imza(_ek(k))["uygulandi"]]
+    kontrol("12 profilin HEPSI gorsel imza uretiyor (sessiz kayip yok)",
+            not _bos, str(_bos))
+    for _k in sp.PROFIL:
+        _g = _pl2.bilesik_gorsel_imza(_ek(_k))
+        _kotu_ef = [e["ad"] for e in _g["efektler"]
+                    if e["ad"] not in _pl2.GECERLI_EFEKT_ADI]
+        if _kotu_ef:
+            kontrol(f"{_k}: efekt adlari render tarafinin BILDIGI adlar",
+                    False, str(_kotu_ef))
+    kontrol("uretilen efekt adlari render tarafinin BILDIGI adlar",
+            all(e["ad"] in _pl2.GECERLI_EFEKT_ADI
+                for k in sp.PROFIL
+                for e in _pl2.bilesik_gorsel_imza(_ek(k))["efektler"]))
+    kontrol("uretilen gecis imzalari render tarafinin BILDIGI adlar",
+            all(_pl2.bilesik_gorsel_imza(_ek(k))["gecis_imza"]
+                in ("",) + _pl2.GECERLI_GECIS_IMZA for k in sp.PROFIL))
+    kontrol("gecis turlerinin HEPSI eslenmis (uydurma yok)",
+            {p["gecis"]["tur"] for p in sp.PROFIL.values()}
+            <= set(_pl2.BILESIK_GECIS_IMZA),
+            str({p["gecis"]["tur"] for p in sp.PROFIL.values()}
+                - set(_pl2.BILESIK_GECIS_IMZA)))
+    kontrol("gecis orani 0-1 araliginda",
+            all(0.0 <= _pl2.bilesik_gorsel_imza(_ek(k))["gecis_oran"] <= 1.0
+                for k in sp.PROFIL))
+
+    # Eski tabloya karsi KALIBRASYON (esdeger profil, esdeger imza)
+    _kal = _pl2.bilesik_gorsel_imza(_ek("belgesel-sinematik"))
+    _kal_ad = {e["ad"] for e in _kal["efektler"]}
+    kontrol("belgesel-sinematik eski 'sinematik-belgesel' ruhunu tasiyor",
+            {"grain", "vinyet", "kontrast-grade"} <= _kal_ad, str(_kal_ad))
+    kontrol("bilim-anlatisi eski 'veri-anlatisi' ile AYNI (grain 0.5)",
+            _pl2.bilesik_gorsel_imza(_ek("bilim-anlatisi"))["efektler"]
+            == [{"ad": "grain", "siddet": 0.5}])
+    kontrol("explainer-hizli eski 'hizli-explainer' ile AYNI (efekt YOK)",
+            _pl2.bilesik_gorsel_imza(_ek("explainer-hizli"))["efektler"] == [])
+    kontrol("parlak/temiz gorunumde doku EKLENMIYOR",
+            not _pl2.bilesik_gorsel_imza(_ek("urun-tanitim"))["efektler"])
+    kontrol("karanlik profilde soguk grade + vinyet geliyor",
+            {"soguk-grade", "vinyet"}
+            <= {e["ad"] for e in
+                _pl2.bilesik_gorsel_imza(_ek("korku-gerilim"))["efektler"]})
+
+    # Yeni kimlik UCTAN UCA: efekt_ata/gecis_imza_sec profilden besleniyor
+    _ekp = _ek("korku-gerilim")
+    kontrol("efekt_ata bilesik profilden BESLENIYOR",
+            {e["ad"] for e in _pl2.efekt_ata("korku-gerilim", "", 0, _ekp)}
+            >= {"grain", "soguk-grade"})
+    kontrol("gecis_imza_sec bilesik profilden BESLENIYOR",
+            any(_pl2.gecis_imza_sec("cocuk-yumusak", _i, _ek("cocuk-yumusak"))
+                for _i in range(20)))
+    kontrol("islev vurgusu bilesik profille de calisiyor (seyrek aksan)",
+            any("sarsinti" in {e["ad"] for e in
+                               _pl2.efekt_ata("korku-gerilim", "vurgu", _i, _ekp)}
+                for _i in range(30)))
+    kontrol("ek_profil VERILMEZSE eski tablo isler (yeni kimlik -> bos)",
+            _pl2.efekt_ata("korku-gerilim", "", 0) == [])
+
+    # ── (c) BOZUK PROFIL / FALLBACK ──
+    for _ad, _bozuk in [("None", None), ("bos sozluk", {}),
+                        ("sozluk degil", "bozuk"), ("liste", [1, 2]),
+                        ("palet bozuk", {"palet": "x", "gecis": "y"}),
+                        ("palet None", {"palet": None, "gecis": None}),
+                        ("alanlar eksik", {"palet": {}, "gecis": {}}),
+                        ("oran metin", {"palet": {"grade": "dogal-sicak",
+                                                  "kontrast": "orta"},
+                                        "gecis": {"tur": "hard-cut",
+                                                  "oran_pct": "cok"}})]:
+        _g = _pl2.bilesik_gorsel_imza(_bozuk)
+        kontrol(f"bozuk profil COKERTMIYOR: {_ad}",
+                isinstance(_g, dict) and "uygulandi" in _g)
+    kontrol("bozuk profilde efekt_ata ESKI tabloya duser",
+            _pl2.efekt_ata("sinematik-belgesel", "", 0, {"palet": "bozuk"})
+            == [dict(e) for e in _pl2.EFEKT_TEMEL["sinematik-belgesel"]])
+    kontrol("bozuk profilde gecis_imza_sec ESKI tabloya duser",
+            all(_pl2.gecis_imza_sec("sinematik-belgesel", _i, {"palet": "x"})
+                == _ref_gecis("sinematik-belgesel", _i) for _i in range(40)))
+    kontrol("bilinmeyen gecis turunde imza URETILMIYOR (uydurma yok)",
+            _pl2.bilesik_gorsel_imza(
+                {"gecis": {"tur": "uzay-gecisi", "oran_pct": 50}})["gecis_imza"]
+            == "")
+    kontrol("oran 0 ise imza URETILMIYOR",
+            _pl2.bilesik_gorsel_imza(
+                {"gecis": {"tur": "hard-cut", "oran_pct": 0}})["gecis_imza"] == "")
+
+    # ── (d) HER KARAR IZLENEBILIR ──
+    _gk = _pl2.bilesik_gorsel_imza(_ek("belgesel-sinematik"))
+    kontrol("her turetme GEREKCE uretiyor", len(_gk["gerekce"]) >= 2,
+            str(_gk["gerekce"]))
+    kontrol("gerekce hangi ALANDAN geldigini yaziyor",
+            any("palet.grade" in g for g in _gk["gerekce"])
+            and any("gecis.tur" in g for g in _gk["gerekce"]))
+    kontrol("uygulanamayan durumda da GEREKCE var",
+            _pl2.bilesik_gorsel_imza({"palet": {}, "gecis": {}})["gerekce"])
+    kontrol("turetme SESSIZ degil: log satiri var",
+            "GORSEL IMZA (bilesik)" in _PP2)
+    kontrol("turetilemezse SESLI dusuluyor (eski tabloya sessizce gecilmez)",
+            "TURETILEMEDI" in _PP2 and "eski tabloya dusuluyor" in _PP2)
+    kontrol("turetme DETERMINISTIK (ayni profil -> ayni imza)",
+            _pl2.bilesik_gorsel_imza(_ek("hikaye-sinematik"))
+            == _pl2.bilesik_gorsel_imza(_ek("hikaye-sinematik")))
+except Exception as e:
+    bloke_yaz("I-2d gorsel imza fonksiyonel kosumu",
+              f"{type(e).__name__}: {str(e)[:110]}")
+
+kontrol("22 alanlik generate sozlesmesi HALA degismedi",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("UI bu adimda DEGISMEDI (basit mod + sure secici duruyor)",
+        "basitGovde" in oku(KOK, "static/js/wizard.js")
+        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js"))
+kontrol("referans olcum motoru bu adimda BAGLANMADI",
+        "referans_parmak" not in _PP2)
+kontrol("pipeline.py derleniyor (I-2d sonrasi)",
+        _derlenir(os.path.join(KOK, "pipeline.py")))
 
 
 print(f"\n{'=' * 60}")

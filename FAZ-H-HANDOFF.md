@@ -169,7 +169,8 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-2b sürümlü bileşik stil profilleri** | `fff3f36` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-2c akışa bağlama** (taksonomi + stil profili → `analiz()`) | `0945a2f` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-3 basit "Metin + Stil + Auto" arayüzü** | `37b0b04` | ✅ **origin'e push edildi**, deploy YOK |
-| 12 Ağu | **I-4 referans video parmak izi sözleşmesi** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
+| 12 Ağu | **I-4 referans video parmak izi sözleşmesi** | `0d45fc8` | ✅ **origin'e push edildi**, deploy YOK |
+| 12 Ağu | **I-2d görsel imza boşluğu kapatıldı** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
 
 ---
 
@@ -885,7 +886,10 @@ bilgisini `_profil.gecis` içinde (`{'tur': 'hard-cut', 'sure_sn': 0.0,
 
 **Sessiz bırakılmadı:** kod bu durumda stderr'e açık uyarı basıyor ve iki
 tabloya erişim `.get()` ile (KeyError yok). Üçü de testle kilitli.
-**Bağlanması I-2d'ye ait.**
+
+> ✅ **BU SINIR §21'DE (I-2d) KAPATILDI.** Görsel imza artık profilin
+> `palet`/`gecis` beyanından türetiliyor; 12 profilin hepsi imza üretiyor,
+> eski kimlikler bit-bit korunuyor.
 
 ### Ölçülen test sonucu (12 Ağu)
 
@@ -1069,8 +1073,8 @@ tarayıcı URL'ye açıldı — `.claude/` oluşturulmadı.
    `melez:a+b` kimliğini çözemiyor. Arayüz bunu açıkça söylüyor.
 3. **Hikâye hattında bileşik profil uygulanmıyor** — `HIKAYE_STILLERI` ayrı
    bir sözlük. Auto o hatta stil taşımıyor (sessiz düşüş yerine dürüst not).
-4. **Görsel imza boşluğu** (§18 sınır 1) aynen geçerli: yeni-nesil kimlikle
-   `EFEKT_TEMEL`/`GECIS_IMZASI` gelmiyor.
+4. ~~**Görsel imza boşluğu** (§18 sınır 1): yeni-nesil kimlikle
+   `EFEKT_TEMEL`/`GECIS_IMZASI` gelmiyor.~~ → ✅ **§21'de (I-2d) kapatıldı.**
 5. **Gerçek kullanıcıyla kullanılabilirlik ölçülmedi.** İddia "akış kısaldı
    ve alan kaybı yok" — bu testlerle kanıtlı; "kullanıcılar daha hızlı
    üretiyor" iddiası **ölçülmedi**.
@@ -1081,7 +1085,7 @@ tarayıcı URL'ye açıldı — `.claude/` oluşturulmadı.
 
 ## 20. FAZ I-4 — REFERANS VİDEO PARMAK İZİ SÖZLEŞMESİ (12 Ağu, ölçüldü)
 
-> **Durum: yazıldı + testlendi, dosyalar staged. Commit YOK, deploy YOK.**
+> **Durum: commit `0d45fc8`, `origin/arastirma-motoru`'na PUSH EDİLDİ. Deploy YOK.**
 > Yeni: `webapp/referans_parmak.py`.
 > Değişen: `webapp/testler/test_faz_i.py` (+ bu handoff).
 > **Dokunulmadı:** `server.py`, `pipeline.py`, `deploy.sh`, tüm arayüz.
@@ -1218,3 +1222,123 @@ duruyor (≥12 şartı sağlanıyor).
 Ölçüm motoru (ffmpeg `select/scene` + `blackdetect` + `silencedetect` ile
 ritim/çekim/ses; renk için kare histogramı), `/api/generate` veya ayrı bir uçla
 bağlama, ve arayüzde referans video yükleme + parmak izi özeti.
+
+---
+
+## 21. FAZ I-2d — GÖRSEL İMZA BOŞLUĞU KAPATILDI (12 Ağu, ölçüldü)
+
+> **Durum: yazıldı + testlendi, dosyalar staged. Commit YOK, deploy YOK.**
+> Değişen: `webapp/pipeline.py`, `webapp/testler/test_faz_i.py` (+ bu handoff).
+> **Dokunulmadı:** `server.py`, `stil_profili.py`, `referans_parmak.py`,
+> `deploy.sh`, tüm arayüz, 22 alanlık generate sözleşmesi.
+
+### Kapatılan açık
+
+§18 ve §19'un bilinen sınırı ölçülmüştü:
+
+```
+sinematik-belgesel  efekt=3  gecis=('karartma', 0.2)
+korku-gerilim       efekt=0  gecis=yok
+belgesel-sinematik  efekt=0  gecis=yok
+```
+
+`EFEKT_TEMEL` ve `GECIS_IMZASI` **eski kimliklerle** anahtarlıydı. Yeni-nesil
+bir kimlikle üretilirse tempo/footage/altyazı profilden geliyor ama
+grain/vinyet/grade ve geçiş imzası **gelmiyordu** — kullanıcının sebebini
+bilmediği sessiz bir kalite kaybı.
+
+### Çözüm: profilin kendi beyanından türetme
+
+`bilesik_gorsel_imza(_profil)` → `{efektler, gecis_imza, gecis_oran, gerekce,
+uygulandi}`. Kaynak: profilin `palet` (grade/kontrast/doygunluk) ve `gecis`
+(tür/oran) blokları.
+
+**Üretilen adlar yalnızca render tarafının BİLDİĞİ adlar:**
+efekt ∈ `grain · vinyet · siyah-beyaz · kontrast-grade · sicak-grade ·
+soguk-grade`, geçiş ∈ `karartma · flash · whip`. Bilinmeyen ad sessizce yok
+sayılırdı; testler bunu kilitliyor.
+
+Geçiş eşlemesi (4 türün **hepsi** eşlenmiş, uydurma yok):
+`hard-cut → karartma` (seyrek aksan, eski modelin aynısı) · `crossfade →
+karartma` (render tarafında karartma = crossfade + parlaklık dibi) ·
+`whip → whip` · `karisik → flash`. Oran = profilin `oran_pct`'si.
+
+### Eski tabloya karşı kalibrasyon (testle kilitli)
+
+⚠ Bu kurallar **ölçüm değil, türetme kararıdır.** Doğrulama yöntemi: eşdeğer
+profilin eski tablonun ruhunu üretmesi.
+
+| Yeni profil | Türetilen | Eski karşılığı |
+|---|---|---|
+| `belgesel-sinematik` | grain 0.9 · vinyet 0.9 · sicak-grade 0.8 · kontrast-grade 1.1 | `sinematik-belgesel`: grain 0.9 · vinyet 1.0 · kontrast-grade 1.1 |
+| `bilim-anlatisi` | grain 0.5 | `veri-anlatisi`: grain 0.5 — **birebir** |
+| `explainer-hizli` | efekt yok | `hizli-explainer`: `[]` — **birebir** |
+| `korku-gerilim` | grain 0.9 · vinyet 1.0 · soguk-grade 0.9 · kontrast-grade 1.1 | (eski karşılığı yoktu) |
+
+**12 profilin hepsi** görsel imza üretiyor — sessiz kayıp kalmadı.
+
+### Eski kimliklerde BİT-BİT gerileme yok
+
+`efekt_ata(edit_id, islev, indeks, ek_profil=None)` ve
+`gecis_imza_sec(edit_id, indeks, ek_profil=None)` — 3./4. parametre
+**opsiyonel**. Eski kimliklerde `_profil` bloğu yoktur → `None` → eski kod
+yolu aynen işler.
+
+**Kanıt:** test, dokunulmamış tablolardan **bağımsız bir referans uygulama**
+kuruyor ve 5 eski stil × 120 sahne × 6 işlev için çıktıyı karşılaştırıyor →
+**fark yok**. Yani "kod kendini doğruluyor" değil, davranış eski algoritmayla
+karşılaştırılıyor.
+
+### Her karar görünür ve izlenebilir
+
+- `gerekce` listesi hangi alanın hangi efekti doğurduğunu tek tek yazar
+  (`palet.grade 'dogal-sicak' -> 'sicak' kurali: sicak-grade 0.8`).
+- İş kaydına `sonuc["stil_profili"]["gorsel_imza"]` yazılıyor
+  (uygulandı/efektler/geçiş/gerekçe).
+- Üretim logunda `GORSEL IMZA (bilesik): efekt=[...] gecis=karartma %10` +
+  gerekçe satırları.
+- Türetme **başarısız olursa sessizce eski tabloya geçilmez**; log açıkça
+  `TURETILEMEDI ... eski tabloya dusuluyor` der.
+
+### Bozuk profil → kontrollü fallback
+
+`bilesik_gorsel_imza()` **istisna fırlatmaz**. `None`, boş sözlük, dize,
+liste, `palet: "x"`, eksik alanlar, `oran_pct: "cok"` — hepsi testli; her
+durumda eski tabloya düşülür ve gerekçe yazılır. Bilinmeyen geçiş türünde
+(`uzay-gecisi`) imza **üretilmez** — uydurma yok.
+
+### Ölçülen test sonucu (12 Ağu) — İKİ ORTAM AYRI
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Zengin venv** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **257** | **562** | **1976** |
+| **Sistem Python** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **203** | **562** | **1922** |
+
+0 hata. Faz I 515 → **562** (+47). Zengin venv'de 1 BLOKE (`QA_TEST_VIDEO`),
+sistem Python'da 2 çevresel BLOKE. pyflakes taraması temiz.
+
+⚠ §16'daki iki kontrol **güncellendi, silinmedi**: I-3 döneminde oradaki
+"yeni kimlikte görsel imza YOK" satırı bir *bilinen sınırı* kilitliyordu;
+I-2d o sınırı kapattığı için kontrol artık türetmenin varlığını kilitliyor.
+
+### BİLİNEN SINIRLAR (dürüstçe)
+
+1. **Türetme kuralları ölçülmedi.** Eski tablo 786 kesme ölçümünden geliyordu;
+   bu kurallar profilin **beyanından** türetiliyor ve gerçek videoyla A/B
+   doğrulaması yok. Kalibrasyon iddiası yalnızca "eski tablonun ruhunu
+   üretiyor" düzeyinde.
+2. **`oran_pct` değerleri profilin kendi beyanı.** `ambient-sakin` %90,
+   `explainer-hizli` %45 — bunlar 786 kesme ölçümündeki "sert kesme %79.9"
+   gerçeğiyle karşılaştırılmadı. Yüksek oranlar ekranda beklenenden yoğun
+   görünebilir.
+3. **Gerçek videoyla uçtan uca koşulmadı.** Efekt/geçiş adlarının render
+   tarafında tanındığı statik olarak doğrulandı; çıktı videosu izlenmedi.
+4. **`kamera.hareket` bu adımda bağlanmadı** — `motion` alanı zaten
+   `eski_edit_stiline()` üzerinden akıyordu, ayrıca bir şey yapılmadı.
+5. **Hikâye/animasyon hatlarına taşma yok** (kasıtlı): o hatların kendi stil
+   sözlükleri var; bileşik profil oralarda hâlâ uygulanmıyor (§19 sınır 3).
+
+### SONRAKİ ADIM
+
+§19 sınır 1–3 ve §20 sınır 1–2 hâlâ açık: adım adım modda Auto paneli,
+melez stillerin üretime taşınması, referans ölçüm motoru.

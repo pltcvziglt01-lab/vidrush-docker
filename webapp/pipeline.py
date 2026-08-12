@@ -81,10 +81,157 @@ EFEKT_ISLEV = {
 EFEKT_SEYREKLIK = float(os.environ.get("EFEKT_SEYREKLIK", "0.7"))
 
 
-def efekt_ata(edit_id: str, islev: str, indeks: int) -> list:
+# ══ FAZ I-2d — BILESIK PROFILDEN GORSEL IMZA ══
+# ⚠ KAPATILAN ACIK (§18'de olculmustu): `EFEKT_TEMEL` ve `GECIS_IMZASI`
+# tablolari ESKI kimliklerle anahtarli. Yeni-nesil bir kimlik geldiginde ikisi
+# de varsayilanina dusuyordu: efekt=0, gecis imzasi=yok. Yani tempo/footage
+# profilden geliyor ama grain/vinyet/grade ve gecis imzasi GELMIYORDU —
+# kullanicinin sebebini bilmedigi SESSIZ bir kalite kaybi.
+#
+# ⚠ BU KURALLAR OLCUM DEGIL, TURETME KARARIDIR. Kaynak: profilin kendi
+# `palet`/`gecis` beyani. Eski tabloya karsi kalibre edildi (test kilitliyor):
+#   belgesel-sinematik -> grain/vinyet/kontrast-grade  (eski sinematik-belgesel)
+#   bilim-anlatisi     -> grain 0.5                    (eski veri-anlatisi)
+#   explainer-hizli    -> efekt YOK                    (eski hizli-explainer)
+#
+# ⚠ Uretilen ADLAR yalnizca render tarafinin BILDIGI adlardir; bilinmeyen ad
+# sessizce yok sayilirdi (hizli_render `_ef_v` sozlugu ve GECIS_IMZA_FFMPEG).
+GECERLI_EFEKT_ADI = ("grain", "vinyet", "siyah-beyaz", "kontrast-grade",
+                     "sicak-grade", "soguk-grade")
+GECERLI_GECIS_IMZA = ("karartma", "flash", "whip")
+
+# `stil_profili` gecis turu -> render imzasi. 4 turun HEPSI eslenmis;
+# eslenmeyen bir tur gelirse imza URETILMEZ (uydurma yok).
+BILESIK_GECIS_IMZA = {
+    "hard-cut": "karartma",    # sert kesme stilinde SEYREK karartma aksani
+    "crossfade": "karartma",   # render tarafinda karartma = crossfade + dip
+    "whip": "whip",
+    "karisik": "flash",
+}
+
+# palet.grade icindeki anahtar -> renk/doku katmani. SIRA ONEMLI:
+# "soguk-karanlik" hem "soguk" hem "karanlik" tasir; zengin olan once gelir.
+_GRADE_KURALI = (
+    ("vintage", (("grain", 1.1), ("sicak-grade", 0.8)), True),
+    ("karanlik", (("grain", 0.9), ("vinyet", 1.0), ("soguk-grade", 0.9)), True),
+    ("teal-orange", (("grain", 0.9), ("vinyet", 0.9),
+                     ("kontrast-grade", 1.0)), True),
+    # Parlak/temiz gorunum: DOKU YOK (eski `hizli-explainer` bos listesiyle
+    # ayni ruh). `dokusuz=True` kontrast kuralini da bastirir.
+    ("flat", (), False),
+    ("temiz", (), False),
+    ("pastel", (("sicak-grade", 0.5),), False),
+    ("dogal", (("grain", 0.7), ("vinyet", 0.8)), True),
+    ("sicak", (("sicak-grade", 0.8),), True),
+    ("soguk", (("soguk-grade", 0.9),), True),
+)
+
+
+def _efekt_birlestir(hedef: list, ad: str, siddet: float) -> None:
+    """Ayni efekt iki kez girmesin; siddeti YUKSEK olan kazanir."""
+    if ad not in GECERLI_EFEKT_ADI:
+        return
+    for e in hedef:
+        if e["ad"] == ad:
+            e["siddet"] = max(float(e.get("siddet") or 0), float(siddet))
+            return
+    hedef.append({"ad": ad, "siddet": float(siddet)})
+
+
+def bilesik_gorsel_imza(ek_profil) -> dict:
+    """`_profil`ten efekt temeli + gecis imzasi turet (Faz I-2d).
+
+    Donus: {"efektler": [...], "gecis_imza": str, "gecis_oran": float,
+            "gerekce": [...], "uygulandi": bool}
+
+    ⚠ HER KARAR IZLENEBILIR: `gerekce` hangi alanin hangi efekti dogurdugunu
+    tek tek yazar. Kara kutu yok.
+    ⚠ ISTISNA FIRLATMAZ: bozuk/eksik profilde `uygulandi=False` doner ve
+    cagiran taraf ESKI tabloya duser (gerileme yok).
+    """
+    sonuc = {"efektler": [], "gecis_imza": "", "gecis_oran": 0.0,
+             "gerekce": [], "uygulandi": False}
+    try:
+        ek = ek_profil if isinstance(ek_profil, dict) else {}
+        palet = ek.get("palet") if isinstance(ek.get("palet"), dict) else {}
+        gecis = ek.get("gecis") if isinstance(ek.get("gecis"), dict) else {}
+        if not palet and not gecis:
+            sonuc["gerekce"].append("profilde palet/gecis blogu yok")
+            return sonuc
+
+        # ── EFEKT TEMELI ──
+        grade = str(palet.get("grade") or "").lower()
+        kontrast = str(palet.get("kontrast") or "").lower()
+        efektler, dokulu, eslesme = [], True, False
+        for anahtar, cifter, doku in _GRADE_KURALI:
+            if anahtar in grade:
+                eslesme = True
+                dokulu = dokulu and doku
+                for ad, sid in cifter:
+                    _efekt_birlestir(efektler, ad, sid)
+                sonuc["gerekce"].append(
+                    f"palet.grade '{grade}' -> '{anahtar}' kurali: "
+                    + (", ".join(f"{a} {s}" for a, s in cifter) or "doku yok"))
+        if kontrast == "yuksek" and dokulu:
+            for ad, sid in (("kontrast-grade", 1.1), ("grain", 0.9),
+                            ("vinyet", 0.9)):
+                _efekt_birlestir(efektler, ad, sid)
+            sonuc["gerekce"].append(
+                "palet.kontrast 'yuksek' -> kontrast-grade 1.1, grain 0.9, "
+                "vinyet 0.9")
+        elif kontrast == "yuksek":
+            sonuc["gerekce"].append(
+                "palet.kontrast 'yuksek' ama grade parlak/temiz -> doku "
+                "eklenmedi (parlak gorunum korunur)")
+        if not efektler and dokulu and grade:
+            # Hicbir kural tutmadiysa HAFIF taban doku (eski `veri-anlatisi`
+            # grain 0.5 ile ayni). Parlak/temiz gorunumde bu da eklenmez.
+            _efekt_birlestir(efektler, "grain", 0.5)
+            sonuc["gerekce"].append(
+                f"palet.grade '{grade}' icin ozel kural yok -> taban grain 0.5")
+        if not eslesme and not grade:
+            sonuc["gerekce"].append("palet.grade bos -> efekt turetilmedi")
+        sonuc["efektler"] = efektler
+
+        # ── GECIS IMZASI ──
+        tur = str(gecis.get("tur") or "").lower()
+        imza = BILESIK_GECIS_IMZA.get(tur, "")
+        try:
+            oran = max(0.0, min(1.0, float(gecis.get("oran_pct") or 0) / 100.0))
+        except (TypeError, ValueError):
+            oran = 0.0
+        if imza in GECERLI_GECIS_IMZA and oran > 0:
+            sonuc["gecis_imza"], sonuc["gecis_oran"] = imza, oran
+            sonuc["gerekce"].append(
+                f"gecis.tur '{tur}' + oran %{oran * 100:.0f} -> imza '{imza}'")
+        elif tur and not imza:
+            sonuc["gerekce"].append(
+                f"gecis.tur '{tur}' render tarafinda karsiliksiz -> imza yok")
+        elif tur:
+            sonuc["gerekce"].append(
+                f"gecis.tur '{tur}' oran 0 -> imza yok (saf sert kesme)")
+
+        sonuc["uygulandi"] = bool(sonuc["efektler"] or sonuc["gecis_imza"])
+    except Exception as e:                  # hat COKERTMEZ, eski tabloya duser
+        sonuc["gerekce"].append(f"turetme hatasi: {type(e).__name__}")
+    return sonuc
+
+
+def efekt_ata(edit_id: str, islev: str, indeks: int, ek_profil=None) -> list:
     """Sahnenin efekt listesi: stil temeli + (seyrek) islev vurgusu.
-    Ayni sahne her uretimde AYNI efekti alir (indeks tabanli, rastgelelik yok)."""
-    temel = [dict(e) for e in EFEKT_TEMEL.get(edit_id, [])]
+    Ayni sahne her uretimde AYNI efekti alir (indeks tabanli, rastgelelik yok).
+
+    ⚠ FAZ I-2d: `ek_profil` verilirse ve ondan efekt TURETILEBILIYORSA temel
+    oradan gelir. Verilmezse (eski kimlikler) `EFEKT_TEMEL` aynen kullanilir —
+    eski davranis bit-bit korunur.
+    """
+    temel = None
+    if ek_profil:
+        _tur = bilesik_gorsel_imza(ek_profil)
+        if _tur["efektler"]:
+            temel = [dict(e) for e in _tur["efektler"]]
+    if temel is None:
+        temel = [dict(e) for e in EFEKT_TEMEL.get(edit_id, [])]
     vurgu = EFEKT_ISLEV.get(islev or "", [])
     # Seyreklik: islev eslesse bile hepsine degil (surekli efekt yorucu olur)
     if vurgu and (indeks * 6151 % 100) / 100.0 < EFEKT_SEYREKLIK:
@@ -112,9 +259,18 @@ GECIS_IMZASI = {
 }
 
 
-def gecis_imza_sec(edit_id: str, indeks: int) -> str:
-    """Bu sahneye gecis imzasi konacak mi? Deterministik — ayni sahne her uretimde ayni."""
-    imza, oran = GECIS_IMZASI.get(edit_id, ("", 0.0))
+def gecis_imza_sec(edit_id: str, indeks: int, ek_profil=None) -> str:
+    """Bu sahneye gecis imzasi konacak mi? Deterministik — ayni sahne her uretimde ayni.
+
+    ⚠ FAZ I-2d: `ek_profil` verilirse ve ondan imza TURETILEBILIYORSA o
+    kullanilir. Verilmezse `GECIS_IMZASI` tablosu aynen isler (gerileme yok).
+    """
+    imza, oran = "", 0.0
+    if ek_profil:
+        _tur = bilesik_gorsel_imza(ek_profil)
+        imza, oran = _tur["gecis_imza"], _tur["gecis_oran"]
+    if not imza:
+        imza, oran = GECIS_IMZASI.get(edit_id, ("", 0.0))
     if not imza or oran <= 0:
         return ""
     return imza if (indeks * 4177 % 1000) / 1000.0 < oran else ""
@@ -1620,18 +1776,17 @@ def bilesik_stile_cevir(edit_id):
     eski["_stil_kimligi"] = edit_id
     print(f"  BILESIK STIL: '{edit_id}' v{p.get('surum')} kullaniliyor "
           f"(sema {getattr(stil_profili, 'SEMA_SURUM', '?')})", file=sys.stderr)
-    # ⚠ OLCULEN EKSIK — SESSIZ KALMASIN: `EFEKT_TEMEL` ve `GECIS_IMZASI`
-    # tablolari ESKI kimliklerle anahtarlanmis durumda. Yeni-nesil bir kimlik
-    # geldiginde ikisi de varsayilanina duser (0 efekt, imzasiz sert kesme) —
-    # yani grain/vinyet/grade ve gecis imzasi UYGULANMAZ. Profil `_profil.gecis`
-    # icinde gecis bilgisini TASIYOR ama bu tablolara henuz baglanmadi (I-2d).
-    # Bunu bastan sesli soylemek, kullanicinin sebebini bilmedigi bir kalite
-    # dususu yasamasindan iyidir.
-    if edit_id not in EFEKT_TEMEL or edit_id not in GECIS_IMZASI:
-        print(f"  ⚠ '{edit_id}' icin efekt/gecis imzasi tablosunda karsilik YOK "
-              f"-> efekt={len(EFEKT_TEMEL.get(edit_id, []))}, "
-              f"gecis imzasi yok. Tempo/footage/altyazi profilden GELIYOR, "
-              f"gorsel imza GELMIYOR (bkz. FAZ-H-HANDOFF §18 bilinen sinir).",
+    # ⚠ FAZ I-2d: gorsel imza artik PROFILDEN turetiliyor (bkz.
+    # `bilesik_gorsel_imza`). Eski tablolarda karsilik olmamasi ARTIK sessiz
+    # kalite kaybi DEGIL. Yine de turetme bos cikarsa bunu SESLI soyleriz:
+    # kullanicinin sebebini bilmedigi bir dusus yasamasindansa loga yazilir.
+    _imza = bilesik_gorsel_imza(eski.get("_profil"))
+    if not _imza["uygulandi"]:
+        print(f"  ⚠ '{edit_id}' icin bilesik profilden gorsel imza "
+              f"TURETILEMEDI; eski tabloya dusuluyor "
+              f"(efekt={len(EFEKT_TEMEL.get(edit_id, []))}, "
+              f"gecis={GECIS_IMZASI.get(edit_id, ('yok', 0))[0]}). "
+              f"Gerekce: {'; '.join(_imza['gerekce']) or 'belirtilmedi'}",
               file=sys.stderr)
     return eski
 
@@ -3903,6 +4058,21 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     panlar = ["right", "left", "top", "bottom"]
     props_sahneler = []
     toplam = len(scenes)
+    # ── FAZ I-2d: GORSEL IMZA KAYNAGI ──
+    # Bilesik profil varsa efekt/gecis imzasi ONDAN turetilir. Eski stil
+    # kimliklerinde `_profil` blogu YOKTUR -> `None` kalir ve `efekt_ata` /
+    # `gecis_imza_sec` eski tablolariyla BIT-BIT ayni calisir.
+    _gorsel_ek = profil_ek_oku(prof) or None
+    _gorsel_imza = bilesik_gorsel_imza(_gorsel_ek) if _gorsel_ek else None
+    if _gorsel_imza:
+        _ef_adlari = [e["ad"] for e in _gorsel_imza["efektler"]] or ["yok"]
+        _gz = _gorsel_imza["gecis_imza"] or "yok"
+        if _gorsel_imza["gecis_imza"]:
+            _gz += f" %{_gorsel_imza['gecis_oran'] * 100:.0f}"
+        print(f"  GORSEL IMZA (bilesik): efekt={_ef_adlari} gecis={_gz}",
+              file=sys.stderr)
+        for _g in _gorsel_imza["gerekce"]:
+            print(f"    · {_g}", file=sys.stderr)
     # Gorsel capa: normalde ilk uretilen sahne sonrakilere kilit olur (video ICI tutarlilik).
     # PROFIL KILITLIYSE capa ta bastan gelir -> ILK SAHNE DAHIL her kare kanalin sabit
     # gorunumune kilitlenir (videolar ARASI tutarlilik). Kanal kimligi budur.
@@ -4219,9 +4389,13 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             **_etiket_props(s),
             **_alt_band_props(s),
             # Efekt atamasi: stil temeli + islev vurgusu (deterministik, LLM'e sorulmaz)
-            **({"gecisImza": _gi} if (_gi := gecis_imza_sec(edit_id, i)) else {}),
+            # ⚠ FAZ I-2d: bilesik profil varsa gorsel imza ONDAN turetilir;
+            # yoksa `_gorsel_ek` None kalir ve eski tablolar aynen isler.
+            **({"gecisImza": _gi} if (_gi := gecis_imza_sec(edit_id, i, _gorsel_ek))
+               else {}),
             **({"efektler": _ef} if (_ef := efekt_ata(
-                edit_id, kurgu_analiz[i]["islev"] if i < len(kurgu_analiz) else "aciklama", i))
+                edit_id, kurgu_analiz[i]["islev"] if i < len(kurgu_analiz) else "aciklama",
+                i, _gorsel_ek))
                else {}),
             **({"bolum": str(s["bolum"]).strip(),
                 "bolumYeri": ("ust" if str(s.get("bolum_yeri")) == "ust" else "orta")}
@@ -4450,6 +4624,17 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             "surum": _stil_ek.get("surum") or "",
             "sema_surum": getattr(stil_profili, "SEMA_SURUM", ""),
             "boyutlar": sorted(k for k in _stil_ek if k != "surum"),
+        }
+        # ── FAZ I-2d: GORSEL IMZA IZLENEBILIRLIGI ──
+        # Hangi efektin/gecisin NEDEN uygulandigi ise yazilir; "efekt yok"
+        # durumu da gerekcesiyle gorunur (sessiz kalite kaybi yok).
+        _gi_ozet = bilesik_gorsel_imza(_stil_ek)
+        sonuc["stil_profili"]["gorsel_imza"] = {
+            "uygulandi": _gi_ozet["uygulandi"],
+            "efektler": _gi_ozet["efektler"],
+            "gecis_imza": _gi_ozet["gecis_imza"],
+            "gecis_oran": _gi_ozet["gecis_oran"],
+            "gerekce": _gi_ozet["gerekce"],
         }
     # ── FAZ H: MEDYA KAPISI — reddedilen adaylar GORUNUR olur ──
     # Sessiz dusus yasak: kapi bir klibi attiysa kullanici NEDEN atildigini
