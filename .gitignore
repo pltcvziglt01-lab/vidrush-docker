@@ -15,6 +15,8 @@ webapp/veri/onbellek/
 
 # Yerel arac/test artiklari — depoya girmez (Faz F QA maddesi 5)
 .claude/
+# §14'un tarif ettigi yerel test venv'i — depoya girmez (Faz I-14)
+.venv-test/
 
 # Python bytecode / test onbellegi — depoya girmez (Faz H)
 __pycache__/

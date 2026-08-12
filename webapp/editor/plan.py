@@ -241,8 +241,16 @@ def uret(*, cumleler: list, medya_manifest: dict,
          profil_adi: str = "premium-modern",
          beklenen_ulke: str = "", beklenen_donem: str = "",
          cikti_dizin: str = ".", ambience: str = "", muzik: str = "",
-         saglayici_tavani: int = 4) -> dict:
-    """Tum Faz C zincirini kosur ve dort dosyayi yazar."""
+         saglayici_tavani: int = 4,
+         kare_olcu: Optional[tuple] = None,
+         anlatim_bitis_sn: Optional[float] = None,
+         benzerlik_okuyucu=None,
+         kalite_kapisi: bool = False) -> dict:
+    """Tum Faz C zincirini kosur ve dort dosyayi yazar.
+
+    Son dort parametre Faz I-14 kalite kapilarina aittir; hepsi opsiyonel ve
+    `kalite_kapisi=False` iken QA hukmu DEGISMEZ (yalniz olcum yazilir).
+    """
     p = profil.profil(profil_adi)
     index, sahne_adaylari = _adaylari_indeksle(medya_manifest)
     bosluklar = _bosluk_indeksle(medya_manifest)
@@ -273,7 +281,11 @@ def uret(*, cumleler: list, medya_manifest: dict,
                       ses_plani=splan, adaylar_index=index, profil_=p,
                       beklenen_ulke=beklenen_ulke,
                       beklenen_donem=beklenen_donem,
-                      arastirma_fact_idler=fact_idler or None)
+                      arastirma_fact_idler=fact_idler or None,
+                      kare_olcu=kare_olcu,
+                      anlatim_bitis_sn=anlatim_bitis_sn,
+                      benzerlik_okuyucu=benzerlik_okuyucu,
+                      kalite_kapisi=kalite_kapisi)
 
     # ── edit_manifest ──
     edit_manifest = {

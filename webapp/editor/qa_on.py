@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
-from . import gramer, motion, tipografi
+from . import gramer, kalite_kapisi, motion, tipografi
 from .profil import OLCULEN, EditProfili, VARSAYILAN
 
 # ── Sorun kodlari ve seviyeleri ──
@@ -26,7 +26,17 @@ FAIL_KODLARI = {
     "LISANS-EKSIK", "LISANS-ATIF-EKSIK", "FACT-BAGLANTI-YOK",
     "EFEKT-SESSIZ-KAYIP", "SHOT-TAVAN-IHLAL", "ENTITY-DONEM",
     "MEDYA-KAPSAM-YOK", "SES-LUFS-HEDEF-YOK", "TIPO-KONTRAST",
+    # ── Faz I-14 kalite kapilari ──
+    "KALITE-BASLIK-KIRPIK", "KALITE-BASLIK-TASMA", "KALITE-MEDYA-TEKRAR",
+    "KALITE-RITIM-SABIT", "KALITE-OLU-FINAL",
 }
+
+# I-14 kapisinin urettigi kodlar. Kapi KAPALIYKEN bunlarin HICBIRI uretilmez;
+# olcumler yine de `olcumler["kalite"]`e yazilir (gizlenmiyor, yalniz hukum
+# verilmiyor). Boylece varsayilan yolun PASS/WARN/FAIL karari BIT-BIT ayni kalir.
+KALITE_KODLARI = ("KALITE-BASLIK-KIRPIK", "KALITE-BASLIK-TASMA",
+                  "KALITE-MEDYA-TEKRAR", "KALITE-RITIM-SABIT",
+                  "KALITE-OLU-FINAL", "KALITE-MEDYA-BENZER-OLCULEMEDI")
 
 
 @dataclass
@@ -75,7 +85,24 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
             motion_specler: list, ses_plani, adaylar_index: dict,
             profil_: Optional[EditProfili] = None,
             beklenen_ulke: str = "", beklenen_donem: str = "",
-            arastirma_fact_idler: Optional[set] = None) -> QaSonucu:
+            arastirma_fact_idler: Optional[set] = None,
+            kare_olcu: Optional[tuple] = None,
+            anlatim_bitis_sn: Optional[float] = None,
+            benzerlik_okuyucu=None,
+            kalite_kapisi: bool = False) -> QaSonucu:
+    """Pre-render denetim.
+
+    Faz I-14 ek parametreleri (hepsi OPSIYONEL, varsayilan davranis degismez):
+      `kare_olcu`        : render'in GERCEK (genislik, yukseklik) olcusu.
+                           Verilmezse profilin nominal olcusu kullanilir.
+                           ⚠ I-13'te profil 1920 diyordu, render 1280'e
+                           yapiliyordu; baslik kirpilmasinin kok nedeni buydu.
+      `anlatim_bitis_sn` : anlatim sesinin bittigi an (olu final olcumu icin).
+      `benzerlik_okuyucu`: (yolA, yolB) -> 0..1. Verilmezse gorsel benzerlik
+                           `olculemedi` yazilir; "benzer medya yok" DENMEZ.
+      `kalite_kapisi`    : False iken KALITE-* kodlari URETILMEZ, yalnizca
+                           olcum yazilir. True iken kapi gercekten hukum verir.
+    """
     p = profil_ or VARSAYILAN
     q = QaSonucu()
     beatler = beat_plani.beatler
@@ -295,4 +322,132 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
         q.ekle(Sorun(kod, "warn" if "TAVAN" not in kod else "fail", detay=u,
                      oneri="beat planini duzelt"))
 
+    # ═══ 9) FAZ I-14 KALITE KAPILARI ═══
+    # ⚠ OLCUM HER ZAMAN yapilir ve `olcumler["kalite"]`e yazilir; HUKUM
+    # yalnizca `kalite_kapisi=True` iken verilir. Boylece kapali yolda
+    # PASS/WARN/FAIL karari degismez ama olcum de gizlenmez.
+    _kalite_denetle(q, beatler=beatler, cekimler=cekimler,
+                    yazi_katmanlari=yazi_katmanlari,
+                    adaylar_index=adaylar_index, p=p, kare_olcu=kare_olcu,
+                    anlatim_bitis_sn=anlatim_bitis_sn, toplam=toplam,
+                    benzerlik_okuyucu=benzerlik_okuyucu, acik=kalite_kapisi)
+
     return q.sonuclandir()
+
+
+def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
+                    adaylar_index, p, kare_olcu, anlatim_bitis_sn, toplam,
+                    benzerlik_okuyucu, acik: bool) -> None:
+    """I-14 olcumlerini kos ve (kapi acikken) sorun uret. ASLA COKMEZ."""
+    kk = kalite_kapisi
+    try:
+        # Baslik bandi YATAY tasar; yukseklik bu olcumde kullanilmaz.
+        genislik = int((kare_olcu or (p.genislik,))[0] or p.genislik)
+    except (TypeError, ValueError, IndexError):
+        genislik = p.genislik
+    olcum: dict = {"kare_genislik": genislik,
+                   "kare_olcu_verildi": bool(kare_olcu),
+                   "kapi_acik": bool(acik)}
+
+    def _ekle(kod, seviye, detay, oneri, scene_id="", beat_id=""):
+        if acik:
+            q.ekle(Sorun(kod, seviye, scene_id, beat_id, detay, oneri))
+
+    # ── (1) BASLIK: kelime ortasi kesik + bant tasmasi ──
+    baslik_olcumleri = []
+    ham_metinler = {b.beat_id: str(getattr(b, "metin", "") or "")
+                    for b in beatler}
+    for k in yazi_katmanlari:
+        if getattr(k, "ad", "") != "chapter-title":
+            continue
+        o = kk.baslik_olcusu(k.metin, punto=k.punto, kare_genislik=genislik)
+        # Ham beat metni: katman ilk beat'ten uretiliyor (plan._yazi_katmanlari_kur)
+        ham = ham_metinler.get(beatler[0].beat_id, "") if beatler else ""
+        kes = kk.kelime_ortasi_kesik(ham, k.metin)
+        o["kelime_kesik"] = kes
+        o["sigan_karakter"] = kk.sigan_karakter(k.punto, genislik)
+        baslik_olcumleri.append(o)
+        if kes.get("kesik"):
+            _ekle("KALITE-BASLIK-KIRPIK", "fail",
+                  f"baslik kelime ortasindan kesik: "
+                  f"{kes.get('yarim_kelime')!r} <- {kes.get('tam_kelime')!r} "
+                  f"({o.get('karakter')} karakter, sigan {o['sigan_karakter']})",
+                  "basligi KELIME SINIRINDA kisalt "
+                  "(plan.kart_basligi_siniri kullanilmali, sabit dilim degil)")
+        if o.get("olculdu") and not o.get("sigar"):
+            _ekle("KALITE-BASLIK-TASMA", "fail",
+                  f"bant {o['cizilen_px']}px cizim / {o['kullanilabilir_px']}px "
+                  f"alan -> {o['tasma_px']}px tasma "
+                  f"(punto {o['punto_taban']}->{o['uygulanan_punto']}, "
+                  f"kucultme tabani vuruldu: {o['kucultme_tabani_vuruldu']})",
+                  f"basligi {o['sigan_karakter']} karaktere indir ya da "
+                  f"render kare genisligini ({genislik}) plana bildir")
+    olcum["baslik"] = baslik_olcumleri
+
+    # ── (2) MEDYA TEKRARI ──
+    sahneler = []
+    for c in cekimler:
+        aday = adaylar_index.get(getattr(c, "asset_id", "") or "") or {}
+        sahneler.append({
+            "asset_id": getattr(c, "asset_id", "") or "",
+            "scene_id": getattr(c, "scene_id", "") or "",
+            "medya_yolu": aday.get("yerel_yol") or aday.get("medya_yolu") or ""})
+    mt = kk.medya_tekrari(sahneler, benzerlik_okuyucu=benzerlik_okuyucu)
+    olcum["medya_tekrari"] = mt
+    if mt.get("olculdu"):
+        for b in (mt.get("bitisik_ayni_asset") or []):
+            _ekle("KALITE-MEDYA-TEKRAR", "fail",
+                  f"ayni varlik ARKA ARKAYA: {b['asset_id']} "
+                  f"(sahne {b['indeks']})",
+                  "komsu sahneye farkli bir lisansli aday sec")
+        for aid, n in (mt.get("tekrar_eden_asset") or {}).items():
+            if not any(b["asset_id"] == aid
+                       for b in (mt.get("bitisik_ayni_asset") or [])):
+                _ekle("KALITE-MEDYA-TEKRAR", "fail",
+                      f"ayni varlik {n} kez kullanildi: {aid}",
+                      "tekrar eden sahnelerden birine alternatif aday sec")
+        for c2 in (mt.get("benzer_ciftler") or []):
+            _ekle("KALITE-MEDYA-TEKRAR", "fail",
+                  f"ayirt edilemeyecek kadar benzer medya: {c2['asset_a']} ~ "
+                  f"{c2['asset_b']} (benzerlik {c2['benzerlik']:.3f} >= "
+                  f"{mt['benzerlik_esigi']})",
+                  "gorsel olarak ayrisan bir aday sec")
+        if not mt.get("benzerlik_olculdu"):
+            # ⚠ SESSIZ PASS YOK: olcemedigimizi soyleriz, "temiz" demeyiz.
+            _ekle("KALITE-MEDYA-BENZER-OLCULEMEDI", "bilgi",
+                  "gorsel benzerlik OLCULEMEDI (okuyucu verilmedi); "
+                  "yalniz ayni asset_id kontrolu yapildi",
+                  "benzerlik_okuyucu enjekte et")
+
+    # ── (3) RITIM: sabit blok + olu final ──
+    plan_sahneleri = [{"sure_sn": getattr(b, "sure_sn", 0),
+                       "metin": str(getattr(b, "metin", "") or "")}
+                      for b in beatler]
+    rt = kk.ritim_olcusu(plan_sahneleri, toplam_sn=toplam,
+                         anlatim_bitis_sn=anlatim_bitis_sn)
+    olcum["ritim"] = rt
+    if rt.get("olculdu"):
+        if rt.get("sabit_blok"):
+            _ekle("KALITE-RITIM-SABIT", "fail",
+                  f"{rt['sahne']} sahnenin hepsi ayni surede "
+                  f"({rt['sureler']}, yayilim {rt['yayilim_sn']} sn <= "
+                  f"{rt['sabit_esik_sn']} sn) — sure icerikten turetilmemis"
+                  + (f"; anlatim agirligi %"
+                     f"{(rt['agirlik_yayilim_orani'] or 0) * 100:.0f} degisiyor"
+                     if rt.get("agirlik_yayilim_orani") else ""),
+                  "sahne suresini anlatim/olgu uzunlugundan turet")
+        elif rt.get("anlatim_bagi") is False:
+            _ekle("KALITE-RITIM-SABIT", "fail",
+                  f"sure yayilimi %{rt['sure_yayilim_orani'] * 100:.0f} ama "
+                  f"anlatim agirligi %"
+                  f"{(rt['agirlik_yayilim_orani'] or 0) * 100:.0f} degisiyor "
+                  f"— sureler anlatima bagli degil",
+                  "sahne suresini anlatim/olgu uzunlugundan turet")
+        if rt.get("olu_final_asildi"):
+            _ekle("KALITE-OLU-FINAL", "fail",
+                  f"planin sonunda {rt['olu_final_sn']} sn anlatimsiz kuyruk "
+                  f"(tavan {rt['olu_final_esigi']} sn): toplam "
+                  f"{rt['toplam_sn']} sn, anlatim {rt['anlatim_bitis_sn']} sn",
+                  "son sahneyi anlatim bitisine kadar kisalt")
+
+    q.olcumler["kalite"] = olcum

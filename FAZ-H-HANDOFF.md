@@ -180,6 +180,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-11 20 sn GERÇEK render smoke** | `f4e3a5e` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-12 QA WARN raporu + chapter-card kalitesi** | `9be6375` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-13 10 sn kaliteli sesli Apollo mini-belgeseli** | `ca023f3` | ✅ **origin'e push edildi**, deploy YOK |
+| 12 Ağu | **I-14 (1. atom) kalite kapıları ölçüldü + QA'ya bağlandı** | `PENDING` | ✅ **origin'e push edildi**, deploy YOK |
 
 ---
 
@@ -2246,8 +2247,10 @@ araştırma/fact-check motoru (olgular hazır manifestten) · canlı
 
 ## 31. ⏭ SIRADAKİ ATOM — **I-14: KALİTE KAPILARI** (yeni oturum buradan devralır)
 
-> **Durum: HENÜZ BAŞLANMADI.** Bu bölüm bir *devir belgesidir*, yapılmış iş
-> değildir. `ca023f3` sonrası çalışma ağacı **temiz**, `origin` ile **0/0**.
+> **Durum (güncellendi): I-14'ün BİRİNCİ atomu §32'de yapıldı** — ölçüm
+> motoru + QA sözleşmesi bağlandı. Bu bölüm devir belgesi olarak **aynen
+> duruyor**; hangi maddesinin kapandığı §32'de tek tek yazılı.
+> Kusurların **giderilmesi** (render'ı yeşile çevirmek) I-15'e ait.
 
 ### Bağlam
 
@@ -2308,3 +2311,197 @@ cd /Users/polatcan/vidrush-docker && git log --oneline -1   # ca023f3 olmalı
 
 Test koşumu ve ortam notları için **§14**'e bak (`edge-tts`, `pyflakes`,
 `fastapi` gerekir; `node` olmadan §25/§27 BLOKE yazar).
+
+---
+
+## 32. FAZ I-14 (1. atom) — KALİTE KAPILARI ÖLÇÜLDÜ ve QA'YA BAĞLANDI (12 Ağu)
+
+> **Durum: yerel yeşil, `origin/arastirma-motoru`'na push edildi. Deploy YOK.**
+> **Tüm bayraklar varsayılan KAPALI. Maliyet $0.00 — ağ/ücretli API yok.**
+> Yeni: `webapp/editor/kalite_kapisi.py`.
+> Değişen: `webapp/editor/qa_on.py`, `webapp/editor/qa_son.py`,
+> `webapp/editor/plan.py`, `webapp/edit_kopru.py`,
+> `webapp/testler/test_faz_i.py` (+ bu handoff).
+> **Dokunulmadı:** `pipeline.py`, `server.py`, tüm arayüz, 22 alanlık generate
+> sözleşmesi, `deploy.sh`, lisans duvarı, SSRF, kare kapısı, iş bütçesi.
+
+### Bu atomun kapsamı — ve kasıtlı olarak NE OLMADIĞI
+
+§31 iki iş tanımlamıştı: (1) kusurları **ölçen** kapılar, (2) kusurların
+**giderilmesi**. Bu atom **yalnızca (1)**'dir. Kapı açıldığında I-13'ün 10 sn
+çıktısı **FAIL veriyor ve render engelleniyor** — bu beklenen ve doğru sonuç,
+kusurlar gerçek. Düzeltme I-15'e ait; sahte PASS üretmemek için kapı
+gevşetilmedi.
+
+### Ölçülen kusurlar — hepsi GERÇEK artefakttan
+
+Kanıt uydurma fixture'dan değil, depoda **izlenen** iki rapordan geliyor
+(`.mp4`/`.png` `.gitignore`'da, bu yüzden ölçümler rapordan okunur —
+test temiz klonda da koşar):
+
+| # | Kusur | Ölçülen değer | Kaynak |
+|---|---|---|---|
+| 1a | Başlık **kelime ortasından kesik** | `"20 JULY"` → `"20 JU"` | `quality_voice_rapor.json` + smoke kaynağı |
+| 1b | Başlık bandı **taşıyor** | 1287.7 px çizim / 1015.2 px alan = **272.5 px taşma** | ffprobe genişliği (1280) |
+| 2 | **Aynı varlık arka arkaya** | `a082` b001+b002'de | `smoke_rapor.json` (I-11, 20 sn) |
+| 3a | **Sabit blok süreler** | 3 sahne de 3.2 sn, yayılım **0.0 sn** | `quality_voice_rapor.json` |
+| 3b | Süreler **anlatıma bağlı değil** | anlatım ağırlığı %30 değişiyor, süre %0 | aynı |
+| 3c | **Ölü final** | plan 0.811 sn · ölçülen **0.903 sn** (tavan 0.5) | aynı + silencedetect |
+| 4a | **Miks sessizlik oranı** | 1.887 sn / 9.643 sn = **%19.6** (tavan %15) | aynı |
+| 4b | **Ambiyans duyulmuyor** | anlatımın **57.12 dB** altında | ffmpeg loudnorm |
+
+### Kusur 1'in KÖK NEDENİ — üç katmanlı, ölçüldü
+
+I-12 "punto küçültme" düzeltmesi yapmıştı ama bu yolda yetmiyor. Neden:
+
+1. **`plan.py:57` sabit `b.metin[:42]` dilimi kullanıyor.** Aynı dosyada
+   `kart_basligi_siniri()` **zaten var** ve hesaplıyor — ama yalnızca `data`
+   çekimi fallback'inde çağrılıyor, `chapter-title` katmanında değil.
+   I-12 iki yoldan **birini** düzeltmiş.
+2. **Plan 1920'ye göre hesaplıyor, render 1280'e yapılıyor.**
+   `remotion_v2.render(olcu=(1280,720))` props'u eziyor, `Root.tsx`
+   `calculateMetadata` onu okuyor. Ölçülen sığan karakter: **1920'de 45,
+   1280'de 29** — plan 42 verdi.
+3. **TSX'in kendi sığdırma hesabı `letterSpacing`'i saymıyor.**
+   `Grafikler.tsx:51` `length * punto * 0.72` diyor ama satır 74'te
+   `letterSpacing: '0.01em'` var. Üstelik küçültmenin **%70 tabanı** var
+   (satır 52); taban vurulduktan sonra `overflow: hidden` **harf ortasından
+   keser**. 1280'de taban gerçekten vuruldu (punto 60 → 42).
+
+⚠ **Nominal 1920'de bile taşıyor** (10.9 px) — yani kusur yalnızca çözünürlük
+farkından değil, `letterSpacing` boşluğundan da geliyor.
+
+### Kusur 3c/4a'nın ÖLÇÜLEMEZ olmasının nedeni — post-QA kör noktası
+
+`qa_son.komut_plani`'nın `sessizlik` geçişi `silencedetect=...:d=1.2`
+kullanıyor. I-13'ün iki boşluğu **0.984 sn** ve **0.903 sn** — ikisi de bu
+eşiğin altında, yani post-QA onları **hiç görmedi**. Bu yüzden `d=0.30`'luk
+ayrı bir **ince geçiş** eklendi; **yalnız kapı açıkken** koşar (kapalı yolda
+fazladan ffmpeg geçişi yok, komut planı **7 komutla birebir aynı**).
+
+Test bunu doğrudan kanıtlıyor: aynı video, kaba geçişte ölü kuyruk **0.0**,
+ince geçişte **0.903**.
+
+### `webapp/editor/kalite_kapisi.py` — saf ölçüm modülü
+
+**6 ölçüm · 7 render sabiti · 6 eşik · 1 enjekte okuyucu** (`kapsam_ozeti()`).
+
+- **Ağ/dosya/alt-süreç yok** — `os`, `subprocess`, `requests` **import
+  edilmiyor**; AST ile ölçülüyor (ham dize taraması modülün kendi
+  dokümantasyonunu yakalıyordu — I-9 dersi).
+- **Render sabitleri `Grafikler.tsx`'ten okundu**, uydurulmadı: `0.72 · 0.01em
+  · 0.84 · 0.42 · 2.4 · 0.70 · IZGARA_X`. Test TSX ile eşliği kilitliyor.
+- **Ölçemediyse "temiz" demiyor.** Benzerlik okuyucusu verilmezse
+  `benzerlik_olculdu=False` **ve** `benzerlik_temiz=False` — "benzer medya
+  yok" iddiası üretilmiyor.
+- **Hiçbir girdide istisna fırlatmıyor** (`None`, `{}`, `"x"`, `5`, `NaN`,
+  `inf`, karışık liste — hepsi testli).
+
+### Eşikler — hesaplanmış ya da ölçülmüş, sabit sayı değil
+
+| Eşik | Değer | Nereden |
+|---|---|---|
+| Sabit blok | 0.05 sn | 30 fps'te ~1.5 kare — izleyici için ayırt edilemez |
+| Ölü final | 0.5 sn | kullanıcı kararı (I-14 önceliği) |
+| Sessizlik oranı | %15 | §31 devir belgesi |
+| Benzerlik | 0.86 | Apollo havuzunda ölçüldü (farklı kareler %60–75 bandında) |
+| Anlatım sapması | 0.15 | süre/ağırlık yayılım karşılaştırması |
+| Ambiyans farkı | 30 dB | ⚠ **beyan edilmiş tasarım eşiği** — dinleme testi değil |
+
+### QA sözleşmesi — kapalı varsayılan, açıkken gerçek kapı
+
+Yeni kodlar: `KALITE-BASLIK-KIRPIK · KALITE-BASLIK-TASMA ·
+KALITE-MEDYA-TEKRAR · KALITE-RITIM-SABIT · KALITE-OLU-FINAL` (ön-render,
+hepsi **fail**) ve `POST-SESSIZ-ORAN · POST-OLU-FINAL · POST-AMBANS-DUYULMAZ`
+(render sonrası, hepsi **fail**).
+
+**Kritik tasarım kararı:** kapı kapalıyken bu kodların **hiçbiri
+üretilmiyor**, ama **ölçüm yine de** `olcumler["kalite"]` altına yazılıyor.
+Yani varsayılan yolun PASS/WARN/FAIL kararı **bit-bit aynı** kalıyor ve ölçüm
+de gizlenmiyor. Faz A–H'nin 1414 kontrolü bu yüzden dokunulmadan geçiyor.
+
+Açma yolları (üçü de **açık karar**, yalnız gerçek `True`; `"evet"`/`1` açmaz):
+`kalite_kapisi=True` parametresi · `KALITE_KAPISI=1` ortam değişkeni ·
+dahili `{"kalite_kapisi": True}` iş ayarı.
+
+### Uçtan uca ölçüm — GERÇEK 10 sn planı
+
+```
+KAPI KAPALI (varsayilan)   QA=WARN  fail=0 warn=2   render_edilebilir=True
+KAPI ACIK                  QA=FAIL  fail=4 warn=2   render_edilebilir=False
+                             FAIL KALITE-BASLIK-KIRPIK   'JU' <- 'JULY'
+                             FAIL KALITE-BASLIK-TASMA    272.5px tasma
+                             FAIL KALITE-RITIM-SABIT     [3.2, 3.2, 3.2]
+                             FAIL KALITE-OLU-FINAL       0.811 sn
+```
+
+Kapalı sonuç I-13'ün rapor ettiği **WARN (fail=0 warn=2)** ile birebir aynı —
+gerileme yok.
+
+### DÜRÜST SONUÇ — kusur 2 bu çıktıda YOK
+
+§31 "son iki medya tekrarlı" diyordu. **10 sn çıktısında ölçülebilir medya
+tekrarı yok:** üç ayrı varlık, dHash yapısal benzerlik en fazla **%60.9**,
+tonal histogram kesişimi en fazla **%67.9** — ikisi de 0.86 eşiğinin altında.
+Kapı burada **haklı olarak sessiz**.
+
+Eşiği kırmızı yansın diye 0.65'e çekmedim: bu **sahte FAIL** olurdu ve
+üretimde meşru biçimde farklı görüntüleri elerdi. Bunun yerine kapının
+gerçekten çalıştığı **başka bir gerçek artefaktla** kanıtlandı — I-11'in
+20 sn çıktısında `a082` **arka arkaya** iki sahnede kullanılmış.
+
+⚠ §31'in "semantik zayıf" gözlemi (5. ve 9. sn kareleri ikisi de gri ay
+yüzeyi yakın planı) **gerçek** ama **algısal/anlamsal** bir yargı; ölçtüğüm üç
+deterministik araçtan hiçbiri onu yakalamıyor. Bu, ölçüm boşluğu olarak
+**açık bırakıldı** — kapatıldığı iddia edilmiyor.
+
+### Bu atomda bulunan ve düzeltilen kendi hatam
+
+`kelime_ortasi_kesik()` ilk sürümde `_KELIME_SON.match(b)` kullanıyordu.
+`match()` dizenin **başından** bağlar; `[\w]$` deseni `match` ile ancak tek
+karakterlik dizede tutar. Sonuç: ölçüm **sessizce hep `False`** dönüyordu —
+yani kapı en ağır kusuru göremiyordu. Gerçek artefaktla koşturulunca yakalandı
+(`.search()`), test artık kilitliyor.
+
+### Ölçülen test sonucu (12 Ağu) — İKİ ORTAM AYRI
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Zengin venv** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **257** | **1060** | **2474** |
+| **Sistem Python** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **203** | **1060** | **2420** |
+
+0 hata. Faz I 989 → **1060** (+71). Zengin venv'de 1 BLOKE (`QA_TEST_VIDEO`),
+sistem Python'da 2 çevresel BLOKE (`fastapi` yok). **BLOKE'ler PASS
+sayılmadı.** Faz C **148/0** — editor paketinde gerileme yok.
+`deploy.sh`'nin tanımsız-isim taraması elle koşuldu → **0 bulgu**.
+
+### BİLİNEN SINIRLAR (dürüstçe)
+
+1. **Hiçbir kusur GİDERİLMEDİ.** Bu atom yalnızca ölçüp kapıya bağladı.
+   Kapı açıkken 10 sn fixture'ı render edilemez — düzeltme I-15.
+2. **Yeniden render YAPILMADI**, dolayısıyla §31'in istediği "önce/sonra kare
+   karşılaştırması" **yok**. Karşılaştırılacak "sonra" hâli henüz üretilmedi.
+3. **Ambiyans 30 dB eşiği dinleme testiyle doğrulanmadı** — beyan edilmiş
+   tasarım kararı. Girdiler (−48.68 LUFS, 0.20, 0.30, −16.43 LUFS) gerçek
+   ölçüm; eşik değil.
+4. **Benzerlik eşiği 0.86, 7 görüntülük tek havuzda kalibre edildi.** Gerçek
+   stok dağılımında yanlış pozitif/negatif oranı **bilinmiyor**.
+5. **Anlatım bağı kelime sayısıyla ölçülüyor**, gerçek TTS kelime
+   zamanlamasıyla değil. Vekil ölçüm olduğu kodda yazılı.
+6. **`em` oranları hâlâ tahmin.** Gerçek Montserrat font metriği okunmuyor;
+   TSX'in kendi tahminiyle **tutarlı** olması sağlandı, doğruluğu ölçülmedi.
+7. **Altyazı, kaynak künyesi, 1080p ve gelişmiş motion bu atomda YOK** —
+   `kapsam_ozeti()["kapsam_disi"]` bunu açıkça sayıyor.
+8. **Canlı `/api/generate` hattı bu kapıyı görmüyor** — `qa_kopru` yalnızca
+   `qa_son`'un varsayılan (kapalı) yolunu çağırıyor.
+
+### SONRAKİ ATOM (I-15 — bu atomda YAPILMADI)
+
+1. `plan.py:57` sabit `[:42]` → `kart_basligi_siniri()` + `_kart_basligi()`
+   (fonksiyonlar **zaten var**, yalnız bu yola bağlanmamış).
+2. Render kare ölçüsünün plana **bildirilmesi** (1920/1280 uyuşmazlığı).
+3. TSX sığdırma hesabına `letterSpacing` eklenmesi.
+4. Sahne sürelerinin anlatım/olgu uzunluğundan türetilmesi + ölü kuyruğun
+   kırpılması.
+5. Ambiyans kaynağının duyulabilir seviyeye getirilmesi.
+6. Sonra **yeniden render + dürüst önce/sonra kare karşılaştırması**.

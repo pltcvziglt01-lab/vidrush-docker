@@ -92,6 +92,30 @@ def acik_mi(is_ayar=None) -> tuple:
     return False, NEDEN["KAPALI"]
 
 
+def kalite_kapisi_acik(is_ayar=None, acik_istek=None) -> bool:
+    """Faz I-14 kalite kapisi acik mi? VARSAYILAN KAPALI.
+
+    Uc yol, ucu de ACIK KARAR (sirasiyla):
+      1. cagri parametresi  `kalite_kapisi=True`
+      2. ortam degiskeni    `KALITE_KAPISI=1`
+      3. dahili is ayari    `{"kalite_kapisi": True}`
+
+    ⚠ `is_ayar` DAHILI sozluktur; 22 alanlik generate sozlesmesi buraya
+    ulasmaz. Yalnizca gercek `True` acar — `"evet"`, `1`, `"true"` ACMAZ.
+    """
+    if acik_istek is True:
+        return True
+    if acik_istek is False:
+        return False
+    if os.environ.get("KALITE_KAPISI", "").strip() == "1":
+        return True
+    try:
+        return bool(isinstance(is_ayar, dict)
+                    and is_ayar.get("kalite_kapisi") is True)
+    except Exception:
+        return False
+
+
 def edit_profili_sec(stil_kimligi: str) -> tuple:
     """(profil_adi, gerekce). Bilinmeyen kimlikte VARSAYILANA duser."""
     k = str(stil_kimligi or "").strip()
@@ -185,7 +209,9 @@ def plan_kur(*, cumleler, medya_manifest, olgular=None, stil=None,
              ambience: str = "", muzik: str = "", beklenen_ulke: str = "",
              beklenen_donem: str = "", fps: int = 30,
              genislik: int = 1920, yukseklik: int = 1080,
-             destek_matrisi=None) -> dict:
+             destek_matrisi=None, kare_olcu=None,
+             anlatim_bitis_sn=None, benzerlik_okuyucu=None,
+             kalite_kapisi=None) -> dict:
     """Uctan uca: analiz + stil + olgu + medya -> EditorV2 props.
 
     Doner:
@@ -239,7 +265,10 @@ def plan_kur(*, cumleler, medya_manifest, olgular=None, stil=None,
             arastirma_manifest=_fact_manifesti(olgular),
             profil_adi=profil_adi, beklenen_ulke=beklenen_ulke,
             beklenen_donem=beklenen_donem, cikti_dizin=cikti_dizin,
-            ambience=ambience, muzik=muzik)
+            ambience=ambience, muzik=muzik,
+            kare_olcu=kare_olcu, anlatim_bitis_sn=anlatim_bitis_sn,
+            benzerlik_okuyucu=benzerlik_okuyucu,
+            kalite_kapisi=kalite_kapisi_acik(is_ayar, kalite_kapisi))
     except Exception as e:
         print(f"  edit plani uretilemedi: {type(e).__name__}: {str(e)[:140]}",
               file=sys.stderr)

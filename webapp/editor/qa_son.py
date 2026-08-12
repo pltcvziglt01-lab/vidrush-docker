@@ -22,6 +22,7 @@ import subprocess
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
+from . import kalite_kapisi
 from .profil import EditProfili, VARSAYILAN
 
 
@@ -63,9 +64,17 @@ class PostQa:
 
 # ─────────────────────────── KOMUT PLANLAYICI ───────────────────────────
 
-def komut_plani(video_yolu: str) -> dict:
-    """Kosulacak gercek komutlar. Testler bu plani okuyup fixture eslesir."""
-    return {
+def komut_plani(video_yolu: str, *, ince_sessizlik: bool = False) -> dict:
+    """Kosulacak gercek komutlar. Testler bu plani okuyup fixture eslesir.
+
+    ⚠ `ince_sessizlik` (Faz I-14): varsayilan `sessizlik` gecisi
+    `d=1.2` kullaniyor — yani 1.2 sn'den KISA sessizligi HIC GORMUYOR.
+    I-13 ciktisindaki iki bosluk 0.984 sn ve 0.903 sn'ydi; ikisi de bu
+    esigin altinda kaldigi icin post-QA'da **hic gorunmediler**. Olu kuyruk
+    olcumu bu yuzden ayri, ince (`d=0.30`) bir gecis ister. Varsayilan
+    KAPALI: canli yolda fazladan ffmpeg gecisi kosulmaz.
+    """
+    plan = {
         "ffprobe": ["ffprobe", "-v", "error", "-select_streams", "v:0",
                     "-show_entries",
                     "stream=width,height,r_frame_rate,nb_frames,codec_name",
@@ -85,6 +94,11 @@ def komut_plani(video_yolu: str) -> dict:
         "sessizlik": ["ffmpeg", "-nostdin", "-i", video_yolu, "-af",
                       "silencedetect=noise=-45dB:d=1.2", "-f", "null", "-"],
     }
+    if ince_sessizlik:
+        plan["sessizlik_ince"] = ["ffmpeg", "-nostdin", "-i", video_yolu,
+                                  "-af", "silencedetect=noise=-45dB:d=0.30",
+                                  "-f", "null", "-"]
+    return plan
 
 
 def kare_ornekleme_komutu(video_yolu: str, hedef_dizin: str,
@@ -180,17 +194,32 @@ def _sessizlik_ayikla(stderr: str) -> list:
 def denetle(video_yolu: str, *, beklenen: Optional[dict] = None,
             profil_: Optional[EditProfili] = None,
             kosucu: Optional[Callable] = None,
-            zaman_asimi: int = 180) -> PostQa:
+            zaman_asimi: int = 180,
+            kalite_kapisi: bool = False,
+            ambans_lufs: Optional[float] = None,
+            anlatim_lufs: Optional[float] = None,
+            ambans_seviye: float = 1.0,
+            ducking: float = 1.0) -> PostQa:
     """Bitmis videoyu olcer.
 
     `beklenen`: {"sure_sn","cekim_sayisi","genislik","yukseklik","fps"}
     `kosucu`: (komut:list, zaman_asimi:int) -> {"rc","stdout","stderr"}
+
+    Faz I-14 (hepsi OPSIYONEL, varsayilan davranis degismez):
+      `kalite_kapisi` : False iken POST-SESSIZ-ORAN / POST-OLU-FINAL /
+                        POST-AMBANS-DUYULMAZ kodlari URETILMEZ ve ince
+                        sessizlik gecisi KOSULMAZ. Olcum yine de
+                        `olcumler["kalite"]`e yazilir (kapali yolda yalniz
+                        kaba `sessizlik` verisinden turetilir).
+      `ambans_lufs` / `anlatim_lufs` / `ambans_seviye` / `ducking`:
+                        ambiyans duyulabilirligi icin GERCEK olcumler.
+                        Verilmezse duyulabilirlik `olculemedi` yazilir.
     """
     p = profil_ or VARSAYILAN
     beklenen = beklenen or {}
     kos = kosucu or varsayilan_kosucu
     q = PostQa()
-    plan = komut_plani(video_yolu)
+    plan = komut_plani(video_yolu, ince_sessizlik=bool(kalite_kapisi))
 
     if not os.path.exists(video_yolu) and kosucu is None:
         q.ekle("POST-DOSYA-YOK", "fail", f"video bulunamadi: {video_yolu}",
@@ -225,6 +254,9 @@ def denetle(video_yolu: str, *, beklenen: Optional[dict] = None,
             q.olcumler["loudness"] = _loudness_ayikla(r.get("stderr", ""))
         elif ad == "sessizlik":
             q.olcumler["sessizlikler"] = _sessizlik_ayikla(r.get("stderr", ""))
+        elif ad == "sessizlik_ince":
+            q.olcumler["sessizlikler_ince"] = _sessizlik_ayikla(
+                r.get("stderr", ""))
 
     # ── DEGERLENDIRME ──
     v = q.olcumler.get("video") or {}
@@ -292,4 +324,68 @@ def denetle(video_yolu: str, *, beklenen: Optional[dict] = None,
             q.ekle("POST-KESME-SAPMA", "warn",
                    f"tespit edilen ~{g} cekim, plan {b}",
                    "gecis suresi kesme tespitini etkiliyor olabilir")
+
+    # ── FAZ I-14: MIKS SESSIZLIGI + AMBIYANS DUYULABILIRLIGI ──
+    # ⚠ Olcum HER ZAMAN yazilir; HUKUM yalniz `kalite_kapisi=True` iken.
+    _miks_denetle(q, sure_sn=(v.get("sure_sn") or beklenen.get("sure_sn")),
+                  ambans_lufs=ambans_lufs, anlatim_lufs=anlatim_lufs,
+                  ambans_seviye=ambans_seviye, ducking=ducking,
+                  acik=bool(kalite_kapisi))
     return q.sonuclandir()
+
+
+def _miks_denetle(q: PostQa, *, sure_sn, ambans_lufs, anlatim_lufs,
+                  ambans_seviye, ducking, acik: bool) -> None:
+    """I-14 miks olcumleri. ASLA COKMEZ; olcemezse `olculemedi` yazar."""
+    # Ince gecis varsa ONU kullan: kaba gecis (d=1.2) 1 sn altindaki
+    # boslugu hic gormuyor, dolayisiyla olu kuyrugu KACIRIR.
+    ince = q.olcumler.get("sessizlikler_ince")
+    kaynak = "sessizlik_ince(d=0.30)" if ince is not None else "sessizlik(d=1.2)"
+    araliklar = ince if ince is not None else q.olcumler.get("sessizlikler")
+    mx = kalite_kapisi.miks_olcusu(sure_sn=sure_sn,
+                                   sessizlik_araliklari=araliklar)
+    mx["kaynak_gecis"] = kaynak
+    amb = kalite_kapisi.ambans_duyulabilirligi(
+        ambans_lufs=ambans_lufs, anlatim_lufs=anlatim_lufs,
+        ambans_seviye=ambans_seviye, ducking=ducking)
+    q.olcumler["kalite"] = {"kapi_acik": bool(acik), "miks": mx, "ambans": amb}
+    if not acik:
+        return
+
+    if mx.get("olculdu"):
+        if mx.get("sessiz_oran_asildi"):
+            q.ekle("POST-SESSIZ-ORAN", "fail",
+                   f"miksin %{mx['sessiz_orani'] * 100:.1f}'i sessiz "
+                   f"({mx['sessiz_sn']} sn / {mx['sure_sn']} sn, tavan "
+                   f"%{mx['sessiz_oran_tavani'] * 100:.0f}) [{kaynak}]",
+                   "anlatim bosluklarini kapat ya da duyulabilir ambiyans ekle")
+        if mx.get("olu_final_asildi"):
+            q.ekle("POST-OLU-FINAL", "fail",
+                   f"videonun sonunda {mx['olu_final_sn']} sn sessiz kuyruk "
+                   f"(tavan {mx['olu_final_esigi']} sn) [{kaynak}]",
+                   "son sahneyi anlatim bitisine kadar kisalt")
+    else:
+        q.ekle("POST-MIKS-OLCULEMEDI", "warn",
+               f"miks sessizlik olcumu alinamadi ({mx.get('neden')})",
+               "ffprobe sure ve silencedetect ciktisini kontrol et")
+
+    if amb.get("olculdu"):
+        if not amb.get("duyulabilir"):
+            q.ekle("POST-AMBANS-DUYULMAZ", "fail",
+                   f"ambiyans anlatimin {amb['fark_db']} dB altinda "
+                   f"(tavan {amb['esik_db']} dB): kaynak {amb['ambans_lufs']} "
+                   f"LUFS, seviye {amb['ambans_seviye']} "
+                   f"({amb['seviye_db']} dB), ducking {amb['ducking']} "
+                   f"({amb['ducking_db']} dB) -> etkin {amb['etkin_lufs']} LUFS"
+                   + ("; ducking kapatilsa BILE duyulmaz "
+                      f"({amb['fark_ducksuz_db']} dB)"
+                      if not amb.get("ducking_suz_duyulabilir")
+                      else "; ducking'i azaltmak yeterli olabilir"),
+                   "ambiyans kaynagini yukselt ya da seviye/ducking dengesini "
+                   "olculmus hedefe gore kur")
+    elif ambans_lufs is not None or anlatim_lufs is not None:
+        # Yarim girdi verilmis: sessizce gecme, olcemedigini soyle.
+        q.ekle("POST-AMBANS-OLCULEMEDI", "warn",
+               "ambiyans duyulabilirligi OLCULEMEDI (ambans_lufs ve "
+               "anlatim_lufs birlikte gerekir)",
+               "iki LUFS olcumunu de gecir")

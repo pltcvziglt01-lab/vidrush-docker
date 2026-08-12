@@ -3888,6 +3888,452 @@ kontrol("pipeline bu adimda DEGISMEDI",
         "smoke_kaliteli_ses" not in oku(KOK, "pipeline.py"))
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# §32  FAZ I-14 — KALITE KAPILARI
+#
+# ⚠ BU BOLUMUN ISPAT YUKU: kapinin GERCEK artefaktta kusuru GORMESI.
+# Kanit uydurma fixture'dan degil, depoda IZLENEN iki rapordan geliyor:
+#     outputs/sample/quality_voice_rapor.json  (I-13, 10 sn)
+#     outputs/sample/smoke_rapor.json          (I-11, 20 sn)
+# Video/kare dosyalari `.gitignore`da; bu yuzden olcumler RAPORDAN okunur,
+# boylece test temiz klonda da kosar.
+# ═══════════════════════════════════════════════════════════════════════
+import json as _json                                             # noqa: E402
+from editor import kalite_kapisi as _kk                           # noqa: E402
+from editor import qa_on as _qon, qa_son as _qsn                  # noqa: E402
+
+blok("§32a I-14 modul saflig i ve olculebilir kapsam")
+
+_KK_KAYNAK = oku(KOK, "editor/kalite_kapisi.py")
+_kk_agac = None
+try:
+    import ast as _ast
+    _kk_agac = _ast.parse(_KK_KAYNAK)
+except SyntaxError:
+    pass
+kontrol("kalite_kapisi ayristirilabiliyor", _kk_agac is not None)
+if _kk_agac is not None:
+    _ithal = set()
+    for _n in _ast.walk(_kk_agac):
+        if isinstance(_n, _ast.Import):
+            _ithal.update(a.name.split(".")[0] for a in _n.names)
+        elif isinstance(_n, _ast.ImportFrom) and _n.module:
+            _ithal.add(_n.module.split(".")[0])
+    # ⚠ AST ile olculuyor; ham dize taramasi modulun KENDI dokumantasyonunu
+    # yakalayip yanlis alarm uretiyordu (I-9'da ogrenildi).
+    kontrol("kalite_kapisi AG/DOSYA/ALT-SUREC modulu ITHAL ETMIYOR",
+            not (_ithal & {"requests", "urllib", "socket", "http", "os",
+                           "subprocess", "shutil", "pathlib", "open"}),
+            sorted(_ithal))
+_ozet = _kk.kapsam_ozeti()
+kontrol("kapsam_ozeti sayilabilir", _ozet["sema_surum"] == "1.0.0"
+        and _ozet["render_sabiti"] == 7 and len(_ozet["esik"]) == 6)
+kontrol("kapsam DISI acikca yaziliyor (altyazi/kunye/1080p/motion)",
+        len(_ozet["kapsam_disi"]) == 4
+        and any("altyazi" in k for k in _ozet["kapsam_disi"])
+        and any("1080p" in k for k in _ozet["kapsam_disi"]))
+
+# Render sabitleri TSX'ten OKUNDU mu — uydurma degil, eslesme testli.
+_TSX = oku(KOK, "..", "app/render-studio/src/editorv2/Grafikler.tsx")
+kontrol("EM_BUYUK_HARF TSX ile ayni (0.72)",
+        _kk.EM_BUYUK_HARF == 0.72 and "* 0.72" in _TSX)
+kontrol("BANT_MAKS_ORAN TSX ile ayni (0.84)",
+        _kk.BANT_MAKS_ORAN == 0.84 and "width * 0.84" in _TSX)
+kontrol("DOLGU_ORANI TSX ile ayni (0.42)",
+        _kk.DOLGU_ORANI == 0.42 and "* 0.42" in _TSX)
+kontrol("KUCULTME_TABANI TSX ile ayni (0.7)",
+        _kk.KUCULTME_TABANI == 0.70 and "Math.max(0.7" in _TSX)
+kontrol("HARF_ARALIGI_EM TSX letterSpacing'inden (0.01em)",
+        _kk.HARF_ARALIGI_EM == 0.01 and "letterSpacing: '0.01em'" in _TSX)
+# ⚠ ASIL BULGU: TSX'in KENDI sigdirma hesabi letterSpacing'i saymiyor.
+kontrol("OLCULEN BOSLUK: TSX sigdirma hesabi letterSpacing'i SAYMIYOR",
+        "yaziMetni.length * puntoTaban * 0.72" in _TSX
+        and "letterSpacing" not in _TSX.split("tahminiGenislik")[1][:200])
+
+blok("§32b KIRMIZI KANIT — I-13 10 sn ciktisi (izlenen rapor)")
+
+_R10_YOL = os.path.join(KOK, "..", "outputs", "sample",
+                        "quality_voice_rapor.json")
+_R10 = None
+if os.path.exists(_R10_YOL):
+    try:
+        _R10 = _json.load(open(_R10_YOL, encoding="utf-8"))
+    except ValueError:
+        _R10 = None
+if _R10 is None:
+    bloke_yaz("I-13 10 sn raporu", f"yok/bozuk: {_R10_YOL}")
+else:
+    _z10 = _R10["zincir"]
+    _ses10 = _R10["video_ses_olcumu"]
+    _master10 = _R10["anlatici_ses"]["master"]
+
+    # ── (1) BASLIK: kelime ortasindan KESIK ──
+    # Smoke'un ilk sahne metni (izlenen kaynaktan, uydurma degil).
+    _SS14 = oku(KOK, "testler/smoke_kaliteli_ses_10sn.py")
+    _m = re.search(r'\("f001",\s*"([^"]+)"\)', _SS14)
+    _ham10 = _m.group(1) if _m else ""
+    kontrol("smoke ilk sahne metni okunabildi", bool(_ham10), _ham10)
+    # plan.py'nin URETTIGI baslik: SABIT 42 karakterlik dilim + upper()
+    _kart10 = (_ham10[:42] or "").upper()
+    _kes10 = _kk.kelime_ortasi_kesik(_ham10, _kart10)
+    kontrol("KIRMIZI: baslik KELIME ORTASINDAN kesik ('JULY' -> 'JU')",
+            _kes10.get("kesik") is True
+            and _kes10.get("yarim_kelime") == "JU"
+            and _kes10.get("tam_kelime") == "JULY", _kes10)
+
+    # ── (2) BASLIK: GERCEK render genisliginde BANT TASMASI ──
+    # Render olcusu rapordaki ffprobe'dan OKUNUR (varsayilmaz).
+    _vak = [a for a in (_R10["ffprobe"].get("streams") or [])
+            if a.get("codec_type") == "video"]
+    _gen10 = int(_vak[0].get("width") or 0) if _vak else 0
+    kontrol("render GERCEK genisligi rapordan okundu (1280)", _gen10 == 1280,
+            _gen10)
+    _b10 = _kk.baslik_olcusu(_kart10, punto=60, kare_genislik=_gen10)
+    kontrol("KIRMIZI: baslik bandi TASIYOR (1280 render'da)",
+            _b10["sigar"] is False and _b10["tasma_px"] > 200, _b10)
+    kontrol("KIRMIZI: punto kucultme TABANI vuruldu — kucultme YETMIYOR",
+            _b10["kucultme_tabani_vuruldu"] is True
+            and _b10["uygulanan_punto"] == 42, _b10)
+    # KOK NEDEN: plan 1920'ye gore sinir hesapliyor, render 1280.
+    _sig1920 = _kk.sigan_karakter(60, 1920)
+    _sig1280 = _kk.sigan_karakter(60, _gen10)
+    kontrol("KOK NEDEN: 1920 sinirinin YARISI 1280'de gecerli "
+            f"({_sig1920} -> {_sig1280}), plan sabit 42 kullandi",
+            _sig1920 > _sig1280 and _sig1280 < 42 and len(_kart10) == 42,
+            (_sig1920, _sig1280))
+
+    # ── (3) RITIM: SABIT BLOK + anlatim bagi YOK ──
+    _agir10 = []
+    for _fid, _mt in re.findall(r'\("(f\d+)",\s*"([^"]+)"\)', _SS14):
+        _agir10.append(float(len(_mt.split())))
+    _rt10 = _kk.ritim_olcusu(
+        [{"sure_sn": s["sure_sn"]} for s in _z10],
+        anlatim_agirliklari=_agir10[:len(_z10)],
+        toplam_sn=sum(s["sure_sn"] for s in _z10),
+        anlatim_bitis_sn=_master10["sure_sn"])
+    kontrol("KIRMIZI: uc sahnenin UCU DE ayni surede (3.2 sn, yayilim 0.0)",
+            _rt10["sabit_blok"] is True and _rt10["yayilim_sn"] == 0.0
+            and _rt10["sureler"] == [3.2, 3.2, 3.2], _rt10["sureler"])
+    kontrol("KIRMIZI: sureler anlatima BAGLI DEGIL "
+            "(anlatim agirligi %30 degisiyor, sure %0)",
+            _rt10["anlatim_bagi"] is False
+            and _rt10["agirlik_yayilim_orani"] > 0.15
+            and _rt10["sure_yayilim_orani"] == 0.0, _rt10)
+    kontrol("KIRMIZI: planda OLU FINAL var (>0.5 sn)",
+            _rt10["olu_final_asildi"] is True
+            and _rt10["olu_final_sn"] > 0.5, _rt10["olu_final_sn"])
+    # ⚠ Mevcut PACING-TEKDUZE bu vakayi NEDEN gormuyordu — olculdu.
+    kontrol("OLCULEN BOSLUK: PACING-TEKDUZE >=4 beat sarti tasiyor, "
+            "3 sahnelik plani ELIYOR",
+            "len(sureler) >= 4" in oku(KOK, "editor/qa_on.py")
+            and len(_z10) == 3)
+
+    # ── (4) MIKS: sessizlik orani + OLU KUYRUK ──
+    # Sessizlik araliklari raporun kendi olcumunden turetilir.
+    _mx10 = _kk.miks_olcusu(
+        sure_sn=_ses10["sure_sn"],
+        sessizlik_araliklari=[{"bas": 5.390146, "sure": 0.983583},
+                              {"bas": 8.739437, "sure": 0.903229}])
+    kontrol("olculen sessiz toplam rapordaki degerle uyusuyor (1.887 sn)",
+            abs(_mx10["sessiz_sn"] - _ses10["sessiz_sn"]) < 0.01,
+            (_mx10["sessiz_sn"], _ses10["sessiz_sn"]))
+    kontrol("KIRMIZI: miksin %15'ten fazlasi sessiz (%19.6)",
+            _mx10["sessiz_oran_asildi"] is True
+            and _mx10["sessiz_orani"] > 0.15, _mx10["sessiz_orani"])
+    kontrol("KIRMIZI: videonun SONUNDA 0.9 sn olu kuyruk (>0.5 sn)",
+            _mx10["olu_final_asildi"] is True
+            and _mx10["olu_final_sn"] > 0.5, _mx10["olu_final_sn"])
+
+    # ── (5) AMBIYANS: DUYULMAZ ──
+    # Seviye/ducking degerleri izlenen smoke KAYNAGINDAN okunur.
+    kontrol("smoke ambans seviye 0.20 + ducking 0.30 kullaniyor",
+            'ambans_seviye"] = 0.20' in _SS14
+            and '"ducking"] = {"ambans": 0.30}' in _SS14)
+    _AMB_LUFS = -48.68        # ffmpeg loudnorm, ambans0.wav (I-14'te olculdu)
+    _amb10 = _kk.ambans_duyulabilirligi(
+        ambans_lufs=_AMB_LUFS, anlatim_lufs=_master10["lufs"],
+        ambans_seviye=0.20, ducking=0.30)
+    kontrol("KIRMIZI: ambiyans anlatimin 30 dB'den COK altinda — DUYULMAZ",
+            _amb10["duyulabilir"] is False and _amb10["fark_db"] > 50,
+            _amb10["fark_db"])
+    kontrol("KOK NEDEN ducking DEGIL: ducking kapatilsa BILE duyulmaz",
+            _amb10["ducking_suz_duyulabilir"] is False
+            and _amb10["fark_ducksuz_db"] > 40, _amb10["fark_ducksuz_db"])
+    # Ambans dosyasi yerelde varsa olcumu YENIDEN dogrula (yoksa BLOKE).
+    _AMBW = os.path.join(KOK, "..", "app", "render-studio", "public",
+                         "editorv2", "faz_e", "ambans0.wav")
+    if not os.path.exists(_AMBW):
+        bloke_yaz("ambans0.wav yeniden olcumu",
+                  "dosya yok (.gitignore: app/render-studio/public/editorv2/)")
+    else:
+        _pr = subprocess.run(
+            ["ffmpeg", "-nostdin", "-i", _AMBW, "-af",
+             "loudnorm=print_format=json", "-f", "null", "-"],
+            capture_output=True, text=True, timeout=120)
+        _mm = re.findall(r'"input_i"\s*:\s*"(-?[\d.]+)"', _pr.stderr or "")
+        kontrol("ambans kaynagi GERCEKTEN -48.7 LUFS civari",
+                bool(_mm) and abs(float(_mm[-1]) - _AMB_LUFS) < 1.0,
+                _mm[-1:] or "olculemedi")
+
+blok("§32c KIRMIZI KANIT — I-11 20 sn ciktisinda MEDYA TEKRARI")
+
+_R20_YOL = os.path.join(KOK, "..", "outputs", "sample", "smoke_rapor.json")
+_R20 = None
+if os.path.exists(_R20_YOL):
+    try:
+        _R20 = _json.load(open(_R20_YOL, encoding="utf-8"))
+    except ValueError:
+        _R20 = None
+if _R20 is None:
+    bloke_yaz("I-11 20 sn raporu", f"yok/bozuk: {_R20_YOL}")
+else:
+    _mt20 = _kk.medya_tekrari(_R20["zincir"])
+    kontrol("KIRMIZI: ayni varlik ARKA ARKAYA kullanilmis (a082 x2)",
+            len(_mt20["bitisik_ayni_asset"]) == 1
+            and _mt20["bitisik_ayni_asset"][0]["asset_id"].startswith("a082"),
+            _mt20["bitisik_ayni_asset"])
+    kontrol("KIRMIZI: tekrar sayimi dogru (a082 -> 2)",
+            _mt20["tekrar_eden_asset"].get("a082_wiki_4ba3ccdace") == 2,
+            _mt20["tekrar_eden_asset"])
+    # ⚠ DURUSTLUK: 10 sn ciktisinda medya tekrari OLCULEBILIR bicimde YOK.
+    if _R10 is not None:
+        _mt10 = _kk.medya_tekrari(_R10["zincir"])
+        kontrol("DURUST SONUC: 10 sn ciktisinda ayni-asset tekrari YOK "
+                "(3 ayri varlik) — kapi burada hakli olarak SESSIZ",
+                not _mt10["bitisik_ayni_asset"]
+                and not _mt10["tekrar_eden_asset"]
+                and _mt10["benzersiz_asset"] == 3, _mt10)
+        kontrol("okuyucu verilmeyince 'benzer medya yok' IDDIASI URETILMIYOR",
+                _mt10["benzerlik_olculdu"] is False
+                and _mt10["benzerlik_temiz"] is False)
+
+blok("§32d Yanlis pozitif korumalari ve bozuk girdi")
+
+kontrol("kelime SINIRINDA kesme KESIK sayilmaz",
+        _kk.kelime_ortasi_kesik("The Eagle began its final descent",
+                                "THE EAGLE BEGAN ITS")["kesik"] is False)
+kontrol("tam metin KESIK sayilmaz",
+        _kk.kelime_ortasi_kesik("Tranquility Base",
+                                "TRANQUILITY BASE")["kesik"] is False)
+kontrol("on ek OLMAYAN kisaltma icin kesik IDDIASI URETILMEZ",
+        _kk.kelime_ortasi_kesik("Apollo 11 landed",
+                                "BAMBASKA BIR BASLIK")["kesik"] is False)
+kontrol("kisa baslik gercek render genisliginde SIGAR",
+        _kk.baslik_olcusu("EAGLE HAS LANDED", punto=60,
+                          kare_genislik=1280)["sigar"] is True)
+kontrol("1920 render'da 34 karakterlik baslik sigar",
+        _kk.baslik_olcusu("A" * 30, punto=60, kare_genislik=1920)["sigar"]
+        is True)
+kontrol("degisken sureler SABIT BLOK sayilmaz",
+        _kk.ritim_olcusu([{"sure_sn": 2.5}, {"sure_sn": 5.9},
+                          {"sure_sn": 3.4}])["sabit_blok"] is False)
+kontrol("tek sahne SABIT BLOK sayilmaz (kiyas yok)",
+        _kk.ritim_olcusu([{"sure_sn": 3.2}])["sabit_blok"] is False)
+kontrol("anlatim agirligi da SABITSE sabit sure anlatimla TUTARLI",
+        _kk.ritim_olcusu([{"sure_sn": 3.2}, {"sure_sn": 3.2}],
+                         anlatim_agirliklari=[8, 8])["anlatim_bagi"] is True)
+kontrol("olu final esik ALTINDA ise bayrak kalkmaz",
+        _kk.ritim_olcusu([{"sure_sn": 3.0}], toplam_sn=3.0,
+                         anlatim_bitis_sn=2.7)["olu_final_asildi"] is False)
+kontrol("ortadaki sessizlik OLU KUYRUK sayilmaz",
+        _kk.miks_olcusu(sure_sn=10.0,
+                        sessizlik_araliklari=[{"bas": 2.0, "sure": 0.9}]
+                        )["olu_final_sn"] == 0.0)
+kontrol("ambiyans esik ICINDE ise DUYULABILIR",
+        _kk.ambans_duyulabilirligi(ambans_lufs=-30.0, anlatim_lufs=-16.0,
+                                   ambans_seviye=1.0,
+                                   ducking=0.5)["duyulabilir"] is True)
+kontrol("ambiyans olcumu YOKSA 'duyulabilir' IDDIASI URETILMEZ",
+        _kk.ambans_duyulabilirligi(ambans_lufs=None, anlatim_lufs=-16.0
+                                   )["duyulabilir"] is None)
+
+# ⚠ HICBIR GIRDIDE ISTISNA FIRLATMAZ.
+_BOZUK = (None, {}, [], "x", 5, [{"sure_sn": "cok"}], [None, 3], {"a": 1})
+_patlayan = []
+for _g in _BOZUK:
+    for _fn, _ad in ((lambda v: _kk.medya_tekrari(v), "medya_tekrari"),
+                     (lambda v: _kk.ritim_olcusu(v), "ritim_olcusu")):
+        try:
+            _fn(_g)
+        except Exception as _e:                                   # noqa: BLE001
+            _patlayan.append(f"{_ad}({_g!r}): {type(_e).__name__}")
+for _g in (None, "x", -1, float("nan"), float("inf")):
+    try:
+        _kk.baslik_olcusu("ABC", punto=_g, kare_genislik=1280)
+        _kk.baslik_olcusu(_g, punto=60, kare_genislik=_g)
+        _kk.miks_olcusu(sure_sn=_g, sessizlik_araliklari=None)
+        _kk.ambans_duyulabilirligi(ambans_lufs=_g, anlatim_lufs=_g)
+    except Exception as _e:                                       # noqa: BLE001
+        _patlayan.append(f"skaler({_g!r}): {type(_e).__name__}")
+kontrol("hicbir bozuk girdide ISTISNA FIRLATMIYOR", not _patlayan, _patlayan)
+
+blok("§32e QA SOZLESMESI — kapali varsayilan, acikken GERCEK kapi")
+
+kontrol("qa_on: I-14 kodlari FAIL_KODLARI'nda",
+        {"KALITE-BASLIK-KIRPIK", "KALITE-BASLIK-TASMA", "KALITE-MEDYA-TEKRAR",
+         "KALITE-RITIM-SABIT", "KALITE-OLU-FINAL"} <= _qon.FAIL_KODLARI)
+kontrol("qa_on.denetle kalite_kapisi VARSAYILAN False",
+        "kalite_kapisi: bool = False" in oku(KOK, "editor/qa_on.py"))
+kontrol("qa_son.denetle kalite_kapisi VARSAYILAN False",
+        "kalite_kapisi: bool = False" in oku(KOK, "editor/qa_son.py"))
+kontrol("plan.uret kalite_kapisi VARSAYILAN False",
+        "kalite_kapisi: bool = False" in oku(KOK, "editor/plan.py"))
+kontrol("edit_kopru: env + is ayari, yalniz GERCEK True acar",
+        ekp.kalite_kapisi_acik({"kalite_kapisi": True}) is True
+        and ekp.kalite_kapisi_acik({"kalite_kapisi": "evet"}) is False
+        and ekp.kalite_kapisi_acik({"kalite_kapisi": 1}) is False
+        and ekp.kalite_kapisi_acik(None) is False)
+kontrol("cagri parametresi env'i EZEBILIYOR (acik karar)",
+        ekp.kalite_kapisi_acik(None, True) is True
+        and ekp.kalite_kapisi_acik({"kalite_kapisi": True}, False) is False)
+
+# ⚠ KABA SESSIZLIK GECISI OLU KUYRUGU GORMUYOR — olculdu.
+kontrol("OLCULEN BOSLUK: varsayilan sessizlik gecisi d=1.2 "
+        "(0.9 sn kuyrugu GORMEZ)",
+        "silencedetect=noise=-45dB:d=1.2" in oku(KOK, "editor/qa_son.py"))
+kontrol("ince gecis d=0.30 ve YALNIZ kapi acikken kosuluyor",
+        "d=0.30" in oku(KOK, "editor/qa_son.py")
+        and "sessizlik_ince" not in _qsn.komut_plani("v.mp4")
+        and "sessizlik_ince" in _qsn.komut_plani("v.mp4",
+                                                 ince_sessizlik=True))
+kontrol("kapali komut plani ESKISIYLE BIREBIR ayni (7 komut)",
+        len(_qsn.komut_plani("v.mp4")) == 7)
+
+
+def _sahte_kosucu_10sn(komut, zaman_asimi=0):
+    """I-13 ciktisinin GERCEK olcumleriyle besleyen sahte kosucu."""
+    j = " ".join(komut)
+    if "format=duration,size" in j:
+        return {"rc": 0, "stderr": "", "stdout": _json.dumps({
+            "streams": [{"width": 1280, "height": 720, "r_frame_rate": "30/1",
+                         "codec_name": "h264"}],
+            "format": {"duration": "9.643", "size": "8222479"}})}
+    if "d=0.30" in j:
+        return {"rc": 0, "stdout": "", "stderr":
+                "silence_start: 5.390146\nsilence_end: 6.373729 | "
+                "silence_duration: 0.983583\nsilence_start: 8.739437\n"
+                "silence_end: 9.642667 | silence_duration: 0.903229\n"}
+    if "loudnorm" in j:
+        return {"rc": 0, "stdout": "", "stderr": _json.dumps(
+            {"input_i": "-16.56", "input_tp": "-4.47", "input_lra": "2.7"})}
+    return {"rc": 0, "stdout": "{}", "stderr": ""}
+
+
+_pq_kapali = _qsn.denetle("sahte.mp4", kosucu=_sahte_kosucu_10sn,
+                          ambans_lufs=-48.68, anlatim_lufs=-16.43,
+                          ambans_seviye=0.20, ducking=0.30)
+_pq_acik = _qsn.denetle("sahte.mp4", kosucu=_sahte_kosucu_10sn,
+                        kalite_kapisi=True, ambans_lufs=-48.68,
+                        anlatim_lufs=-16.43, ambans_seviye=0.20, ducking=0.30)
+_kod_kapali = {s["kod"] for s in _pq_kapali.sorunlar}
+_kod_acik = {s["kod"] for s in _pq_acik.sorunlar}
+kontrol("KAPALIYKEN hicbir I-14 kodu URETILMIYOR",
+        not any(k.startswith("POST-SESSIZ-ORAN") or k.startswith("POST-OLU-")
+                or k.startswith("POST-AMBANS") for k in _kod_kapali),
+        sorted(_kod_kapali))
+kontrol("KAPALIYKEN de OLCUM YAZILIYOR (gizlenmiyor)",
+        _pq_kapali.olcumler.get("kalite", {}).get("ambans", {}).get(
+            "duyulabilir") is False
+        and _pq_kapali.olcumler["kalite"]["kapi_acik"] is False)
+kontrol("ACIKKEN uc I-14 kodu da FAIL uretiyor",
+        {"POST-SESSIZ-ORAN", "POST-OLU-FINAL", "POST-AMBANS-DUYULMAZ"}
+        <= _kod_acik and _pq_acik.durum == "FAIL", sorted(_kod_acik))
+kontrol("ACIK kapi olu kuyrugu INCE gecisten okuyor",
+        _pq_acik.olcumler["kalite"]["miks"]["kaynak_gecis"].startswith(
+            "sessizlik_ince"))
+kontrol("KAPALI kapi kaba gecise dusuyor ve bunu SOYLUYOR",
+        _pq_kapali.olcumler["kalite"]["miks"]["kaynak_gecis"].startswith(
+            "sessizlik(d=1.2)"))
+# ⚠ Kaba gecis gercekten KACIRIYOR: ayni video, iki farkli olcum.
+kontrol("KANIT: kaba gecis olu kuyrugu KACIRIYOR (0.0 vs 0.903)",
+        _pq_kapali.olcumler["kalite"]["miks"]["olu_final_sn"] == 0.0
+        and _pq_acik.olcumler["kalite"]["miks"]["olu_final_sn"] > 0.9)
+
+blok("§32f UCTAN UCA — plan.uret uzerinden GERCEK kapi karari")
+
+# ⚠ Dosya OKUNMAZ: `plan.uret` manifest SOZLUGUYLE calisir, goruntu baytina
+# dokunmaz. Bu yuzden temiz klonda da kosar (fixture goruntusu gerekmez).
+from editor import plan as _pln                                   # noqa: E402
+
+
+def _i14_manifest(asset_bir, asset_iki):
+    return {"adaylar": [
+        {"asset_id": a, "scene_id": f"s{i + 1:03d}", "fact_id": f"f00{i + 1}",
+         "saglayici": "wikimedia", "lisans": "public-domain", "tur": "image",
+         "yerel_yol": f"/yok/{a}.jpg", "medya_yolu": f"/yok/{a}.jpg",
+         "orijinal_url": f"https://example.invalid/{a}",
+         "eser_sahibi": "NASA", "atif_metni": "NASA / Public Domain",
+         "atif_gerekli": False, "baslik": "Apollo archive",
+         "genislik": 1920, "yukseklik": 1080, "sure_sn": 3.2,
+         "toplam_skor": 80, "render_kullanilabilir": True,
+         "sahne_amaci": "arsiv"}
+        for i, a in enumerate((asset_bir, asset_iki))],
+        "kapsam_bosluklari": []}
+
+
+_C14 = [{"scene_id": "s001", "fact_id": "f001", "sure_sn": 3.2,
+         "metin": "The Eagle began its final descent on 20 July 1969."},
+        {"scene_id": "s002", "fact_id": "f002", "sure_sn": 3.2,
+         "metin": "Armstrong took manual control of the lunar module."}]
+_ARA14 = {"iddialar": [{"fact_id": "f001"}, {"fact_id": "f002"}]}
+
+import tempfile as _tf                                            # noqa: E402
+with _tf.TemporaryDirectory() as _d14:
+    # (1) AYNI varlik iki sahnede -> KALITE-MEDYA-TEKRAR
+    _ct = _pln.uret(cumleler=_C14, medya_manifest=_i14_manifest("aX", "aX"),
+                    arastirma_manifest=_ARA14, cikti_dizin=_d14,
+                    kare_olcu=(1280, 720), kalite_kapisi=True)
+    _kt = {s["kod"] for s in _ct["editor_qa"]["sorunlar"]}
+    kontrol("UCTAN UCA: ayni varlik tekrari QA HUKMUNE ulasiyor",
+            "KALITE-MEDYA-TEKRAR" in _kt
+            and _ct["editor_qa"]["durum"] == "FAIL", sorted(_kt))
+    # (2) FARKLI varlik -> tekrar kodu URETILMEZ (yanlis pozitif yok)
+    _cf = _pln.uret(cumleler=_C14, medya_manifest=_i14_manifest("aX", "aY"),
+                    arastirma_manifest=_ARA14, cikti_dizin=_d14,
+                    kare_olcu=(1280, 720), kalite_kapisi=True)
+    _kf = {s["kod"] for s in _cf["editor_qa"]["sorunlar"]}
+    kontrol("UCTAN UCA: farkli varlikta tekrar kodu URETILMIYOR",
+            "KALITE-MEDYA-TEKRAR" not in _kf, sorted(_kf))
+    # (3) KAPI KAPALI -> ayni girdi, HICBIR KALITE-* kodu yok
+    _ck = _pln.uret(cumleler=_C14, medya_manifest=_i14_manifest("aX", "aX"),
+                    arastirma_manifest=_ARA14, cikti_dizin=_d14)
+    _kk_kapali = {s["kod"] for s in _ck["editor_qa"]["sorunlar"]}
+    kontrol("UCTAN UCA: kapi KAPALIYKEN hicbir KALITE-* kodu yok",
+            not any(k.startswith("KALITE-") for k in _kk_kapali),
+            sorted(_kk_kapali))
+    kontrol("UCTAN UCA: kapali/acik AYNI girdide olcum yine yaziliyor",
+            _ck["editor_qa"]["olcumler"]["kalite"]["medya_tekrari"][
+                "tekrar_eden_asset"] == {"aX": 2}
+            and _ck["editor_qa"]["olcumler"]["kalite"]["kapi_acik"] is False)
+    # (4) kare_olcu VERILMEZSE profilin nominal olcusune duser (gerileme yok)
+    kontrol("kare_olcu verilmezse profil olcusu (1920) kullanilir",
+            _ck["editor_qa"]["olcumler"]["kalite"]["kare_genislik"] == 1920
+            and _ck["editor_qa"]["olcumler"]["kalite"][
+                "kare_olcu_verildi"] is False)
+
+
+blok("§32g Geriye uyumluluk — varsayilan yol DEGISMEDI")
+
+kontrol("qa_son varsayilan hukmu I-14'ten ETKILENMIYOR",
+        _pq_kapali.durum == _qsn.denetle(
+            "sahte.mp4", kosucu=_sahte_kosucu_10sn).durum)
+kontrol("kalite olcumu qa_on.olcumler['kalite'] altinda IZOLE",
+        "q.olcumler[\"kalite\"] = olcum" in oku(KOK, "editor/qa_on.py"))
+kontrol("pipeline.py I-14'e HIC dokunmuyor",
+        "kalite_kapisi" not in oku(KOK, "pipeline.py"))
+kontrol("server.py I-14'e HIC dokunmuyor",
+        "kalite_kapisi" not in oku(KOK, "server.py"))
+kontrol("22 alanlik generate sozlesmesi I-14'te de DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("kalite kapisi 22 alandan ULASILAMAZ (dahili is ayari)",
+        "kalite_kapisi" not in oku(KOK, "static/js/api.js")
+        and "kalite_kapisi" not in oku(KOK, "static/js/wizard.js"))
+kontrol("I-14 hicbir ucretli/AI cagrisi EKLEMIYOR",
+        not re.search(r"openai|anthropic|api_key|xai|freepik",
+                      _KK_KAYNAK, re.I))
+
+
 print(f"\n{'=' * 60}")
 print(f"GECEN: {gecen}   BASARISIZ: {len(basarisiz)}   BLOKE: {len(bloke)}")
 for b in basarisiz:
