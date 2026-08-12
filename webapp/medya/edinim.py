@@ -175,7 +175,7 @@ def edin(sorgu: str, hedef_yol: str, *, saglayicilar: list,
          en_az_genislik: int = 0, kesici: Optional[DevreKesici] = None,
          onbellek: Optional[dict] = None, uyu: Optional[Callable] = None,
          saat: Optional[Callable] = None, aday_secici: Optional[Callable] = None,
-         olcu_okuyucu: Optional[Callable] = None) -> dict:
+         olcu_okuyucu: Optional[Callable] = None, adet: int = 1) -> dict:
     """Saglayici zincirini SIRAYLA dene; ilk GERCEK BAYT ile don.
 
     `saglayicilar`: [{"ad", "modul", "sorgu"?}] — `modul` `ara()`/`indir()`
@@ -188,7 +188,10 @@ def edin(sorgu: str, hedef_yol: str, *, saglayicilar: list,
     kesici = kesici if kesici is not None else DevreKesici(saat=saat)
     onbellek = onbellek if onbellek is not None else {}
     basla = saat()
+    istenen = max(1, int(adet))
+    toplanan: list = []
     rapor = {"ok": False, "sorgu": str(sorgu or ""), "aday": None,
+             "adaylar": [], "istenen_adet": istenen,
              "kullanilan_saglayici": "", "denemeler": [],
              "metadata_bulundu": 0, "bayt_indirildi": 0,
              "onbellekten": False, "failover_sn": None,
@@ -242,26 +245,40 @@ def edin(sorgu: str, hedef_yol: str, *, saglayicilar: list,
 
         # ── GERCEK BAYT ──
         son = {}
-        for aday in adaylar[:3]:
+        # ⚠ N ADAY MEVCUT ARAMA LISTESINDEN secilir — EK AG CAGRISI YOK.
+        # `ara()` zaten 6 aday dondurmustu; I-21'e kadar yalnizca ILKI
+        # kullaniliyordu ve bolunen iki beat AYNI varligi paylasiyordu.
+        _kok, _uzanti = os.path.splitext(hedef_yol)
+        for _sira, aday in enumerate(adaylar[:max(3, istenen * 3)]):
+            if len(toplanan) >= istenen:
+                break
             url = str(aday.get("indirme_url") or "")
+            _yol = hedef_yol if _sira == 0 else f"{_kok}_{_sira}{_uzanti}"
             if url in onbellek and os.path.exists(onbellek[url]):
-                rapor.update({"ok": True, "aday": dict(aday),
-                              "kullanilan_saglayici": ad, "onbellekten": True})
-                rapor["aday"]["yol"] = onbellek[url]
-                deneme.update({"durum": "ONBELLEK", "sn": round(saat() - d_basla, 3)})
-                rapor["denemeler"].append(deneme)
-                rapor["failover_sn"] = round(saat() - basla, 3)
-                rapor["devre"] = kesici.ozet()
-                return rapor
+                _k = dict(aday)
+                _k["yol"] = onbellek[url]
+                toplanan.append(_k)
+                rapor["onbellekten"] = True
+                if len(toplanan) >= istenen:
+                    rapor.update({"ok": True, "aday": dict(toplanan[0]),
+                                  "adaylar": list(toplanan),
+                                  "kullanilan_saglayici": ad})
+                    deneme.update({"durum": "ONBELLEK",
+                                   "sn": round(saat() - d_basla, 3)})
+                    rapor["denemeler"].append(deneme)
+                    rapor["failover_sn"] = round(saat() - basla, 3)
+                    rapor["devre"] = kesici.ozet()
+                    return rapor
+                continue
             # ⚠ TELIF/ATIF DOGRULAMASI — saglayici ne derse desin BURADA da
             # kontrol edilir; eksikse KESIN RED.
             if not aday.get("render_kullanilabilir") or not aday.get(
                     "eser_sahibi") or not aday.get("lisans"):
                 son = {"ok": False, "sebep": "PROVENANCE-EKSIK"}
                 continue
-            son = _indir_tek(modul, aday, hedef_yol)
+            son = _indir_tek(modul, aday, _yol)
             if son.get("ok") and not _olcu_yeter(
-                    hedef_yol, aday, en_az_genislik, olcu_okuyucu):
+                    _yol, aday, en_az_genislik, olcu_okuyucu):
                 # ⚠ ARAMA BEYANI ile GERCEK BAYT AYRI: bazi saglayicilar
                 # (NASA) arama ucunda piksel olcusu VERMIYOR. "1920 istedim"
                 # demek yetmez; olcu ancak INDIRDIKTEN sonra bilinir ve
@@ -270,34 +287,45 @@ def edin(sorgu: str, hedef_yol: str, *, saglayicilar: list,
                        "olculen": aday.get("olculen_olcu")}
                 continue
             if son.get("ok"):
-                onbellek[url] = hedef_yol
+                onbellek[url] = _yol
                 kesici.basari(ad)
-                rapor.update({"ok": True, "aday": dict(aday),
-                              "kullanilan_saglayici": ad})
-                rapor["aday"]["yol"] = hedef_yol
+                _k = dict(aday)
+                _k["yol"] = _yol
+                toplanan.append(_k)
                 rapor["bayt_indirildi"] += 1
-                deneme.update({"durum": "OK", "sn": round(saat() - d_basla, 3)})
-                rapor["denemeler"].append(deneme)
-                rapor["failover_sn"] = round(saat() - basla, 3)
-                rapor["devre"] = kesici.ozet()
-                return rapor
-            karar = bekle_karari(son)
-            if karar["karar"] == "BEKLE":
-                bekle(karar["bekleme_sn"])
-                son = _indir_tek(modul, aday, hedef_yol)
-                if son.get("ok"):
-                    onbellek[url] = hedef_yol
-                    kesici.basari(ad)
-                    rapor.update({"ok": True, "aday": dict(aday),
+                if len(toplanan) >= istenen:
+                    rapor.update({"ok": True, "aday": dict(toplanan[0]),
+                                  "adaylar": list(toplanan),
                                   "kullanilan_saglayici": ad})
-                    rapor["aday"]["yol"] = hedef_yol
-                    rapor["bayt_indirildi"] += 1
-                    deneme.update({"durum": "OK-BEKLEDIKTEN-SONRA",
+                    deneme.update({"durum": "OK",
                                    "sn": round(saat() - d_basla, 3)})
                     rapor["denemeler"].append(deneme)
                     rapor["failover_sn"] = round(saat() - basla, 3)
                     rapor["devre"] = kesici.ozet()
                     return rapor
+                continue
+            karar = bekle_karari(son)
+            if karar["karar"] == "BEKLE":
+                bekle(karar["bekleme_sn"])
+                son = _indir_tek(modul, aday, _yol)
+                if son.get("ok"):
+                    onbellek[url] = _yol
+                    kesici.basari(ad)
+                    _k = dict(aday)
+                    _k["yol"] = _yol
+                    toplanan.append(_k)
+                    rapor["bayt_indirildi"] += 1
+                    if len(toplanan) >= istenen:
+                        rapor.update({"ok": True, "aday": dict(toplanan[0]),
+                                      "adaylar": list(toplanan),
+                                      "kullanilan_saglayici": ad})
+                        deneme.update({"durum": "OK-BEKLEDIKTEN-SONRA",
+                                       "sn": round(saat() - d_basla, 3)})
+                        rapor["denemeler"].append(deneme)
+                        rapor["failover_sn"] = round(saat() - basla, 3)
+                        rapor["devre"] = kesici.ozet()
+                        return rapor
+                    continue
             elif karar["karar"] == "DEVRE-AC":
                 deneme["bekleme_karari"] = karar
                 break                    # ayni hostu ZORLAMA, sirakine gec
@@ -311,6 +339,13 @@ def edin(sorgu: str, hedef_yol: str, *, saglayicilar: list,
                        "sn": round(saat() - d_basla, 3)})
         rapor["denemeler"].append(deneme)
 
+    # ⚠ KISMI BASARI DURUSTCE: N istendi, daha azi geldiyse ELDE OLANI don
+    # ve kac tane geldigini RAPORLA. Sahte aday uretilmez.
+    if toplanan:
+        rapor.update({"ok": True, "aday": dict(toplanan[0]),
+                      "adaylar": list(toplanan),
+                      "kullanilan_saglayici": rapor["kullanilan_saglayici"]
+                      or (toplanan[0].get("saglayici") or "")})
     rapor["failover_sn"] = round(saat() - basla, 3)
     rapor["devre"] = kesici.ozet()
     return rapor

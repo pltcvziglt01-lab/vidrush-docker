@@ -1,0 +1,2041 @@
+{
+  "atom": "I-20",
+  "izleyici_kalite_puani": {
+    "olculdu": true,
+    "puan": 75.0,
+    "kazanilan": 75.0,
+    "olculen_agirlik": 100,
+    "olculemeyen": [],
+    "bilesenler": {
+      "optik_hareket": {
+        "agirlik": 25,
+        "puan": 0.0,
+        "olculdu": true,
+        "gerekce": "duragan ihlal: 1"
+      },
+      "motion_cesitlilik": {
+        "agirlik": 20,
+        "puan": 20.0,
+        "olculdu": true,
+        "gerekce": "benzersiz hareket 5, benzersiz gecis 3, pencere tekrari 0"
+      },
+      "ritim": {
+        "agirlik": 15,
+        "puan": 15.0,
+        "olculdu": true,
+        "gerekce": "sabit_blok=False olu_final=0.35"
+      },
+      "tipografi": {
+        "agirlik": 15,
+        "puan": 15.0,
+        "olculdu": true,
+        "gerekce": "guvenli_alan=True cakisma=True altyazi=True"
+      },
+      "medya": {
+        "agirlik": 15,
+        "puan": 15.0,
+        "olculdu": true,
+        "gerekce": "tekrar=0 bitisik=0"
+      },
+      "ses": {
+        "agirlik": 10,
+        "puan": 10.0,
+        "olculdu": true,
+        "gerekce": "sessiz_asildi=False ambans_dengeli=True"
+      }
+    },
+    "not": "olculen kusur bilesenlerinin agirlikli birlesimi; izleyici arastirmasi DEGILDIR"
+  },
+  "optik_hareket": {
+    "olculdu": true,
+    "ornek": 67,
+    "ornek_fps": 4,
+    "durgun_esigi": 2.0,
+    "asiri_esigi": 45.0,
+    "warn_sn": 1.5,
+    "fail_sn": 3.0,
+    "genel_ortalama": 13.45,
+    "sahneler": [
+      {
+        "ad": "b001 push-in",
+        "bas_sn": 0.0,
+        "sure_sn": 0.862,
+        "ornek": 3,
+        "ortalama": 41.012,
+        "en_dusuk": 4.994,
+        "en_yuksek": 108.643,
+        "durgun_sn": 0.0,
+        "durgun": false,
+        "asiri": false
+      },
+      {
+        "ad": "b002 pull-out",
+        "bas_sn": 0.862,
+        "sure_sn": 1.725,
+        "ornek": 3,
+        "ortalama": 5.758,
+        "en_dusuk": 5.284,
+        "en_yuksek": 6.494,
+        "durgun_sn": 0.0,
+        "durgun": false,
+        "asiri": false
+      },
+      {
+        "ad": "b003 slow-drift",
+        "bas_sn": 2.587,
+        "sure_sn": 4.738,
+        "ornek": 15,
+        "ortalama": 4.291,
+        "en_dusuk": 3.591,
+        "en_yuksek": 5.065,
+        "durgun_sn": 0.0,
+        "durgun": false,
+        "asiri": false
+      },
+      {
+        "ad": "b004 pan-right",
+        "bas_sn": 7.325,
+        "sure_sn": 4.9,
+        "ornek": 15,
+        "ortalama": 16.208,
+        "en_dusuk": 13.693,
+        "en_yuksek": 17.77,
+        "durgun_sn": 0.0,
+        "durgun": false,
+        "asiri": false
+      },
+      {
+        "ad": "b005 data-reveal",
+        "bas_sn": 12.225,
+        "sure_sn": 4.825,
+        "ornek": 16,
+        "ortalama": 0.178,
+        "en_dusuk": 0.042,
+        "en_yuksek": 2.087,
+        "durgun_sn": 3.75,
+        "durgun": true,
+        "asiri": false,
+        "seviye": "fail",
+        "gerekce": "kesintisiz seri"
+      }
+    ],
+    "ihlaller": [
+      {
+        "ad": "b005 data-reveal",
+        "bas_sn": 12.225,
+        "sure_sn": 4.825,
+        "ornek": 16,
+        "ortalama": 0.178,
+        "en_dusuk": 0.042,
+        "en_yuksek": 2.087,
+        "durgun_sn": 3.75,
+        "durgun": true,
+        "asiri": false,
+        "seviye": "fail",
+        "gerekce": "kesintisiz seri"
+      }
+    ],
+    "en_durgun_sahne": {
+      "ad": "b005 data-reveal",
+      "bas_sn": 12.225,
+      "sure_sn": 4.825,
+      "ornek": 16,
+      "ortalama": 0.178,
+      "en_dusuk": 0.042,
+      "en_yuksek": 2.087,
+      "durgun_sn": 3.75,
+      "durgun": true,
+      "asiri": false,
+      "seviye": "fail",
+      "gerekce": "kesintisiz seri"
+    },
+    "temiz": false
+  },
+  "kenar_siyahligi": {
+    "olculdu": true,
+    "kare": 68,
+    "serit_sutun": 2,
+    "siyah_esigi": 16.0,
+    "ihlal_kare": 6,
+    "ihlal_orani": 0.0882,
+    "ornek_ihlal": [
+      {
+        "kare": 4,
+        "sol": 8.26,
+        "sag": 25.18,
+        "genel": 66.58
+      },
+      {
+        "kare": 5,
+        "sol": 8.28,
+        "sag": 33.57,
+        "genel": 66.0
+      },
+      {
+        "kare": 6,
+        "sol": 8.26,
+        "sag": 40.69,
+        "genel": 65.11
+      }
+    ],
+    "en_koyu_sol": 8.26,
+    "en_koyu_sag": 20.36,
+    "temiz": false
+  },
+  "motion_grammar": {
+    "olculdu": true,
+    "sahne": 5,
+    "hareketler": [
+      "push-in",
+      "pull-out",
+      "slow-drift",
+      "pan-right",
+      "data-reveal"
+    ],
+    "benzersiz_hareket": 5,
+    "ardisik_tekrar": [],
+    "pencere_tekrari": [],
+    "pencere": 3,
+    "statik_sahneler": [],
+    "gecisler": [
+      "hard-cut",
+      "flash",
+      "hard-cut",
+      "hard-cut",
+      "karartma"
+    ],
+    "benzersiz_gecis": 3,
+    "gecis_dagilimi": {
+      "flash": 1,
+      "karartma": 1,
+      "hard-cut": 3
+    },
+    "acilis_hareketi": "push-in",
+    "kapanis_hareketi": "data-reveal",
+    "acilis_kapanis_ayri": true
+  },
+  "video": "outputs/sample/editorv2_teknoloji_i20.mp4",
+  "konu": "Apollo 11 ay inisi (20 Temmuz 1969)",
+  "kalite_kapisi": "ACIK (kalite_kapisi=True)",
+  "maliyet_usd": 0.0,
+  "duzeltilen_kusurlar": {
+    "baslik": {
+      "olcum": {
+        "olculdu": true,
+        "metin": "GÜÇ",
+        "karakter": 3,
+        "punto_taban": 60.0,
+        "kare_genislik": 1920.0,
+        "kullanilabilir_px": 1552.8,
+        "olcek": 1.0,
+        "kucultme_tabani_vuruldu": false,
+        "uygulanan_punto": 60,
+        "cizilen_px": 131.4,
+        "tasma_px": 0.0,
+        "sigar": true,
+        "bant_sag_px": 1687.8,
+        "bant_kare_disi": false,
+        "kelime_kesik": {
+          "olculdu": true,
+          "on_ek": true,
+          "kesik": false,
+          "ham": "Güç burada üretilir.",
+          "gosterilen": "GÜÇ",
+          "yarim_kelime": "",
+          "tam_kelime": ""
+        }
+      },
+      "metin": "GÜÇ",
+      "punto": 60,
+      "kare_genislik": 1920
+    },
+    "sahne_sureleri": {
+      "kaynak": "edge-tts SentenceBoundary (GERCEK zamanlama)",
+      "sureler": [
+        2.587,
+        4.738,
+        4.9,
+        4.825
+      ],
+      "toplam_sn": 17.05,
+      "yayilim_sn": 2.313,
+      "benzersiz": 4,
+      "cumle_sinirlari": [
+        {
+          "bas": 0.1,
+          "sure": 2.538,
+          "metin": "Güç burada üretilir."
+        },
+        {
+          "bas": 2.587,
+          "sure": 4.737,
+          "metin": "Binlerce işlemci tek salonda, sıra sıra dizili duruyor."
+        },
+        {
+          "bas": 7.325,
+          "sure": 4.9,
+          "metin": "Her hesaplama, silikon üzerindeki devrelerde gerçekleşiyor."
+        },
+        {
+          "bas": 12.225,
+          "sure": 4.475,
+          "metin": "Bu işlem gücünün faturası ise enerjiyle ödeniyor."
+        }
+      ]
+    },
+    "olu_final": {
+      "anlatim_bitis_sn": 16.7,
+      "kesim_sn": 17.05,
+      "kuyruk_sn": 0.35,
+      "olculen_olu_final_sn": 0.0
+    },
+    "ambiyans": {
+      "kaynak_lufs": -48.68,
+      "normalize_lufs": -25.99,
+      "seviye": 0.5,
+      "ducking": 0.5,
+      "anlatim_araliklari_gecildi": true,
+      "olcum": {
+        "olculdu": true,
+        "ambans_lufs": -25.99,
+        "anlatim_lufs": -14.27,
+        "ambans_seviye": 0.5,
+        "seviye_db": -6.02,
+        "ducking": 0.5,
+        "ducking_db": -6.02,
+        "etkin_lufs": -38.03,
+        "etkin_ducksuz_lufs": -32.01,
+        "fark_db": 23.76,
+        "fark_ducksuz_db": 17.74,
+        "esik_db": 30.0,
+        "bastirma_esik_db": 12.0,
+        "duyulabilir": true,
+        "bastiriyor": false,
+        "dengeli": true,
+        "ducking_suz_duyulabilir": true
+      }
+    }
+  },
+  "sessizlik_yorumu": {
+    "mikste_sessiz_pct": 0.0,
+    "neden": "ambiyans -45 dB esiginin uzerinde ve kesintisiz; silencedetect bu yuzden aralik bulmuyor",
+    "anlatim_master_sessizlikleri": [
+      {
+        "bas": 0.0,
+        "sure": 0.407
+      },
+      {
+        "bas": 1.6,
+        "sure": 1.347
+      },
+      {
+        "bas": 6.307,
+        "sure": 1.315
+      },
+      {
+        "bas": 11.194,
+        "sure": 1.416
+      },
+      {
+        "bas": 15.67,
+        "sure": 1.082
+      }
+    ],
+    "anlatim_master_sessiz_pct": 33.2,
+    "cumle_arasi_bosluklar_sn": [
+      -0.051,
+      0.001,
+      -0.0
+    ]
+  },
+  "altyazi": {
+    "kup_sayisi": 4,
+    "olculen_kup": 4,
+    "orantili_kup": 0,
+    "birlestirilen": 0,
+    "maks_karakter": 42,
+    "maks_satir": 2,
+    "okunabilirlik_temiz": true,
+    "cok_hizli": [],
+    "uzun_satir": [],
+    "kupler": [
+      {
+        "bas_sn": 0.1,
+        "sure_sn": 2.538,
+        "metin": "Güç burada üretilir.",
+        "satirlar": [
+          "Güç burada üretilir."
+        ],
+        "zamanlama": "olculdu"
+      },
+      {
+        "bas_sn": 2.587,
+        "sure_sn": 4.737,
+        "metin": "Binlerce işlemci tek salonda, sıra sıra dizili duruyor.",
+        "satirlar": [
+          "Binlerce işlemci tek salonda, sıra sıra",
+          "dizili duruyor."
+        ],
+        "zamanlama": "olculdu"
+      },
+      {
+        "bas_sn": 7.325,
+        "sure_sn": 4.9,
+        "metin": "Her hesaplama, silikon üzerindeki devrelerde gerçekleşiyor.",
+        "satirlar": [
+          "Her hesaplama, silikon üzerindeki",
+          "devrelerde gerçekleşiyor."
+        ],
+        "zamanlama": "olculdu"
+      },
+      {
+        "bas_sn": 12.225,
+        "sure_sn": 4.475,
+        "metin": "Bu işlem gücünün faturası ise enerjiyle ödeniyor.",
+        "satirlar": [
+          "Bu işlem gücünün faturası ise enerjiyle",
+          "ödeniyor."
+        ],
+        "zamanlama": "olculdu"
+      }
+    ],
+    "zamanlama_notu": "cumle sinirlari OLCULDU (edge-tts SentenceBoundary); cumle ICI bolunme gerektiginde parca zamanlamasi karakter agirlikli ORANTILI dagitimdir, olcum degil",
+    "sahnelere_dagitildi": [
+      {
+        "scene_id": "s001",
+        "kup": 0
+      },
+      {
+        "scene_id": "s001",
+        "kup": 0
+      },
+      {
+        "scene_id": "s002",
+        "kup": 0
+      },
+      {
+        "scene_id": "s003",
+        "kup": 0
+      },
+      {
+        "scene_id": "s004",
+        "kup": 0
+      }
+    ]
+  },
+  "kaynak_kunyesi": {
+    "atif_gerekli": true,
+    "katmanlar": [
+      {
+        "ad": "source-label",
+        "metin": "Dominic Hart / NASA-PUBLIC",
+        "y_orani": 0.6,
+        "bas_sn": 1.262,
+        "sure_sn": 1.725,
+        "kaydirildi": true
+      },
+      {
+        "ad": "source-label",
+        "metin": "GRC / NASA-PUBLIC",
+        "y_orani": 0.755,
+        "bas_sn": 2.987,
+        "sure_sn": 3.0,
+        "kaydirildi": false
+      },
+      {
+        "ad": "source-label",
+        "metin": "Wade Sisler / NASA-PUBLIC",
+        "y_orani": 0.755,
+        "bas_sn": 7.725,
+        "sure_sn": 3.0,
+        "kaydirildi": false
+      }
+    ],
+    "tipografi_raporu": [
+      {
+        "kod": "TIPO-CAKISMA-DUSURULDU",
+        "katman": "source-label",
+        "seviye": "uyari",
+        "detay": "cozulemedi (['chapter-title'])"
+      },
+      {
+        "kod": "TIPO-CAKISMA-KAYDIRILDI",
+        "katman": "source-label",
+        "detay": "y 0.895 -> 0.6 (['chapter-title'])"
+      }
+    ]
+  },
+  "guvenli_alan": {
+    "olculdu": true,
+    "kare_yukseklik": 1080.0,
+    "guvenli_kenar": 64.0,
+    "alt_sinir_px": 1016.0,
+    "katman": 5,
+    "olcumler": [
+      {
+        "ad": "chapter-title",
+        "ust_px": 756.0,
+        "alt_px": 869.4,
+        "tavan_px": 1016.0,
+        "taban_px": 64.0
+      },
+      {
+        "ad": "source-label",
+        "ust_px": 648.0,
+        "alt_px": 696.6,
+        "tavan_px": 1016.0,
+        "taban_px": 64.0
+      },
+      {
+        "ad": "source-label",
+        "ust_px": 815.4,
+        "alt_px": 864.0,
+        "tavan_px": 1016.0,
+        "taban_px": 64.0
+      },
+      {
+        "ad": "source-label",
+        "ust_px": 815.4,
+        "alt_px": 864.0,
+        "tavan_px": 1016.0,
+        "taban_px": 64.0
+      },
+      {
+        "ad": "subtitle",
+        "ust_px": 874.8,
+        "alt_px": 1015.2,
+        "tavan_px": 1016.0,
+        "taban_px": 64.0
+      }
+    ],
+    "ihlaller": [],
+    "temiz": true
+  },
+  "yazi_cakismasi": {
+    "olculdu": true,
+    "katman": 5,
+    "cakisan_cift": [],
+    "tolerans": 0.005,
+    "temiz": true
+  },
+  "video_broll": {
+    "aday": [],
+    "taranan_dizin": [
+      "app/render-studio/public/editorv2"
+    ],
+    "durum": "BLOKE",
+    "sebep": "I-18 yalnizca FOTOGRAF edinir; guvenli havuzda hareketli video adayi YOK ve depodaki .mp4 dosyalari bu projenin kendi render ciktilari, B-roll DEGILDIR"
+  },
+  "medya_edinim": {
+    "mimari": "medya.edinim saglayici zinciri + devre kesici",
+    "maliyet_usd": 0.0,
+    "saglayici_sirasi": [
+      "commons",
+      "nasa"
+    ],
+    "atlanan_saglayicilar": [
+      {
+        "ad": "pexels",
+        "sebep": "mevcut anahtar GECERSIZ (HTTP 401) — yeni anahtar ALINMADI"
+      }
+    ],
+    "en_az_genislik": 1920,
+    "sahneler": [
+      {
+        "kimlik": "s01",
+        "sorgu": "Pleiades supercomputer",
+        "saglayici": "nasa",
+        "failover_sn": 7.616,
+        "metadata_bulundu": 6,
+        "bayt_indirildi": 2,
+        "onbellekten": false,
+        "denemeler": [
+          {
+            "saglayici": "commons",
+            "metadata": 0,
+            "elenen": 0,
+            "durum": "ADAY-YOK",
+            "sebep": "lisans/provenance duvarini gecen aday yok",
+            "sn": 0.626
+          },
+          {
+            "saglayici": "nasa",
+            "metadata": 6,
+            "elenen": 0,
+            "durum": "OK",
+            "sebep": "",
+            "sn": 6.99
+          }
+        ],
+        "devre": {
+          "esik": 2,
+          "soguma_sn": 900.0,
+          "ardisik_hata": {},
+          "acik_devreler": []
+        },
+        "durum": "OK",
+        "asset_id": "s01_11206373",
+        "baslik": "ARC-2008-ACD08-0272-005",
+        "lisans": "nasa-public",
+        "eser_sahibi": "Dominic Hart",
+        "olcu": [
+          4192,
+          2832
+        ],
+        "detay_std": 52.3,
+        "orijinal_url": "https://images.nasa.gov/details-ARC-2008-ACD08-0272-005",
+        "dayanak": "cumle bu varligin KENDI basligini betimliyor",
+        "yedek_aday": 1
+      },
+      {
+        "kimlik": "s02",
+        "sorgu": "supercomputer facility",
+        "saglayici": "nasa",
+        "failover_sn": 6.624,
+        "metadata_bulundu": 6,
+        "bayt_indirildi": 2,
+        "onbellekten": false,
+        "denemeler": [
+          {
+            "saglayici": "commons",
+            "metadata": 0,
+            "elenen": 0,
+            "durum": "ADAY-YOK",
+            "sebep": "lisans/provenance duvarini gecen aday yok",
+            "sn": 0.622
+          },
+          {
+            "saglayici": "nasa",
+            "metadata": 6,
+            "elenen": 0,
+            "durum": "OK",
+            "sebep": "",
+            "sn": 6.002
+          }
+        ],
+        "devre": {
+          "esik": 2,
+          "soguma_sn": 900.0,
+          "ardisik_hata": {},
+          "acik_devreler": []
+        },
+        "durum": "OK",
+        "asset_id": "s02_76221487",
+        "baslik": "ARC-1988-AC88-0514-42",
+        "lisans": "nasa-public",
+        "eser_sahibi": "Wade Sisler",
+        "olcu": [
+          2048,
+          3072
+        ],
+        "detay_std": 88.5,
+        "orijinal_url": "https://images.nasa.gov/details-ARC-1988-AC88-0514-42",
+        "dayanak": "cumle bu varligin KENDI basligini betimliyor",
+        "yedek_aday": 1
+      },
+      {
+        "kimlik": "s03",
+        "sorgu": "Silicon Carbide Integrated Circuit Chip",
+        "saglayici": "nasa",
+        "failover_sn": 2.644,
+        "metadata_bulundu": 1,
+        "bayt_indirildi": 1,
+        "onbellekten": false,
+        "denemeler": [
+          {
+            "saglayici": "commons",
+            "metadata": 0,
+            "elenen": 0,
+            "durum": "ADAY-YOK",
+            "sebep": "lisans/provenance duvarini gecen aday yok",
+            "sn": 0.645
+          },
+          {
+            "saglayici": "nasa",
+            "metadata": 1,
+            "elenen": 0,
+            "durum": "BAYT-YOK",
+            "sebep": "jpeg; decode ok (3000x2250); ffprobe ok (mjpeg 3000x2250)",
+            "sn": 1.999,
+            "http": 200,
+            "kalici": false,
+            "devre_acildi": false
+          }
+        ],
+        "devre": {
+          "esik": 2,
+          "soguma_sn": 900.0,
+          "ardisik_hata": {},
+          "acik_devreler": []
+        },
+        "durum": "OK",
+        "asset_id": "s03_47380190",
+        "baslik": "Silicon Carbide Integrated Circuit Chip",
+        "lisans": "nasa-public",
+        "eser_sahibi": "GRC",
+        "olcu": [
+          3000,
+          2250
+        ],
+        "detay_std": 63.2,
+        "orijinal_url": "https://images.nasa.gov/details-GRC-2015-C-00595",
+        "dayanak": "cumle bu varligin KENDI basligini betimliyor",
+        "yedek_aday": 0
+      },
+      {
+        "kimlik": "s04",
+        "sorgu": "solar array power",
+        "saglayici": "nasa",
+        "failover_sn": 8.869,
+        "metadata_bulundu": 6,
+        "bayt_indirildi": 2,
+        "onbellekten": false,
+        "denemeler": [
+          {
+            "saglayici": "commons",
+            "metadata": 0,
+            "elenen": 0,
+            "durum": "ADAY-YOK",
+            "sebep": "lisans/provenance duvarini gecen aday yok",
+            "sn": 0.548
+          },
+          {
+            "saglayici": "nasa",
+            "metadata": 6,
+            "elenen": 0,
+            "durum": "OK",
+            "sebep": "",
+            "sn": 8.321
+          }
+        ],
+        "devre": {
+          "esik": 2,
+          "soguma_sn": 900.0,
+          "ardisik_hata": {},
+          "acik_devreler": []
+        },
+        "durum": "OK",
+        "asset_id": "s04_73561526",
+        "baslik": "Juno Solar Panel Deployment Test",
+        "lisans": "nasa-public",
+        "eser_sahibi": "NASA/JPL-Caltech/Lockheed Martin",
+        "olcu": [
+          1431,
+          820
+        ],
+        "detay_std": 56.0,
+        "orijinal_url": "https://images.nasa.gov/details-PIA13926",
+        "dayanak": "cumle bu varligin KENDI basligini betimliyor",
+        "yedek_aday": 2
+      }
+    ],
+    "basarili": 4,
+    "dort_k_uygun": false,
+    "en_hizli_failover_sn": 2.644,
+    "devre_ozeti": {
+      "esik": 2,
+      "soguma_sn": 900.0,
+      "ardisik_hata": {},
+      "acik_devreler": []
+    }
+  },
+  "auto_siniflandirma": {
+    "konu_metni": "Süperbilgisayarların enerji ve çip ekonomisi: işlem gücü nasıl üretiliyor ve faturası ne kadar",
+    "tur_elle_verildi_mi": false,
+    "konsept": {
+      "adaylar": [
+        [
+          "egitim.teknoloji",
+          5.0,
+          5
+        ],
+        [
+          "egitim.aciklayici",
+          2.0,
+          1
+        ],
+        [
+          "egitim.bilim",
+          1.0,
+          1
+        ]
+      ],
+      "kanit": 5,
+      "sinyaller": {
+        "soru": 1
+      },
+      "kapsam": {
+        "aile": 7,
+        "aileler": [
+          "belgesel",
+          "egitim",
+          "hikaye",
+          "kultur",
+          "seyahat",
+          "urun",
+          "yasam"
+        ],
+        "dal": 33,
+        "anahtar": 849,
+        "sinyal": 18,
+        "sinyal_bagi": 50,
+        "karsit": 94
+      },
+      "kaynak": "deterministik",
+      "model_kullanildi": false,
+      "yol": "egitim.teknoloji",
+      "aile": "egitim",
+      "tur": "teknoloji",
+      "ad": "Teknoloji",
+      "guven": 0.77,
+      "durum": "kesin",
+      "ikincil": null,
+      "eski_etiket": "aciklayici",
+      "gerekce": "egitim.teknoloji: puan 5.0 (2. egitim.aciklayici 2.0), kanit 5 = 4 anahtar + 1 yapisal sinyal"
+    },
+    "stil": {
+      "kimlik": "explainer-hizli",
+      "surum": "1.0.0",
+      "profil": {
+        "ad": "Hizli Explainer",
+        "ozet": "1.5-3 sn kesme, surekli kinetik metin, flat grafik",
+        "surum": "1.0.0",
+        "anlatim": {
+          "yapi": "liste",
+          "acilis": "kanca",
+          "kisi": "2.",
+          "bolum_basligi": false
+        },
+        "tempo": {
+          "plan_sn": 2.4,
+          "maks_plan_sn": 4.0,
+          "kelime_plan": 6.0,
+          "dagilim": "tek-modlu"
+        },
+        "gecis": {
+          "tur": "whip",
+          "sure_sn": 0.2,
+          "oran_pct": 45.0
+        },
+        "kamera": {
+          "hareket": "push-in",
+          "yogunluk": 70.0,
+          "zoom_tavan": 1.35
+        },
+        "tipografi": {
+          "altyazi": "yogun",
+          "baslik": "kinetik",
+          "guvenli_alan_pct": 10.0
+        },
+        "palet": {
+          "grade": "flat-canli",
+          "doygunluk": "yuksek",
+          "kontrast": "yuksek",
+          "hex": [
+            "#1446A0",
+            "#F5A623",
+            "#FFFFFF"
+          ]
+        },
+        "ses": {
+          "muzik": "ritmik",
+          "muzik_db": -20.0,
+          "sfx": "yogun",
+          "ducking_db": -12.0
+        },
+        "medya": {
+          "strateji": "karma",
+          "footage_pct": 45.0,
+          "grafik_pct": 40.0,
+          "ai_gorsel_yasak": false
+        },
+        "dagitim": {
+          "oran": "16:9",
+          "kanal": "youtube",
+          "hedef_sn": 300.0,
+          "maks_sn": 900.0
+        },
+        "kanit": {
+          "lisans_beyaz_liste": [
+            "cc0",
+            "public-domain",
+            "cc-by",
+            "cc-by-sa",
+            "pexels",
+            "pixabay",
+            "coverr",
+            "freepik"
+          ],
+          "atif_zorunlu": true,
+          "min_bagimsiz_kaynak": 1.0,
+          "arsiv_zorunlu": false,
+          "yer_kapisi": false
+        },
+        "qa": {
+          "lufs_hedef": -14.0,
+          "tepe_dbtp_maks": -1.5,
+          "sure_sapma_pct_maks": 20.0,
+          "siyah_kare_maks": 0.0,
+          "donmus_kare_maks": 0.0,
+          "min_kesme": 20.0
+        }
+      },
+      "kaynak": "auto",
+      "gerekce": "konsept 'egitim.teknoloji' (guven 0.77) -> explainer-hizli",
+      "turetme": null,
+      "uyari": []
+    },
+    "edit_profili": "premium-modern",
+    "not": "kullanici YALNIZ metin verdi; aile/stil/edit profili taksonomi + stil_profili tarafindan SECILDI"
+  },
+  "once_i16": {
+    "kaynak": "outputs/sample/editorv2_altyazi_1080p_i16.mp4",
+    "olcum_yontemi": "4 fps / 64x36 gri, ardisik ortalama mutlak fark (kalite_kapisi.optik_ornek_komutu)",
+    "sahneler": [
+      {
+        "ad": "b001 push-in",
+        "sure_sn": 2.962,
+        "optik_ort": 3.551
+      },
+      {
+        "ad": "b002 static",
+        "sure_sn": 5.213,
+        "optik_ort": 0.914
+      },
+      {
+        "ad": "b003 push-in",
+        "sure_sn": 4.688,
+        "optik_ort": 5.102
+      },
+      {
+        "ad": "b004 pull-out",
+        "sure_sn": 4.675,
+        "optik_ort": 7.03
+      }
+    ],
+    "gecis_dagilimi": {
+      "hard-cut": 4
+    },
+    "hareketler": [
+      "push-in",
+      "static",
+      "push-in",
+      "pull-out"
+    ]
+  },
+  "medya_cesitliligi": {
+    "esik": 0.86,
+    "esik_degistirildi_mi": false,
+    "ciftler": [
+      {
+        "a": "s01_11206373",
+        "b": "s03_47380190",
+        "bitisik": true,
+        "benzerlik": 0.4531
+      },
+      {
+        "a": "s01_11206373",
+        "b": "s02_76221487",
+        "bitisik": false,
+        "benzerlik": 0.5156
+      },
+      {
+        "a": "s01_11206373",
+        "b": "s04_73561526",
+        "bitisik": false,
+        "benzerlik": 0.5312
+      },
+      {
+        "a": "s03_47380190",
+        "b": "s02_76221487",
+        "bitisik": true,
+        "benzerlik": 0.4688
+      },
+      {
+        "a": "s03_47380190",
+        "b": "s04_73561526",
+        "bitisik": false,
+        "benzerlik": 0.6094
+      },
+      {
+        "a": "s02_76221487",
+        "b": "s04_73561526",
+        "bitisik": true,
+        "benzerlik": 0.5156
+      }
+    ],
+    "en_yuksek": 0.6094,
+    "en_yuksek_bitisik": 0.5156,
+    "esigi_asan": [],
+    "siralama": {
+      "once_sira": [
+        "s01_11206373",
+        "s02_76221487",
+        "s03_47380190",
+        "s04_73561526"
+      ],
+      "once_komsu_maks": 0.6094,
+      "sonra_sira": [
+        "s01_11206373",
+        "s03_47380190",
+        "s02_76221487",
+        "s04_73561526"
+      ],
+      "sonra_komsu_maks": 0.5156,
+      "not": "yalnizca SIRA degisti; kume ve esikler ayni. Havuzun en cesitli 4'lusu zaten seciliydi (olculdu)."
+    }
+  },
+  "gorsel_secimi": {
+    "esik_std": 20.0,
+    "olcumler": [
+      {
+        "asset_id": "s01_11206373",
+        "detay_std": 52.3
+      },
+      {
+        "asset_id": "s02_76221487",
+        "detay_std": 88.5
+      },
+      {
+        "asset_id": "s03_47380190",
+        "detay_std": 63.2
+      },
+      {
+        "asset_id": "s04_73561526",
+        "detay_std": 56.0
+      }
+    ],
+    "secilen": [
+      "s01_11206373",
+      "s03_47380190",
+      "s02_76221487",
+      "s04_73561526"
+    ]
+  },
+  "anlatici_ses": {
+    "motor": "edge-tts",
+    "maliyet_usd": 0.0,
+    "secilen": "tr-TR-AhmetNeural",
+    "adaylar": [
+      {
+        "codec": "mp3",
+        "ornekleme_hz": 24000,
+        "kanal": 1,
+        "sure_sn": 16.752,
+        "lufs": -17.38,
+        "tepe_dbtp": -2.86,
+        "lra": 3.9,
+        "sessizlikler": [
+          {
+            "bas": 0.0,
+            "sure": 0.416
+          },
+          {
+            "bas": 1.575,
+            "sure": 1.376
+          },
+          {
+            "bas": 6.306,
+            "sure": 1.323
+          },
+          {
+            "bas": 11.184,
+            "sure": 1.427
+          },
+          {
+            "bas": 15.669,
+            "sure": 1.083
+          }
+        ],
+        "sessiz_sn": 5.625,
+        "sessiz_pct": 33.6,
+        "kirpma_var": false,
+        "ses": "tr-TR-AhmetNeural",
+        "cumle_siniri": 4
+      },
+      {
+        "codec": "mp3",
+        "ornekleme_hz": 24000,
+        "kanal": 1,
+        "sure_sn": 15.264,
+        "lufs": -18.82,
+        "tepe_dbtp": -2.47,
+        "lra": 2.9,
+        "sessizlikler": [
+          {
+            "bas": 1.354,
+            "sure": 1.077
+          },
+          {
+            "bas": 5.704,
+            "sure": 1.122
+          },
+          {
+            "bas": 10.18,
+            "sure": 1.077
+          },
+          {
+            "bas": 14.268,
+            "sure": 0.996
+          }
+        ],
+        "sessiz_sn": 4.273,
+        "sessiz_pct": 28.0,
+        "kirpma_var": false,
+        "ses": "tr-TR-EmelNeural",
+        "cumle_siniri": 4
+      }
+    ],
+    "master": {
+      "codec": "pcm_s16le",
+      "ornekleme_hz": 48000,
+      "kanal": 1,
+      "sure_sn": 16.752,
+      "lufs": -14.27,
+      "tepe_dbtp": -1.5,
+      "lra": 3.7,
+      "sessizlikler": [
+        {
+          "bas": 0.0,
+          "sure": 0.407
+        },
+        {
+          "bas": 1.6,
+          "sure": 1.347
+        },
+        {
+          "bas": 6.307,
+          "sure": 1.315
+        },
+        {
+          "bas": 11.194,
+          "sure": 1.416
+        },
+        {
+          "bas": 15.67,
+          "sure": 1.082
+        }
+      ],
+      "sessiz_sn": 5.567,
+      "sessiz_pct": 33.2,
+      "kirpma_var": false,
+      "ses": "tr-TR-AhmetNeural",
+      "anlatim_bitis_sn": 16.7,
+      "kesim_sn": 17.05
+    }
+  },
+  "plan": {
+    "profil": "premium-modern",
+    "qa": {
+      "durum": "WARN",
+      "fail": 0,
+      "warn": 2,
+      "sorun_sayisi": 5
+    },
+    "on_render_qa": {
+      "durum": "WARN",
+      "fail": 0,
+      "warn": 2,
+      "olcumler": {
+        "pacing": {
+          "beat": 5,
+          "ortalama_sn": 3.41,
+          "en_kisa": 0.86,
+          "en_uzun": 4.9,
+          "kisa_cekim_orani": 0.4,
+          "referans_kisa_orani": 0.32,
+          "histogram": {
+            "0-1": 1,
+            "1-2": 1,
+            "4-5": 3
+          }
+        },
+        "perde": {
+          "acilis": 2,
+          "gelisme": 3,
+          "kapanis": 0
+        },
+        "islev": {
+          "hook": 2,
+          "aciklama": 2,
+          "sonuc": 1
+        },
+        "kapsam": {
+          "cekim": 5,
+          "medya": 4,
+          "fallback": 1,
+          "kapsam_orani": 0.8
+        },
+        "saglayici": {
+          "nasa": 4
+        },
+        "tek_saglayici_orani": 1.0,
+        "efekt": {
+          "toplam": 31,
+          "beat_basina_ort": 6.2
+        },
+        "gecis": {
+          "toplam": 5,
+          "seyrek": 0,
+          "hard_cut_orani": 0.6
+        },
+        "tipografi": {
+          "katman": 4,
+          "sorun": 0
+        },
+        "ses": {
+          "lufs_hedef": -14.0,
+          "tepe_tavan": -1.0,
+          "sfx_dakikada": 1.0,
+          "on_zincir_adim": 5,
+          "ducking_araligi": 0
+        },
+        "kalite": {
+          "kare_genislik": 1920,
+          "kare_olcu_verildi": true,
+          "kapi_acik": true,
+          "baslik": [
+            {
+              "olculdu": true,
+              "metin": "GÜÇ",
+              "karakter": 3,
+              "punto_taban": 60.0,
+              "kare_genislik": 1920.0,
+              "kullanilabilir_px": 1552.8,
+              "olcek": 1.0,
+              "kucultme_tabani_vuruldu": false,
+              "uygulanan_punto": 60,
+              "cizilen_px": 131.4,
+              "tasma_px": 0.0,
+              "sigar": true,
+              "bant_sag_px": 1687.8,
+              "bant_kare_disi": false,
+              "kelime_kesik": {
+                "olculdu": true,
+                "on_ek": true,
+                "kesik": false,
+                "ham": "Güç",
+                "gosterilen": "GÜÇ",
+                "yarim_kelime": "",
+                "tam_kelime": ""
+              },
+              "sigan_karakter": 45
+            }
+          ],
+          "medya_tekrari": {
+            "olculdu": true,
+            "sahne": 5,
+            "benzersiz_asset": 4,
+            "tekrar_eden_asset": {},
+            "bitisik_ayni_asset": [],
+            "benzerlik_olculdu": true,
+            "benzerlik_esigi": 0.86,
+            "benzer_ciftler": [],
+            "okunamayan_cift": 4,
+            "benzerlik_temiz": true
+          },
+          "ritim": {
+            "olculdu": true,
+            "sahne": 5,
+            "sureler": [
+              0.862,
+              1.725,
+              4.738,
+              4.9,
+              4.825
+            ],
+            "yayilim_sn": 4.038,
+            "sure_yayilim_orani": 0.8241,
+            "sabit_esik_sn": 0.05,
+            "sabit_blok": false,
+            "anlatim_agirliklari": [
+              1.0,
+              2.0,
+              8.0,
+              6.0,
+              7.0
+            ],
+            "agirlik_yayilim_orani": 0.875,
+            "anlatim_sapma_esigi": 0.15,
+            "anlatim_bagi": true,
+            "toplam_sn": 17.05,
+            "anlatim_bitis_sn": 16.7,
+            "olu_final_sn": 0.35,
+            "olu_final_esigi": 0.5,
+            "olu_final_asildi": false
+          },
+          "guvenli_alan": {
+            "olculdu": true,
+            "kare_yukseklik": 1080.0,
+            "guvenli_kenar": 64.0,
+            "alt_sinir_px": 1016.0,
+            "katman": 5,
+            "olcumler": [
+              {
+                "ad": "chapter-title",
+                "ust_px": 756.0,
+                "alt_px": 869.4,
+                "tavan_px": 1016.0,
+                "taban_px": 64.0
+              },
+              {
+                "ad": "source-label",
+                "ust_px": 648.0,
+                "alt_px": 696.6,
+                "tavan_px": 1016.0,
+                "taban_px": 64.0
+              },
+              {
+                "ad": "source-label",
+                "ust_px": 815.4,
+                "alt_px": 864.0,
+                "tavan_px": 1016.0,
+                "taban_px": 64.0
+              },
+              {
+                "ad": "source-label",
+                "ust_px": 815.4,
+                "alt_px": 864.0,
+                "tavan_px": 1016.0,
+                "taban_px": 64.0
+              },
+              {
+                "ad": "subtitle",
+                "ust_px": 874.8,
+                "alt_px": 1015.2,
+                "tavan_px": 1016.0,
+                "taban_px": 64.0
+              }
+            ],
+            "ihlaller": [],
+            "temiz": true
+          },
+          "yazi_cakismasi": {
+            "olculdu": true,
+            "katman": 5,
+            "cakisan_cift": [],
+            "tolerans": 0.005,
+            "temiz": true
+          },
+          "altyazi": {
+            "olculdu": true,
+            "kup_sayisi": 4,
+            "birlestirilen": 0,
+            "maks_karakter": 42,
+            "maks_satir": 2,
+            "min_sn": 1.2,
+            "maks_cps": 20.0,
+            "olculen_kup": 4,
+            "orantili_kup": 0,
+            "cok_hizli": [],
+            "uzun_satir": [],
+            "cok_satir": [],
+            "temiz": true
+          },
+          "motion_grammar": {
+            "olculdu": true,
+            "sahne": 5,
+            "hareketler": [
+              "push-in",
+              "pull-out",
+              "slow-drift",
+              "pan-right",
+              "data-reveal"
+            ],
+            "benzersiz_hareket": 5,
+            "ardisik_tekrar": [],
+            "pencere_tekrari": [],
+            "pencere": 3,
+            "statik_sahneler": [],
+            "gecisler": [
+              "hard-cut",
+              "flash",
+              "hard-cut",
+              "hard-cut",
+              "karartma"
+            ],
+            "benzersiz_gecis": 3,
+            "gecis_dagilimi": {
+              "flash": 1,
+              "karartma": 1,
+              "hard-cut": 3
+            },
+            "acilis_hareketi": "push-in",
+            "kapanis_hareketi": "data-reveal",
+            "acilis_kapanis_ayri": true
+          }
+        }
+      },
+      "sorunlar": [
+        {
+          "kod": "SHOT-COK-KISA",
+          "seviye": "warn",
+          "scene_id": "s001",
+          "beat_id": "b001",
+          "detay": "0.862 sn < 1.5 sn",
+          "oneri": "komsu beat ile birlestir"
+        },
+        {
+          "kod": "SUREKLILIK-AYNI-SAGLAYICI",
+          "seviye": "uyari",
+          "scene_id": "",
+          "beat_id": "b002",
+          "detay": "ardil ayni saglayici (nasa)",
+          "oneri": "alternatif varlik/kadraj/hareket sec"
+        },
+        {
+          "kod": "SUREKLILIK-AYNI-SAGLAYICI",
+          "seviye": "uyari",
+          "scene_id": "",
+          "beat_id": "b003",
+          "detay": "ardil ayni saglayici (nasa)",
+          "oneri": "alternatif varlik/kadraj/hareket sec"
+        },
+        {
+          "kod": "SUREKLILIK-AYNI-SAGLAYICI",
+          "seviye": "uyari",
+          "scene_id": "",
+          "beat_id": "b004",
+          "detay": "ardil ayni saglayici (nasa)",
+          "oneri": "alternatif varlik/kadraj/hareket sec"
+        },
+        {
+          "kod": "SAGLAYICI-TEKEL",
+          "seviye": "warn",
+          "scene_id": "",
+          "beat_id": "",
+          "detay": "tek saglayici %100 (tavan %40): nasa",
+          "oneri": "alternatif saglayici adayi kullan ya da coverage_gap birak"
+        }
+      ],
+      "adapter_kayip_efekt": [
+        {
+          "beat_id": "b001",
+          "spec": "light-sweep",
+          "kayip": "yonlu isik sizmasi yok, kisa flash"
+        }
+      ],
+      "adapter_remotion_gerekli": [
+        "b001"
+      ]
+    },
+    "efekt_kapsami": {
+      "sayim": {
+        "gercek": 31,
+        "pseudo": 0,
+        "ffmpeg-yolu": 0,
+        "bilinmeyen": 0,
+        "toplam": 31
+      },
+      "detay": {
+        "gercek": {
+          "push-in": 1,
+          "grain": 5,
+          "vignette": 5,
+          "grade": 5,
+          "light-sweep": 1,
+          "hard-cut": 3,
+          "chapter-title": 2,
+          "pull-out": 1,
+          "flash": 1,
+          "source-label": 3,
+          "slow-drift": 1,
+          "pan-right": 1,
+          "static": 1,
+          "karartma": 1
+        }
+      }
+    },
+    "kapsam_boslugu": [],
+    "elenen_medya": []
+  },
+  "zincir": [
+    {
+      "beat_id": "b001",
+      "scene_id": "s001",
+      "fact_id": "s01",
+      "asset_id": "s01_11206373",
+      "saglayici": "nasa",
+      "lisans": "nasa-public",
+      "sure_sn": 0.862,
+      "bas_sn": 0.0,
+      "cekim_turu": "close-detail",
+      "hareket": "push-in",
+      "kadraj": "tam",
+      "motion": [
+        "push-in",
+        "grain",
+        "vignette",
+        "grade",
+        "light-sweep",
+        "hard-cut",
+        "chapter-title"
+      ],
+      "gecis": [
+        "hard-cut"
+      ],
+      "altyazi_adet": 1,
+      "tipografi": [
+        "chapter-title"
+      ],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "hook"
+    },
+    {
+      "beat_id": "b002",
+      "scene_id": "s001",
+      "fact_id": "s01",
+      "asset_id": "s01y1_95292052",
+      "saglayici": "nasa",
+      "lisans": "nasa-public",
+      "sure_sn": 1.725,
+      "bas_sn": 0.862,
+      "cekim_turu": "close-detail",
+      "hareket": "pull-out",
+      "kadraj": "punch-1.35",
+      "motion": [
+        "pull-out",
+        "grain",
+        "vignette",
+        "grade",
+        "flash",
+        "source-label"
+      ],
+      "gecis": [
+        "flash"
+      ],
+      "altyazi_adet": 1,
+      "tipografi": [],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "hook"
+    },
+    {
+      "beat_id": "b003",
+      "scene_id": "s002",
+      "fact_id": "s02",
+      "asset_id": "s03_47380190",
+      "saglayici": "nasa",
+      "lisans": "nasa-public",
+      "sure_sn": 4.738,
+      "bas_sn": 2.587,
+      "cekim_turu": "medium",
+      "hareket": "slow-drift",
+      "kadraj": "ust",
+      "motion": [
+        "slow-drift",
+        "grain",
+        "vignette",
+        "grade",
+        "hard-cut",
+        "source-label"
+      ],
+      "gecis": [
+        "hard-cut"
+      ],
+      "altyazi_adet": 2,
+      "tipografi": [],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "aciklama"
+    },
+    {
+      "beat_id": "b004",
+      "scene_id": "s003",
+      "fact_id": "s03",
+      "asset_id": "s02_76221487",
+      "saglayici": "nasa",
+      "lisans": "nasa-public",
+      "sure_sn": 4.9,
+      "bas_sn": 7.325,
+      "cekim_turu": "medium",
+      "hareket": "pan-right",
+      "kadraj": "punch-1.6",
+      "motion": [
+        "pan-right",
+        "grain",
+        "vignette",
+        "grade",
+        "hard-cut",
+        "source-label"
+      ],
+      "gecis": [
+        "hard-cut"
+      ],
+      "altyazi_adet": 1,
+      "tipografi": [],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "aciklama"
+    },
+    {
+      "beat_id": "b005",
+      "scene_id": "s004",
+      "fact_id": "s04",
+      "asset_id": "",
+      "saglayici": "",
+      "lisans": "",
+      "sure_sn": 4.825,
+      "bas_sn": 12.225,
+      "cekim_turu": "data",
+      "hareket": "data-reveal",
+      "kadraj": "tam",
+      "motion": [
+        "static",
+        "grain",
+        "vignette",
+        "grade",
+        "chapter-title",
+        "karartma"
+      ],
+      "gecis": [
+        "karartma"
+      ],
+      "altyazi_adet": 1,
+      "tipografi": [
+        "chapter-title"
+      ],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "sonuc"
+    }
+  ],
+  "ffprobe": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "codec_type": "video",
+        "width": 1920,
+        "height": 1080,
+        "r_frame_rate": "30/1",
+        "side_data_list": [
+          {}
+        ]
+      },
+      {
+        "codec_name": "aac",
+        "codec_type": "audio",
+        "sample_rate": "48000",
+        "channels": 2,
+        "r_frame_rate": "0/0"
+      }
+    ],
+    "format": {
+      "duration": "17.109333",
+      "size": "33228112",
+      "bit_rate": "15536835"
+    }
+  },
+  "video_ses_olcumu": {
+    "codec": "h264",
+    "ornekleme_hz": 0,
+    "kanal": 0,
+    "sure_sn": 17.109,
+    "lufs": -14.36,
+    "tepe_dbtp": -4.09,
+    "lra": 3.6,
+    "sessizlikler": [],
+    "sessiz_sn": 0,
+    "sessiz_pct": 0.0,
+    "kirpma_var": false
+  },
+  "remaster": {
+    "uygulandi": false,
+    "once": {
+      "codec": "h264",
+      "ornekleme_hz": 0,
+      "kanal": 0,
+      "sure_sn": 17.109,
+      "lufs": -14.36,
+      "tepe_dbtp": -4.09,
+      "lra": 3.6,
+      "sessizlikler": [],
+      "sessiz_sn": 0,
+      "sessiz_pct": 0.0,
+      "kirpma_var": false
+    }
+  },
+  "kesmeler": {
+    "sayi": 7,
+    "anlar": [
+      0.033,
+      0.867,
+      0.9,
+      0.967,
+      2.6,
+      7.333,
+      12.233
+    ]
+  },
+  "post_qa": {
+    "durum": "FAIL",
+    "olcumler": {
+      "video": {
+        "genislik": 1920,
+        "yukseklik": 1080,
+        "fps": 30.0,
+        "codec": "h264",
+        "sure_sn": 17.109333,
+        "boyut_bayt": 33228112
+      },
+      "ses_akisi": {
+        "codec": "aac",
+        "ornekleme": 48000,
+        "kanal": 2
+      },
+      "siyah_araliklar": [
+        {
+          "bas": 12.233333,
+          "bitis": 12.466667,
+          "sure": 0.233333
+        }
+      ],
+      "donmus_araliklar": [
+        {
+          "bas": 12.666667,
+          "sure": 4.066667
+        }
+      ],
+      "kesmeler": [
+        0.0333333,
+        0.866667,
+        0.9,
+        0.966667,
+        2.6,
+        7.333333,
+        12.233333
+      ],
+      "kesme_sayisi": 7,
+      "loudness": {
+        "lufs": -14.36,
+        "tepe_dbtp": -4.09,
+        "lra": 3.6
+      },
+      "sessizlikler": [],
+      "sessizlikler_ince": [],
+      "sure_farki_sn": 0.06,
+      "kalite": {
+        "kapi_acik": true,
+        "miks": {
+          "olculdu": true,
+          "sure_sn": 17.109,
+          "aralik_sayisi": 0,
+          "araliklar": [],
+          "sessiz_sn": 0,
+          "sessiz_orani": 0.0,
+          "sessiz_oran_tavani": 0.15,
+          "sessiz_oran_asildi": false,
+          "olu_final_sn": 0.0,
+          "olu_final_esigi": 0.5,
+          "olu_final_asildi": false,
+          "kaynak_gecis": "sessizlik_ince(d=0.30)"
+        },
+        "ambans": {
+          "olculdu": true,
+          "ambans_lufs": -25.99,
+          "anlatim_lufs": -14.27,
+          "ambans_seviye": 0.5,
+          "seviye_db": -6.02,
+          "ducking": 0.5,
+          "ducking_db": -6.02,
+          "etkin_lufs": -38.03,
+          "etkin_ducksuz_lufs": -32.01,
+          "fark_db": 23.76,
+          "fark_ducksuz_db": 17.74,
+          "esik_db": 30.0,
+          "bastirma_esik_db": 12.0,
+          "duyulabilir": true,
+          "bastiriyor": false,
+          "dengeli": true,
+          "ducking_suz_duyulabilir": true
+        },
+        "optik": {
+          "olculdu": true,
+          "ornek": 67,
+          "ornek_fps": 4,
+          "durgun_esigi": 2.0,
+          "asiri_esigi": 45.0,
+          "warn_sn": 1.5,
+          "fail_sn": 3.0,
+          "genel_ortalama": 13.45,
+          "sahneler": [
+            {
+              "ad": "b001 push-in",
+              "bas_sn": 0.0,
+              "sure_sn": 0.862,
+              "ornek": 3,
+              "ortalama": 41.012,
+              "en_dusuk": 4.994,
+              "en_yuksek": 108.643,
+              "durgun_sn": 0.0,
+              "durgun": false,
+              "asiri": false
+            },
+            {
+              "ad": "b002 pull-out",
+              "bas_sn": 0.862,
+              "sure_sn": 1.725,
+              "ornek": 3,
+              "ortalama": 5.758,
+              "en_dusuk": 5.284,
+              "en_yuksek": 6.494,
+              "durgun_sn": 0.0,
+              "durgun": false,
+              "asiri": false
+            },
+            {
+              "ad": "b003 slow-drift",
+              "bas_sn": 2.587,
+              "sure_sn": 4.738,
+              "ornek": 15,
+              "ortalama": 4.291,
+              "en_dusuk": 3.591,
+              "en_yuksek": 5.065,
+              "durgun_sn": 0.0,
+              "durgun": false,
+              "asiri": false
+            },
+            {
+              "ad": "b004 pan-right",
+              "bas_sn": 7.325,
+              "sure_sn": 4.9,
+              "ornek": 15,
+              "ortalama": 16.208,
+              "en_dusuk": 13.693,
+              "en_yuksek": 17.77,
+              "durgun_sn": 0.0,
+              "durgun": false,
+              "asiri": false
+            },
+            {
+              "ad": "b005 data-reveal",
+              "bas_sn": 12.225,
+              "sure_sn": 4.825,
+              "ornek": 16,
+              "ortalama": 0.178,
+              "en_dusuk": 0.042,
+              "en_yuksek": 2.087,
+              "durgun_sn": 3.75,
+              "durgun": true,
+              "asiri": false,
+              "seviye": "fail",
+              "gerekce": "kesintisiz seri"
+            }
+          ],
+          "ihlaller": [
+            {
+              "ad": "b005 data-reveal",
+              "bas_sn": 12.225,
+              "sure_sn": 4.825,
+              "ornek": 16,
+              "ortalama": 0.178,
+              "en_dusuk": 0.042,
+              "en_yuksek": 2.087,
+              "durgun_sn": 3.75,
+              "durgun": true,
+              "asiri": false,
+              "seviye": "fail",
+              "gerekce": "kesintisiz seri"
+            }
+          ],
+          "en_durgun_sahne": {
+            "ad": "b005 data-reveal",
+            "bas_sn": 12.225,
+            "sure_sn": 4.825,
+            "ornek": 16,
+            "ortalama": 0.178,
+            "en_dusuk": 0.042,
+            "en_yuksek": 2.087,
+            "durgun_sn": 3.75,
+            "durgun": true,
+            "asiri": false,
+            "seviye": "fail",
+            "gerekce": "kesintisiz seri"
+          },
+          "temiz": false
+        },
+        "kenar": {
+          "olculdu": true,
+          "kare": 68,
+          "serit_sutun": 2,
+          "siyah_esigi": 16.0,
+          "ihlal_kare": 6,
+          "ihlal_orani": 0.0882,
+          "ornek_ihlal": [
+            {
+              "kare": 4,
+              "sol": 8.26,
+              "sag": 25.18,
+              "genel": 66.58
+            },
+            {
+              "kare": 5,
+              "sol": 8.28,
+              "sag": 33.57,
+              "genel": 66.0
+            },
+            {
+              "kare": 6,
+              "sol": 8.26,
+              "sag": 40.69,
+              "genel": 65.11
+            }
+          ],
+          "en_koyu_sol": 8.26,
+          "en_koyu_sag": 20.36,
+          "temiz": false
+        }
+      }
+    },
+    "sorunlar": [
+      {
+        "kod": "POST-SIYAH-KARE",
+        "seviye": "fail",
+        "detay": "1 siyah aralik: [{'bas': 12.233333, 'bitis': 12.466667, 'sure': 0.233333}]",
+        "oneri": "karartma gecisini eq-brightness dip'e cevir (fadeblack asimetrik)"
+      },
+      {
+        "kod": "POST-DONMUS-KARE",
+        "seviye": "warn",
+        "detay": "1 donmus aralik: [{'bas': 12.666667, 'sure': 4.066667}]",
+        "oneri": "kisa klibi donguye sokmak yerine baska varlik sec"
+      },
+      {
+        "kod": "POST-OPTIK-DURGUN",
+        "seviye": "fail",
+        "detay": "b005 data-reveal: 4.825 sn sahnede optik hareket ortalamasi 0.178 (esik 2.0), en uzun duragan seri 3.75 sn [kesintisiz seri]",
+        "oneri": "cekime Ken Burns yonu/siddeti ver ya da sahneyi kisalt"
+      },
+      {
+        "kod": "POST-KENAR-SIYAH",
+        "seviye": "fail",
+        "detay": "6/68 karede kenarda siyah bant (en koyu sol 8.26, sag 20.36, esik 16.0) — kamera kadrajdan tasiyor",
+        "oneri": "motion._guvenli_pay hesabini kontrol et; pan payi (S-1)/(2S) sinirini asmamali"
+      }
+    ],
+    "komutlar": [
+      {
+        "ad": "ffprobe",
+        "komut": "ffprobe -v error -select_streams v:0 -show_entries ...",
+        "rc": 0
+      },
+      {
+        "ad": "ffprobe_ses",
+        "komut": "ffprobe -v error -select_streams a:0 -show_entries ...",
+        "rc": 0
+      },
+      {
+        "ad": "siyah",
+        "komut": "ffmpeg -nostdin -i /Users/polatcan/vidrush-docker/outputs/sample/editorv2_teknoloji_i20.mp4 -vf blackdetect=d=0.05:pix_th=0.10 ...",
+        "rc": 0
+      },
+      {
+        "ad": "donmus",
+        "komut": "ffmpeg -nostdin -i /Users/polatcan/vidrush-docker/outputs/sample/editorv2_teknoloji_i20.mp4 -vf freezedetect=n=0.003:d=1.0 ...",
+        "rc": 0
+      },
+      {
+        "ad": "kesme",
+        "komut": "ffmpeg -nostdin -i /Users/polatcan/vidrush-docker/outputs/sample/editorv2_teknoloji_i20.mp4 -filter:v select='gt(scene,0.12)',showinfo ...",
+        "rc": 0
+      },
+      {
+        "ad": "loudness",
+        "komut": "ffmpeg -nostdin -i /Users/polatcan/vidrush-docker/outputs/sample/editorv2_teknoloji_i20.mp4 -af loudnorm=print_format=json ...",
+        "rc": 0
+      },
+      {
+        "ad": "sessizlik",
+        "komut": "ffmpeg -nostdin -i /Users/polatcan/vidrush-docker/outputs/sample/editorv2_teknoloji_i20.mp4 -af silencedetect=noise=-45dB:d=1.2 ...",
+        "rc": 0
+      },
+      {
+        "ad": "sessizlik_ince",
+        "komut": "ffmpeg -nostdin -i /Users/polatcan/vidrush-docker/outputs/sample/editorv2_teknoloji_i20.mp4 -af silencedetect=noise=-45dB:d=0.30 ...",
+        "rc": 0
+      }
+    ]
+  },
+  "kareler": [
+    {
+      "an_sn": 1.2,
+      "dosya": "outputs/sample/i20_kare_1_2s.png",
+      "bayt": 2537058
+    },
+    {
+      "an_sn": 1.71,
+      "dosya": "outputs/sample/i20_kare_1_71s.png",
+      "bayt": 2509851
+    },
+    {
+      "an_sn": 3.76,
+      "dosya": "outputs/sample/i20_kare_3_76s.png",
+      "bayt": 2407070
+    },
+    {
+      "an_sn": 4.96,
+      "dosya": "outputs/sample/i20_kare_4_96s.png",
+      "bayt": 2400949
+    },
+    {
+      "an_sn": 5.99,
+      "dosya": "outputs/sample/i20_kare_5_99s.png",
+      "bayt": 2459349
+    },
+    {
+      "an_sn": 8.21,
+      "dosya": "outputs/sample/i20_kare_8_21s.png",
+      "bayt": 2186769
+    },
+    {
+      "an_sn": 9.78,
+      "dosya": "outputs/sample/i20_kare_9_78s.png",
+      "bayt": 2225544
+    },
+    {
+      "an_sn": 10.27,
+      "dosya": "outputs/sample/i20_kare_10_27s.png",
+      "bayt": 2205603
+    },
+    {
+      "an_sn": 12.32,
+      "dosya": "outputs/sample/i20_kare_12_32s.png",
+      "bayt": 83195
+    },
+    {
+      "an_sn": 14.54,
+      "dosya": "outputs/sample/i20_kare_14_54s.png",
+      "bayt": 260295
+    },
+    {
+      "an_sn": 16.25,
+      "dosya": "outputs/sample/i20_kare_16_25s.png",
+      "bayt": 271621
+    }
+  ],
+  "kapsam": {
+    "gercek_motor": [
+      "editor.plan.uret (beat/gramer/motion/tipografi/ses/QA-on)",
+      "editor.adapter.donustur",
+      "editor.remotion_v2 dogrula/props_hazirla/render",
+      "Remotion VidrushEditorV2 (Chrome headless + ffmpeg)",
+      "edge-tts anlatim + SentenceBoundary zamanlamasi",
+      "kalite_kapisi ACIK: on-render + render sonrasi"
+    ],
+    "kapsam_disi": [
+      "WEB'DEN MEDYA BULMA — saglayiciya HIC istek atilmadi",
+      "arastirma/fact-check motoru (olgular Faz E manifestinden)",
+      "canli /api/generate hatti",
+      "altyazi ve kaynak kunyesi (sonraki atom)",
+      "ucretli API (maliyet $0.00)"
+    ]
+  }
+}

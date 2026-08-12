@@ -88,6 +88,10 @@ AMBANS_DUCK = 0.5
 
 # ⚠ SABIT GORSEL HAVUZU YOK. Medya `medya.commons` ile konuya gore EDINILIR.
 DETAY_ESIGI = 20.0          # I-13'te olculdu: esik alti kare DUZ GRI cikiyor
+# ⚠ I-21: sahne basina N aday. Bolunen bir sahne IKI beat uretirse `gramer`
+# ikisine FARKLI varlik atayabilsin diye. EK AG CAGRISI YOK — adaylar zaten
+# `ara()`nin dondurdugu listeden geliyor; kota da DEGISMIYOR.
+ADAY_ADEDI = 2
 MEDYA_ONBELLEK = os.path.join(DEPO, "cikti", "_i20_medya")
 SAHNE_SAYISI = len(SAHNE_METINLERI)
 
@@ -333,7 +337,7 @@ def medya_edin():
         else:
             son = edinim.edin(
                 tanim["sorgu"], hedef, en_az_genislik=1920, kesici=kesici,
-                onbellek=onbellek,
+                onbellek=onbellek, adet=ADAY_ADEDI,
                 saglayicilar=[
                     {"ad": "commons", "modul": commons,
                      "sorgu": tanim["sorgu"] + " Iceland"},
@@ -382,6 +386,19 @@ def medya_edin():
             rapor["sahneler"].append(kayit)
             secilen.append(None)
             continue
+        # I-21: yedek adaylari da tasiyalim (bolunen beat icin)
+        aday["yedekler"] = []
+        for _y, _ek in enumerate(son.get("adaylar") or []):
+            if _ek.get("yol") == aday["yol"]:
+                continue
+            _e = dict(_ek)
+            _e["asset_id"] = f"{tanim['kimlik']}y{_y}_{abs(hash(_e.get('orijinal_url') or _e['yol'])) % 10**8}"
+            _e["detay_std"] = gorsel_detay(_e["yol"])
+            _o = _olcu_oku(_e["yol"])
+            _e["genislik"], _e["yukseklik"] = _o
+            if _e["detay_std"] >= DETAY_ESIGI:
+                aday["yedekler"].append(_e)
+        kayit["yedek_aday"] = len(aday["yedekler"])
         rapor["sahneler"].append(kayit)
         secilen.append(aday)
     rapor["basarili"] = sum(1 for s in secilen if s)
@@ -531,6 +548,24 @@ def girdi_kur(secilen, sinirlar, kesim_sn):
             "sure_sn": sure, "toplam_skor": 90 - i,
             "render_kullanilabilir": True,
             "detay_std": se.get("detay_std"), "sahne_amaci": "manzara"})
+        # ⚠ I-21: YEDEK adaylar AYNI scene_id ile manifeste girer. `gramer`
+        # bir sahne iki beat'e bolunurse ikinci beat'e FARKLI varlik atar —
+        # "ayni varlik arka arkaya" kusuru boylece kaynaginda engellenir.
+        for _y in (se.get("yedekler") or []):
+            adaylar.append({
+                "asset_id": _y["asset_id"], "scene_id": sid, "fact_id": fid,
+                "saglayici": _y.get("saglayici"), "lisans": _y.get("lisans"),
+                "tur": "image", "medya_turu": "image",
+                "yerel_yol": _y["yol"], "medya_yolu": _y["yol"],
+                "orijinal_url": _y.get("orijinal_url"),
+                "eser_sahibi": _y.get("eser_sahibi"),
+                "atif_metni": _y.get("atif_metni"),
+                "atif_gerekli": bool(_y.get("atif_gerekli")),
+                "baslik": _y.get("baslik"),
+                "genislik": _y.get("genislik"), "yukseklik": _y.get("yukseklik"),
+                "sure_sn": sure, "toplam_skor": 80 - i,
+                "render_kullanilabilir": True,
+                "detay_std": _y.get("detay_std"), "sahne_amaci": "manzara"})
     return cumleler, {"adaylar": adaylar, "kapsam_bosluklari": []}
 
 

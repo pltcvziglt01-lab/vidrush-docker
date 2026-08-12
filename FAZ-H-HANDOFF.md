@@ -187,6 +187,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-18 ikinci konsept: motor kanıtlandı, medya BLOKE** | `ccb97ce` | ⚠ **origin'e push edildi**, MP4 YOK, deploy YOK |
 | 12 Ağu | **I-19 edinim dayanıklılığı — I-18'in BLOKE'si açıldı** | `888063e` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-20 üçüncü konsept: motor sınandı, render BLOKE** | `beaee8f` | ⚠ **push edildi**, MP4 YOK, deploy YOK |
+| 12 Ağu | **I-21 bölünen beat ayrı varlık alır (dar atom)** | `PENDING` | ⚠ **push edildi**, POST-QA FAIL, MP4 teslim YOK |
 
 ---
 
@@ -3374,3 +3375,63 @@ Bölünen sahneye **ikinci aday** verecek şekilde `medya_edin`i sahne başına
 N aday getirir hale getirmek (sağlayıcı kotasını yükseltmeden). Bu, I-15'ten
 beri üç kez karşımıza çıkan tek yapısal engel; çözülürse üçüncü konsept
 pilotu doğrudan render edilebilir.
+
+---
+
+## 39. FAZ I-21 — BÖLÜNEN BEAT AYNI VARLIĞI PAYLAŞMASIN (dar atom, 12 Ağu)
+
+> **Durum: yerel yeşil, push edildi. Deploy YOK. Maliyet $0.00.**
+> Değişen: `webapp/medya/edinim.py`,
+> `webapp/testler/smoke_konsept3_teknoloji_i20.py`,
+> `webapp/testler/test_faz_i.py` (+ handoff).
+> **Yeni sağlayıcı/mimari YOK.** `pipeline.py`, `server.py`, arayüz, 22 alan,
+> `deploy.sh`, kalite kapıları, sağlayıcı kotası **dokunulmadı**.
+
+### ✅ Dar hedef TUTTU
+
+I-15'ten beri üç kez çıkan tek yapısal engel: bir sahne iki beat'e
+bölündüğünde ikisi **tek adayı paylaşıyor** ve `KALITE-MEDYA-TEKRAR`
+FAIL veriyordu.
+
+`edinim.edin(..., adet=N)` artık **mevcut arama listesinden** N ayrı aday
+seçiyor. Ölçülen kanıt:
+
+| | I-20 | **I-21** |
+|---|---|---|
+| b001 / b002 varlığı | `s01_…` / **`s01_…` (AYNI)** | `s01_…` / **`s01y1_…` (FARKLI)** |
+| PRE-QA | **FAIL** (fail=1) | **WARN (fail=0)** |
+| Render | başlatılmadı | **tamamlandı** (17.109 sn, 1920×1080) |
+
+**Ağ çağrısı sayısı ARTMADI** (testle kilitli: `ara()` yine **1 kez**
+çağrılıyor — 6 aday zaten dönüyordu, I-21'e kadar yalnız ilki kullanılıyordu).
+**Sağlayıcı kotası YÜKSELTİLMEDİ.** Kısmi başarı (2 istendi 1 geldi)
+dürüstçe raporlanıyor.
+
+### ⛔ RENDER KABUL EDİLMİŞ SAYILMAZ — POST-QA FAIL
+
+Render tamamlandı ama **POST-QA FAIL**:
+`POST-SIYAH-KARE` · `POST-OPTIK-DURGUN` · `POST-KENAR-SIYAH`.
+
+Kök neden ölçüldü: bölünme 5 beat üretti, sağlayıcı kotası 4 →
+**b005 medyasız** kaldı ve statik fallback karta düştü
+(optik ortalama **0.178**, 3.75 sn donuk, siyah kare).
+
+Yani I-21 kendi hedefini çözdü, ama **kota ile beat sayısı arasındaki
+uyuşmazlık** yeni yüzeye çıktı. Kapılar bunu **doğru** yakaladı; MP4
+teslim edilmiyor ve testte **BLOKE** olarak duruyor — sessizce PASS
+sayılmadı.
+
+### Ölçülen test sonucu
+
+| Paket | B | C | D | I | Faz I toplam |
+|---|---|---|---|---|---|
+| Zengin venv | 200 | 148 | 95 | **1436** | 0 hata, **1 BLOKE** |
+
+Faz I 1426 → **1436** (+10). BLOKE: I-21 POST-QA — sebebi ölçülmüş yazılı.
+
+### SONRAKİ ATOM (I-22 — dondurma sonrası)
+
+Tek kalan engel net: **beat sayısı sağlayıcı kotasını aşabiliyor.** Doğru
+çözüm kotayı yükseltmek değil, ya (a) bölünmeyi plan aşamasında sahne
+sayısına göre sınırlamak, ya da (b) `medya_edin`i **beat sayısına** göre
+aday getirmek (plan bir kez koşulup beat sayısı öğrenildikten sonra).

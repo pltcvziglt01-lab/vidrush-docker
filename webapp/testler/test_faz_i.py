@@ -5839,13 +5839,66 @@ kontrol("deploy.sh ezme korumasi KORUNDU",
 kontrol("bayraklar HALA varsayilan kapali",
         mkp.ACIK is False and ekp.ACIK is False)
 
+blok("§38d I-21 — bolunen beat AYNI varligi PAYLASMASIN (dar duzeltme)")
+
+# ⚠ N aday MEVCUT arama listesinden secilir: ek AG CAGRISI yok, kota sabit.
+_s21 = _SahteSaglayici("y", [_aday("https://a.test/1.jpg"),
+                             _aday("https://a.test/2.jpg"),
+                             _aday("https://a.test/3.jpg")], {"ok": True})
+with _tf19.TemporaryDirectory() as _d21:
+    _r21 = _ed.edin("q", os.path.join(_d21, "a.jpg"), adet=2, saat=_saat,
+                    saglayicilar=[{"ad": "y", "modul": _s21}])
+    kontrol("⭐ N=2 istenince IKI AYRI aday donuyor",
+            _r21["ok"] and len(_r21["adaylar"]) == 2)
+    kontrol("⭐ adaylarin DOSYA YOLLARI farkli (ayni dosya iki kez degil)",
+            len({a["yol"] for a in _r21["adaylar"]}) == 2,
+            [a["yol"] for a in _r21["adaylar"]])
+    kontrol("⭐ adaylarin URL'leri farkli (ayni varlik degil)",
+            len({a["indirme_url"] for a in _r21["adaylar"]}) == 2)
+    kontrol("ARAMA yalnizca BIR KEZ cagrildi (ag cagrisi ARTMADI)",
+            _s21.ara_sayisi == 1, _s21.ara_sayisi)
+    kontrol("geriye uyumluluk: adet=1 varsayilan, tek aday",
+            len(_ed.edin("q", os.path.join(_d21, "b.jpg"), saat=_saat,
+                         saglayicilar=[{"ad": "z", "modul": _SahteSaglayici(
+                             "z", [_aday("https://b.test/1.jpg")],
+                             {"ok": True})}])["adaylar"]) == 1)
+    # KISMI BASARI: 2 istendi, 1 geldi -> DURUSTCE 1 doner, ok=True
+    _s22 = _SahteSaglayici("k", [_aday("https://c.test/1.jpg")], {"ok": True})
+    _r22 = _ed.edin("q", os.path.join(_d21, "c.jpg"), adet=2, saat=_saat,
+                    saglayicilar=[{"ad": "k", "modul": _s22}])
+    kontrol("KISMI BASARI durustce raporlanir (2 istendi, 1 geldi)",
+            _r22["ok"] and len(_r22["adaylar"]) == 1
+            and _r22["istenen_adet"] == 2)
+kontrol("smoke sahne basina N aday istiyor ve YEDEKLERI manifeste yaziyor",
+        "ADAY_ADEDI = 2" in oku(KOK, "testler/smoke_konsept3_teknoloji_i20.py")
+        and "yedekler" in oku(KOK, "testler/smoke_konsept3_teknoloji_i20.py"))
+kontrol("saglayici kotasi YUKSELTILMEDI",
+        "saglayici_tavani=" not in oku(
+            KOK, "testler/smoke_konsept3_teknoloji_i20.py"))
+
 _R20_YOL = os.path.join(KOK, "..", "outputs", "sample",
                         "teknoloji_i20_rapor.json")
 if not os.path.exists(_R20_YOL):
-    bloke_yaz("I-20 teknoloji pilotu render raporu",
-              "medya EDINILDI (4/4 NASA) ama PLAN seviyesinde BLOKE: acilis "
-              "beat'i bolunup tek adayi paylasiyor, KALITE-MEDYA-TEKRAR FAIL "
-              "— kapi dogru calisti, esik gevsetilmedi, render BASLATILMADI")
+    bloke_yaz("I-20/21 teknoloji pilotu render raporu", "rapor yok")
+else:
+    _R20 = _json.load(open(_R20_YOL, encoding="utf-8"))
+    _z20 = _R20["zincir"]
+    kontrol("⭐ I-21: bolunen beatler AYNI varligi PAYLASMIYOR",
+            len({z["asset_id"] for z in _z20 if z.get("asset_id")})
+            == len([z for z in _z20 if z.get("asset_id")]),
+            [z.get("asset_id") for z in _z20])
+    kontrol("⭐ PRE-QA artik FAIL DEGIL (I-20'de FAIL'di)",
+            _R20["plan"]["qa"]["fail"] == 0, _R20["plan"]["qa"])
+    # ⚠ POST-QA FAIL ise SESSIZCE GECILMEZ — BLOKE yazilir.
+    if _R20["post_qa"]["durum"] == "FAIL":
+        _nedenler = [s["kod"] for s in _R20["post_qa"]["sorunlar"]
+                     if s["seviye"] == "fail"]
+        bloke_yaz("I-21 teknoloji pilotu POST-QA",
+                  f"render TAMAMLANDI ama POST-QA FAIL: {_nedenler} — "
+                  f"medyasiz 5. beat fallback karta dustu (saglayici kotasi 4, "
+                  f"beat 5). Kapi dogru calisti; MP4 KABUL EDILMIS SAYILMAZ.")
+    else:
+        kontrol("POST-QA FAIL degil", True)
 
 
 print(f"\n{'=' * 60}")
