@@ -119,6 +119,15 @@ def normalize(is_id: str, ham: dict, *, kuyruk_sira=None, kuyruk_toplam=None,
         if d not in dususler:
             dususler.append(d)
 
+    # ⚠ FAZ H — QA FAIL ISI "BASARILI" GOSTERMEZ.
+    # Kullanici kurali: "QA FAIL ise is basarili gorunmesin". Videoyu SILMEK
+    # ya da durumu "hata" yapmak yanlis olurdu (dosya var ve indirilebilir),
+    # bu yuzden ayri bir KALITE ekseni tutuluyor: arayuz "Tamamlandi" yerine
+    # "Kalite: BASARISIZ" rozetini kirmizi gosterir.
+    qa = ham.get("qa") or {}
+    kalite = str(qa.get("durum") or "").upper() or "OLCULMEDI"
+    kalite_ok = kalite in ("PASS", "KAPALI")
+
     yeni = {
         # ── YENI SOZLESME ──
         "job_id": is_id,
@@ -130,7 +139,10 @@ def normalize(is_id: str, ham: dict, *, kuyruk_sira=None, kuyruk_toplam=None,
         "video_url": str(ham.get("video") or ham.get("video_url") or ""),
         "cover_url": str(ham.get("kapak") or ham.get("cover_url") or ""),
         "error": str(ham.get("hata") or ham.get("error") or ""),
-        "qa": ham.get("qa") or {},
+        "qa": qa,
+        # PASS/WARN/FAIL/OLCULEMEDI/OLCULMEDI/KAPALI
+        "kalite": kalite,
+        "kalite_ok": kalite_ok,
         "attribution": ham.get("atiflar") or ham.get("attribution") or [],
         "sources": ham.get("kaynaklar") or [],
         "research": arastirma,

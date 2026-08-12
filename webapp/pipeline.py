@@ -31,6 +31,7 @@ import uret as uretmod  # seslendir, altyazi_parcala (DIKKAT: bu dosyada 'uret' 
 
 import kaynak  # YT/Pexels footage + Magnific upscale
 import arastirma_kopru  # Faz H: arastirma motorunu bu hatta baglar (bkz. modul basligi)
+import qa_kopru         # Faz H: render sonrasi kalite kapisi (bkz. modul basligi)
 
 OPENAI_KEY = os.environ.get("OPENAI_KEY", "")
 STUDYO = os.path.join(KOK_YOL, "render-studio")
@@ -4344,6 +4345,28 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # ── FAZ H: MEDYA KAPISI — reddedilen adaylar GORUNUR olur ──
     # Sessiz dusus yasak: kapi bir klibi attiysa kullanici NEDEN atildigini
     # gorebilmeli. Uydurma yok, gercek red kayitlari.
+    # ── FAZ H: KALITE KAPISI — render sonrasi GERCEK olcum ──
+    # ⚠ editor/qa_son.py Faz C'de yazilmisti ama pipeline onu HIC cagirmiyordu;
+    # is sozlesmesindeki `qa` alani HER ZAMAN bos sozlukttu ve video hicbir
+    # olcumden gecmeden "Hazir!" diye teslim ediliyordu.
+    # FAIL ise is basarili GORUNMEZ (bkz. is_sozlesme.kalite_durumu) ve
+    # UCRETSIZ + DETERMINISTIK bir duzeltme (ses remaster) denenir.
+    try:
+        _qa = qa_kopru.denetle(
+            son_video, bildir=bildir,
+            beklenen={"sure_sn": sonuc["sure"],
+                      "cekim_sayisi": sonuc["sahne_sayisi"],
+                      "genislik": 1920, "yukseklik": 1080})
+        sonuc["qa"] = qa_kopru.ozet(_qa)
+        sonuc["dususler"].extend(qa_kopru.dususe_cevir(_qa))
+    except Exception as e:
+        # QA HATTI COKERTMEZ — video yine teslim edilir, ama PASS DENMEZ.
+        print(f"  QA kopru hatasi: {str(e)[:120]}", file=sys.stderr)
+        sonuc["qa"] = {"durum": "OLCULEMEDI", "not": str(e)[:160]}
+        sonuc["dususler"].append({
+            "asama": "qa", "neden": f"{type(e).__name__}",
+            "etki": "Kalite ölçümü yapılamadı; PASS olduğu varsayılmıyor."})
+
     try:
         _redler = kaynak.kapi_redleri()
         if _redler:

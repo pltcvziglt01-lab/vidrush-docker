@@ -128,8 +128,17 @@ export function isKart(is) {
   const kaynakSayi = Number(is.research?.kaynak_sayisi ?? 0);
   const olguSayi = Number(is.research?.dogrulanmis_iddia ?? 0);
 
+  // ⚠ FAZ H: QA FAIL ise kart "Tamamlandı" DEMEZ. Video indirilebilir kalir
+  // ama rozet kalite kapısının sonucunu dürüstçe söyler.
+  const kalite = String(is.kalite || '').toUpperCase();
+  const kaliteKotu = kalite === 'FAIL';
+  const kaliteBelirsiz = kalite === 'OLCULEMEDI' || kalite === 'OLCULMEDI';
   const durumEtiket = hataMi ? etiket('Hata', 'hata')
-    : bittiMi ? etiket('Tamamlandı', 'iyi')
+    : bittiMi
+      ? (kaliteKotu ? etiket('Kalite: BAŞARISIZ', 'hata')
+        : kalite === 'WARN' ? etiket('Tamamlandı (uyarılı)', 'uyari')
+          : kaliteBelirsiz ? etiket('Tamamlandı — ölçülemedi', 'uyari')
+            : etiket('Tamamlandı', 'iyi'))
       : etiket(is.stage_ad || (durumHam === 'queued' ? 'Sırada' : 'Üretimde'),
         'uyari');
 
@@ -161,6 +170,26 @@ export function isKart(is) {
             kac(is.research.manifest)}" download>
             ${ikon('bilgi', {boyut: 16})} Araştırma manifesti</a>` : ''}
       </div>` : ''}
+    ${bittiMi && is.qa && is.qa.durum ? `
+      <details class="gelismis iskart-dusus" ${kaliteKotu ? 'open' : ''}>
+        <summary><span>Kalite ölçümü: ${kac(kalite)}</span></summary>
+        <div class="gelismis-ic"><ul class="kucuk orta">
+          ${is.qa.cozunurluk ? `<li>Çözünürlük: ${kac(is.qa.cozunurluk)}${
+            is.qa.fps ? ` · ${kac(String(is.qa.fps))} fps` : ''}</li>` : ''}
+          ${is.qa.sure_sn != null ? `<li>Süre: ${kac(String(is.qa.sure_sn))} sn</li>` : ''}
+          ${is.qa.lufs != null ? `<li>Ses: ${kac(String(is.qa.lufs))} LUFS${
+            is.qa.tepe_dbtp != null ? ` · tepe ${kac(String(is.qa.tepe_dbtp))} dBTP` : ''}</li>` : ''}
+          <li>Siyah aralık: ${kac(String(is.qa.siyah_aralik ?? '—'))} ·
+              Donmuş: ${kac(String(is.qa.donmus_aralik ?? '—'))}</li>
+          ${(is.qa.sorunlar || []).map((s) =>
+            `<li><strong>${kac(s.seviye || '')}</strong> ${kac(s.kod || '')}:
+             ${kac(s.detay || '')}</li>`).join('')}
+          ${is.qa.retry && is.qa.retry.denendi
+            ? `<li>Düzeltme denendi (${kac(is.qa.retry.tur || '')}): ${
+              is.qa.retry.basarili ? 'başarılı' : 'başarısız'}</li>` : ''}
+          ${is.qa.not ? `<li>${kac(is.qa.not)}</li>` : ''}
+        </ul></div>
+      </details>` : ''}
     ${bittiMi && (kaynakSayi || olguSayi) ? `
       <div class="iskart-satir kucuk orta">
         ${etiket(`${kaynakSayi} kaynak`)}${etiket(`${olguSayi} doğrulanmış olgu`)}

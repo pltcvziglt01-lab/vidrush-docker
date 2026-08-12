@@ -450,6 +450,70 @@ if shutil.which("python3"):
         else:
             kontrol("pyflakes: tanimsiz isim YOK", not _tanimsiz, str(_tanimsiz[:3]))
 
+# ═══════════════ 6c. QA KAPISI (Faz H6) ═══════════════
+blok("6c. Render sonrasi kalite kapisi")
+
+import qa_kopru  # noqa: E402
+
+PIPE = oku(KOK, "pipeline.py")
+kontrol("pipeline qa_kopru'yu IMPORT ediyor", "import qa_kopru" in PIPE)
+kontrol("pipeline QA'yi CAGIRIYOR", "qa_kopru.denetle(" in PIPE)
+kontrol("QA sonucu ise yaziliyor", 'sonuc["qa"] = qa_kopru.ozet(' in PIPE)
+kontrol("QA dususleri GORUNUR", "qa_kopru.dususe_cevir(" in PIPE)
+kontrol("QA hattı cokertmiyor (try/except sarmali)",
+        "QA kopru hatasi" in PIPE)
+
+# ⚠ ANAHTAR ADI REGRESYONU: ozet() qa_son'un GERCEK anahtarlarini okumali.
+# Ilk surumde "sure"/"I"/"Peak" yaziyordu; o adlar qa_son'da YOK ve sure ile
+# LUFS arayuzde HEP bos gorunuyordu.
+QAK = oku(KOK, "qa_kopru.py")
+for _anahtar in ('v.get("sure_sn")', 'ln.get("lufs")', 'ln.get("tepe_dbtp")'):
+    kontrol(f"ozet dogru anahtari okuyor: {_anahtar}", _anahtar in QAK)
+
+_bos = qa_kopru.ozet({})
+kontrol("bos QA ozeti cokmuyor", _bos["durum"] == "OLCULMEDI")
+kontrol("olculemedi PASS SAYILMIYOR",
+        qa_kopru.dususe_cevir({"durum": "OLCULEMEDI"})[0]["asama"] == "qa")
+kontrol("PASS dusus uretmiyor", qa_kopru.dususe_cevir({"durum": "PASS"}) == [])
+kontrol("FAIL dusus uretiyor",
+        len(qa_kopru.dususe_cevir({"durum": "FAIL", "sorunlar": []})) == 1)
+kontrol("olmayan dosya OLCULEMEDI doner",
+        qa_kopru.denetle("/yok/olan.mp4")["durum"] == "OLCULEMEDI")
+kontrol("QA_KAPISI env ile kapatilabilir", 'os.environ.get("QA_KAPISI"' in QAK)
+kontrol("retry UCRETSIZ ve deterministik (ses remaster)",
+        "_ses_yeniden_master" in QAK and "loudnorm" in QAK)
+kontrol("retry PARA HARCAYAN yol denemiyor",
+        "referansli_gorsel" not in QAK and "oai_chat" not in QAK)
+
+# Sozlesme: QA FAIL isi basarili GOSTERMEZ
+_f = is_sozlesme.normalize("j", {"durum": "bitti", "qa": {"durum": "FAIL"}})
+kontrol("QA FAIL -> kalite alani FAIL", _f["kalite"] == "FAIL")
+kontrol("QA FAIL -> kalite_ok False", _f["kalite_ok"] is False)
+_p = is_sozlesme.normalize("j", {"durum": "bitti", "qa": {"durum": "PASS"}})
+kontrol("QA PASS -> kalite_ok True", _p["kalite_ok"] is True)
+_y = is_sozlesme.normalize("j", {"durum": "bitti"})
+kontrol("QA yoksa OLCULMEDI (PASS varsayilmiyor)", _y["kalite"] == "OLCULMEDI")
+kontrol("QA yoksa kalite_ok False", _y["kalite_ok"] is False)
+
+kontrol("arayuz FAIL'de 'Tamamlandi' DEMIYOR",
+        "Kalite: BAŞARISIZ" in BILESEN and "kaliteKotu" in BILESEN)
+kontrol("arayuz QA olcumlerini gosteriyor",
+        "Kalite ölçümü" in BILESEN and "is.qa.lufs" in BILESEN)
+kontrol("arayuz dogru anahtari okuyor (tepe_dbtp)",
+        "is.qa.tepe_dbtp" in BILESEN)
+
+# GERCEK VIDEO uzerinde olcum (pilot ciktisi varsa)
+_pilot = os.environ.get("QA_TEST_VIDEO", "")
+if _pilot and os.path.exists(_pilot):
+    _o = qa_kopru.ozet(qa_kopru.denetle(_pilot, beklenen={"sure_sn": 60},
+                                        retry=False))
+    kontrol("gercek video: cozunurluk okundu", bool(_o["cozunurluk"]), str(_o))
+    kontrol("gercek video: LUFS okundu", _o["lufs"] is not None, str(_o["lufs"]))
+    kontrol("gercek video: sure okundu", _o["sure_sn"] is not None)
+else:
+    bloke_yaz("gercek video QA olcumu",
+              "QA_TEST_VIDEO ayarlanmadi (opsiyonel)")
+
 # ═══════════════ 7. DERIN SAGLIK ═══════════════
 blok("7. Derin saglik (gercek olcum, anahtar sizmaz)")
 
