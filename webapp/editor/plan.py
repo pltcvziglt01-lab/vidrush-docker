@@ -16,7 +16,8 @@ import os
 import re
 from typing import Optional
 
-from . import adapter, beat, gramer, motion, profil, qa_on, ses, tipografi
+from . import (adapter, beat, gramer, kalite_kapisi, motion, profil, qa_on,
+               ses, tipografi)
 from .profil import EditProfili
 
 
@@ -47,14 +48,24 @@ def _bosluk_indeksle(medya_manifest: dict) -> dict:
 
 
 def _yazi_katmanlari_kur(cekimler: list, beatler: list, adaylar_index: dict,
-                         p: EditProfili) -> tuple:
+                         p: EditProfili,
+                         kare_genislik: Optional[float] = None) -> tuple:
     """Beat/cekimden yazi katmanlarini uret ve cakismalari coz."""
     katmanlar = []
+    baslik_siniri = kart_basligi_siniri(p, kare_genislik)
     for c, b in zip(cekimler, beatler):
         # Bolum basligi: yalnizca perde basinda
         if b.perde == "acilis" and b.beat_id == beatler[0].beat_id:
+            # ⚠ I-15 DUZELTMESI: burada SABIT `b.metin[:42]` dilimi vardi ve
+            # basligi KELIME ORTASINDAN kesiyordu ("20 JULY" -> "20 JU",
+            # I-14'te olculdu). Ayni dosyadaki `_kart_basligi` +
+            # `kart_basligi_siniri` zaten dogru isi yapiyordu ama YALNIZCA
+            # veri-karti fallback yolunda cagriliyordu; I-12 iki yoldan
+            # birini duzeltmisti. Artik iki yol da AYNI hesabi kullaniyor.
             katmanlar.append(tipografi.katman_kur(
-                "chapter-title", (b.metin[:42] or "").upper(), b.bas_sn + 0.2,
+                "chapter-title",
+                _kart_basligi(b.metin, baslik_siniri).upper(),
+                b.bas_sn + 0.2,
                 min(5.5, b.sure_sn + 1.5), fact_id=b.fact_id, p=p))
         # Kanit beat'lerinde alt band (yer/kurum)
         if b.islev == "kanit" and c.ulke:
@@ -99,28 +110,32 @@ def _beat_sayilari(metin: str, sinir: int = 6) -> list:
     return cikti
 
 
-# BUYUK HARF Montserrat Bold ortalama karakter genisligi (em cinsinden).
-# ⚠ `tipografi.guvenli_alan_kontrol` 0.60 kullaniyor ama o KUCUK-BUYUK karisik
-# metin icin; bolum karti metni TAMAMEN BUYUK HARF cizilir ve daha genistir.
-# 0.60 ile hesaplanan baslik ekranda TASIP KIRPILDI (20 sn render, 19. sn).
-BUYUK_HARF_EM = 0.68
-# Bant `maxWidth: 84%` + iki yanda `dolgu*1.2` ic bosluk (Grafikler.tsx).
-BANT_MAKS_ORAN = 0.84
+# ⚠ I-15: em/bant sabitleri ARTIK BURADA TUTULMUYOR. Tek kaynak
+# `kalite_kapisi` — o degerler `Grafikler.tsx`ten okundu ve QA kapisi da ayni
+# sayilari kullaniyor. Iki ayri aritmetik tutmak I-14'te olculen kusurun ta
+# kendisiydi: plan 0.68 ile hesapliyor, render 0.72 + `letterSpacing` ile
+# ciziyordu; ikisi ayrisinca baslik kirpiliyordu.
+BUYUK_HARF_EM = kalite_kapisi.EM_BUYUK_HARF
+BANT_MAKS_ORAN = kalite_kapisi.BANT_MAKS_ORAN
 
 
-def kart_basligi_siniri(p: EditProfili) -> int:
+def kart_basligi_siniri(p: EditProfili,
+                        kare_genislik: Optional[float] = None) -> int:
     """Bolum kartina KAC KARAKTER sigar? Kirpilma olmasin diye HESAPLANIR.
 
-    ⚠ Onceki surum sabit 42 karakter kullaniyordu; punto 60'ta bant
-    `overflow: hidden` ile metni KIRPIYORDU ("...ELEPHANT ISLAN"). Sinir artik
-    puntodan ve kare genisliginden turetilir, guvenlik payi birakilir.
+    ⚠ `kare_genislik` GERCEK render olcusudur. Verilmezse profilin nominal
+    genisligine duser — ama I-14'te olculdu ki ikisi ayrilabiliyor
+    (profil 1920, render 1280) ve sinir o zaman IKI KATI fazla cikiyor.
+
+    ⚠ `kucultme_tabani=1.0`: sinir TAM PUNTODA sigacak sekilde verilir.
+    Render tarafinin %30'a kadar kucultme guvencesi (Grafikler.tsx) boylece
+    bir GERI DUSUS agi olarak kalir, normal calisma sarti olmaz — baslik
+    tasarlandigi boyutta cizilir.
     """
-    punto = max(1, int(p.tipografi.bolum_basligi))
-    dolgu = round(punto * 0.42)
-    kullanilabilir = p.genislik * BANT_MAKS_ORAN - 2 * dolgu * 1.2
-    tahmin = int(kullanilabilir / (punto * BUYUK_HARF_EM))
-    # %10 guvenlik payi: font metrikleri tahminidir, kirpmaktansa kisalt.
-    return max(12, int(tahmin * 0.90))
+    return max(12, kalite_kapisi.sigan_karakter(
+        max(1, int(p.tipografi.bolum_basligi)),
+        float(kare_genislik or p.genislik),
+        kucultme_tabani=1.0))
 
 
 # Baslik sonunda yalniz kalmamasi gereken edat/baglac/artikel.
@@ -155,7 +170,8 @@ def _kart_basligi(metin: str, sinir: int = 42) -> str:
     return ham.rstrip(" ,;:-—")
 
 
-def _motion_kur(cekimler: list, beatler: list, p: EditProfili) -> list:
+def _motion_kur(cekimler: list, beatler: list, p: EditProfili,
+                kare_genislik: Optional[float] = None) -> list:
     """Her beat icin motion spec listesi (beat_id ile etiketli)."""
     specler = []
     for i, (c, b) in enumerate(zip(cekimler, beatler)):
@@ -182,7 +198,8 @@ def _motion_kur(cekimler: list, beatler: list, p: EditProfili) -> list:
                 # Sayi yoksa PROFESYONEL BOLUM KARTI: baslik guvenli izgarada,
                 # uydurma gosterge YOK. Bosluk rastgele stokla da kapanmaz.
                 yerel.append(motion.bolum_basligi_spec(
-                    _kart_basligi(b.metin, kart_basligi_siniri(p)),
+                    _kart_basligi(b.metin,
+                                  kart_basligi_siniri(p, kare_genislik)),
                     b.sure_sn, p=p))
         if b.islev == "hook" and i == 0:
             yerel.append(motion.light_sweep_spec(min(0.9, b.sure_sn * 0.4)))
@@ -265,9 +282,11 @@ def uret(*, cumleler: list, medya_manifest: dict,
         bplan.beatler, sahne_adaylari=sahne_adaylari,
         kapsam_bosluklari=bosluklar, saglayici_tavani=saglayici_tavani)
     # 3) MOTION
-    specler = _motion_kur(cekimler, bplan.beatler, p)
+    _kare_gen = (kare_olcu or (None,))[0]
+    specler = _motion_kur(cekimler, bplan.beatler, p, _kare_gen)
     # 4) TIPOGRAFI
-    katmanlar, tipo_rapor = _yazi_katmanlari_kur(cekimler, bplan.beatler, index, p)
+    katmanlar, tipo_rapor = _yazi_katmanlari_kur(
+        cekimler, bplan.beatler, index, p, _kare_gen)
     # ⚠ Cozulmus yazi katmanlari MOTION SPEC'e cevrilir. Ilk surumde katmanlar
     # yalnizca edit_manifest'te duruyordu; render_plan'a girmedigi icin adapter
     # bolum basligini ve kaynak yazisini GOREMIYORDU (test yakaladi) — yani

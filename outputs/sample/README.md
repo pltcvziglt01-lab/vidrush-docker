@@ -1,11 +1,50 @@
 # EditorV2 render örnekleri
 
-Bu dizinde **iki** örnek var:
+Bu dizinde **üç** örnek var:
 
 | Dosya | Ne | Betik |
 |---|---|---|
-| `editorv2_quality_voice_10sn.mp4` | **10 sn Apollo 11 mini-belgeseli, kaliteli anlatıcı sesli** | `webapp/testler/smoke_kaliteli_ses_10sn.py` |
+| `editorv2_kalite_pass_i15.mp4` | ⭐ **12.8 sn Apollo belgeseli — kalite kapısı AÇIK ve PASS** | `webapp/testler/smoke_kalite_pass_i15.py` |
+| `editorv2_quality_voice_10sn.mp4` | 10 sn Apollo mini-belgeseli (I-13; kapı açıkken **FAIL(4)** verir) | `webapp/testler/smoke_kaliteli_ses_10sn.py` |
 | `editorv2_smoke_20sn.mp4` | 20 sn motor smoke (sessiz anlatım, konu uyuşmazlıklı) | `webapp/testler/smoke_editorv2_20sn.py` |
+
+---
+
+# 0) ⭐ I-15 — kalite kapısı AÇIKKEN PASS üreten Apollo belgeseli
+
+```bash
+python3 webapp/testler/smoke_kalite_pass_i15.py
+```
+
+I-14 kapıları kurdu ve I-13 çıktısı açık kapıda **FAIL(4)** verdi. Bu örnek
+aynı Apollo fixture'ıyla **gerçekten düzeltilmiş** çıktıdır.
+
+| Ölçüm | I-13 (10 sn) | **I-15 (12.8 sn)** |
+|---|---|---|
+| Ön-render QA | WARN (fail=0) | WARN (fail=0) |
+| **Kapı açıkken** | **FAIL(4)** | **PASS** |
+| Başlık | `20 JULY` → `20 JU`, 272.5 px taşma | **`THE EAGLE HAS LANDED`, 0 px taşma, tam punto 60** |
+| Sahne süreleri | 3.2 · 3.2 · 3.2 (yayılım 0.0) | **1.637 · 4.051 · 3.224 · 3.825** (yayılım 2.414) |
+| Süre kaynağı | eşit bölme | **edge-tts `SentenceBoundary`** (gerçek anlatım zamanlaması) |
+| Ölü final | 0.903 sn | **0.0 sn** |
+| Ambiyans | anlatımın 57.1 dB altında (duyulmaz) | **23.1 dB altında — duyulabilir, bastırmıyor** |
+| Miks | −16.56 LUFS | **−14.87 LUFS / TP −4.0 / kırpma yok** |
+| Kare | 3 | **9** (hepsi görsel incelendi) |
+
+**Dört gerçek düzeltme:** `plan.py`'nin sabit `[:42]` dilimi kaldırıldı ve
+sınır gerçek render genişliğinden (1280) hesaplanıyor · TSX sığdırma hesabı
+artık `letterSpacing`'i sayıyor · süreler `SentenceBoundary`'den türetiliyor ·
+`anlatim_araliklari` geçirildiği için ducking artık tüm videoya değil yalnızca
+konuşma aralıklarına uygulanıyor.
+
+**Dürüst sınırlar:** medya çeşitliliği için hiçbir eşik düşürülmedi; ölçülen en
+yüksek ikili benzerlik **0.6094** (eşik 0.86 — I-14'ten değişmedi) ve fixture
+havuzunun en çeşitli 4'lüsü zaten seçili. Yalnızca **sıra** değiştirilerek
+komşu benzerliği 0.6094 → 0.5312'ye indirildi. Altyazı, kaynak künyesi ve
+1080p **hâlâ kapsam dışı**. edge-tts prosodisi çağrıdan çağrıya biraz
+değiştiği için süreler bit-bit tekrar üretilebilir değildir.
+
+---
 
 ---
 

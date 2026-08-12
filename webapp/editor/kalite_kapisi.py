@@ -371,6 +371,11 @@ SESSIZ_ORAN_TAVANI = 0.15
 # altinda tutulur; 30 dB alti anlatimin maskeleme tabanina girer. Parametre
 # olarak disari acildi ki kalibre edilebilsin.
 DUYULABILIR_FARK_DB = 30.0
+# ⚠ ALT SINIR (I-15): "duyulabilir" tek basina yetmez — ambiyans anlatima
+# fazla yaklasirsa SOZU BOGAR. Ayni yayin pratiginin diger ucu: yatak sesi
+# konusmanin 12 dB'den fazla yakinina cikmamali. Bu da beyan edilmis tasarim
+# esigidir, dinleme testi degil.
+BASTIRMA_FARK_DB = 12.0
 
 
 def _oran_db(oran: float) -> float:
@@ -385,8 +390,8 @@ def ambans_duyulabilirligi(*, ambans_lufs: Optional[float],
                            anlatim_lufs: Optional[float],
                            ambans_seviye: float = 1.0,
                            ducking: float = 1.0,
-                           duyulabilir_fark_db: float = DUYULABILIR_FARK_DB
-                           ) -> dict:
+                           duyulabilir_fark_db: float = DUYULABILIR_FARK_DB,
+                           bastirma_fark_db: float = BASTIRMA_FARK_DB) -> dict:
     """Ambiyans yatagi anlatimin altinda DUYULABILIR seviyede mi?
 
     I-13'te olculen zincir:
@@ -422,7 +427,12 @@ def ambans_duyulabilirligi(*, ambans_lufs: Optional[float],
         "fark_db": round(fark, 2),
         "fark_ducksuz_db": round(n - etkin_ducksuz, 2),
         "esik_db": duyulabilir_fark_db,
+        "bastirma_esik_db": bastirma_fark_db,
         "duyulabilir": bool(fark <= duyulabilir_fark_db),
+        # ⚠ Ust sinir kadar ALT sinir da var: cok yakinsa sozu bogar.
+        "bastiriyor": bool(fark < bastirma_fark_db),
+        # Ikisi birden: hem duyulur hem anlatimi bogmaz.
+        "dengeli": bool(bastirma_fark_db <= fark <= duyulabilir_fark_db),
         # Ducking sifirlansa bile duyulur mu? Kusurun kaynagini ayirt eder.
         "ducking_suz_duyulabilir": bool((n - etkin_ducksuz)
                                         <= duyulabilir_fark_db),

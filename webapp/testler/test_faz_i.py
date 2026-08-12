@@ -3936,7 +3936,7 @@ kontrol("kapsam DISI acikca yaziliyor (altyazi/kunye/1080p/motion)",
 # Render sabitleri TSX'ten OKUNDU mu — uydurma degil, eslesme testli.
 _TSX = oku(KOK, "..", "app/render-studio/src/editorv2/Grafikler.tsx")
 kontrol("EM_BUYUK_HARF TSX ile ayni (0.72)",
-        _kk.EM_BUYUK_HARF == 0.72 and "* 0.72" in _TSX)
+        _kk.EM_BUYUK_HARF == 0.72 and "0.72" in _TSX)
 kontrol("BANT_MAKS_ORAN TSX ile ayni (0.84)",
         _kk.BANT_MAKS_ORAN == 0.84 and "width * 0.84" in _TSX)
 kontrol("DOLGU_ORANI TSX ile ayni (0.42)",
@@ -3945,10 +3945,13 @@ kontrol("KUCULTME_TABANI TSX ile ayni (0.7)",
         _kk.KUCULTME_TABANI == 0.70 and "Math.max(0.7" in _TSX)
 kontrol("HARF_ARALIGI_EM TSX letterSpacing'inden (0.01em)",
         _kk.HARF_ARALIGI_EM == 0.01 and "letterSpacing: '0.01em'" in _TSX)
-# ⚠ ASIL BULGU: TSX'in KENDI sigdirma hesabi letterSpacing'i saymiyor.
-kontrol("OLCULEN BOSLUK: TSX sigdirma hesabi letterSpacing'i SAYMIYOR",
-        "yaziMetni.length * puntoTaban * 0.72" in _TSX
-        and "letterSpacing" not in _TSX.split("tahminiGenislik")[1][:200])
+# ⚠ BU KONTROL I-14'te bir BILINEN KUSURU kilitliyordu ("TSX sigdirma hesabi
+# letterSpacing'i SAYMIYOR"). I-15 o kusuru KAPATTI, bu yuzden kontrol
+# SILINMEDI — duzeltilmis davranisi kilitleyecek sekilde CEVRILDI.
+# Kuralin niyeti ayni: plan ile render AYNI genislik aritmetigini kullanmali.
+kontrol("I-15: TSX sigdirma hesabi letterSpacing'i ARTIK SAYIYOR",
+        "puntoTaban * (0.72 + 0.01)" in _TSX
+        and f"{_kk.EM_BUYUK_HARF} + {_kk.HARF_ARALIGI_EM}" in _TSX)
 
 blok("§32b KIRMIZI KANIT — I-13 10 sn ciktisi (izlenen rapor)")
 
@@ -4332,6 +4335,280 @@ kontrol("kalite kapisi 22 alandan ULASILAMAZ (dahili is ayari)",
 kontrol("I-14 hicbir ucretli/AI cagrisi EKLEMIYOR",
         not re.search(r"openai|anthropic|api_key|xai|freepik",
                       _KK_KAYNAK, re.I))
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# §33  FAZ I-15 — GERCEK DUZELTME + YENIDEN RENDER
+#
+# I-14 kapilari kurdu ve kusurlari OLCTU; bu bolum kusurlarin GERCEKTEN
+# GIDERILDIGINI kilitler. Kanit yine depoda IZLENEN rapordan:
+#     outputs/sample/kalite_pass_i15_rapor.json
+# (video ve kareler `.gitignore`da — betik yerelde yeniden uretir.)
+# ═══════════════════════════════════════════════════════════════════════
+
+blok("§33a KAYNAK DUZELTMELERI — sabit dilim gitti, tek aritmetik kaldi")
+
+
+def _kod_yalniz(kaynak: str) -> str:
+    """Yorum ve dize/docstring'leri ATARAK yalnizca CALISAN kodu don.
+
+    ⚠ Ham dize taramasi modulun KENDI dokumantasyonunu yakaliyor: bu dosyada
+    "b.metin[:42] dilimi vardi" diye bir aciklama var ve naif bir `in`
+    kontrolu kod duzeltilmis olsa bile KIRMIZI yaniyor. Ayni tuzak I-9'da da
+    yasanmisti (AST'ye gecilmisti). Burada tokenize ile ayikliyoruz.
+    """
+    import io
+    import tokenize
+    parcalar = []
+    try:
+        for tok in tokenize.generate_tokens(io.StringIO(kaynak).readline):
+            if tok.type in (tokenize.COMMENT, tokenize.STRING):
+                continue
+            parcalar.append(tok.string)
+    except (tokenize.TokenError, IndentationError):
+        return kaynak
+    return " ".join(parcalar)
+
+
+_PLAN15 = oku(KOK, "editor/plan.py")
+_PLAN15_KOD = _kod_yalniz(_PLAN15)
+kontrol("plan.py SABIT `b.metin[:42]` dilimini ARTIK KULLANMIYOR",
+        "[:42]" not in _PLAN15_KOD.replace(" ", "")
+        and "b.metin[:42]" in _PLAN15,      # yorumda TARIHI olarak duruyor
+        _PLAN15_KOD.replace(" ", "")[:0])
+kontrol("chapter-title artik _kart_basligi + hesaplanan siniri kullaniyor",
+        "_kart_basligi(b.metin, baslik_siniri).upper()" in _PLAN15
+        and "baslik_siniri = kart_basligi_siniri(p, kare_genislik)" in _PLAN15)
+kontrol("kart_basligi_siniri GERCEK kare genisligini aliyor",
+        "def kart_basligi_siniri(p: EditProfili,\n"
+        "                        kare_genislik: Optional[float] = None)"
+        in _PLAN15)
+kontrol("TEK ARITMETIK: plan em/bant sabitlerini kalite_kapisi'ndan aliyor",
+        "BUYUK_HARF_EM = kalite_kapisi.EM_BUYUK_HARF" in _PLAN15
+        and "BANT_MAKS_ORAN = kalite_kapisi.BANT_MAKS_ORAN" in _PLAN15)
+kontrol("sinir TAM PUNTODA hesaplaniyor (kucultme geri dusus agi olarak kalir)",
+        "kucultme_tabani=1.0" in _PLAN15)
+
+_pp15 = _eprofil.profil("premium-modern")
+kontrol("GERCEK render genisliginde sinir DAHA KATI (1920 > 1280)",
+        _ep2.kart_basligi_siniri(_pp15, 1920)
+        > _ep2.kart_basligi_siniri(_pp15, 1280) > 0,
+        (_ep2.kart_basligi_siniri(_pp15, 1920),
+         _ep2.kart_basligi_siniri(_pp15, 1280)))
+kontrol("kare genisligi verilmezse profil olcusune duser (gerileme yok)",
+        _ep2.kart_basligi_siniri(_pp15)
+        == _ep2.kart_basligi_siniri(_pp15, _pp15.genislik))
+# I-13'un tam metniyle: artik ne kesik ne tasan bir baslik cikiyor.
+_HAM15 = "The Eagle landed on the Moon in July, nineteen sixty-nine."
+for _g15 in (1920, 1280):
+    _s15 = _ep2.kart_basligi_siniri(_pp15, _g15)
+    _k15 = _ep2._kart_basligi(_HAM15, _s15).upper()
+    _o15 = _kk.baslik_olcusu(_k15, punto=60, kare_genislik=_g15)
+    kontrol(f"{_g15}: baslik SIGIYOR ve TAM PUNTO (kucultme yok)",
+            _o15["sigar"] is True and _o15["tasma_px"] == 0.0
+            and _o15["uygulanan_punto"] == 60, (_g15, _k15, _o15["tasma_px"]))
+    kontrol(f"{_g15}: baslik kelime ortasindan KESIK DEGIL",
+            _kk.kelime_ortasi_kesik(_HAM15, _k15)["kesik"] is False, _k15)
+
+kontrol("I-15: ambiyans kapisi CIFT TARAFLI (duyulabilir + bastirmiyor)",
+        {"bastiriyor", "dengeli", "bastirma_esik_db"}
+        <= set(_kk.ambans_duyulabilirligi(ambans_lufs=-26.0,
+                                          anlatim_lufs=-14.0).keys()))
+kontrol("ambiyans anlatima COK YAKINSA 'bastiriyor' diyor",
+        _kk.ambans_duyulabilirligi(ambans_lufs=-18.0, anlatim_lufs=-14.0,
+                                   ambans_seviye=1.0,
+                                   ducking=1.0)["bastiriyor"] is True)
+kontrol("dengeli = hem duyulur hem bogmaz",
+        _kk.ambans_duyulabilirligi(ambans_lufs=-26.0, anlatim_lufs=-14.0,
+                                   ambans_seviye=0.5,
+                                   ducking=0.5)["dengeli"] is True)
+kontrol("qa_son POST-AMBANS-BASKIN kodunu tasiyor",
+        "POST-AMBANS-BASKIN" in oku(KOK, "editor/qa_son.py"))
+
+blok("§33b YENIDEN RENDER — kalite kapisi ACIK, olculen sonuc")
+
+_R15_YOL = os.path.join(KOK, "..", "outputs", "sample",
+                        "kalite_pass_i15_rapor.json")
+_R15 = None
+if os.path.exists(_R15_YOL):
+    try:
+        _R15 = _json.load(open(_R15_YOL, encoding="utf-8"))
+    except ValueError:
+        _R15 = None
+if _R15 is None:
+    bloke_yaz("I-15 render raporu", f"yok/bozuk: {_R15_YOL}")
+else:
+    kontrol("rapor kalite kapisinin ACIK oldugunu yaziyor",
+            "ACIK" in str(_R15.get("kalite_kapisi")))
+    kontrol("maliyet $0.00", _R15.get("maliyet_usd") == 0.0)
+
+    # ── (1) BASLIK ──
+    _b15 = _R15["duzeltilen_kusurlar"]["baslik"]
+    kontrol("DUZELDI: baslik render genisliginde SIGIYOR",
+            _b15["olcum"]["sigar"] is True
+            and _b15["olcum"]["tasma_px"] == 0.0, _b15["olcum"]["tasma_px"])
+    kontrol("DUZELDI: baslik TAM PUNTODA cizildi (kucultme tabani vurulmadi)",
+            _b15["olcum"]["kucultme_tabani_vuruldu"] is False
+            and _b15["olcum"]["olcek"] == 1.0)
+    kontrol("DUZELDI: baslik kelime ortasindan KESIK DEGIL",
+            _b15["olcum"]["kelime_kesik"]["kesik"] is False,
+            _b15.get("metin"))
+    kontrol("baslik GERCEK render genisligine gore olculdu (1280)",
+            _b15["kare_genislik"] == 1280)
+
+    # ── (2) SURELER ──
+    _s15r = _R15["duzeltilen_kusurlar"]["sahne_sureleri"]
+    kontrol("DUZELDI: sabit blok YOK — her sahne FARKLI surede",
+            _s15r["benzersiz"] == len(_s15r["sureler"])
+            and len(set(_s15r["sureler"])) == len(_s15r["sureler"]),
+            _s15r["sureler"])
+    kontrol("DUZELDI: sure yayilimi sabit-blok esiginin COK USTUNDE",
+            _s15r["yayilim_sn"] > _kk.SABIT_BLOK_ESIGI_SN * 10,
+            _s15r["yayilim_sn"])
+    kontrol("sureler GERCEK anlatim zamanlamasindan (SentenceBoundary)",
+            "SentenceBoundary" in _s15r["kaynak"]
+            and len(_s15r["cumle_sinirlari"]) == len(_s15r["sureler"]))
+    _rt15 = _kk.ritim_olcusu([{"sure_sn": s} for s in _s15r["sureler"]])
+    kontrol("I-14 ritim kapisi bu surelerde SESSIZ (sabit_blok=False)",
+            _rt15["sabit_blok"] is False)
+    # Sure sinirlari cumle sinirlariyla gercekten ortusuyor mu?
+    _cs15 = _s15r["cumle_sinirlari"]
+    _tur15 = [round((_cs15[i + 1]["bas"] if i + 1 < len(_cs15)
+                     else _R15["duzeltilen_kusurlar"]["olu_final"]["kesim_sn"])
+                    - (0.0 if i == 0 else _cs15[i]["bas"]), 3)
+              for i in range(len(_cs15))]
+    kontrol("sureler cumle sinirlarindan TUREDIGI dogrulandi (yeniden hesap)",
+            all(abs(a - b) < 0.01 for a, b in zip(_tur15, _s15r["sureler"])),
+            (_tur15, _s15r["sureler"]))
+
+    # ── (3) OLU FINAL ──
+    _of15 = _R15["duzeltilen_kusurlar"]["olu_final"]
+    kontrol("DUZELDI: olculen olu final 0.5 sn tavaninin ALTINDA",
+            (_of15["olculen_olu_final_sn"] or 0) <= _kk.OLU_FINAL_ESIGI_SN,
+            _of15["olculen_olu_final_sn"])
+    kontrol("anlatim master anlatim bitisi + kuyruk payindan KESILDI",
+            abs((_of15["anlatim_bitis_sn"] + _of15["kuyruk_sn"])
+                - _of15["kesim_sn"]) < 0.01)
+    kontrol("kuyruk payi tavanin ALTINDA secildi",
+            _of15["kuyruk_sn"] < _kk.OLU_FINAL_ESIGI_SN)
+
+    # ── (4) AMBIYANS + MIKS ──
+    _a15 = _R15["duzeltilen_kusurlar"]["ambiyans"]
+    kontrol("DUZELDI: ambiyans DUYULABILIR",
+            _a15["olcum"]["duyulabilir"] is True, _a15["olcum"]["fark_db"])
+    kontrol("DUZELDI: ambiyans anlatimi BASTIRMIYOR",
+            _a15["olcum"]["bastiriyor"] is False)
+    kontrol("ambiyans DENGELI (iki sinir arasinda)",
+            _a15["olcum"]["dengeli"] is True)
+    kontrol("kok neden giderildi: kaynak -48.7 LUFS'tan yukseltildi",
+            _a15["kaynak_lufs"] < -45 and _a15["normalize_lufs"] > -30,
+            (_a15["kaynak_lufs"], _a15["normalize_lufs"]))
+    kontrol("ASIL DUZELTME: anlatim_araliklari GECIRILDI "
+            "(ducking artik tum videoya uygulanmiyor)",
+            _a15["anlatim_araliklari_gecildi"] is True
+            and "anlatim_araliklari" in oku(
+                KOK, "testler/smoke_kalite_pass_i15.py"))
+    _m15 = _R15["video_ses_olcumu"]
+    kontrol("miks LUFS profil hedefine (-14) 1 dB icinde",
+            abs(_m15["lufs"] + 14.0) <= 1.0, _m15["lufs"])
+    kontrol("true peak tavanin altinda, kirpma yok",
+            _m15["tepe_dbtp"] <= -1.5 and _m15["kirpma_var"] is False,
+            _m15["tepe_dbtp"])
+    kontrol("sessizlik orani tavanin ALTINDA",
+            (_m15["sessiz_pct"] / 100.0) <= _kk.SESSIZ_ORAN_TAVANI,
+            _m15["sessiz_pct"])
+    kontrol("DURUSTLUK: %0 sessizligin NEDENI raporda yaziyor",
+            "ambiyans" in _R15["sessizlik_yorumu"]["neden"]
+            and "anlatim_master_sessizlikleri" in _R15["sessizlik_yorumu"])
+
+    # ── (5) MEDYA CESITLILIGI — DURUST RAPOR, ESIK OYNAMASI YOK ──
+    _c15 = _R15["medya_cesitliligi"]
+    kontrol("SAHTE ESIK DUSURME YOK: esik I-14'teki degeriyle ayni",
+            _c15["esik"] == _kk.BENZERLIK_ESIGI
+            and _c15["esik_degistirildi_mi"] is False)
+    kontrol("hicbir cift esigi asmiyor (kapi hakli olarak sessiz)",
+            len(_c15["esigi_asan"]) == 0)
+    kontrol("DURUST RAPOR: olculen en yuksek benzerlik aciklanmis",
+            isinstance(_c15["en_yuksek"], float)
+            and _c15["en_yuksek"] < _c15["esik"], _c15["en_yuksek"])
+    kontrol("siralama komsu benzerligini DUSURDU (yalniz SIRA degisti)",
+            _c15["siralama"]["sonra_komsu_maks"]
+            <= _c15["siralama"]["once_komsu_maks"]
+            and sorted(_c15["siralama"]["once_sira"])
+            == sorted(_c15["siralama"]["sonra_sira"]),
+            _c15["siralama"])
+    _z15 = _R15["zincir"]
+    _mt15 = _kk.medya_tekrari(_z15)
+    kontrol("ayni varlik tekrari YOK, bitisik tekrar YOK",
+            not _mt15["tekrar_eden_asset"]
+            and not _mt15["bitisik_ayni_asset"])
+    kontrol("her sahnede GERCEK medya var (fallback kart yok)",
+            all(z.get("asset_id") for z in _z15), _z15)
+
+    # ── (6) KAPI SONUCU + KANIT ──
+    kontrol("on-render QA FAIL DEGIL", _R15["plan"]["qa"]["durum"] != "FAIL"
+            and _R15["plan"]["qa"]["fail"] == 0)
+    kontrol("render sonrasi QA FAIL DEGIL",
+            _R15["post_qa"]["durum"] != "FAIL")
+    kontrol("hicbir KALITE-*/POST-* kapisi FAIL uretmedi",
+            not [s for s in _R15["plan"]["on_render_qa"]["sorunlar"]
+                 if s["seviye"] == "fail"]
+            and not [s for s in _R15["post_qa"]["sorunlar"]
+                     if s["seviye"] == "fail"])
+    kontrol("EN AZ 6 kare cikarildi ve gorsel incelendi",
+            len(_R15["kareler"]) >= 6, len(_R15["kareler"]))
+    kontrol("kareler bos/duz degil (her biri > 100 KB)",
+            all(k["bayt"] > 100_000 for k in _R15["kareler"]),
+            [k["bayt"] for k in _R15["kareler"]])
+    kontrol("ffprobe + kesme + ses olcumleri raporda",
+            bool(_R15["ffprobe"].get("streams"))
+            and "sayi" in _R15["kesmeler"]
+            and "lufs" in _R15["video_ses_olcumu"])
+    kontrol("cikti outputs/sample altinda",
+            str(_R15["video"]).startswith("outputs/sample/"))
+    kontrol("sure 10-20 sn araliginda",
+            10.0 <= float((_R15["ffprobe"].get("format") or {}).get(
+                "duration") or 0) <= 20.0)
+    kontrol("kapsam disi DURUSTCE yaziliyor (altyazi/kunye/1080p)",
+            any("altyazi" in k for k in _R15["kapsam"]["kapsam_disi"])
+            and any("1080p" in k for k in _R15["kapsam"]["kapsam_disi"]))
+
+blok("§33c I-15 KORUMALARI — dokunulmamasi gerekenler")
+
+_SM15 = oku(KOK, "testler/smoke_kalite_pass_i15.py")
+# ⚠ Ham tarama betigin KENDI docstring'ini yakaliyordu ("lavfi/testsrc/color
+# KULLANILMAZ" cumlesi). Yalniz CALISAN kod taranir.
+kontrol("smoke ffmpeg test kaynagi (lavfi/testsrc) KULLANMIYOR",
+        not re.search(r"lavfi|testsrc|color=c=", _kod_yalniz(_SM15)))
+kontrol("smoke gercek render zincirini cagiriyor",
+        "edit_kopru.plan_kur" in _SM15 and "remotion_v2.render" in _SM15)
+kontrol("smoke QA FAIL'de render BASLATMIYOR",
+        'if not sonuc["render_edilebilir"]:' in _SM15)
+kontrol("smoke saglayici kotasini YUKSELTMIYOR",
+        "saglayici_tavani=" not in _SM15)
+kontrol("smoke benzerlik esigini DEGISTIRMIYOR",
+        "BENZERLIK_ESIGI =" not in _SM15
+        and "benzerlik_esigi=" not in _SM15)
+kontrol("pipeline.py I-15'te de DEGISMEDI",
+        "kalite_kapisi" not in oku(KOK, "pipeline.py")
+        and "smoke_kalite_pass" not in oku(KOK, "pipeline.py"))
+kontrol("server.py I-15'te de DEGISMEDI",
+        "kalite_kapisi" not in oku(KOK, "server.py"))
+kontrol("22 alanlik generate sozlesmesi I-15'te de DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("UI I-15'te DEGISMEDI",
+        "basitGovde" in oku(KOK, "static/js/wizard.js")
+        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js"))
+kontrol("deploy.sh ezme korumasi KORUNDU",
+        "GERIDE" in open(os.path.join(KOK, "..", "deploy.sh"),
+                         encoding="utf-8").read())
+kontrol("bayraklar HALA varsayilan kapali",
+        mkp.ACIK is False and ekp.ACIK is False
+        and ekp.kalite_kapisi_acik(None) is False)
+kontrol("ikili ciktilar .gitignore'da (mp4/png depoya girmiyor)",
+        "outputs/sample/*.mp4" in oku(KOK, "..", ".gitignore")
+        and "outputs/sample/*.png" in oku(KOK, "..", ".gitignore"))
 
 
 print(f"\n{'=' * 60}")

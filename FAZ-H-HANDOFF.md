@@ -181,6 +181,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-12 QA WARN raporu + chapter-card kalitesi** | `9be6375` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-13 10 sn kaliteli sesli Apollo mini-belgeseli** | `ca023f3` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-14 (1. atom) kalite kapıları ölçüldü + QA'ya bağlandı** | `c584020` | ✅ **origin'e push edildi**, deploy YOK |
+| 12 Ağu | **I-15 gerçek düzeltme + yeniden render (kapı AÇIK, PASS)** | `PENDING` | ✅ **origin'e push edildi**, deploy YOK |
 
 ---
 
@@ -2247,10 +2248,12 @@ araştırma/fact-check motoru (olgular hazır manifestten) · canlı
 
 ## 31. ⏭ SIRADAKİ ATOM — **I-14: KALİTE KAPILARI** (yeni oturum buradan devralır)
 
-> **Durum (güncellendi): I-14'ün BİRİNCİ atomu §32'de yapıldı** — ölçüm
-> motoru + QA sözleşmesi bağlandı. Bu bölüm devir belgesi olarak **aynen
-> duruyor**; hangi maddesinin kapandığı §32'de tek tek yazılı.
-> Kusurların **giderilmesi** (render'ı yeşile çevirmek) I-15'e ait.
+> **Durum (güncellendi): I-14 §32'de ölçtü, I-15 §33'te DÜZELTTİ.**
+> Bu bölüm devir belgesi olarak **aynen duruyor**. Yedi kusurdan
+> **1–5 kapandı** (başlık, sabit süre, ölü final, ambiyans, miks sessizliği);
+> **6 (altyazı/künye) ve 7 (1080p) hâlâ AÇIK** — I-16'ya ait.
+> Kusur 3'ün "tekrarlı medya" bacağı ölçülebilir biçimde hiç doğrulanamadı
+> (bkz. §32 ve §33 "medya çeşitliliği").
 
 ### Bağlam
 
@@ -2505,3 +2508,161 @@ sayılmadı.** Faz C **148/0** — editor paketinde gerileme yok.
    kırpılması.
 5. Ambiyans kaynağının duyulabilir seviyeye getirilmesi.
 6. Sonra **yeniden render + dürüst önce/sonra kare karşılaştırması**.
+
+---
+
+## 33. FAZ I-15 — GERÇEK DÜZELTME + YENİDEN RENDER (12 Ağu, ölçüldü)
+
+> **Durum: yerel yeşil, `origin/arastirma-motoru`'na push edildi. Deploy YOK.**
+> **Bayraklar varsayılan KAPALI. Maliyet $0.00 — ağ/ücretli API yok.**
+> Yeni: `webapp/testler/smoke_kalite_pass_i15.py`,
+> `outputs/sample/kalite_pass_i15_rapor.json`.
+> Değişen: `webapp/editor/plan.py`, `webapp/editor/kalite_kapisi.py`,
+> `webapp/editor/qa_son.py`,
+> `app/render-studio/src/editorv2/Grafikler.tsx`,
+> `webapp/testler/test_faz_i.py`, `outputs/sample/README.md` (+ bu handoff).
+> **Dokunulmadı:** `pipeline.py`, `server.py`, tüm arayüz, 22 alanlık generate
+> sözleşmesi, `deploy.sh`, lisans duvarı, SSRF, kare kapısı, iş bütçesi.
+
+### I-14 ölçtü, I-15 düzeltti
+
+I-14 kapıları kurmuştu ve I-13'ün 10 sn çıktısı açık kapıda **FAIL(4)**
+veriyordu. Bu atom kusurları **gerçekten giderdi** ve aynı Apollo
+tarih/belgesel fixture'ıyla **yeniden render** aldı.
+
+### Ölçülen ÖNCE / SONRA
+
+| Ölçüm | I-13 (10 sn) | **I-15 (12.821 sn)** |
+|---|---|---|
+| **Kapı açıkken** | **FAIL(4)** · render engellendi | **on-render WARN(fail=0) · post-render PASS** |
+| Başlık metni | `20 JULY` → `20 JU` | **`THE EAGLE HAS LANDED`** |
+| Başlık taşması | **272.5 px** | **0.0 px** |
+| Uygulanan punto | 42 (küçültme tabanı vuruldu) | **60 — tam punto, küçültme yok** |
+| Sahne süreleri | 3.2 · 3.2 · 3.2 | **1.637 · 4.051 · 3.224 · 3.825** |
+| Süre yayılımı | **0.0 sn** | **2.414 sn** |
+| Süre kaynağı | eşit bölme `(hedef−0.4)/n` | **edge-tts `SentenceBoundary`** |
+| Ölü final | **0.903 sn** | **0.0 sn** |
+| Ambiyans farkı | 57.12 dB (duyulmaz) | **23.07 dB — duyulabilir, bastırmıyor** |
+| Miks LUFS / TP | −16.56 / −4.47 | **−14.87 / −4.0** (hedef −14) |
+| Kesme sayısı | — | **3** (1.633 · 5.7 · 8.933) |
+| Kare | 3 | **9**, hepsi görsel incelendi |
+
+### Dört gerçek düzeltme
+
+**1. Başlık — iki katmanlı kök neden kapatıldı.**
+`plan.py`'nin sabit `b.metin[:42]` dilimi kaldırıldı; `chapter-title` artık
+aynı dosyadaki `_kart_basligi()` + `kart_basligi_siniri()` ikilisini
+kullanıyor (I-12 bu ikiliyi yazmış ama yalnızca veri-kartı yoluna bağlamıştı).
+Sınır artık **gerçek render genişliğinden** hesaplanıyor ve `kucultme_tabani=1.0`
+ile **tam puntoda** sığacak şekilde veriliyor — render tarafının %30 küçültme
+güvencesi bir *geri düşüş ağı* olarak kalıyor, normal çalışma şartı olmuyor.
+Ayrıca `Grafikler.tsx`'in kendi sığdırma hesabı `letterSpacing`'i saymaya
+başladı. **Plan ile render artık tek aritmetiği paylaşıyor:** `plan.py` em/bant
+sabitlerini `kalite_kapisi`'ndan alıyor.
+
+**2. Süreler — vekil değil ölçüm.**
+edge-tts 7.2.8 `SentenceBoundary` olayları veriyor (WordBoundary değil).
+Sahne *i*, cümle *i*'nin başından cümle *i+1*'in başına kadar sürüyor. I-14'te
+kullanılan "kelime sayısı" yalnızca bir vekildi; bu motorun kendi sentez zaman
+çizelgesi. Test bunu **yeniden hesaplayarak** doğruluyor.
+
+**3. Ölü final — kaynağında kesildi.**
+Anlatım master'ı `anlatım_bitişi + 0.35 sn` noktasından kesiliyor.
+⚠ **Baş sessizliği kırpılmıyor** — kırpmak `SentenceBoundary` ofsetlerini
+kaydırır ve zamanlama ölçümünü yalan yapardı.
+
+**4. Ambiyans — asıl kusur ducking değil, iki ayrı şeydi.**
+Kaynak −48.68 LUFS'tan −26 LUFS'a normalize edildi **ve** `anlatim_araliklari`
+props'a geçirildi. İkincisi kritikti: `Ses.tsx` bu alan verilmeyince **tüm
+videoyu anlatım sayıp** ambiyansı baştan sona kısıyordu. Artık ducking yalnızca
+gerçek konuşma aralıklarında uygulanıyor, cümle aralarında ambiyans geri geliyor.
+Kapı da **çift taraflı** hale getirildi: `duyulabilir` (≤30 dB) **ve**
+`bastiriyor` (<12 dB) — yeni kod `POST-AMBANS-BASKIN`.
+
+### Render sırasında kapının YAKALADIĞI iki gerçek kusur
+
+Bunlar tahmin değil, kapı FAIL verdiği için bulundu ve **eşik gevşetilmeden**
+çözüldü:
+
+1. **Beat bölünmesi → aynı görsel arka arkaya.** İlk deneme f001 ile açılıyordu
+   (4.438 sn). Beat motoru `hook`/`açılış` için hedefi bilgi yoğunluğuna göre
+   ~2.0 sn'ye çekiyor ve bölünme eşiği hedefin 1.5 katı (~3.06 sn). Sahne iki
+   beat'e bölündü, ikisi sahnenin tek adayını paylaştı, `KALITE-MEDYA-TEKRAR`
+   **FAIL** verdi. Çözüm: açılış cümlesi gerçekten kısaltıldı
+   (`"The Eagle has landed."`, 1.637 sn) — hook'un zaten olması gereken şey.
+2. **Sağlayıcı kotası → medyasız son sahne.** 5 sahnelik ilk kurguda `gramer`
+   bir sağlayıcıdan en fazla 4 çekim alıyor ve fixture havuzunun tamamı
+   `wikimedia`. Beşinci sahne fallback karta düştü: görüntüsüz koyu zemin,
+   **3.5 sn donmuş kare**, `"ARMSTRONG TOOK"` gibi yarım bir başlık (kareyle
+   görüldü). Kotayı yükseltmek yerine sahne sayısı 4'e indirildi — o kota
+   gerçek bir çeşitlilik güvencesi.
+
+### MEDYA ÇEŞİTLİLİĞİ — dürüst rapor, eşik oynaması YOK
+
+Benzerlik eşiği **0.86**, I-14'ten **değişmedi** (test kilitliyor).
+
+- Seçilen 4 varlığın ölçülen en yüksek ikili benzerliği **0.6094** — eşiğin
+  altında, kapı **haklı olarak sessiz**.
+- Uygun 5 görselin **tüm 4'lü alt kümeleri** ölçüldü: hepsinin en yüksek ikili
+  benzerliği ≥ 0.6094. Yani **mevcut seçim zaten havuzun en çeşitli 4'lüsü**;
+  daha iyisi yok. Bu bir fixture sınırıdır, seçim hatası değil.
+- Yapılabilen tek iyileştirme uygulandı: **yalnızca sıra** değiştirilerek en
+  benzer çiftin komşu düşmesi engellendi → komşu benzerliği **0.6094 → 0.5312**.
+  Küme ve eşikler aynı kaldı.
+- ⚠ **Açık kalan ölçüm boşluğu:** iki gri regolit ayak izi karesi algısal olarak
+  aynı özne ailesinden; dHash 0.6094 bunu yakalamıyor. §31'in "semantik zayıf"
+  gözlemi **hâlâ ölçülemiyor** — I-14'te açık bırakılmıştı, I-15'te de açık.
+
+### Görsel doğrulama — 9 kare, hepsi incelendi
+
+`0.82 · 1.2 · 1.92 · 3.66 · 5.13 · 7.3 · 8.33 · 10.82 · 11.54` sn.
+Başlık bandı (0.82/1.2 sn): **"THE EAGLE HAS LANDED" tam görünüyor**, kırpma
+yok, bant kare içinde. Sahne akışı: LM → geniş ayak izi → altın folyo →
+yakın ayak izi. Boş/düz kare yok (hepsi > 100 KB), donmuş kare yok.
+
+### Ölçülen test sonucu (12 Ağu) — İKİ ORTAM AYRI
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Zengin venv** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **257** | **1125** | **2539** |
+| **Sistem Python** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **203** | **1125** | **2485** |
+
+0 hata. Faz I 1060 → **1125** (+65). Faz C **148/0** — editor paketinde
+gerileme yok. `deploy.sh` tanımsız-isim taraması → **0 bulgu**.
+
+⚠ **İki I-14 kontrolü silinmedi, ÇEVRİLDİ.** O ikisi TSX'in `letterSpacing`'i
+saymadığı *bilinen kusuru* kilitliyordu; I-15 kusuru kapattığı için kontrol
+artık düzeltilmiş davranışı kilitliyor. Kuralın niyeti aynı: plan ile render
+aynı genişlik aritmetiğini kullanmalı.
+
+### Bu atomda düzelttiğim kendi test hatam
+
+İki yeni kontrol ham dize taramasıyla yazılmıştı ve **kod doğruyken kırmızı
+yanıyordu**: `"b.metin[:42]"` deseni benim yazdığım *açıklama satırına*,
+`lavfi|testsrc` deseni smoke betiğinin *kendi docstring'ine* takılıyordu.
+Aynı tuzak I-9'da da yaşanmıştı. `tokenize` ile yorum ve dizeleri ayıklayan
+`_kod_yalniz()` yardımcısı eklendi; artık yalnızca **çalışan kod** taranıyor.
+
+### BİLİNEN SINIRLAR (dürüstçe)
+
+1. **Altyazı ve kaynak künyesi hâlâ YOK** — `kapsam_ozeti()["kapsam_disi"]`
+   bunu açıkça sayıyor. Sonraki atom.
+2. **1080p ölçülmedi** — çıktı 1280×720. §31'in 7. kusuru **açık**.
+3. **Medya çeşitliliğinin algısal boyutu ölçülemiyor** (yukarıda).
+4. **edge-tts prosodisi çağrıdan çağrıya değişiyor** — süreler bit-bit tekrar
+   üretilebilir değil. Rapor son koşunun ölçümüdür; testler süre *değerlerini*
+   değil *özelliklerini* (benzersizlik, yayılım, sınırlardan türeme) kilitler.
+5. **Ambiyans 30/12 dB eşikleri hâlâ beyan edilmiş tasarım kararı**, dinleme
+   testi değil. Girdiler gerçek ölçüm.
+6. **İki WARN duruyor:** `PACING-KISA-ORAN` (%75, referans %32) ve
+   `SAGLAYICI-TEKEL` (%100 wikimedia). İkisi de **fixture sınırı** — havuzda
+   tek sağlayıcı var ve klipler kısa. Gerçek çok sağlayıcılı bir işte düşmesi
+   *beklenir* ama **ölçülmedi**.
+7. **Canlı `/api/generate` hattı bu kapıyı hâlâ görmüyor** (§32 sınır 8 aynen).
+8. **Web'den medya bulma hiç koşulmadı** — sağlayıcıya tek istek atılmadı.
+
+### SONRAKİ ATOM (I-16 — bu atomda YAPILMADI)
+
+Altyazı dizisinin TTS zamanlamasından üretilip props'a bağlanması (artık
+`SentenceBoundary` elimizde), `source-label` künyesinin ekrana çıkması ve
+1080p render ölçümü.

@@ -383,6 +383,11 @@ def _miks_denetle(q: PostQa, *, sure_sn, ambans_lufs, anlatim_lufs,
                       else "; ducking'i azaltmak yeterli olabilir"),
                    "ambiyans kaynagini yukselt ya da seviye/ducking dengesini "
                    "olculmus hedefe gore kur")
+        elif amb.get("bastiriyor"):
+            q.ekle("POST-AMBANS-BASKIN", "fail",
+                   f"ambiyans anlatimin yalnizca {amb['fark_db']} dB altinda "
+                   f"(alt sinir {amb['bastirma_esik_db']} dB) — sozu bogar",
+                   "ambans seviyesini dusur ya da ducking'i derinlestir")
     elif ambans_lufs is not None or anlatim_lufs is not None:
         # Yarim girdi verilmis: sessizce gecme, olcemedigini soyle.
         q.ekle("POST-AMBANS-OLCULEMEDI", "warn",

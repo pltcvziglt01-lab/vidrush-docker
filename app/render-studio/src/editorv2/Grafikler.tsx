@@ -48,7 +48,12 @@ export const BolumBasligi: React.FC<{spec: MotionSpec; fps: number}> = ({spec, f
   const yaziMetni = metin(spec.parametre.metin).toUpperCase();
   const kullanilabilir = width * 0.84 - dolgu * 2.4;
   // BUYUK HARF Montserrat Bold ~0.72em (muhafazakar; azimsamak kirpar).
-  const tahminiGenislik = Math.max(1, yaziMetni.length * puntoTaban * 0.72);
+  // ⚠ I-15: `letterSpacing` (asagida 0.01em) bu hesaba KATILMIYORDU. Yani
+  // bant "sigar" dedigi halde cizim harf araligi kadar tasip son harfi
+  // `overflow: hidden` ile kesiyordu (I-14'te olculdu: 1920'de 10.9px tasma).
+  // Aralik artik sayiliyor; plan tarafi da ayni sabiti kullaniyor
+  // (`kalite_kapisi.HARF_ARALIGI_EM`).
+  const tahminiGenislik = Math.max(1, yaziMetni.length * puntoTaban * (0.72 + 0.01));
   const olcek = Math.max(0.7, Math.min(1, kullanilabilir / tahminiGenislik));
   const punto = Math.round(puntoTaban * olcek);
   return (
