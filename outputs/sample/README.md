@@ -1,16 +1,54 @@
 # EditorV2 render örnekleri
 
-Bu dizinde **üç** örnek var:
+Bu dizinde **dört** örnek var:
 
 | Dosya | Ne | Betik |
 |---|---|---|
-| `editorv2_kalite_pass_i15.mp4` | ⭐ **12.8 sn Apollo belgeseli — kalite kapısı AÇIK ve PASS** | `webapp/testler/smoke_kalite_pass_i15.py` |
+| `editorv2_altyazi_1080p_i16.mp4` | ⭐ **17.6 sn · 1080p · altyazılı + kaynak künyeli Apollo belgeseli** | `webapp/testler/smoke_altyazi_kunye_1080p_i16.py` |
+| `editorv2_kalite_pass_i15.mp4` | 12.8 sn Apollo belgeseli — kalite kapısı AÇIK ve PASS (720p, altyazısız) | `webapp/testler/smoke_kalite_pass_i15.py` |
 | `editorv2_quality_voice_10sn.mp4` | 10 sn Apollo mini-belgeseli (I-13; kapı açıkken **FAIL(4)** verir) | `webapp/testler/smoke_kaliteli_ses_10sn.py` |
 | `editorv2_smoke_20sn.mp4` | 20 sn motor smoke (sessiz anlatım, konu uyuşmazlıklı) | `webapp/testler/smoke_editorv2_20sn.py` |
 
 ---
 
-# 0) ⭐ I-15 — kalite kapısı AÇIKKEN PASS üreten Apollo belgeseli
+# 0) ⭐ I-16 — altyazılı + kaynak künyeli 1080p Apollo belgeseli
+
+```bash
+python3 webapp/testler/smoke_altyazi_kunye_1080p_i16.py
+```
+
+I-15 kapıyı PASS ettirmişti ama altyazı yoktu, kaynak künyesi ekranda
+görünmüyordu ve çıktı 720p'ydi. Bu örnek üçünü de kapatır.
+
+| Ölçüm | I-15 | **I-16** |
+|---|---|---|
+| Çözünürlük | 1280×720 | **1920×1080** |
+| Süre | 12.8 sn | **17.579 sn** |
+| Altyazı | yok | **5 küp, zaman kodlu, ≤2 satır / ≤42 karakter** |
+| Kaynak künyesi | üretilmiyordu | **NASA / PUBLIC-DOMAIN, sahneye bağlı** |
+| Güvenli alan | — | **ihlal yok** (1080p'de ölçüldü) |
+| Yazı çakışması | — | **yok** (başlık + künye + altyazı aynı anda) |
+| Miks | −14.87 LUFS | **−14.32 LUFS / TP −2.08** (tek loudnorm remaster) |
+| Kare | 9 | **10**, hepsi görsel incelendi |
+| PRE / POST QA | WARN / PASS | **WARN(fail=0) / PASS** |
+
+**Kapatılan iki gerçek kusur:** `altyazi` alanı sözleşmede vardı ve adapter
+onu props'a taşıyordu ama **hiçbir Remotion bileşeni çizmiyordu** — yeni
+`Altyazi` bileşeni eklendi. `KaynakEtiketi` ise `bottom: 22` sabitiyle
+çiziliyordu, yani Python'un konum hesabını hiç okumuyordu ve 1080p'de yayın
+güvenli alanının (64 px) **dışında** kalıyordu.
+
+**Dürüst sınırlar:** cümle içi bölünme gerektiğinde küp zamanlaması ölçüm
+değil, karakter ağırlıklı **orantılı dağıtımdır** (edge-tts 7.2.8 yalnızca
+cümle sınırı veriyor, kelime sınırı vermiyor — ölçüldü); her küp
+`zamanlama: olculdu|orantili` etiketi taşır. **Hareketli video B-roll
+BLOKE:** güvenli fixture havuzunda gerçek video adayı yok; depodaki `.mp4`
+dosyalarının hepsi bu projenin kendi render çıktıları (Faz D/E pilotları) ve
+B-roll değildir. Medya çeşitliliği eşiği (0.86) **değişmedi**.
+
+---
+
+# 0b) I-15 — kalite kapısı AÇIKKEN PASS üreten Apollo belgeseli
 
 ```bash
 python3 webapp/testler/smoke_kalite_pass_i15.py

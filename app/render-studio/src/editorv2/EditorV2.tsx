@@ -21,6 +21,7 @@ import {AbsoluteFill, Sequence, interpolate, useCurrentFrame, useVideoConfig} fr
 
 import {SesZamanCizelgesi} from './Ses';
 import {
+  Altyazi,
   AlintiKarti,
   AltBand,
   BelgeVurgusu,
@@ -245,6 +246,19 @@ const SahneKatmani: React.FC<{sahne: EditorSahne; sureKare: number}> = ({sahne, 
           {s.ad === 'film-burn' ? <FilmBurn spec={s} fps={fps} /> : null}
         </React.Fragment>
       ))}
+
+      {/* ALTYAZI en ustte, gecisin ALTINDA: gecis karartmasi altyaziyi da
+          etkilemeli, yoksa kesme aninda yazi havada asili kalir.
+          Kup zamanlari SAHNEYE GORELIDIR (bkz. Grafikler.tsx `Altyazi`). */}
+      {/* ⚠ `?? 0` YAZMA: `sayi()` yalnizca SAYI OLMAYAN girdide varsayilana
+          duser. `?? 0` ile 0 gecirilince fontSize 0 olur ve altyazi GORUNMEZ
+          cizilir — ilk 1080p kosusunda tam bu oldu (kareyle goruldu). */}
+      <Altyazi
+        kupler={(sahne.altyazi as unknown[]) || []}
+        fps={fps}
+        punto={sayi(sahne.altyazi_punto, 38)}
+        yOrani={sayi(sahne.altyazi_y, 0.81)}
+      />
 
       <GecisKatmani spec={gecis} sureKare={sureKare} fps={fps} />
     </AbsoluteFill>

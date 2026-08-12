@@ -125,6 +125,11 @@ def donustur(render_plan: dict, *, fps: int = 30, genislik: int = 1920,
             "kaynak_aralik": list(sh.get("kaynak_aralik") or [0.0, 0.0]),
             "j_cut": bool(sh.get("j_cut")), "l_cut": bool(sh.get("l_cut")),
             "altyazi": copy.deepcopy(sh.get("altyazi") or []),
+            # ⚠ I-16: altyazi punto/konumu Python profilinden gelir; bu iki
+            # alan tasinmazsa Remotion kendi varsayilanina duser ve profil
+            # karari SESSIZCE kaybolur.
+            "altyazi_punto": sh.get("altyazi_punto"),
+            "altyazi_y": sh.get("altyazi_y"),
             # OZGUN MOTION SPEC LISTESI — renderer/fallback/gerekce/easing/katman
             # alanlariyla birlikte, hicbiri indirgenmeden.
             "motion": copy.deepcopy(sh.get("motion") or []),

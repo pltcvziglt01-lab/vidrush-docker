@@ -3926,12 +3926,18 @@ if _kk_agac is not None:
                            "subprocess", "shutil", "pathlib", "open"}),
             sorted(_ithal))
 _ozet = _kk.kapsam_ozeti()
+# ⚠ I-14'te bu kontrol 5 olcum / 6 esik / 4 kapsam-disi kilitliyordu.
+# I-16 altyazi, kunye ve 1080p'yi KAPSAMA ALDI; kontrol SILINMEDI, yeni
+# kapsama gore GUNCELLENDI. Kuralin niyeti ayni: kapsam SAYILABILIR olmali
+# ve kapsam disi olan ACIKCA yazilmali.
 kontrol("kapsam_ozeti sayilabilir", _ozet["sema_surum"] == "1.0.0"
-        and _ozet["render_sabiti"] == 7 and len(_ozet["esik"]) == 6)
-kontrol("kapsam DISI acikca yaziliyor (altyazi/kunye/1080p/motion)",
-        len(_ozet["kapsam_disi"]) == 4
-        and any("altyazi" in k for k in _ozet["kapsam_disi"])
-        and any("1080p" in k for k in _ozet["kapsam_disi"]))
+        and _ozet["render_sabiti"] == 7 and _ozet["olcum"] >= 5
+        and len(_ozet["esik"]) >= 6)
+kontrol("kapsam DISI acikca yaziliyor ve BOS DEGIL",
+        isinstance(_ozet["kapsam_disi"], list)
+        and len(_ozet["kapsam_disi"]) >= 1
+        and all(isinstance(k, str) and k for k in _ozet["kapsam_disi"]),
+        _ozet["kapsam_disi"])
 
 # Render sabitleri TSX'ten OKUNDU mu — uydurma degil, eslesme testli.
 _TSX = oku(KOK, "..", "app/render-studio/src/editorv2/Grafikler.tsx")
@@ -4609,6 +4615,318 @@ kontrol("bayraklar HALA varsayilan kapali",
 kontrol("ikili ciktilar .gitignore'da (mp4/png depoya girmiyor)",
         "outputs/sample/*.mp4" in oku(KOK, "..", ".gitignore")
         and "outputs/sample/*.png" in oku(KOK, "..", ".gitignore"))
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# §34  FAZ I-16 — ALTYAZI + GORUNUR KAYNAK KUNYESI + 1080p
+#
+# Kanit yine depoda IZLENEN rapordan:
+#     outputs/sample/altyazi_1080p_i16_rapor.json
+# ═══════════════════════════════════════════════════════════════════════
+
+def _tsx_kod(kaynak: str) -> str:
+    """TSX'ten /* */ ve // yorumlarini ayikla — ayni tuzak, JS tarafi.
+
+    Ham `in` kontrolu benim yazdigim ACIKLAMA satirina takiliyordu
+    ("burada `bottom: 22` SABITI vardi"). Kod duzeltilmis olmasina ragmen
+    test kirmizi yaniyordu. Python tarafinda `_kod_yalniz` ayni isi yapiyor.
+    """
+    kaynak = re.sub(r"/\*.*?\*/", " ", kaynak, flags=re.S)
+    return re.sub(r"(?m)^\s*//.*$", " ", kaynak)
+
+
+blok("§34a ALTYAZI RENDER HATTI — 'props'ta var, videoda yok' kapatildi")
+
+_TSX_G = oku(KOK, "..", "app/render-studio/src/editorv2/Grafikler.tsx")
+_TSX_E = oku(KOK, "..", "app/render-studio/src/editorv2/EditorV2.tsx")
+_ADP = oku(KOK, "editor/adapter.py")
+
+kontrol("Altyazi bileseni Grafikler.tsx'te TANIMLI",
+        "export const Altyazi" in _TSX_G)
+kontrol("Altyazi EditorV2'de ITHAL ve MOUNT edilmis",
+        "Altyazi," in _TSX_E and "<Altyazi" in _TSX_E)
+kontrol("altyazi sozlesmede ZATEN vardi (kapatilan acik: cizim yoktu)",
+        "altyazi: unknown[]" in oku(
+            KOK, "..", "app/render-studio/src/editorv2/sozlesme.ts"))
+kontrol("adapter altyazi + punto + konumu TASIYOR",
+        '"altyazi": copy.deepcopy(sh.get("altyazi") or [])' in _ADP
+        and '"altyazi_punto": sh.get("altyazi_punto")' in _ADP
+        and '"altyazi_y": sh.get("altyazi_y")' in _ADP)
+# ⚠ I-16'da yasanan GERCEK hata: `sayi(v, d)` yalnizca SAYI OLMAYAN girdide
+# varsayilana duser; `?? 0` ile 0 gecirilince fontSize 0 olup altyazi
+# GORUNMEZ cizildi. Tuzak koda yazildi, test kilitliyor.
+kontrol("KILIT: Altyazi mount'unda `?? 0` tuzagi YOK",
+        "sahne.altyazi_punto, 38" in _tsx_kod(_TSX_E)
+        and "?? 0, 38" not in _tsx_kod(_TSX_E))
+kontrol("sayi() tuzagi kodda ACIKLANMIS",
+        "`?? 0` YAZMA" in _TSX_E or "`?? 0` yazma" in _TSX_E)
+kontrol("altyazi kup zamanlari SAHNEYE GORELI (Sequence semantigi)",
+        "SAHNEYE GORELIDIR" in _TSX_G
+        and "def _altyazi_dagit" in oku(KOK, "editor/plan.py"))
+
+blok("§34b ALTYAZI OKUNABILIRLIGI — olculebilir kurallar")
+
+_CUM = [{"bas": 0.05, "sure": 2.9,
+         "metin": "Tranquility Base here, the Eagle has landed."},
+        {"bas": 2.96, "sure": 5.2,
+         "metin": "The lunar module touched down on the Moon on the "
+                  "twentieth of July, nineteen sixty-nine."}]
+_AK = _kk.altyazi_kupleri(_CUM, maks_karakter=42)
+kontrol("kupler uretildi ve okunabilirlik TEMIZ",
+        _AK["olculdu"] and _AK["kup_sayisi"] >= 2 and _AK["temiz"] is True)
+kontrol("hicbir satir 42 karakteri ASMIYOR",
+        all(len(s) <= 42 for k in _AK["kupler"] for s in k["satirlar"]))
+kontrol("hicbir kup 2 satiri ASMIYOR",
+        all(len(k["satirlar"]) <= 2 for k in _AK["kupler"]))
+kontrol("DENGELI BOLME: hicbir kup min sureden kisa degil",
+        all(k["sure_sn"] >= _kk.ALTYAZI_MIN_SN - 0.01
+            for k in _AK["kupler"]),
+        [k["sure_sn"] for k in _AK["kupler"]])
+kontrol("SARKAN EDAT satir/kup sonunda YALNIZ BIRAKILMIYOR",
+        not any(s.split() and s.split()[-1].lower().strip(",;:.")
+                in _kk._SARKAN_KELIME
+                for k in _AK["kupler"] for s in k["satirlar"][:-1]),
+        [k["satirlar"] for k in _AK["kupler"]])
+kontrol("DURUST ETIKET: cumle ici bolunme 'orantili' isaretleniyor",
+        any(k["zamanlama"] == "orantili" for k in _AK["kupler"])
+        and any(k["zamanlama"] == "olculdu" for k in _AK["kupler"]))
+kontrol("okuma hizi tavani asilinca RAPORLANIYOR",
+        len(_kk.altyazi_kupleri(
+            [{"bas": 0, "sure": 0.5,
+              "metin": "A very long sentence that cannot be read this fast"}],
+            maks_karakter=42)["cok_hizli"]) >= 1)
+kontrol("harf ortasindan ASLA kesilmiyor (kelime sinirinda bolme)",
+        all(" ".join(k["satirlar"]).replace("  ", " ") in
+            k["metin"].replace("  ", " ") or
+            set(" ".join(k["satirlar"]).split()) <= set(k["metin"].split())
+            for k in _AK["kupler"]))
+for _g in (None, [], "x", 5, [None], [{"bas": "a", "sure": "b"}]):
+    try:
+        _kk.altyazi_kupleri(_g)
+    except Exception as _e:                                       # noqa: BLE001
+        kontrol(f"altyazi_kupleri({_g!r}) istisna FIRLATMIYOR", False,
+                type(_e).__name__)
+kontrol("altyazi_kupleri bozuk girdide ISTISNA FIRLATMIYOR", True)
+
+blok("§34c GUVENLI ALAN + CAKISMA — olcum ve kapi")
+
+_KUT = [{"ad": "chapter-title", "y_ust": 0.70, "yukseklik": 0.105,
+         "bas_sn": 0.2, "sure_sn": 5.0},
+        {"ad": "subtitle", "y_ust": 0.81, "yukseklik": 0.13,
+         "bas_sn": 0.0, "sure_sn": 17.0}]
+_GA = _kk.guvenli_alan_olcusu(_KUT, kare_yukseklik=1080, guvenli_kenar=64)
+kontrol("guvenli alan olculuyor ve TEMIZ (1080p yerlesimi)",
+        _GA["olculdu"] and _GA["temiz"] is True, _GA.get("ihlaller"))
+kontrol("altyazi bandi alt siniri TAM guvenli alanda (1015.2 <= 1016)",
+        abs(_kk.ALTYAZI_BANT[1] * 1080 - 1015.2) < 0.5
+        and _kk.ALTYAZI_BANT[1] * 1080 <= 1080 - 64
+        if hasattr(_kk, "ALTYAZI_BANT") else True)
+_ihlal = _kk.guvenli_alan_olcusu(
+    [{"ad": "kotu", "y_ust": 0.93, "yukseklik": 0.06,
+      "bas_sn": 0, "sure_sn": 1}], kare_yukseklik=1080, guvenli_kenar=64)
+kontrol("guvenli alani ASAN katman YAKALANIYOR",
+        not _ihlal["temiz"] and _ihlal["ihlaller"][0]["ihlal"] == "ALT")
+_CK = _kk.yazi_cakismasi(_KUT)
+kontrol("1080p yerlesiminde baslik ile altyazi CAKISMIYOR",
+        _CK["temiz"] is True, _CK.get("cakisan_cift"))
+kontrol("ayni anda ayni yerdeki iki yazi CAKISMA olarak yakalaniyor",
+        not _kk.yazi_cakismasi(
+            [{"ad": "a", "y_ust": 0.80, "yukseklik": 0.10,
+              "bas_sn": 0, "sure_sn": 3},
+             {"ad": "b", "y_ust": 0.85, "yukseklik": 0.10,
+              "bas_sn": 1, "sure_sn": 3}])["temiz"])
+kontrol("ZAMAN kesismiyorsa cakisma SAYILMAZ",
+        _kk.yazi_cakismasi(
+            [{"ad": "a", "y_ust": 0.80, "yukseklik": 0.10,
+              "bas_sn": 0, "sure_sn": 1},
+             {"ad": "b", "y_ust": 0.80, "yukseklik": 0.10,
+              "bas_sn": 2, "sure_sn": 1}])["temiz"] is True)
+kontrol("DIKEY kesismiyorsa cakisma SAYILMAZ",
+        _kk.yazi_cakismasi(
+            [{"ad": "a", "y_ust": 0.20, "yukseklik": 0.10,
+              "bas_sn": 0, "sure_sn": 3},
+             {"ad": "b", "y_ust": 0.80, "yukseklik": 0.10,
+              "bas_sn": 0, "sure_sn": 3}])["temiz"] is True)
+
+_tip = _ep2 and None
+from editor import tipografi as _tg                               # noqa: E402
+kontrol("cakisma cozucu YASAK BANDA kaydirmiyor",
+        _tg.bant_cakisiyor(0.88, _tg.YUKSEKLIK["source-label"],
+                           _tg.ALTYAZI_BANT) is True
+        and "yasak_bant" in oku(KOK, "editor/tipografi.py"))
+kontrol("altyazi varken kunye BANDIN USTUNE tasiniyor",
+        _tg.KAYNAK_ETIKETI_ALTYAZILI + _tg.YUKSEKLIK["source-label"]
+        <= _tg.ALTYAZI_BANT[0] + 1e-9,
+        (_tg.KAYNAK_ETIKETI_ALTYAZILI, _tg.ALTYAZI_BANT))
+kontrol("bant_cakisiyor bozuk girdide ISTISNA FIRLATMIYOR",
+        _tg.bant_cakisiyor(None, None, None) is False
+        and _tg.bant_cakisiyor("x", "y", (0.8, 0.9)) is False)
+
+# ⚠ I-16'da bulunan GERCEK kusur: KaynakEtiketi `bottom: 22` sabitiyle
+# ciziliyordu, yani Python'un konum hesabini HIC okumuyordu ve 1080p'de
+# guvenli alanin (64 px) DISINDA kaliyordu.
+_TSX_G_KOD = _tsx_kod(_TSX_G)
+kontrol("KaynakEtiketi artik y_orani OKUYOR (bottom sabiti kaldirildi)",
+        "bottom: 22" not in _TSX_G_KOD
+        and "sayi(spec.parametre.y_orani, 0.755)" in _TSX_G_KOD,
+        "bottom: 22 kodda hala var" if "bottom: 22" in _TSX_G_KOD else "")
+kontrol("KaynakEtiketi GUVENLI KENARI zorluyor",
+        "height - GUVENLI_KENAR" in _TSX_G_KOD
+        and "right: GUVENLI_KENAR" in _TSX_G_KOD)
+kontrol("qa_on I-16 kodlarini FAIL_KODLARI'nda tasiyor",
+        {"KALITE-YAZI-CAKISMA", "KALITE-GUVENLI-ALAN"} <= _qon.FAIL_KODLARI)
+kontrol("kapsam_ozeti I-16 olcumlerini sayiyor",
+        _kk.kapsam_ozeti()["olcum"] == 9
+        and "yazi_cakismasi" in _kk.kapsam_ozeti()["olcum_adlari"]
+        and "altyazi_kupleri" in _kk.kapsam_ozeti()["olcum_adlari"])
+kontrol("altyazi/kunye/1080p artik KAPSAM DISI listesinde DEGIL",
+        not any("altyazi" in k or "1080p" in k or "kunye" in k
+                for k in _kk.kapsam_ozeti()["kapsam_disi"]),
+        _kk.kapsam_ozeti()["kapsam_disi"])
+
+blok("§34d 1080p YENIDEN RENDER — olculen sonuc")
+
+_R16_YOL = os.path.join(KOK, "..", "outputs", "sample",
+                        "altyazi_1080p_i16_rapor.json")
+_R16 = None
+if os.path.exists(_R16_YOL):
+    try:
+        _R16 = _json.load(open(_R16_YOL, encoding="utf-8"))
+    except ValueError:
+        _R16 = None
+if _R16 is None:
+    bloke_yaz("I-16 render raporu", f"yok/bozuk: {_R16_YOL}")
+else:
+    _v16 = next((a for a in (_R16["ffprobe"].get("streams") or [])
+                 if a.get("codec_type") == "video"), {})
+    kontrol("⭐ 1080p: cikti 1920x1080",
+            _v16.get("width") == 1920 and _v16.get("height") == 1080,
+            (_v16.get("width"), _v16.get("height")))
+    kontrol("sure 15-20 sn araliginda",
+            15.0 <= float((_R16["ffprobe"].get("format") or {}).get(
+                "duration") or 0) <= 20.0,
+            (_R16["ffprobe"].get("format") or {}).get("duration"))
+    kontrol("maliyet $0.00", _R16.get("maliyet_usd") == 0.0)
+
+    # ── ALTYAZI ──
+    _a16 = _R16["altyazi"]
+    kontrol("⭐ ALTYAZI URETILDI ve okunabilirlik temiz",
+            _a16["kup_sayisi"] >= 4 and _a16["okunabilirlik_temiz"] is True)
+    kontrol("altyazi kupleri sahnelere DAGITILDI (props'a ulasti)",
+            sum(len(s.get("altyazi") or []) for s in _R16["zincir"]) >= 4
+            if _R16["zincir"] and "altyazi" in (_R16["zincir"][0] or {})
+            else _a16["kup_sayisi"] >= 4)
+    kontrol("DURUSTLUK: olculen/orantili kup ayrimi raporda",
+            _a16["olculen_kup"] + _a16["orantili_kup"] == _a16["kup_sayisi"]
+            and "orantili" in _a16["zamanlama_notu"].lower())
+    kontrol("altyazi cok hizli / uzun satir YOK",
+            not _a16["cok_hizli"] and not _a16["uzun_satir"])
+
+    # ── KAYNAK KUNYESI ──
+    _k16 = _R16["kaynak_kunyesi"]
+    kontrol("⭐ KAYNAK KUNYESI URETILDI (sahneye bagli)",
+            _k16["atif_gerekli"] is True and len(_k16["katmanlar"]) >= 1,
+            len(_k16["katmanlar"]))
+    kontrol("kunye metni eser sahibi + lisans tasiyor",
+            all("NASA" in (k.get("metin") or "") for k in _k16["katmanlar"]))
+    kontrol("kunye altyazi bandinin USTUNDE",
+            all((k.get("y_orani") or 0)
+                + _tg.YUKSEKLIK["source-label"] <= _tg.ALTYAZI_BANT[0] + 1e-6
+                for k in _k16["katmanlar"]),
+            [k.get("y_orani") for k in _k16["katmanlar"]])
+
+    # ── GUVENLI ALAN + CAKISMA (gercek plandan) ──
+    kontrol("⭐ GERCEK planda guvenli alan IHLALI YOK",
+            (_R16["guvenli_alan"] or {}).get("temiz") is True,
+            (_R16["guvenli_alan"] or {}).get("ihlaller"))
+    kontrol("⭐ GERCEK planda yazi CAKISMASI YOK",
+            (_R16["yazi_cakismasi"] or {}).get("temiz") is True,
+            (_R16["yazi_cakismasi"] or {}).get("cakisan_cift"))
+    kontrol("guvenli alan 1080p'ye gore olculdu",
+            (_R16["guvenli_alan"] or {}).get("kare_yukseklik") == 1080)
+
+    # ── SES / MIKS ──
+    _m16 = _R16["video_ses_olcumu"]
+    kontrol("miks LUFS profil hedefine (-14) 1 dB icinde",
+            abs(_m16["lufs"] + 14.0) <= 1.0, _m16["lufs"])
+    kontrol("true peak tavan altinda, kirpma yok",
+            _m16["tepe_dbtp"] <= -1.5 and _m16["kirpma_var"] is False)
+    kontrol("sessizlik orani tavan altinda",
+            (_m16["sessiz_pct"] / 100.0) <= _kk.SESSIZ_ORAN_TAVANI)
+    _rm = _R16.get("remaster") or {}
+    kontrol("remaster uygulandiysa DURUSTCE raporlandi (once/sonra)",
+            (not _rm.get("uygulandi"))
+            or ("once" in _rm and "sonra" in _rm
+                and _rm.get("maliyet_usd") == 0.0), _rm.get("uygulandi"))
+    kontrol("ambiyans dengeli (duyulur + bogmaz)",
+            _R16["duzeltilen_kusurlar"]["ambiyans"]["olcum"]["dengeli"] is True)
+    kontrol("olu final tavan altinda",
+            (_R16["duzeltilen_kusurlar"]["olu_final"]
+             ["olculen_olu_final_sn"] or 0) <= _kk.OLU_FINAL_ESIGI_SN)
+
+    # ── KESIM / KARE / QA ──
+    kontrol("sahne kesimleri olculdu",
+            _R16["kesmeler"]["sayi"] >= 3, _R16["kesmeler"])
+    kontrol("EN AZ 9 kare cikarildi",
+            len(_R16["kareler"]) >= 9, len(_R16["kareler"]))
+    kontrol("kareler bos/duz degil (her biri > 500 KB @1080p)",
+            all(k["bayt"] > 500_000 for k in _R16["kareler"]))
+    kontrol("PRE QA FAIL DEGIL", _R16["plan"]["qa"]["fail"] == 0)
+    kontrol("POST QA FAIL DEGIL", _R16["post_qa"]["durum"] != "FAIL")
+    kontrol("hicbir KALITE-*/POST-* kapisi FAIL uretmedi",
+            not [s for s in _R16["plan"]["on_render_qa"]["sorunlar"]
+                 if s["seviye"] == "fail"]
+            and not [s for s in _R16["post_qa"]["sorunlar"]
+                     if s["seviye"] == "fail"])
+
+    # ── B-ROLL: DURUST BLOKE ──
+    _b16 = _R16["video_broll"]
+    kontrol("B-ROLL durumu raporda ACIKCA yaziyor",
+            _b16["durum"] in ("VAR", "BLOKE"))
+    if _b16["durum"] == "BLOKE":
+        kontrol("B-ROLL BLOKE sebebi yazili (kusur GIZLENMIYOR)",
+                bool(_b16["sebep"]) and "B-roll DEGILDIR" in _b16["sebep"])
+        kontrol("B-ROLL icin taranan dizinler raporda",
+                len(_b16["taranan_dizin"]) >= 1)
+    kontrol("medya cesitliligi esigi HALA degismedi",
+            _R16["medya_cesitliligi"]["esik"] == _kk.BENZERLIK_ESIGI
+            and _R16["medya_cesitliligi"]["esik_degistirildi_mi"] is False)
+
+blok("§34e I-16 KORUMALARI")
+
+_SM16 = oku(KOK, "testler/smoke_altyazi_kunye_1080p_i16.py")
+kontrol("smoke ffmpeg test kaynagi KULLANMIYOR",
+        not re.search(r"lavfi|testsrc|color=c=", _kod_yalniz(_SM16)))
+kontrol("smoke gercek render zincirini cagiriyor",
+        "edit_kopru.plan_kur" in _SM16 and "remotion_v2.render" in _SM16)
+kontrol("smoke QA FAIL'de render BASLATMIYOR",
+        'if not sonuc["render_edilebilir"]:' in _SM16)
+kontrol("smoke benzerlik esigini/saglayici kotasini DEGISTIRMIYOR",
+        "BENZERLIK_ESIGI =" not in _SM16
+        and "saglayici_tavani=" not in _SM16)
+kontrol("smoke B-roll icin kendi render ciktilarini KULLANMIYOR",
+        "pilot_master" not in _SM16 and "pilot_ham" not in _SM16
+        and "faz_d_onizleme" not in _SM16)
+kontrol("pipeline.py I-16'da da DEGISMEDI",
+        "kalite_kapisi" not in oku(KOK, "pipeline.py")
+        and "altyazi_kupleri" not in oku(KOK, "pipeline.py"))
+kontrol("server.py I-16'da da DEGISMEDI",
+        "kalite_kapisi" not in oku(KOK, "server.py"))
+kontrol("22 alanlik generate sozlesmesi I-16'da da DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("UI I-16'da DEGISMEDI",
+        "basitGovde" in oku(KOK, "static/js/wizard.js")
+        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js"))
+kontrol("deploy.sh ezme korumasi KORUNDU",
+        "GERIDE" in open(os.path.join(KOK, "..", "deploy.sh"),
+                         encoding="utf-8").read())
+kontrol("bayraklar HALA varsayilan kapali",
+        mkp.ACIK is False and ekp.ACIK is False
+        and ekp.kalite_kapisi_acik(None) is False)
+kontrol("altyazi kupleri verilmezse plan ESKISI GIBI davraniyor",
+        '"altyazi_stili": "bant-orta" if _altyazi_var else "yok"'
+        in oku(KOK, "editor/plan.py"))
 
 
 print(f"\n{'=' * 60}")

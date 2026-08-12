@@ -211,7 +211,7 @@ def plan_kur(*, cumleler, medya_manifest, olgular=None, stil=None,
              genislik: int = 1920, yukseklik: int = 1080,
              destek_matrisi=None, kare_olcu=None,
              anlatim_bitis_sn=None, benzerlik_okuyucu=None,
-             kalite_kapisi=None) -> dict:
+             altyazi_kupleri=None, kalite_kapisi=None) -> dict:
     """Uctan uca: analiz + stil + olgu + medya -> EditorV2 props.
 
     Doner:
@@ -268,6 +268,7 @@ def plan_kur(*, cumleler, medya_manifest, olgular=None, stil=None,
             ambience=ambience, muzik=muzik,
             kare_olcu=kare_olcu, anlatim_bitis_sn=anlatim_bitis_sn,
             benzerlik_okuyucu=benzerlik_okuyucu,
+            altyazi_kupleri=altyazi_kupleri,
             kalite_kapisi=kalite_kapisi_acik(is_ayar, kalite_kapisi))
     except Exception as e:
         print(f"  edit plani uretilemedi: {type(e).__name__}: {str(e)[:140]}",

@@ -1,0 +1,1281 @@
+{
+  "atom": "I-16",
+  "video": "outputs/sample/editorv2_altyazi_1080p_i16.mp4",
+  "konu": "Apollo 11 ay inisi (20 Temmuz 1969)",
+  "kalite_kapisi": "ACIK (kalite_kapisi=True)",
+  "maliyet_usd": 0.0,
+  "duzeltilen_kusurlar": {
+    "baslik": {
+      "olcum": {
+        "olculdu": true,
+        "metin": "TRANQUILITY BASE HERE",
+        "karakter": 21,
+        "punto_taban": 60.0,
+        "kare_genislik": 1920.0,
+        "kullanilabilir_px": 1552.8,
+        "olcek": 1.0,
+        "kucultme_tabani_vuruldu": false,
+        "uygulanan_punto": 60,
+        "cizilen_px": 919.8,
+        "tasma_px": 0.0,
+        "sigar": true,
+        "bant_sag_px": 1687.8,
+        "bant_kare_disi": false,
+        "kelime_kesik": {
+          "olculdu": true,
+          "on_ek": true,
+          "kesik": false,
+          "ham": "Tranquility Base here, the Eagle has landed.",
+          "gosterilen": "TRANQUILITY BASE HERE",
+          "yarim_kelime": "",
+          "tam_kelime": ""
+        }
+      },
+      "metin": "TRANQUILITY BASE HERE",
+      "punto": 60,
+      "kare_genislik": 1920
+    },
+    "sahne_sureleri": {
+      "kaynak": "edge-tts SentenceBoundary (GERCEK zamanlama)",
+      "sureler": [
+        2.962,
+        5.213,
+        4.688,
+        4.675
+      ],
+      "toplam_sn": 17.538,
+      "yayilim_sn": 2.251,
+      "benzersiz": 4,
+      "cumle_sinirlari": [
+        {
+          "bas": 0.05,
+          "sure": 2.913,
+          "metin": "Tranquility Base here, the Eagle has landed."
+        },
+        {
+          "bas": 2.962,
+          "sure": 5.213,
+          "metin": "The lunar module touched down on the Moon on the twentieth of July, nineteen sixty-nine."
+        },
+        {
+          "bas": 8.175,
+          "sure": 4.688,
+          "metin": "During the descent, the guidance computer raised a twelve-oh-two program alarm."
+        },
+        {
+          "bas": 12.863,
+          "sure": 4.325,
+          "metin": "Armstrong took manual control and steered past a field of boulders."
+        }
+      ]
+    },
+    "olu_final": {
+      "anlatim_bitis_sn": 17.188,
+      "kesim_sn": 17.538,
+      "kuyruk_sn": 0.35,
+      "olculen_olu_final_sn": 0.0
+    },
+    "ambiyans": {
+      "kaynak_lufs": -48.68,
+      "normalize_lufs": -25.98,
+      "seviye": 0.5,
+      "ducking": 0.5,
+      "anlatim_araliklari_gecildi": true,
+      "olcum": {
+        "olculdu": true,
+        "ambans_lufs": -25.98,
+        "anlatim_lufs": -15.32,
+        "ambans_seviye": 0.5,
+        "seviye_db": -6.02,
+        "ducking": 0.5,
+        "ducking_db": -6.02,
+        "etkin_lufs": -38.02,
+        "etkin_ducksuz_lufs": -32.0,
+        "fark_db": 22.7,
+        "fark_ducksuz_db": 16.68,
+        "esik_db": 30.0,
+        "bastirma_esik_db": 12.0,
+        "duyulabilir": true,
+        "bastiriyor": false,
+        "dengeli": true,
+        "ducking_suz_duyulabilir": true
+      }
+    }
+  },
+  "sessizlik_yorumu": {
+    "mikste_sessiz_pct": 0.0,
+    "neden": "ambiyans -45 dB esiginin uzerinde ve kesintisiz; silencedetect bu yuzden aralik bulmuyor",
+    "anlatim_master_sessizlikleri": [
+      {
+        "bas": 1.337,
+        "sure": 0.313
+      },
+      {
+        "bas": 2.688,
+        "sure": 0.427
+      },
+      {
+        "bas": 7.923,
+        "sure": 0.399
+      },
+      {
+        "bas": 9.14,
+        "sure": 0.327
+      },
+      {
+        "bas": 12.599,
+        "sure": 0.409
+      },
+      {
+        "bas": 16.904,
+        "sure": 0.352
+      }
+    ],
+    "anlatim_master_sessiz_pct": 12.9,
+    "cumle_arasi_bosluklar_sn": [
+      -0.001,
+      0.0,
+      0.0
+    ]
+  },
+  "altyazi": {
+    "kup_sayisi": 5,
+    "olculen_kup": 3,
+    "orantili_kup": 2,
+    "birlestirilen": 0,
+    "maks_karakter": 42,
+    "maks_satir": 2,
+    "okunabilirlik_temiz": true,
+    "cok_hizli": [],
+    "uzun_satir": [],
+    "kupler": [
+      {
+        "bas_sn": 0.05,
+        "sure_sn": 2.913,
+        "metin": "Tranquility Base here, the Eagle has landed.",
+        "satirlar": [
+          "Tranquility Base here, the Eagle has",
+          "landed."
+        ],
+        "zamanlama": "olculdu"
+      },
+      {
+        "bas_sn": 2.962,
+        "sure_sn": 2.457,
+        "metin": "The lunar module touched down on the Moon",
+        "satirlar": [
+          "The lunar module touched down on the Moon"
+        ],
+        "zamanlama": "orantili"
+      },
+      {
+        "bas_sn": 5.419,
+        "sure_sn": 2.756,
+        "metin": "on the twentieth of July, nineteen sixty-nine.",
+        "satirlar": [
+          "on the twentieth of July, nineteen",
+          "sixty-nine."
+        ],
+        "zamanlama": "orantili"
+      },
+      {
+        "bas_sn": 8.175,
+        "sure_sn": 4.688,
+        "metin": "During the descent, the guidance computer raised a twelve-oh-two program alarm.",
+        "satirlar": [
+          "During the descent, the guidance computer",
+          "raised a twelve-oh-two program alarm."
+        ],
+        "zamanlama": "olculdu"
+      },
+      {
+        "bas_sn": 12.863,
+        "sure_sn": 4.325,
+        "metin": "Armstrong took manual control and steered past a field of boulders.",
+        "satirlar": [
+          "Armstrong took manual control and steered",
+          "past a field of boulders."
+        ],
+        "zamanlama": "olculdu"
+      }
+    ],
+    "zamanlama_notu": "cumle sinirlari OLCULDU (edge-tts SentenceBoundary); cumle ICI bolunme gerektiginde parca zamanlamasi karakter agirlikli ORANTILI dagitimdir, olcum degil",
+    "sahnelere_dagitildi": [
+      {
+        "scene_id": "s001",
+        "kup": 0
+      },
+      {
+        "scene_id": "s002",
+        "kup": 0
+      },
+      {
+        "scene_id": "s003",
+        "kup": 0
+      },
+      {
+        "scene_id": "s004",
+        "kup": 0
+      }
+    ]
+  },
+  "kaynak_kunyesi": {
+    "atif_gerekli": true,
+    "katmanlar": [
+      {
+        "ad": "source-label",
+        "metin": "NASA / PUBLIC-DOMAIN",
+        "y_orani": 0.6,
+        "bas_sn": 0.4,
+        "sure_sn": 2.962,
+        "kaydirildi": true
+      },
+      {
+        "ad": "source-label",
+        "metin": "NASA / PUBLIC-DOMAIN",
+        "y_orani": 0.6,
+        "bas_sn": 3.362,
+        "sure_sn": 3.0,
+        "kaydirildi": true
+      },
+      {
+        "ad": "source-label",
+        "metin": "NASA / PUBLIC-DOMAIN",
+        "y_orani": 0.755,
+        "bas_sn": 8.575,
+        "sure_sn": 3.0,
+        "kaydirildi": false
+      },
+      {
+        "ad": "source-label",
+        "metin": "NASA / PUBLIC-DOMAIN",
+        "y_orani": 0.755,
+        "bas_sn": 13.263,
+        "sure_sn": 3.0,
+        "kaydirildi": false
+      }
+    ],
+    "tipografi_raporu": [
+      {
+        "kod": "TIPO-CAKISMA-KAYDIRILDI",
+        "katman": "source-label",
+        "detay": "y 0.895 -> 0.6 (['chapter-title'])"
+      },
+      {
+        "kod": "TIPO-CAKISMA-KAYDIRILDI",
+        "katman": "source-label",
+        "detay": "y 0.895 -> 0.6 (['chapter-title'])"
+      }
+    ]
+  },
+  "guvenli_alan": {
+    "olculdu": true,
+    "kare_yukseklik": 1080.0,
+    "guvenli_kenar": 64.0,
+    "alt_sinir_px": 1016.0,
+    "katman": 6,
+    "olcumler": [
+      {
+        "ad": "chapter-title",
+        "ust_px": 756.0,
+        "alt_px": 869.4,
+        "tavan_px": 1016.0,
+        "taban_px": 64.0
+      },
+      {
+        "ad": "source-label",
+        "ust_px": 648.0,
+        "alt_px": 696.6,
+        "tavan_px": 1016.0,
+        "taban_px": 64.0
+      },
+      {
+        "ad": "source-label",
+        "ust_px": 648.0,
+        "alt_px": 696.6,
+        "tavan_px": 1016.0,
+        "taban_px": 64.0
+      },
+      {
+        "ad": "source-label",
+        "ust_px": 815.4,
+        "alt_px": 864.0,
+        "tavan_px": 1016.0,
+        "taban_px": 64.0
+      },
+      {
+        "ad": "source-label",
+        "ust_px": 815.4,
+        "alt_px": 864.0,
+        "tavan_px": 1016.0,
+        "taban_px": 64.0
+      },
+      {
+        "ad": "subtitle",
+        "ust_px": 874.8,
+        "alt_px": 1015.2,
+        "tavan_px": 1016.0,
+        "taban_px": 64.0
+      }
+    ],
+    "ihlaller": [],
+    "temiz": true
+  },
+  "yazi_cakismasi": {
+    "olculdu": true,
+    "katman": 6,
+    "cakisan_cift": [],
+    "tolerans": 0.005,
+    "temiz": true
+  },
+  "video_broll": {
+    "aday": [],
+    "taranan_dizin": [
+      "app/render-studio/public/editorv2/faz_e",
+      "app/render-studio/public/editorv2"
+    ],
+    "durum": "BLOKE",
+    "sebep": "guvenli fixture havuzunda hareketli video adayi YOK; depodaki .mp4 dosyalari bu projenin kendi render ciktilari (Faz D/E pilotlari) ve B-roll DEGILDIR"
+  },
+  "medya_cesitliligi": {
+    "esik": 0.86,
+    "esik_degistirildi_mi": false,
+    "ciftler": [
+      {
+        "a": "a313_wiki_8ba105ee68",
+        "b": "a082_wiki_4ba3ccdace",
+        "bitisik": true,
+        "benzerlik": 0.375
+      },
+      {
+        "a": "a313_wiki_8ba105ee68",
+        "b": "a086_wiki_effc9e462f",
+        "bitisik": false,
+        "benzerlik": 0.3594
+      },
+      {
+        "a": "a313_wiki_8ba105ee68",
+        "b": "a314_wiki_6cff017be6",
+        "bitisik": false,
+        "benzerlik": 0.4844
+      },
+      {
+        "a": "a082_wiki_4ba3ccdace",
+        "b": "a086_wiki_effc9e462f",
+        "bitisik": true,
+        "benzerlik": 0.5156
+      },
+      {
+        "a": "a082_wiki_4ba3ccdace",
+        "b": "a314_wiki_6cff017be6",
+        "bitisik": false,
+        "benzerlik": 0.6094
+      },
+      {
+        "a": "a086_wiki_effc9e462f",
+        "b": "a314_wiki_6cff017be6",
+        "bitisik": true,
+        "benzerlik": 0.5312
+      }
+    ],
+    "en_yuksek": 0.6094,
+    "en_yuksek_bitisik": 0.5312,
+    "esigi_asan": [],
+    "siralama": {
+      "once_sira": [
+        "a313_wiki_8ba105ee68",
+        "a082_wiki_4ba3ccdace",
+        "a314_wiki_6cff017be6",
+        "a086_wiki_effc9e462f"
+      ],
+      "once_komsu_maks": 0.6094,
+      "sonra_sira": [
+        "a313_wiki_8ba105ee68",
+        "a082_wiki_4ba3ccdace",
+        "a086_wiki_effc9e462f",
+        "a314_wiki_6cff017be6"
+      ],
+      "sonra_komsu_maks": 0.5312,
+      "not": "yalnizca SIRA degisti; kume ve esikler ayni. Havuzun en cesitli 4'lusu zaten seciliydi (olculdu)."
+    }
+  },
+  "gorsel_secimi": {
+    "esik_std": 20.0,
+    "olcumler": [
+      {
+        "asset_id": "a082_wiki_4ba3ccdace",
+        "yol": "/Users/polatcan/vidrush-docker/app/render-studio/public/editorv2/faz_e/a082_wiki_4ba3ccdace.jpg",
+        "detay_std": 63.1
+      },
+      {
+        "asset_id": "a086_wiki_effc9e462f",
+        "yol": "/Users/polatcan/vidrush-docker/app/render-studio/public/editorv2/faz_e/a086_wiki_effc9e462f.jpg",
+        "detay_std": 53.8
+      },
+      {
+        "asset_id": "a281_wiki_e42b89a1f6",
+        "yol": "/Users/polatcan/vidrush-docker/app/render-studio/public/editorv2/faz_e/a281_wiki_e42b89a1f6.jpg",
+        "detay_std": 6.1
+      },
+      {
+        "asset_id": "a282_wiki_56a60bf31b",
+        "yol": "/Users/polatcan/vidrush-docker/app/render-studio/public/editorv2/faz_e/a282_wiki_56a60bf31b.jpg",
+        "detay_std": 4.7
+      },
+      {
+        "asset_id": "a283_wiki_58de9c1ba3",
+        "yol": "/Users/polatcan/vidrush-docker/app/render-studio/public/editorv2/faz_e/a283_wiki_58de9c1ba3.jpg",
+        "detay_std": 53.0
+      },
+      {
+        "asset_id": "a313_wiki_8ba105ee68",
+        "yol": "/Users/polatcan/vidrush-docker/app/render-studio/public/editorv2/faz_e/a313_wiki_8ba105ee68.jpg",
+        "detay_std": 63.6
+      },
+      {
+        "asset_id": "a314_wiki_6cff017be6",
+        "yol": "/Users/polatcan/vidrush-docker/app/render-studio/public/editorv2/faz_e/a314_wiki_6cff017be6.jpg",
+        "detay_std": 55.1
+      }
+    ],
+    "secilen": [
+      "a313_wiki_8ba105ee68",
+      "a082_wiki_4ba3ccdace",
+      "a086_wiki_effc9e462f",
+      "a314_wiki_6cff017be6"
+    ]
+  },
+  "anlatici_ses": {
+    "motor": "edge-tts",
+    "maliyet_usd": 0.0,
+    "secilen": "en-US-AndrewNeural",
+    "adaylar": [
+      {
+        "codec": "mp3",
+        "ornekleme_hz": 24000,
+        "kanal": 1,
+        "sure_sn": 18.456,
+        "lufs": -21.31,
+        "tepe_dbtp": -4.33,
+        "lra": 2.0,
+        "sessizlikler": [
+          {
+            "bas": 2.651,
+            "sure": 1.0
+          },
+          {
+            "bas": 8.134,
+            "sure": 0.99
+          },
+          {
+            "bas": 13.144,
+            "sure": 1.003
+          },
+          {
+            "bas": 17.597,
+            "sure": 0.859
+          }
+        ],
+        "sessiz_sn": 3.852,
+        "sessiz_pct": 20.9,
+        "kirpma_var": false,
+        "ses": "en-GB-RyanNeural",
+        "cumle_siniri": 4
+      },
+      {
+        "codec": "mp3",
+        "ornekleme_hz": 24000,
+        "kanal": 1,
+        "sure_sn": 17.256,
+        "lufs": -20.38,
+        "tepe_dbtp": -3.94,
+        "lra": 3.2,
+        "sessizlikler": [
+          {
+            "bas": 1.334,
+            "sure": 0.318
+          },
+          {
+            "bas": 2.686,
+            "sure": 0.43
+          },
+          {
+            "bas": 7.919,
+            "sure": 0.405
+          },
+          {
+            "bas": 9.118,
+            "sure": 0.35
+          },
+          {
+            "bas": 12.598,
+            "sure": 0.412
+          },
+          {
+            "bas": 16.899,
+            "sure": 0.357
+          }
+        ],
+        "sessiz_sn": 2.272,
+        "sessiz_pct": 13.2,
+        "kirpma_var": false,
+        "ses": "en-US-AndrewNeural",
+        "cumle_siniri": 4
+      },
+      {
+        "codec": "mp3",
+        "ornekleme_hz": 24000,
+        "kanal": 1,
+        "sure_sn": 17.712,
+        "lufs": -20.46,
+        "tepe_dbtp": -3.74,
+        "lra": 1.4,
+        "sessizlikler": [
+          {
+            "bas": 2.828,
+            "sure": 0.455
+          },
+          {
+            "bas": 6.624,
+            "sure": 0.583
+          },
+          {
+            "bas": 8.333,
+            "sure": 0.436
+          },
+          {
+            "bas": 12.952,
+            "sure": 0.457
+          },
+          {
+            "bas": 17.343,
+            "sure": 0.369
+          }
+        ],
+        "sessiz_sn": 2.3,
+        "sessiz_pct": 13.0,
+        "kirpma_var": false,
+        "ses": "en-US-BrianNeural",
+        "cumle_siniri": 4
+      }
+    ],
+    "master": {
+      "codec": "pcm_s16le",
+      "ornekleme_hz": 48000,
+      "kanal": 1,
+      "sure_sn": 17.256,
+      "lufs": -15.32,
+      "tepe_dbtp": -1.49,
+      "lra": 2.5,
+      "sessizlikler": [
+        {
+          "bas": 1.337,
+          "sure": 0.313
+        },
+        {
+          "bas": 2.688,
+          "sure": 0.427
+        },
+        {
+          "bas": 7.923,
+          "sure": 0.399
+        },
+        {
+          "bas": 9.14,
+          "sure": 0.327
+        },
+        {
+          "bas": 12.599,
+          "sure": 0.409
+        },
+        {
+          "bas": 16.904,
+          "sure": 0.352
+        }
+      ],
+      "sessiz_sn": 2.228,
+      "sessiz_pct": 12.9,
+      "kirpma_var": false,
+      "ses": "en-US-AndrewNeural",
+      "anlatim_bitis_sn": 17.188,
+      "kesim_sn": 17.538
+    }
+  },
+  "plan": {
+    "profil": "premium-modern",
+    "qa": {
+      "durum": "WARN",
+      "fail": 0,
+      "warn": 1,
+      "sorun_sayisi": 4
+    },
+    "on_render_qa": {
+      "durum": "WARN",
+      "fail": 0,
+      "warn": 1,
+      "olcumler": {
+        "pacing": {
+          "beat": 4,
+          "ortalama_sn": 4.38,
+          "en_kisa": 2.96,
+          "en_uzun": 5.21,
+          "kisa_cekim_orani": 0.25,
+          "referans_kisa_orani": 0.32,
+          "histogram": {
+            "2-3": 1,
+            "4-5": 2,
+            "5-6": 1
+          }
+        },
+        "perde": {
+          "acilis": 1,
+          "gelisme": 3,
+          "kapanis": 0
+        },
+        "islev": {
+          "hook": 1,
+          "aciklama": 2,
+          "sonuc": 1
+        },
+        "kapsam": {
+          "cekim": 4,
+          "medya": 4,
+          "fallback": 0,
+          "kapsam_orani": 1.0
+        },
+        "saglayici": {
+          "wikimedia": 4
+        },
+        "tek_saglayici_orani": 1.0,
+        "efekt": {
+          "toplam": 26,
+          "beat_basina_ort": 6.5
+        },
+        "gecis": {
+          "toplam": 4,
+          "seyrek": 0,
+          "hard_cut_orani": 1.0
+        },
+        "tipografi": {
+          "katman": 5,
+          "sorun": 0
+        },
+        "ses": {
+          "lufs_hedef": -14.0,
+          "tepe_tavan": -1.0,
+          "sfx_dakikada": 1.0,
+          "on_zincir_adim": 5,
+          "ducking_araligi": 0
+        },
+        "kalite": {
+          "kare_genislik": 1920,
+          "kare_olcu_verildi": true,
+          "kapi_acik": true,
+          "baslik": [
+            {
+              "olculdu": true,
+              "metin": "TRANQUILITY BASE HERE",
+              "karakter": 21,
+              "punto_taban": 60.0,
+              "kare_genislik": 1920.0,
+              "kullanilabilir_px": 1552.8,
+              "olcek": 1.0,
+              "kucultme_tabani_vuruldu": false,
+              "uygulanan_punto": 60,
+              "cizilen_px": 919.8,
+              "tasma_px": 0.0,
+              "sigar": true,
+              "bant_sag_px": 1687.8,
+              "bant_kare_disi": false,
+              "kelime_kesik": {
+                "olculdu": true,
+                "on_ek": true,
+                "kesik": false,
+                "ham": "Tranquility Base here, the Eagle has landed.",
+                "gosterilen": "TRANQUILITY BASE HERE",
+                "yarim_kelime": "",
+                "tam_kelime": ""
+              },
+              "sigan_karakter": 45
+            }
+          ],
+          "medya_tekrari": {
+            "olculdu": true,
+            "sahne": 4,
+            "benzersiz_asset": 4,
+            "tekrar_eden_asset": {},
+            "bitisik_ayni_asset": [],
+            "benzerlik_olculdu": true,
+            "benzerlik_esigi": 0.86,
+            "benzer_ciftler": [],
+            "okunamayan_cift": 0,
+            "benzerlik_temiz": true
+          },
+          "ritim": {
+            "olculdu": true,
+            "sahne": 4,
+            "sureler": [
+              2.962,
+              5.213,
+              4.688,
+              4.675
+            ],
+            "yayilim_sn": 2.251,
+            "sure_yayilim_orani": 0.4318,
+            "sabit_esik_sn": 0.05,
+            "sabit_blok": false,
+            "anlatim_agirliklari": [
+              7.0,
+              15.0,
+              11.0,
+              11.0
+            ],
+            "agirlik_yayilim_orani": 0.5333,
+            "anlatim_sapma_esigi": 0.15,
+            "anlatim_bagi": true,
+            "toplam_sn": 17.538,
+            "anlatim_bitis_sn": 17.188,
+            "olu_final_sn": 0.35,
+            "olu_final_esigi": 0.5,
+            "olu_final_asildi": false
+          },
+          "guvenli_alan": {
+            "olculdu": true,
+            "kare_yukseklik": 1080.0,
+            "guvenli_kenar": 64.0,
+            "alt_sinir_px": 1016.0,
+            "katman": 6,
+            "olcumler": [
+              {
+                "ad": "chapter-title",
+                "ust_px": 756.0,
+                "alt_px": 869.4,
+                "tavan_px": 1016.0,
+                "taban_px": 64.0
+              },
+              {
+                "ad": "source-label",
+                "ust_px": 648.0,
+                "alt_px": 696.6,
+                "tavan_px": 1016.0,
+                "taban_px": 64.0
+              },
+              {
+                "ad": "source-label",
+                "ust_px": 648.0,
+                "alt_px": 696.6,
+                "tavan_px": 1016.0,
+                "taban_px": 64.0
+              },
+              {
+                "ad": "source-label",
+                "ust_px": 815.4,
+                "alt_px": 864.0,
+                "tavan_px": 1016.0,
+                "taban_px": 64.0
+              },
+              {
+                "ad": "source-label",
+                "ust_px": 815.4,
+                "alt_px": 864.0,
+                "tavan_px": 1016.0,
+                "taban_px": 64.0
+              },
+              {
+                "ad": "subtitle",
+                "ust_px": 874.8,
+                "alt_px": 1015.2,
+                "tavan_px": 1016.0,
+                "taban_px": 64.0
+              }
+            ],
+            "ihlaller": [],
+            "temiz": true
+          },
+          "yazi_cakismasi": {
+            "olculdu": true,
+            "katman": 6,
+            "cakisan_cift": [],
+            "tolerans": 0.005,
+            "temiz": true
+          },
+          "altyazi": {
+            "olculdu": true,
+            "kup_sayisi": 5,
+            "birlestirilen": 0,
+            "maks_karakter": 42,
+            "maks_satir": 2,
+            "min_sn": 1.2,
+            "maks_cps": 20.0,
+            "olculen_kup": 5,
+            "orantili_kup": 0,
+            "cok_hizli": [],
+            "uzun_satir": [],
+            "cok_satir": [],
+            "temiz": true
+          }
+        }
+      },
+      "sorunlar": [
+        {
+          "kod": "SUREKLILIK-AYNI-SAGLAYICI",
+          "seviye": "uyari",
+          "scene_id": "",
+          "beat_id": "b002",
+          "detay": "ardil ayni saglayici (wikimedia)",
+          "oneri": "alternatif varlik/kadraj/hareket sec"
+        },
+        {
+          "kod": "SUREKLILIK-AYNI-SAGLAYICI",
+          "seviye": "uyari",
+          "scene_id": "",
+          "beat_id": "b003",
+          "detay": "ardil ayni saglayici (wikimedia)",
+          "oneri": "alternatif varlik/kadraj/hareket sec"
+        },
+        {
+          "kod": "SUREKLILIK-AYNI-SAGLAYICI",
+          "seviye": "uyari",
+          "scene_id": "",
+          "beat_id": "b004",
+          "detay": "ardil ayni saglayici (wikimedia)",
+          "oneri": "alternatif varlik/kadraj/hareket sec"
+        },
+        {
+          "kod": "SAGLAYICI-TEKEL",
+          "seviye": "warn",
+          "scene_id": "",
+          "beat_id": "",
+          "detay": "tek saglayici %100 (tavan %40): wikimedia",
+          "oneri": "alternatif saglayici adayi kullan ya da coverage_gap birak"
+        }
+      ],
+      "adapter_kayip_efekt": [
+        {
+          "beat_id": "b001",
+          "spec": "light-sweep",
+          "kayip": "yonlu isik sizmasi yok, kisa flash"
+        }
+      ],
+      "adapter_remotion_gerekli": [
+        "b001"
+      ]
+    },
+    "efekt_kapsami": {
+      "sayim": {
+        "gercek": 26,
+        "pseudo": 0,
+        "ffmpeg-yolu": 0,
+        "bilinmeyen": 0,
+        "toplam": 26
+      },
+      "detay": {
+        "gercek": {
+          "push-in": 2,
+          "grain": 4,
+          "vignette": 4,
+          "grade": 4,
+          "light-sweep": 1,
+          "hard-cut": 4,
+          "chapter-title": 1,
+          "source-label": 4,
+          "static": 1,
+          "pull-out": 1
+        }
+      }
+    },
+    "kapsam_boslugu": [],
+    "elenen_medya": []
+  },
+  "zincir": [
+    {
+      "beat_id": "b001",
+      "scene_id": "s001",
+      "fact_id": "f005",
+      "asset_id": "a313_wiki_8ba105ee68",
+      "saglayici": "wikimedia",
+      "lisans": "public-domain",
+      "sure_sn": 2.962,
+      "bas_sn": 0.0,
+      "cekim_turu": "close-detail",
+      "hareket": "push-in",
+      "kadraj": "tam",
+      "motion": [
+        "push-in",
+        "grain",
+        "vignette",
+        "grade",
+        "light-sweep",
+        "hard-cut",
+        "chapter-title",
+        "source-label"
+      ],
+      "gecis": [
+        "hard-cut"
+      ],
+      "altyazi_adet": 1,
+      "tipografi": [
+        "chapter-title"
+      ],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "hook"
+    },
+    {
+      "beat_id": "b002",
+      "scene_id": "s002",
+      "fact_id": "f001",
+      "asset_id": "a082_wiki_4ba3ccdace",
+      "saglayici": "wikimedia",
+      "lisans": "public-domain",
+      "sure_sn": 5.213,
+      "bas_sn": 2.962,
+      "cekim_turu": "medium",
+      "hareket": "static",
+      "kadraj": "punch-1.35",
+      "motion": [
+        "static",
+        "grain",
+        "vignette",
+        "grade",
+        "hard-cut",
+        "source-label"
+      ],
+      "gecis": [
+        "hard-cut"
+      ],
+      "altyazi_adet": 2,
+      "tipografi": [],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "aciklama"
+    },
+    {
+      "beat_id": "b003",
+      "scene_id": "s003",
+      "fact_id": "f002",
+      "asset_id": "a086_wiki_effc9e462f",
+      "saglayici": "wikimedia",
+      "lisans": "public-domain",
+      "sure_sn": 4.688,
+      "bas_sn": 8.175,
+      "cekim_turu": "medium",
+      "hareket": "push-in",
+      "kadraj": "ust",
+      "motion": [
+        "push-in",
+        "grain",
+        "vignette",
+        "grade",
+        "hard-cut",
+        "source-label"
+      ],
+      "gecis": [
+        "hard-cut"
+      ],
+      "altyazi_adet": 1,
+      "tipografi": [],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "aciklama"
+    },
+    {
+      "beat_id": "b004",
+      "scene_id": "s004",
+      "fact_id": "f004",
+      "asset_id": "a314_wiki_6cff017be6",
+      "saglayici": "wikimedia",
+      "lisans": "public-domain",
+      "sure_sn": 4.675,
+      "bas_sn": 12.863,
+      "cekim_turu": "establishing",
+      "hareket": "pull-out",
+      "kadraj": "punch-1.6",
+      "motion": [
+        "pull-out",
+        "grain",
+        "vignette",
+        "grade",
+        "hard-cut",
+        "source-label"
+      ],
+      "gecis": [
+        "hard-cut"
+      ],
+      "altyazi_adet": 1,
+      "tipografi": [],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "sonuc"
+    }
+  ],
+  "ffprobe": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "codec_type": "video",
+        "width": 1920,
+        "height": 1080,
+        "r_frame_rate": "30/1",
+        "side_data_list": [
+          {}
+        ]
+      },
+      {
+        "codec_name": "aac",
+        "codec_type": "audio",
+        "sample_rate": "96000",
+        "channels": 2,
+        "r_frame_rate": "0/0"
+      }
+    ],
+    "format": {
+      "duration": "17.600000",
+      "size": "31151491",
+      "bit_rate": "14159768"
+    }
+  },
+  "video_ses_olcumu": {
+    "codec": "h264",
+    "ornekleme_hz": 0,
+    "kanal": 0,
+    "sure_sn": 17.6,
+    "lufs": -14.32,
+    "tepe_dbtp": -2.08,
+    "lra": 3.4,
+    "sessizlikler": [],
+    "sessiz_sn": 0,
+    "sessiz_pct": 0.0,
+    "kirpma_var": false
+  },
+  "remaster": {
+    "uygulandi": true,
+    "once": {
+      "codec": "h264",
+      "ornekleme_hz": 0,
+      "kanal": 0,
+      "sure_sn": 17.579,
+      "lufs": -15.31,
+      "tepe_dbtp": -4.19,
+      "lra": 3.4,
+      "sessizlikler": [],
+      "sessiz_sn": 0,
+      "sessiz_pct": 0.0,
+      "kirpma_var": false
+    },
+    "hedef_lufs": -14.0,
+    "sonra": {
+      "codec": "h264",
+      "ornekleme_hz": 0,
+      "kanal": 0,
+      "sure_sn": 17.6,
+      "lufs": -14.32,
+      "tepe_dbtp": -2.08,
+      "lra": 3.4,
+      "sessizlikler": [],
+      "sessiz_sn": 0,
+      "sessiz_pct": 0.0,
+      "kirpma_var": false
+    },
+    "yol": "ffmpeg loudnorm, video akisi kopyalandi",
+    "maliyet_usd": 0.0
+  },
+  "kesmeler": {
+    "sayi": 4,
+    "anlar": [
+      0.033,
+      2.967,
+      8.167,
+      12.867
+    ]
+  },
+  "post_qa": {
+    "durum": "PASS",
+    "olcumler": {
+      "video": {
+        "genislik": 1920,
+        "yukseklik": 1080,
+        "fps": 30.0,
+        "codec": "h264",
+        "sure_sn": 17.6,
+        "boyut_bayt": 31151491
+      },
+      "ses_akisi": {
+        "codec": "aac",
+        "ornekleme": 96000,
+        "kanal": 2
+      },
+      "siyah_araliklar": [],
+      "donmus_araliklar": [],
+      "kesmeler": [
+        0.0333333,
+        2.966667,
+        8.166667,
+        12.866667
+      ],
+      "kesme_sayisi": 4,
+      "loudness": {
+        "lufs": -14.32,
+        "tepe_dbtp": -2.08,
+        "lra": 3.4
+      },
+      "sessizlikler": [],
+      "sessizlikler_ince": [],
+      "sure_farki_sn": 0.06,
+      "kalite": {
+        "kapi_acik": true,
+        "miks": {
+          "olculdu": true,
+          "sure_sn": 17.6,
+          "aralik_sayisi": 0,
+          "araliklar": [],
+          "sessiz_sn": 0,
+          "sessiz_orani": 0.0,
+          "sessiz_oran_tavani": 0.15,
+          "sessiz_oran_asildi": false,
+          "olu_final_sn": 0.0,
+          "olu_final_esigi": 0.5,
+          "olu_final_asildi": false,
+          "kaynak_gecis": "sessizlik_ince(d=0.30)"
+        },
+        "ambans": {
+          "olculdu": true,
+          "ambans_lufs": -25.98,
+          "anlatim_lufs": -15.32,
+          "ambans_seviye": 0.5,
+          "seviye_db": -6.02,
+          "ducking": 0.5,
+          "ducking_db": -6.02,
+          "etkin_lufs": -38.02,
+          "etkin_ducksuz_lufs": -32.0,
+          "fark_db": 22.7,
+          "fark_ducksuz_db": 16.68,
+          "esik_db": 30.0,
+          "bastirma_esik_db": 12.0,
+          "duyulabilir": true,
+          "bastiriyor": false,
+          "dengeli": true,
+          "ducking_suz_duyulabilir": true
+        }
+      }
+    },
+    "sorunlar": [],
+    "komutlar": [
+      {
+        "ad": "ffprobe",
+        "komut": "ffprobe -v error -select_streams v:0 -show_entries ...",
+        "rc": 0
+      },
+      {
+        "ad": "ffprobe_ses",
+        "komut": "ffprobe -v error -select_streams a:0 -show_entries ...",
+        "rc": 0
+      },
+      {
+        "ad": "siyah",
+        "komut": "ffmpeg -nostdin -i /Users/polatcan/vidrush-docker/outputs/sample/editorv2_altyazi_1080p_i16.mp4 -vf blackdetect=d=0.05:pix_th=0.10 ...",
+        "rc": 0
+      },
+      {
+        "ad": "donmus",
+        "komut": "ffmpeg -nostdin -i /Users/polatcan/vidrush-docker/outputs/sample/editorv2_altyazi_1080p_i16.mp4 -vf freezedetect=n=0.003:d=1.0 ...",
+        "rc": 0
+      },
+      {
+        "ad": "kesme",
+        "komut": "ffmpeg -nostdin -i /Users/polatcan/vidrush-docker/outputs/sample/editorv2_altyazi_1080p_i16.mp4 -filter:v select='gt(scene,0.12)',showinfo ...",
+        "rc": 0
+      },
+      {
+        "ad": "loudness",
+        "komut": "ffmpeg -nostdin -i /Users/polatcan/vidrush-docker/outputs/sample/editorv2_altyazi_1080p_i16.mp4 -af loudnorm=print_format=json ...",
+        "rc": 0
+      },
+      {
+        "ad": "sessizlik",
+        "komut": "ffmpeg -nostdin -i /Users/polatcan/vidrush-docker/outputs/sample/editorv2_altyazi_1080p_i16.mp4 -af silencedetect=noise=-45dB:d=1.2 ...",
+        "rc": 0
+      },
+      {
+        "ad": "sessizlik_ince",
+        "komut": "ffmpeg -nostdin -i /Users/polatcan/vidrush-docker/outputs/sample/editorv2_altyazi_1080p_i16.mp4 -af silencedetect=noise=-45dB:d=0.30 ...",
+        "rc": 0
+      }
+    ]
+  },
+  "kareler": [
+    {
+      "an_sn": 1.2,
+      "dosya": "outputs/sample/i16_kare_1_2s.png",
+      "bayt": 1751650
+    },
+    {
+      "an_sn": 1.76,
+      "dosya": "outputs/sample/i16_kare_1_76s.png",
+      "bayt": 1721462
+    },
+    {
+      "an_sn": 3.87,
+      "dosya": "outputs/sample/i16_kare_3_87s.png",
+      "bayt": 2103758
+    },
+    {
+      "an_sn": 5.57,
+      "dosya": "outputs/sample/i16_kare_5_57s.png",
+      "bayt": 2072469
+    },
+    {
+      "an_sn": 6.16,
+      "dosya": "outputs/sample/i16_kare_6_16s.png",
+      "bayt": 2136646
+    },
+    {
+      "an_sn": 8.45,
+      "dosya": "outputs/sample/i16_kare_8_45s.png",
+      "bayt": 2347757
+    },
+    {
+      "an_sn": 10.52,
+      "dosya": "outputs/sample/i16_kare_10_52s.png",
+      "bayt": 2309908
+    },
+    {
+      "an_sn": 12.67,
+      "dosya": "outputs/sample/i16_kare_12_67s.png",
+      "bayt": 2311644
+    },
+    {
+      "an_sn": 14.96,
+      "dosya": "outputs/sample/i16_kare_14_96s.png",
+      "bayt": 2095258
+    },
+    {
+      "an_sn": 16.72,
+      "dosya": "outputs/sample/i16_kare_16_72s.png",
+      "bayt": 2319230
+    }
+  ],
+  "kapsam": {
+    "gercek_motor": [
+      "editor.plan.uret (beat/gramer/motion/tipografi/ses/QA-on)",
+      "editor.adapter.donustur",
+      "editor.remotion_v2 dogrula/props_hazirla/render",
+      "Remotion VidrushEditorV2 (Chrome headless + ffmpeg)",
+      "edge-tts anlatim + SentenceBoundary zamanlamasi",
+      "kalite_kapisi ACIK: on-render + render sonrasi"
+    ],
+    "kapsam_disi": [
+      "WEB'DEN MEDYA BULMA — saglayiciya HIC istek atilmadi",
+      "arastirma/fact-check motoru (olgular Faz E manifestinden)",
+      "canli /api/generate hatti",
+      "altyazi ve kaynak kunyesi (sonraki atom)",
+      "ucretli API (maliyet $0.00)"
+    ]
+  }
+}

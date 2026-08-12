@@ -29,6 +29,8 @@ FAIL_KODLARI = {
     # ── Faz I-14 kalite kapilari ──
     "KALITE-BASLIK-KIRPIK", "KALITE-BASLIK-TASMA", "KALITE-MEDYA-TEKRAR",
     "KALITE-RITIM-SABIT", "KALITE-OLU-FINAL",
+    # ── Faz I-16: altyazi + kunye + guvenli alan ──
+    "KALITE-YAZI-CAKISMA", "KALITE-GUVENLI-ALAN",
 }
 
 # I-14 kapisinin urettigi kodlar. Kapi KAPALIYKEN bunlarin HICBIRI uretilmez;
@@ -36,7 +38,9 @@ FAIL_KODLARI = {
 # verilmiyor). Boylece varsayilan yolun PASS/WARN/FAIL karari BIT-BIT ayni kalir.
 KALITE_KODLARI = ("KALITE-BASLIK-KIRPIK", "KALITE-BASLIK-TASMA",
                   "KALITE-MEDYA-TEKRAR", "KALITE-RITIM-SABIT",
-                  "KALITE-OLU-FINAL", "KALITE-MEDYA-BENZER-OLCULEMEDI")
+                  "KALITE-OLU-FINAL", "KALITE-MEDYA-BENZER-OLCULEMEDI",
+                  "KALITE-YAZI-CAKISMA", "KALITE-GUVENLI-ALAN",
+                  "KALITE-ALTYAZI-OKUNMAZ")
 
 
 @dataclass
@@ -89,6 +93,7 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
             kare_olcu: Optional[tuple] = None,
             anlatim_bitis_sn: Optional[float] = None,
             benzerlik_okuyucu=None,
+            altyazi_kupleri: Optional[list] = None,
             kalite_kapisi: bool = False) -> QaSonucu:
     """Pre-render denetim.
 
@@ -100,6 +105,9 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
       `anlatim_bitis_sn` : anlatim sesinin bittigi an (olu final olcumu icin).
       `benzerlik_okuyucu`: (yolA, yolB) -> 0..1. Verilmezse gorsel benzerlik
                            `olculemedi` yazilir; "benzer medya yok" DENMEZ.
+      `altyazi_kupleri`  : mutlak zamanli altyazi kupleri. Verilirse altyazi
+                           bandi REZERVE sayilir, okunabilirlik olculur ve
+                           kunye/baslik ile cakismasi denetlenir.
       `kalite_kapisi`    : False iken KALITE-* kodlari URETILMEZ, yalnizca
                            olcum yazilir. True iken kapi gercekten hukum verir.
     """
@@ -330,14 +338,16 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
                     yazi_katmanlari=yazi_katmanlari,
                     adaylar_index=adaylar_index, p=p, kare_olcu=kare_olcu,
                     anlatim_bitis_sn=anlatim_bitis_sn, toplam=toplam,
-                    benzerlik_okuyucu=benzerlik_okuyucu, acik=kalite_kapisi)
+                    benzerlik_okuyucu=benzerlik_okuyucu,
+                    altyazi_kupleri=altyazi_kupleri, acik=kalite_kapisi)
 
     return q.sonuclandir()
 
 
 def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
                     adaylar_index, p, kare_olcu, anlatim_bitis_sn, toplam,
-                    benzerlik_okuyucu, acik: bool) -> None:
+                    benzerlik_okuyucu, acik: bool,
+                    altyazi_kupleri=None) -> None:
     """I-14 olcumlerini kos ve (kapi acikken) sorun uret. ASLA COKMEZ."""
     kk = kalite_kapisi
     try:
@@ -449,5 +459,67 @@ def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
                   f"(tavan {rt['olu_final_esigi']} sn): toplam "
                   f"{rt['toplam_sn']} sn, anlatim {rt['anlatim_bitis_sn']} sn",
                   "son sahneyi anlatim bitisine kadar kisalt")
+
+    # ── (4) YAZI: GUVENLI ALAN + CAKISMA + ALTYAZI OKUNABILIRLIGI (I-16) ──
+    try:
+        yukseklik = int((kare_olcu or (0, p.yukseklik))[1] or p.yukseklik)
+    except (TypeError, ValueError, IndexError):
+        yukseklik = p.yukseklik
+    kutular = [{"ad": getattr(k, "ad", ""),
+                "y_ust": getattr(k, "y_orani", 0.0),
+                "yukseklik": tipografi.YUKSEKLIK.get(getattr(k, "ad", ""), 0.08),
+                "bas_sn": getattr(k, "bas_sn", 0.0),
+                "sure_sn": getattr(k, "sure_sn", 0.0)}
+               for k in (yazi_katmanlari or [])]
+    if altyazi_kupleri:
+        # Altyazi bandi TEK bir rezerve kutu olarak katilir: kupler ardisik
+        # oldugu icin bant pratikte surekli doludur.
+        _kb = [kk._sayi(c.get("bas_sn")) for c in altyazi_kupleri
+               if isinstance(c, dict)]
+        _ks = [kk._sayi(c.get("bas_sn")) + kk._sayi(c.get("sure_sn"))
+               for c in altyazi_kupleri if isinstance(c, dict)]
+        if _kb:
+            kutular.append({
+                "ad": "subtitle", "y_ust": tipografi.ALTYAZI_BANT[0],
+                "yukseklik": (tipografi.ALTYAZI_BANT[1]
+                              - tipografi.ALTYAZI_BANT[0]),
+                "bas_sn": min(_kb), "sure_sn": max(_ks) - min(_kb)})
+    ga = kk.guvenli_alan_olcusu(kutular, kare_yukseklik=yukseklik,
+                                guvenli_kenar=p.tipografi.guvenli_kenar)
+    ck = kk.yazi_cakismasi(kutular)
+    olcum["guvenli_alan"] = ga
+    olcum["yazi_cakismasi"] = ck
+    for ih in (ga.get("ihlaller") or []):
+        _ekle("KALITE-GUVENLI-ALAN", "fail",
+              f"{ih['ad']}: {ih['ihlal']} kenardan {ih['tasma_px']}px tasiyor "
+              f"(ust {ih['ust_px']}px / alt {ih['alt_px']}px, "
+              f"guvenli aralik {ih['taban_px']}-{ih['tavan_px']}px)",
+              "katmani guvenli alanin icine tasi ya da puntoyu kucult")
+    for c2 in (ck.get("cakisan_cift") or []):
+        _ekle("KALITE-YAZI-CAKISMA", "fail",
+              f"{c2['a']} ile {c2['b']} ayni anda ve ayni yerde: "
+              f"zaman {c2['zaman']}, dikey {c2['dikey']}",
+              "cakisma cozucuye yasak bant bildir ya da zamanlamayi ayir")
+
+    if altyazi_kupleri:
+        ao = kk.altyazi_kupleri(
+            [{"bas": c.get("bas_sn"), "sure": c.get("sure_sn"),
+              "metin": c.get("metin")} for c in altyazi_kupleri
+             if isinstance(c, dict)],
+            maks_karakter=p.tipografi.maks_satir_karakter)
+        olcum["altyazi"] = {k2: v for k2, v in ao.items() if k2 != "kupler"}
+        olcum["altyazi"]["kup_sayisi"] = ao.get("kup_sayisi")
+        for kupe in (ao.get("cok_hizli") or []):
+            _ekle("KALITE-ALTYAZI-OKUNMAZ", "warn",
+                  f"kup cok hizli: {len(kupe['metin'])} karakter / "
+                  f"{kupe['sure_sn']} sn > {ao['maks_cps']} kar/sn "
+                  f"({kupe['metin'][:40]!r})",
+                  "kupu bol ya da suresini uzat")
+        for kupe in (ao.get("uzun_satir") or []) + (ao.get("cok_satir") or []):
+            _ekle("KALITE-ALTYAZI-OKUNMAZ", "warn",
+                  f"kup okunabilirlik sinirini asiyor: "
+                  f"{len(kupe['satirlar'])} satir, en uzun "
+                  f"{max((len(s) for s in kupe['satirlar']), default=0)} karakter",
+                  "satir uzunlugunu/sayisini dusur")
 
     q.olcumler["kalite"] = olcum

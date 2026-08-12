@@ -182,6 +182,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-13 10 sn kaliteli sesli Apollo mini-belgeseli** | `ca023f3` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-14 (1. atom) kalite kapıları ölçüldü + QA'ya bağlandı** | `c584020` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-15 gerçek düzeltme + yeniden render (kapı AÇIK, PASS)** | `891a814` | ✅ **origin'e push edildi**, deploy YOK |
+| 12 Ağu | **I-16 altyazı + kaynak künyesi + 1080p** | `PENDING` | ✅ **origin'e push edildi**, deploy YOK |
 
 ---
 
@@ -2666,3 +2667,153 @@ Aynı tuzak I-9'da da yaşanmıştı. `tokenize` ile yorum ve dizeleri ayıklaya
 Altyazı dizisinin TTS zamanlamasından üretilip props'a bağlanması (artık
 `SentenceBoundary` elimizde), `source-label` künyesinin ekrana çıkması ve
 1080p render ölçümü.
+
+---
+
+## 34. FAZ I-16 — ALTYAZI + GÖRÜNÜR KAYNAK KÜNYESİ + 1080p (12 Ağu, ölçüldü)
+
+> **Durum: yerel yeşil, `origin/arastirma-motoru`'na push edildi. Deploy YOK.**
+> **Bayraklar varsayılan KAPALI. Maliyet $0.00 — ağ/ücretli API yok.**
+> Yeni: `webapp/testler/smoke_altyazi_kunye_1080p_i16.py`,
+> `outputs/sample/altyazi_1080p_i16_rapor.json`.
+> Değişen: `webapp/editor/kalite_kapisi.py`, `webapp/editor/tipografi.py`,
+> `webapp/editor/plan.py`, `webapp/editor/qa_on.py`,
+> `webapp/editor/adapter.py`, `webapp/edit_kopru.py`,
+> `app/render-studio/src/editorv2/Grafikler.tsx`,
+> `app/render-studio/src/editorv2/EditorV2.tsx`,
+> `webapp/testler/test_faz_i.py`, `outputs/sample/README.md` (+ bu handoff).
+> **Dokunulmadı:** `pipeline.py`, `server.py`, tüm arayüz, 22 alanlık generate
+> sözleşmesi, `deploy.sh`, lisans duvarı, SSRF, kare kapısı, iş bütçesi.
+
+### Kapatılan üç açık
+
+§33 sınır 1–2 ve §31 kusur 6–7: altyazı yoktu, kaynak künyesi ekranda
+görünmüyordu, çıktı yalnızca 720p'ydi. Üçü de kapandı.
+
+| Ölçüm | I-15 | **I-16** |
+|---|---|---|
+| Çözünürlük | 1280×720 | **1920×1080** |
+| Süre | 12.821 sn | **17.579 sn** |
+| Altyazı | **yok** | **5 küp**, zaman kodlu, ≤2 satır / ≤42 karakter |
+| Kaynak künyesi | **üretilmiyordu** | **NASA / PUBLIC-DOMAIN**, sahneye bağlı |
+| Güvenli alan ihlali | ölçülmüyordu | **0** (1080p'de ölçüldü) |
+| Yazı çakışması | ölçülmüyordu | **0** (başlık + künye + altyazı aynı anda) |
+| Miks LUFS / TP | −14.87 / −4.0 | **−14.32 / −2.08** |
+| Sahne kesimi | 3 | **4** (0.033 · 2.967 · 8.167 · 12.867) |
+| Kare | 9 | **10**, hepsi görsel incelendi |
+| PRE / POST QA | WARN(0) / PASS | **WARN(fail=0) / PASS** |
+
+### Bulunan ve kapatılan İKİ GERÇEK KUSUR
+
+**1. Altyazı: "props'ta var, videoda yok".**
+`altyazi` alanı `sozlesme.ts:62`'de tanımlıydı ve `adapter.py:127` onu
+props'a kadar **taşıyordu** — ama hiçbir Remotion bileşeni onu **çizmiyordu**.
+Bu, `Ses.tsx`'te Faz D'de kapatılan kusurun (ses taşınıyordu, `<Audio>` yoktu)
+tipografi tarafındaki eşi. Yeni `Altyazi` bileşeni eklendi ve `SahneKatmani`
+içine, geçiş katmanının **altına** mount edildi (geçiş karartması altyazıyı da
+etkilesin diye).
+
+**2. Kaynak künyesi güvenli alanın DIŞINDAYDI.**
+`KaynakEtiketi` `bottom: 22` **sabitiyle** çiziliyordu — yani Python'un
+hesapladığı `y_orani`'yi **hiç okumuyordu**. 1080p'de yayın güvenli kenarı
+64 px iken künye 22 px'te duruyordu. Üstelik Python'un çakışma aritmetiği
+gerçekle örtüşmüyordu: plan "0.895'te" sanıyor, render 22 px'e çiziyordu.
+Artık spec'ten `y_orani` okunuyor ve güvenli kenar **zorlanıyor**.
+
+### Altyazı zamanlaması — dürüst etiket
+
+Cümle sınırları **ölçüm**: edge-tts `SentenceBoundary`. Ama bir cümle iki
+küpe sığmıyorsa parça zamanlaması **ölçüm değil, karakter ağırlıklı orantılı
+dağıtımdır** — edge-tts 7.2.8 kelime sınırı vermiyor (ölçüldü). Her küp
+`zamanlama: "olculdu" | "orantili"` alanı taşır; rapor ikisini ayrı sayar.
+
+Okunabilirlik kuralları ölçülebilir: ≤42 karakter/satır, ≤2 satır,
+≥1.2 sn küp süresi, ≤20 karakter/sn okuma hızı.
+
+### Altyazı bandı rezerve edildi
+
+`tipografi.ALTYAZI_BANT = (0.81, 0.94)` — alt sınır **hesaplandı**:
+`0.94 × 1080 = 1015.2 px ≤ 1016` (güvenli tavan). Bu bant hiçbir yazı
+katmanına açılmaz: `cakisma_coz()` yeni `yasak_bant` parametresiyle oraya
+**kaydırmıyor**. Aksi halde çözücü `0.88`'e kaydırıp katmanı altyazının
+üstüne bindirir, çözdüğü çakışmanın yerine yenisini koyardı. Altyazı varken
+künye `0.755`'e taşınıyor (`0.755 + 0.045 = 0.80` → bandın hemen üstü).
+
+### Render sırasında bulunan ÜÇ hata (hepsi kendi hatam)
+
+1. **`fontSize: 0` — altyazı görünmez çizildi.** `sayi(v, varsayilan)`
+   yalnızca **sayı olmayan** girdide varsayılana düşer; ben `?? 0` yazınca
+   `sayi(0, 38)` → **0** döndü. İlk 1080p koşusunda altyazı hiç görünmedi,
+   kareyle yakalandı. Tuzak koda yazıldı, test kilitliyor.
+2. **JSX yorumu attribute listesinin içinde** → esbuild render'ı kırdı.
+3. **Sarkan edat altyazıda.** "…on the Moon" / "**on**" — ikinci satır tek
+   başına bir edat kaldı (kareyle görüldü). `plan._SARKAN`'ın altyazı
+   karşılığı (`_SARKAN_KELIME` + `_sarkani_tasi`) eklendi; ayrıca açgözlü
+   doldurma yerine **dengeli bölme** yapılıyor (açgözlü bölme 0.659 sn'lik
+   okunamaz bir artık küp bırakıyordu).
+
+### Kontrollü tek remaster
+
+Miks −15.31 LUFS çıktı (hedef −14). §13'te (H6) onaylanmış yol uygulandı:
+**yalnız ses sorununda, bir kez, ücretsiz + deterministik** `loudnorm`;
+video akışı **kopyalandı**, yeniden render edilmedi. Sonuç −14.32 LUFS /
+TP −2.08. Rapor önce/sonra değerlerini birlikte taşıyor.
+
+### ⛔ HAREKETLI VIDEO B-ROLL — DÜRÜSTÇE BLOKE
+
+Güvenli fixture havuzunda **gerçek video adayı yok**. Depoda 4 `.mp4` var ama
+hepsi bu projenin **kendi render çıktıları** (`cikti/faz_e/pilot_master.mp4`,
+`pilot_ham.mp4`, `cikti/faz_d/*.mp4`). Onları "arşiv B-roll" diye kullanmak
+döngüsel ve yanıltıcı olurdu: kendi çıktımızı yeniden render edip "gerçek
+çekim" demek. Betik bunu tarayıp `durum: "BLOKE"` yazıyor ve sebebi raporda
+duruyor. **Sahte hareket üretilmedi.**
+
+### Görsel doğrulama — 10 kare, hepsi incelendi
+
+`1.2 · 1.76 · 3.87 · 5.57 · 6.16 · 8.45 · 10.52 · 12.67 · 14.96 · 16.72` sn.
+1.2/1.76 sn karelerinde **üçü birden** ekranda: bölüm başlığı
+("TRANQUILITY BASE HERE", tam, kırpma yok), kaynak künyesi
+("NASA / PUBLIC-DOMAIN", sağ üstte güvenli alanda) ve altyazı (alt bantta,
+iki satır). Çakışma yok. Sarkan edat düzeltmesi 5.57 sn karesinde doğrulandı.
+
+### Ölçülen test sonucu (12 Ağu) — İKİ ORTAM AYRI
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Zengin venv** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **257** | **1197** | **2611** |
+| **Sistem Python** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **203** | **1197** | **2557** |
+
+0 hata. Faz I 1125 → **1197** (+72). Faz C **148/0** — editor paketinde
+gerileme yok. `deploy.sh` tanımsız-isim taraması → **0 bulgu**.
+
+⚠ **İki I-14 kontrolü silinmedi, GÜNCELLENDİ:** `kapsam_ozeti` kontrolü
+5 ölçüm / 4 kapsam-dışı kilitliyordu; I-16 altyazı+künye+1080p'yi kapsama
+aldığı için kural aynı niyetle (kapsam sayılabilir olmalı, kapsam dışı
+açıkça yazılmalı) yeniden yazıldı.
+
+### BİLİNEN SINIRLAR (dürüstçe)
+
+1. **Hareketli video B-roll YOK** (yukarıda) — havuz sınırı, gizlenmiyor.
+2. **Altyazı kelime düzeyinde senkron değil.** Cümle sınırı ölçüm, cümle içi
+   dağıtım orantılı. Kelime düzeyi için farklı bir TTS/hizalayıcı gerekir.
+3. **Aynı regolit/ayak izi görselleri hâlâ uzun kalıyor.** Ölçülen en yüksek
+   ikili benzerlik 0.6094, eşik 0.86 — kapı haklı olarak sessiz. §32/§33'te
+   belgelenen **algısal benzerlik ölçüm boşluğu I-16'da da açık**; havuzun en
+   çeşitli 4'lüsü zaten seçili ve eşik düşürülmedi.
+4. **`SAGLAYICI-TEKEL` WARN duruyor** (%100 wikimedia) — fixture'da tek
+   sağlayıcı var. Gerçek çok sağlayıcılı işte düşmesi *beklenir*, ölçülmedi.
+5. **Altyazı stili tek tip** (`bant-orta`). Karaoke/kelime vurgulu stiller yok.
+6. **`altyaziStil` props alanı hâlâ okunmuyor** — bileşen tek stil çiziyor;
+   alan taşınıyor ama davranışı değiştirmiyor.
+7. **Ambiyans 30/12 dB eşikleri beyan edilmiş tasarım kararı**, dinleme testi
+   değil (§33 sınır 5 aynen geçerli).
+8. **Canlı `/api/generate` hattı bu kapıyı hâlâ görmüyor** (§32 sınır 8).
+9. **edge-tts prosodisi tekrar üretilebilir değil**; testler süre değerlerini
+   değil özelliklerini kilitler.
+
+### SONRAKİ ATOM (I-17 — bu atomda YAPILMADI)
+
+Gerçek hareketli B-roll'un güvenli bir havuzdan (Wikimedia video, Openverse)
+**gerçekten indirilmesi** — bu, web medya hattının (`medya_kopru`, bayrak
+hâlâ kapalı) ilk gerçek koşusu olur. Yanında: algısal benzerlik ölçümü için
+ikinci bir sinyal ve `altyaziStil` alanının gerçekten uygulanması.

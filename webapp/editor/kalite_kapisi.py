@@ -494,16 +494,276 @@ def miks_olcusu(*, sure_sn: Optional[float], sessizlik_araliklari=None,
     }
 
 
+# ═══════════════ 5) YAZI: GUVENLI ALAN + CAKISMA (Faz I-16) ═════════════
+#
+# Altyazi GERCEKTEN cizilmeye baslayinca ekranin alt seridi surekli dolu
+# oluyor. Baslik, kaynak kunyesi ve altyazi ayni anda ekranda olabilir;
+# ucunun de yayin guvenli alaninda kalmasi VE birbirini ortmemesi gerekiyor.
+# Bu iki olcum saf geometridir — render'a bakmaz, plandan olculur.
+
+def guvenli_alan_olcusu(katmanlar, *, kare_yukseklik: float,
+                        guvenli_kenar: float) -> dict:
+    """Her yazi katmani yayin guvenli alaninin ICINDE mi?
+
+    `katmanlar`: [{"ad","y_ust","yukseklik","bas_sn","sure_sn"} ...]
+    Oran (0..1) girdiler piksele HESAPLANARAK cevrilir — "yeterince asagi"
+    varsayimi yok (I-12'de ucuncu kez o varsayimla tasilmisti).
+    """
+    try:
+        liste = [k for k in (katmanlar or []) if isinstance(k, dict)]
+    except TypeError:
+        return {"olculdu": False, "neden": "GIRDI-BOZUK"}
+    h = _sayi(kare_yukseklik)
+    kenar = _sayi(guvenli_kenar)
+    if h <= 0:
+        return {"olculdu": False, "neden": "OLCU-YOK"}
+    alt_sinir = h - kenar
+    ihlaller, olcumler = [], []
+    for k in liste:
+        ust_px = _sayi(k.get("y_ust")) * h
+        alt_px = (_sayi(k.get("y_ust")) + _sayi(k.get("yukseklik"))) * h
+        kayit = {"ad": str(k.get("ad") or ""), "ust_px": round(ust_px, 1),
+                 "alt_px": round(alt_px, 1), "tavan_px": round(alt_sinir, 1),
+                 "taban_px": round(kenar, 1)}
+        if alt_px > alt_sinir + 1e-6:
+            kayit["ihlal"] = "ALT"
+            kayit["tasma_px"] = round(alt_px - alt_sinir, 1)
+            ihlaller.append(kayit)
+        elif ust_px < kenar - 1e-6:
+            kayit["ihlal"] = "UST"
+            kayit["tasma_px"] = round(kenar - ust_px, 1)
+            ihlaller.append(kayit)
+        olcumler.append(kayit)
+    return {"olculdu": True, "kare_yukseklik": h, "guvenli_kenar": kenar,
+            "alt_sinir_px": round(alt_sinir, 1), "katman": len(liste),
+            "olcumler": olcumler, "ihlaller": ihlaller,
+            "temiz": not ihlaller}
+
+
+def yazi_cakismasi(katmanlar, *, tolerans: float = 0.005) -> dict:
+    """Ayni anda ekranda olan yazilar birbirini ORTUYOR mu?
+
+    Cakisma = ZAMAN araliklari kesisiyor **ve** DIKEY araliklar kesisiyor.
+    Ikisi birden olmadan cakisma yoktur (11 Agu'da baslik ile alt band tam
+    boyle bindirmisti ve ikisi de okunamaz olmustu).
+    """
+    try:
+        liste = [k for k in (katmanlar or []) if isinstance(k, dict)]
+    except TypeError:
+        return {"olculdu": False, "neden": "GIRDI-BOZUK"}
+    ciftler = []
+    for i in range(len(liste)):
+        for j in range(i + 1, len(liste)):
+            a, b = liste[i], liste[j]
+            a0, a1 = _sayi(a.get("bas_sn")), _sayi(a.get("bas_sn")) + _sayi(
+                a.get("sure_sn"))
+            b0, b1 = _sayi(b.get("bas_sn")), _sayi(b.get("bas_sn")) + _sayi(
+                b.get("sure_sn"))
+            if a1 <= b0 + 1e-9 or b1 <= a0 + 1e-9:
+                continue                      # zaman kesismiyor
+            au, aa = _sayi(a.get("y_ust")), _sayi(a.get("y_ust")) + _sayi(
+                a.get("yukseklik"))
+            bu, ba = _sayi(b.get("y_ust")), _sayi(b.get("y_ust")) + _sayi(
+                b.get("yukseklik"))
+            if aa <= bu + tolerans or ba <= au + tolerans:
+                continue                      # dikey kesismiyor
+            ciftler.append({
+                "a": str(a.get("ad") or ""), "b": str(b.get("ad") or ""),
+                "zaman": [round(max(a0, b0), 3), round(min(a1, b1), 3)],
+                "dikey": [round(max(au, bu), 4), round(min(aa, ba), 4)]})
+    return {"olculdu": True, "katman": len(liste), "cakisan_cift": ciftler,
+            "tolerans": tolerans, "temiz": not ciftler}
+
+
+# ═══════════════ 6) ALTYAZI KUPLERI (Faz I-16) ══════════════════════════
+
+# Okunabilirlik siniri: satir basina karakter ve satir sayisi.
+# BBC/Netflix altyazi kilavuzlarinin ortak paydasi 37-42 karakter/satir ve
+# en fazla 2 satirdir. Profilin `maks_satir_karakter` degeri (42) taban alinir.
+ALTYAZI_MAKS_SATIR = 2
+# Bir kupun ekranda kalmasi gereken en kisa sure (profil `min_gorunme_sn`).
+# Bundan kisa kup KOMSUSUYLA BIRLESTIRILIR, ekrana atilmaz.
+ALTYAZI_MIN_SN = 1.2
+# Okuma hizi tavani (karakter/sn). 20 cps yayin pratiginde rahat okunur ust
+# siniridir; asilirsa kup "cok hizli" olarak RAPORLANIR (uydurma yok).
+ALTYAZI_MAKS_CPS = 20.0
+
+
+def altyazi_kupleri(cumleler, *, maks_karakter: int = 42,
+                    maks_satir: int = ALTYAZI_MAKS_SATIR,
+                    min_sn: float = ALTYAZI_MIN_SN,
+                    maks_cps: float = ALTYAZI_MAKS_CPS) -> dict:
+    """Cumle zamanlamalarindan OKUNABILIR altyazi kupleri uret.
+
+    `cumleler`: [{"bas","sure","metin"} ...] — edge-tts `SentenceBoundary`
+    ciktisi. Cumle kendi icinde `maks_karakter*maks_satir`e sigmiyorsa
+    KELIME SINIRINDA parcalara bolunur ve cumlenin suresi parcalara
+    KARAKTER AGIRLIGIYLA dagitilir.
+
+    ⚠ DURUST ETIKET: parca ici zamanlama OLCUM DEGIL, orantili dagitimdir.
+    Motor cumle sinirlari veriyor, kelime sinirlari vermiyor (edge-tts 7.2.8
+    yalnizca `SentenceBoundary` uretiyor — olculdu). Her kup
+    `zamanlama: "olculdu" | "orantili"` alani tasir; iddia sisirilmez.
+    """
+    try:
+        liste = [c for c in (cumleler or []) if isinstance(c, dict)]
+    except TypeError:
+        return {"olculdu": False, "neden": "GIRDI-BOZUK", "kupler": []}
+    kapasite = max(8, int(maks_karakter) * max(1, int(maks_satir)))
+    kupler = []
+    for c in liste:
+        metin = " ".join(str(c.get("metin") or "").split())
+        bas = _sayi(c.get("bas"))
+        sure = _sayi(c.get("sure"))
+        if not metin or sure <= 0:
+            continue
+        if len(metin) <= kapasite:
+            parcalar = [metin]
+        else:
+            # ⚠ DENGELI BOLME, acgozlu doldurma DEGIL. Acgozlu doldurma son
+            # parcayi ARTIK olarak birakiyor: olculdu ki 88 karakterlik bir
+            # cumle "76 + 12" seklinde bolununce ikinci kup 0.659 sn suruyor
+            # ve `min_sn` (1.2 sn) okunabilirlik tabaninin ALTINA dusuyor.
+            # Parca sayisi once hesaplanir, sonra kelimeler esit paylastirilir.
+            kelimeler = metin.split()
+            adet = max(2, -(-len(metin) // kapasite))
+            parcalar = _dengeli_bol(kelimeler, adet, kapasite)
+        toplam_karakter = sum(len(p) for p in parcalar) or 1
+        t = bas
+        for i, p in enumerate(parcalar):
+            pay = sure * (len(p) / toplam_karakter)
+            if i == len(parcalar) - 1:
+                pay = max(0.0, (bas + sure) - t)     # yuvarlama artigi son kupe
+            kupler.append({
+                "bas_sn": round(t, 3), "sure_sn": round(pay, 3),
+                "metin": p,
+                "satirlar": _satir_bol(p, maks_karakter, maks_satir),
+                "zamanlama": "olculdu" if len(parcalar) == 1 else "orantili"})
+            t += pay
+
+    # ── Cok kisa kupleri KOMSUSUYLA BIRLESTIR (ekrana atma) ──
+    birlesik, atlanan = [], 0
+    for k in kupler:
+        if birlesik and k["sure_sn"] < min_sn and \
+                abs(birlesik[-1]["bas_sn"] + birlesik[-1]["sure_sn"]
+                    - k["bas_sn"]) < 0.05:
+            onceki = birlesik[-1]
+            yeni = f"{onceki['metin']} {k['metin']}".strip()
+            if len(yeni) <= kapasite:
+                onceki["metin"] = yeni
+                onceki["satirlar"] = _satir_bol(yeni, maks_karakter, maks_satir)
+                onceki["sure_sn"] = round(onceki["sure_sn"] + k["sure_sn"], 3)
+                onceki["zamanlama"] = "orantili"
+                atlanan += 1
+                continue
+        birlesik.append(k)
+
+    hizli = [k for k in birlesik
+             if k["sure_sn"] > 0 and len(k["metin"]) / k["sure_sn"] > maks_cps]
+    uzun_satir = [k for k in birlesik
+                  if any(len(s) > maks_karakter for s in k["satirlar"])]
+    cok_satir = [k for k in birlesik if len(k["satirlar"]) > maks_satir]
+    return {
+        "olculdu": True, "kupler": birlesik, "kup_sayisi": len(birlesik),
+        "birlestirilen": atlanan,
+        "maks_karakter": int(maks_karakter), "maks_satir": int(maks_satir),
+        "min_sn": min_sn, "maks_cps": maks_cps,
+        "olculen_kup": sum(1 for k in birlesik
+                           if k["zamanlama"] == "olculdu"),
+        "orantili_kup": sum(1 for k in birlesik
+                            if k["zamanlama"] == "orantili"),
+        "cok_hizli": hizli, "uzun_satir": uzun_satir, "cok_satir": cok_satir,
+        "temiz": not (hizli or uzun_satir or cok_satir),
+    }
+
+
+# Bir satirin/kupun SONUNDA yalniz kalmamasi gereken kelimeler.
+# `plan._SARKAN` ile ayni fikir: baslikta "…Elephant Island in" nasil yarim
+# duruyorsa, altyazida da "…on the Moon / on" oyle duruyor (1080p kosusunda
+# kareyle goruldu). Ayni kusur sinifi, ayni cozum.
+_SARKAN_KELIME = frozenset((
+    "in", "on", "at", "of", "to", "for", "with", "from", "by", "and",
+    "or", "the", "a", "an", "as", "into", "over", "after", "before",
+    "is", "was", "were", "that", "which", "but",
+    "ve", "ile", "icin", "gibi", "kadar", "de", "da", "ki", "bir"))
+
+
+def _sarkani_tasi(parcalar: list, kapasite: int) -> list:
+    """Parca/satir sonundaki SARKAN kelimeyi bir sonrakine tasi.
+
+    Tasima yalnizca (a) sonraki parca varsa, (b) kapasite tasmiyorsa ve
+    (c) parca bosalmiyorsa yapilir. Aksi halde OLDUGU GIBI birakilir —
+    zorla duzeltip metni bozmaktansa kusur gorunur kalir.
+    """
+    out = [list(str(p).split()) for p in parcalar]
+    for i in range(len(out) - 1):
+        while (len(out[i]) > 1
+               and out[i][-1].lower().strip(",;:.") in _SARKAN_KELIME
+               and len(" ".join(out[i + 1])) + len(out[i][-1]) + 1 <= kapasite):
+            out[i + 1].insert(0, out[i].pop())
+    return [" ".join(p) for p in out if p]
+
+
+def _dengeli_bol(kelimeler: list, adet: int, kapasite: int) -> list:
+    """Kelimeleri `adet` parcaya OLABILDIGINCE ESIT uzunlukta bol.
+
+    Hedef uzunluk = toplam/adet. Bir parca hedefi asmak uzereyse kesilir;
+    kapasite ASILAMAZ (kapasite asilirsa parca sayisi artirilir). Kelime
+    ortasindan ASLA bolunmez.
+    """
+    if adet < 2 or not kelimeler:
+        return [" ".join(kelimeler)] if kelimeler else [""]
+    toplam = len(" ".join(kelimeler))
+    for deneme in range(adet, adet + 4):        # kapasite tutmazsa artir
+        hedef = toplam / deneme
+        parcalar, su_an = [], ""
+        for k in kelimeler:
+            aday = f"{su_an} {k}".strip()
+            if su_an and (len(aday) > kapasite or
+                          (len(su_an) >= hedef and
+                           len(parcalar) < deneme - 1)):
+                parcalar.append(su_an)
+                su_an = k
+            else:
+                su_an = aday
+        if su_an:
+            parcalar.append(su_an)
+        parcalar = _sarkani_tasi(parcalar, kapasite)
+        if all(len(p) <= kapasite for p in parcalar):
+            return parcalar
+    return parcalar
+
+
+def _satir_bol(metin: str, maks_karakter: int, maks_satir: int) -> list:
+    """Kelime sinirinda satirlara bol; harf ortasindan ASLA kesme."""
+    kelimeler = str(metin or "").split()
+    satirlar, su_an = [], ""
+    for k in kelimeler:
+        aday = f"{su_an} {k}".strip()
+        if len(aday) > maks_karakter and su_an:
+            satirlar.append(su_an)
+            su_an = k
+        else:
+            su_an = aday
+    if su_an:
+        satirlar.append(su_an)
+    # ⚠ Satir sonunda sarkan edat/baglac birakma ("…on the Moon" / "on").
+    satirlar = _sarkani_tasi(satirlar, maks_karakter)
+    return satirlar[:max(1, int(maks_satir))] or [""]
+
+
 # ═════════════════════════ KAPSAM OZETI ═════════════════════════════════
 
 def kapsam_ozeti() -> dict:
     """Bu modulun NE OLCTUGU sayilabilir olsun — "her seyi olcuyoruz" yok."""
     return {
         "sema_surum": SEMA_SURUM,
-        "olcum": 5,
+        "olcum": 9,
         "olcum_adlari": ["baslik_olcusu", "kelime_ortasi_kesik",
                          "medya_tekrari", "ritim_olcusu",
-                         "ambans_duyulabilirligi", "miks_olcusu"],
+                         "ambans_duyulabilirligi", "miks_olcusu",
+                         "guvenli_alan_olcusu", "yazi_cakismasi",
+                         "altyazi_kupleri"],
         "render_sabiti": 7,
         "enjekte_edilen_okuyucu": 1,
         "esik": {
@@ -513,8 +773,14 @@ def kapsam_ozeti() -> dict:
             "olu_final_sn": OLU_FINAL_ESIGI_SN,
             "sessiz_oran": SESSIZ_ORAN_TAVANI,
             "duyulabilir_fark_db": DUYULABILIR_FARK_DB,
+            "bastirma_fark_db": BASTIRMA_FARK_DB,
+            "altyazi_maks_satir": ALTYAZI_MAKS_SATIR,
+            "altyazi_min_sn": ALTYAZI_MIN_SN,
+            "altyazi_maks_cps": ALTYAZI_MAKS_CPS,
         },
         # Kapsam DISI oldugunu acikca yaz — sonraki atomlarin isi.
-        "kapsam_disi": ["altyazi varligi", "kaynak kunyesi (source-label)",
-                        "1080p cozunurluk", "gelismis motion"],
+        # ⚠ I-16'da altyazi, kaynak kunyesi ve 1080p KAPSAMA ALINDI; listeden
+        # cikarildilar. Kalanlar hala kapsam disidir.
+        "kapsam_disi": ["gelismis motion", "hareketli video B-roll",
+                        "web'den medya bulma"],
     }

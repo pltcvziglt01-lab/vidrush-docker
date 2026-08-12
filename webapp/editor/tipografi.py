@@ -44,6 +44,32 @@ YUKSEKLIK = {
     "data-chart": 0.34,
 }
 
+# ─────────────────────── ALTYAZI BANDI (Faz I-16) ───────────────────────
+# Altyazi artik GERCEKTEN ciziliyor (Remotion `Altyazi` bileseni) ve ekranin
+# alt seridini SUREKLI isgal ediyor. Bu yuzden bir REZERVE BANT tanimlanir:
+# hicbir yazi katmani buraya yerlestirilmez, cakisma cozucu de buraya
+# kaydirmaz. Sinirlar HESAPLANDI, "yeterince asagi" varsayilmadi:
+#   alt = 0.94 -> 0.94*1080 = 1015.2 px  (guvenli alan tavani 1080-64 = 1016)
+#   ust = 0.81 -> iki satir 38 punto + dolgu icin 0.13 oran yeter
+ALTYAZI_BANT = (0.81, 0.94)
+# Altyazi varken kaynak kunyesi bandin USTUNE tasinir (varsayilan 0.895
+# bandin TAM ICINDE kalirdi).  0.755 + 0.045 = 0.80 -> bandin hemen ustu.
+KAYNAK_ETIKETI_ALTYAZILI = 0.755
+
+
+def bant_cakisiyor(y_ust: float, yukseklik: float,
+                   bant=ALTYAZI_BANT) -> bool:
+    """Katman rezerve altyazi bandina giriyor mu? Saf aritmetik."""
+    if not bant:
+        return False
+    try:
+        u, a = float(bant[0]), float(bant[1])
+        k_ust = float(y_ust)
+        k_alt = k_ust + float(yukseklik)
+    except (TypeError, ValueError, IndexError):
+        return False
+    return not (k_alt <= u + 1e-9 or k_ust >= a - 1e-9)
+
 
 @dataclass
 class YaziKatmani:
@@ -139,13 +165,19 @@ ONCELIK = {"quote-card": 5, "chapter-title": 4, "data-chart": 4,
            "lower-third": 3, "subtitle": 2, "callout": 2, "source-label": 1}
 
 
-def cakisma_coz(katmanlar: list, *, p: Optional[EditProfili] = None) -> tuple:
+def cakisma_coz(katmanlar: list, *, p: Optional[EditProfili] = None,
+                yasak_bant=None) -> tuple:
     """Cakisan yazi katmanlarini coz. Doner (cozulmus_katmanlar, rapor).
 
     Strateji sirasi:
       1. Dusuk oncelikli katmani DIKEY KAYDIR (bosluk varsa)
       2. Kaydirilamiyorsa SURESINI KISALT (cakisma bitene kadar ertele)
       3. Ikisi de olmuyorsa DUSUR ve rapora yaz
+
+    ⚠ `yasak_bant` (Faz I-16): altyazi seridi gibi REZERVE bir bolge.
+    Kaydirma adayi bu banda giriyorsa SECILMEZ. Aksi halde cozucu
+    `0.88`'e kaydirip katmani altyazinin USTUNE bindirirdi — cozdugu
+    cakismanin yerine yenisini koymus olurdu.
     """
     p = p or VARSAYILAN
     rapor = []
@@ -160,6 +192,9 @@ def cakisma_coz(katmanlar: list, *, p: Optional[EditProfili] = None) -> tuple:
         # 1) Dikey kaydirma dene
         cozuldu = False
         for hedef in (0.60, 0.52, 0.34, 0.88, 0.26):
+            if yasak_bant and bant_cakisiyor(
+                    hedef, YUKSEKLIK.get(k.ad, 0.08), yasak_bant):
+                continue                       # rezerve banda kaydirma YOK
             deneme = YaziKatmani(**{**k.__dict__, "y_orani": hedef,
                                     "uyarilar": list(k.uyarilar)})
             if not any(_cakisiyor(deneme, y) for y in yerlesmis) and \

@@ -15,7 +15,18 @@ import {AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig} from 'remoti
 
 import {kameraDurumu} from './Kamera';
 import type {MotionSpec} from './sozlesme';
-import {FONT, IZGARA_X, RENK, dizi, ilerleme, metin, popIn, sayi, zarf} from './temel';
+import {
+  FONT,
+  GUVENLI_KENAR,
+  IZGARA_X,
+  RENK,
+  dizi,
+  ilerleme,
+  metin,
+  popIn,
+  sayi,
+  zarf,
+} from './temel';
 
 const bantStil = (opaklik: number): React.CSSProperties => ({
   background: `rgba(0,0,0,${opaklik})`,
@@ -164,20 +175,30 @@ export const AltBand: React.FC<{spec: MotionSpec; fps: number}> = ({spec, fps}) 
 /** Kunye — bant TASIMAZ (bilgi degil kaynak notu), kontur+golge ile okunur. */
 export const KaynakEtiketi: React.FC<{spec: MotionSpec; fps: number}> = ({spec, fps}) => {
   const frame = useCurrentFrame();
+  const {height} = useVideoConfig();
   const bas = sayi(spec.bas_sn, 0.4);
   const sure = Math.min(3.0, sayi(spec.sure_sn, 3));
   const op = zarf(frame, fps, bas, sure, 0.3, 0.3);
   if (op <= 0) return null;
+  // ⚠ I-16 DUZELTMESI: burada `bottom: 22` SABITI vardi. Yani kunye Python
+  // tarafinin hesapladigi `y_orani`yi HIC OKUMUYORDU ve 1080p'de alt kenardan
+  // 22 px'te duruyordu — yayin guvenli alani 64 px iken. Yani hem guvenli
+  // alanin DISINDAYDI hem de Python'un cakisma aritmetigi gercekle
+  // ortusmuyordu (plan "0.895'te" saniyordu, render 22 px'e ciziyordu).
+  // Artik spec'ten gelen y_orani okunuyor ve guvenli kenar ZORLANIYOR.
+  const punto = sayi(spec.parametre.punto, 21);
+  const yOrani = sayi(spec.parametre.y_orani, 0.755);
+  const ustPx = Math.min(yOrani * height, height - GUVENLI_KENAR - punto * 1.3);
   return (
     <AbsoluteFill style={{pointerEvents: 'none'}}>
       <div
         style={{
           position: 'absolute',
-          right: 26,
-          bottom: 22,
+          right: GUVENLI_KENAR,
+          top: ustPx,
           fontFamily: FONT.aile,
           fontWeight: FONT.orta,
-          fontSize: sayi(spec.parametre.punto, 21),
+          fontSize: punto,
           color: RENK.yazi,
           opacity: 0.62 * op,
           textShadow: '0 1px 3px rgba(0,0,0,0.75), 0 0 1px rgba(0,0,0,0.9)',
@@ -691,6 +712,98 @@ export const SahneYazisi: React.FC<{
           >
             {metin(spec.parametre.metin).toUpperCase()}
           </span>
+        </div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+/* ════════════════════ ALTYAZI (Faz I-16) ════════════════════
+ *
+ * ⚠ KAPATILAN ACIK: `altyazi` alani sozlesmede (sozlesme.ts:62) VARDI ve
+ * adapter onu props'a kadar TASIYORDU (adapter.py:127) — ama hicbir bilesen
+ * onu CIZMIYORDU. Yani "props'ta var, videoda yok". Ses.tsx'te ayni sinifta
+ * bir acik vardi (ses tasiniyordu, `<Audio>` yoktu) ve Faz D'de kapatilmisti;
+ * altyazi tarafi I-16'ya kadar acik kaldi.
+ *
+ * ZAMANLAMA: kup `bas_sn` degerleri SAHNEYE GORELIDIR. Bilesen sahne
+ * `Sequence`'inin icinde kosar ve `useCurrentFrame()` orada 0'dan baslar;
+ * mutlak zaman kullanilsaydi ilk sahne disindaki her altyazi kaybolurdu.
+ *
+ * OKUNABILIRLIK: yazi zemine GUVENMEZ — her kup kendi kontrast bandini
+ * tasir (projenin 11 Agu kurali). Satirlar Python tarafinda KELIME
+ * SINIRINDA bolunur (`kalite_kapisi._satir_bol`); burada asla kirpilmaz.
+ */
+export const Altyazi: React.FC<{
+  kupler: unknown[];
+  fps: number;
+  punto?: number;
+  yOrani?: number;
+}> = ({kupler, fps, punto = 38, yOrani = 0.81}) => {
+  const frame = useCurrentFrame();
+  const {height, width} = useVideoConfig();
+  const t = frame / fps;
+  const liste = Array.isArray(kupler) ? kupler : [];
+
+  const aktif = liste.find((k) => {
+    const c = k as Record<string, unknown>;
+    const bas = sayi(c.bas_sn, -1);
+    const sure = sayi(c.sure_sn, 0);
+    return bas >= 0 && t >= bas && t < bas + sure;
+  }) as Record<string, unknown> | undefined;
+  if (!aktif) return null;
+
+  const satirlar = (Array.isArray(aktif.satirlar) ? aktif.satirlar : [])
+    .map((s) => metin(s))
+    .filter(Boolean);
+  const govde = satirlar.length ? satirlar : [metin(aktif.metin)];
+  if (!govde[0]) return null;
+
+  // 0.18 sn'lik yumusak giris; ani belirme "sicrama" gibi duyuluyor.
+  const bas = sayi(aktif.bas_sn, 0);
+  const op = interpolate(t, [bas, bas + 0.18], [0, 1], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
+  const dolgu = Math.round(punto * 0.34);
+
+  return (
+    <AbsoluteFill style={{pointerEvents: 'none'}}>
+      <div
+        style={{
+          position: 'absolute',
+          top: yOrani * height,
+          left: 0,
+          width,
+          display: 'flex',
+          justifyContent: 'center',
+          opacity: op,
+        }}
+      >
+        <div
+          style={{
+            maxWidth: '86%',
+            padding: `${dolgu}px ${Math.round(dolgu * 1.4)}px`,
+            borderRadius: 4,
+            textAlign: 'center',
+            ...bantStil(0.68),
+          }}
+        >
+          {govde.map((s, i) => (
+            <div
+              key={i}
+              style={{
+                fontFamily: FONT.aile,
+                fontWeight: FONT.orta,
+                fontSize: punto,
+                lineHeight: 1.28,
+                color: RENK.yazi,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {s}
+            </div>
+          ))}
         </div>
       </div>
     </AbsoluteFill>

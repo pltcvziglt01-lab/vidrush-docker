@@ -49,10 +49,19 @@ def _bosluk_indeksle(medya_manifest: dict) -> dict:
 
 def _yazi_katmanlari_kur(cekimler: list, beatler: list, adaylar_index: dict,
                          p: EditProfili,
-                         kare_genislik: Optional[float] = None) -> tuple:
-    """Beat/cekimden yazi katmanlarini uret ve cakismalari coz."""
+                         kare_genislik: Optional[float] = None,
+                         altyazi_var: bool = False) -> tuple:
+    """Beat/cekimden yazi katmanlarini uret ve cakismalari coz.
+
+    ⚠ `altyazi_var` (I-16): altyazi GERCEKTEN cizilirken ekranin alt seridi
+    surekli doludur. Kaynak kunyesi varsayilan `0.895` konumunda o bandin
+    TAM ICINDE kalirdi; bandin ustune tasinir ve cakisma cozucuye bant
+    YASAK BOLGE olarak bildirilir.
+    """
     katmanlar = []
     baslik_siniri = kart_basligi_siniri(p, kare_genislik)
+    kunye_y = tipografi.KAYNAK_ETIKETI_ALTYAZILI if altyazi_var else None
+    yasak = tipografi.ALTYAZI_BANT if altyazi_var else None
     for c, b in zip(cekimler, beatler):
         # Bolum basligi: yalnizca perde basinda
         if b.perde == "acilis" and b.beat_id == beatler[0].beat_id:
@@ -78,8 +87,9 @@ def _yazi_katmanlari_kur(cekimler: list, beatler: list, adaylar_index: dict,
             katmanlar.append(tipografi.katman_kur(
                 "source-label", f"{aday.get('eser_sahibi')} / "
                                 f"{aday.get('lisans', '').upper()}",
-                b.bas_sn + 0.4, min(3.0, b.sure_sn), fact_id=b.fact_id, p=p))
-    return tipografi.cakisma_coz(katmanlar, p=p)
+                b.bas_sn + 0.4, min(3.0, b.sure_sn), fact_id=b.fact_id, p=p,
+                y_orani=kunye_y))
+    return tipografi.cakisma_coz(katmanlar, p=p, yasak_bant=yasak)
 
 
 _SAYI_KALIP = re.compile(r"\b(\d[\d.,]*)\b")
@@ -168,6 +178,40 @@ def _kart_basligi(metin: str, sinir: int = 42) -> str:
             birikim.pop()
         ham = " ".join(birikim) or ham[:sinir]
     return ham.rstrip(" ,;:-—")
+
+
+def _altyazi_dagit(kupler, bas_sn: float, sure_sn: float) -> list:
+    """Mutlak zamanli altyazi kuplerini SAHNEYE GORELI hale getir.
+
+    ⚠ Remotion `Sequence` icinde `useCurrentFrame()` 0'dan baslar; mutlak
+    zaman gecilseydi ilk sahne disindaki her altyazi ekranda hic gorunmezdi.
+    Sahne sinirini asan kup KIRPILIR (silinmez) — yazinin sahne degisiminde
+    havada kalmasi engellenir.
+    """
+    if not kupler:
+        return []
+    bit = bas_sn + sure_sn
+    cikti = []
+    for k in kupler:
+        if not isinstance(k, dict):
+            continue
+        try:
+            kb = float(k.get("bas_sn") or 0.0)
+            ks = float(k.get("sure_sn") or 0.0)
+        except (TypeError, ValueError):
+            continue
+        if ks <= 0:
+            continue
+        ust = max(kb, bas_sn)
+        alt = min(kb + ks, bit)
+        if alt - ust <= 0.05:          # sahneyle anlamli kesisim yok
+            continue
+        yeni = dict(k)
+        yeni["bas_sn"] = round(ust - bas_sn, 3)      # SAHNEYE GORELI
+        yeni["sure_sn"] = round(alt - ust, 3)
+        yeni["mutlak_bas_sn"] = round(kb, 3)         # izlenebilirlik
+        cikti.append(yeni)
+    return cikti
 
 
 def _motion_kur(cekimler: list, beatler: list, p: EditProfili,
@@ -262,6 +306,7 @@ def uret(*, cumleler: list, medya_manifest: dict,
          kare_olcu: Optional[tuple] = None,
          anlatim_bitis_sn: Optional[float] = None,
          benzerlik_okuyucu=None,
+         altyazi_kupleri: Optional[list] = None,
          kalite_kapisi: bool = False) -> dict:
     """Tum Faz C zincirini kosur ve dort dosyayi yazar.
 
@@ -285,8 +330,9 @@ def uret(*, cumleler: list, medya_manifest: dict,
     _kare_gen = (kare_olcu or (None,))[0]
     specler = _motion_kur(cekimler, bplan.beatler, p, _kare_gen)
     # 4) TIPOGRAFI
+    _altyazi_var = bool(altyazi_kupleri)
     katmanlar, tipo_rapor = _yazi_katmanlari_kur(
-        cekimler, bplan.beatler, index, p, _kare_gen)
+        cekimler, bplan.beatler, index, p, _kare_gen, _altyazi_var)
     # ⚠ Cozulmus yazi katmanlari MOTION SPEC'e cevrilir. Ilk surumde katmanlar
     # yalnizca edit_manifest'te duruyordu; render_plan'a girmedigi icin adapter
     # bolum basligini ve kaynak yazisini GOREMIYORDU (test yakaladi) — yani
@@ -304,6 +350,7 @@ def uret(*, cumleler: list, medya_manifest: dict,
                       kare_olcu=kare_olcu,
                       anlatim_bitis_sn=anlatim_bitis_sn,
                       benzerlik_okuyucu=benzerlik_okuyucu,
+                      altyazi_kupleri=altyazi_kupleri,
                       kalite_kapisi=kalite_kapisi)
 
     # ── edit_manifest ──
@@ -334,18 +381,20 @@ def uret(*, cumleler: list, medya_manifest: dict,
             "orijinal_url": (aday.get("orijinal_url") or "") if aday else "",
             "lisans": (aday.get("lisans") or "") if aday else "",
             "ses_yolu": "", "sure_sn": b.sure_sn, "bas_sn": b.bas_sn,
+            "altyazi_punto": p.tipografi.altyazi,
+            "altyazi_y": tipografi.ALTYAZI_BANT[0],
             "islev": b.islev, "perde": b.perde,
             "cekim_turu": c.cekim_turu, "hareket": c.hareket, "kadraj": c.kadraj,
             "kaynak_aralik": list(c.kaynak_aralik),
             "j_cut": b.j_cut, "l_cut": b.l_cut,
-            "altyazi": [],
+            "altyazi": _altyazi_dagit(altyazi_kupleri, b.bas_sn, b.sure_sn),
             "motion": [s for s in specler if s.get("beat_id") == b.beat_id],
             "gerekce": c.gerekce,
         })
     render_plan = {
         "sema": "1.0", "fps": p.fps, "genislik": p.genislik,
         "yukseklik": p.yukseklik, "gecis_modu": "sinematik",
-        "altyazi_stili": "yok",
+        "altyazi_stili": "bant-orta" if _altyazi_var else "yok",
         "toplam_sn": round(bplan.toplam_sn, 2),
         "sahne_sayisi": len(sahneler),
         "ses": splan.sozluk(),
