@@ -184,9 +184,43 @@ function adim3() {
 
 const HESAPLANACAK = 'Üretim sırasında hesaplanacak';
 
+/** Adim 4'un analiz sonucu — `/api/analiz` doldurur (bkz. analizCalistir). */
+let _analiz = null;
+
+/**
+ * ⚠ FAZ H: Adim 4 eskiden 7 satirin hepsine "Üretim sırasında hesaplanacak"
+ * yaziyordu ve o alanlarin ON-KONTROL UCU YOKTU — vaat karsiliksizdi.
+ * Artik olculebilir olanlar `/api/analiz` ile URETIMDEN ONCE geliyor
+ * (LLM cagrisi yok, ucretsiz). Olculemeyenler HALA durustce "üretim
+ * sirasinda" diyor; uydurma sayi YOK.
+ */
+async function analizCalistir(yenidenCiz) {
+  const t = taslak();
+  const metin = (t.konu || '').trim();
+  if (metin.length < 20) { _analiz = null; return; }
+  const fd = new FormData();
+  fd.append('story', metin);
+  if (t.tur) fd.append('tur', t.tur);
+  if (t.sureDk) fd.append('sure_dk', String(t.sureDk));
+  if (t.ses) fd.append('ses', t.ses);
+  try {
+    const r = await fetch(yol(UCLAR.analiz), {method: 'POST', body: fd});
+    _analiz = r.ok ? await r.json() : {_hata: `HTTP ${r.status}`};
+  } catch (e) {
+    _analiz = {_hata: String(e.message || e)};
+  }
+  if (yenidenCiz) yenidenCiz();
+}
+
+const ANALIZ_ADI = {
+  konu: 'Konu başlığı (anlatım üretilecek)',
+  'tam-metin': 'Hazır anlatım metni',
+};
+
 function adim4() {
   const t = taslak();
   const tb = turBilgi(t.tur);
+  const a = _analiz;
   const kelime = Math.round(Number(t.sureDk || 2) * 139);  // olculen TTS hizi
   return `<h2>Üretim özeti</h2>
   <p class="kucuk orta adim-giris">
@@ -211,21 +245,56 @@ function adim4() {
     </section>
 
     <section class="kart">
-      <h3 class="ozet-kart-bas">Üretimde belirlenecek</h3>
-      <!-- ⚠ Bu alanlarin backend ucu YOK. Sayi UYDURULMAZ. -->
+      <h3 class="ozet-kart-bas">Metin analizi</h3>
+      ${a && !a._hata ? `
+        ${ozetSatir('Girdi türü', ANALIZ_ADI[a.girdi_turu] || a.girdi_turu)}
+        ${ozetSatir('Kelime sayısı', String(a.kelime_sayisi))}
+        ${ozetSatir('Dil', a.dil ? a.dil.toUpperCase() : 'belirsiz')}
+        ${ozetSatir('İçerik türü', a.icerik_turu)}
+        ${ozetSatir('Dönem', a.varliklar?.donem || '—')}
+        ${ozetSatir('Kişi/yer adları',
+          (a.varliklar?.ozel_adlar || []).slice(0, 3).join(', ') || '—')}
+      ` : a && a._hata
+        ? uyariKutu(`Analiz alınamadı (${kac(a._hata)}). Üretim yine çalışır.`,
+          'uyari')
+        : '<p class="kucuk orta">Analiz çalışıyor…</p>'}
+    </section>
+
+    <section class="kart">
+      <h3 class="ozet-kart-bas">Sistemin otomatik seçtikleri</h3>
+      ${a && a.otomatik_secimler && Object.keys(a.otomatik_secimler).length
+        ? Object.entries(a.otomatik_secimler).map(([k, v]) =>
+          `<div class="ozet-satir"><span class="ad">${kac(k)}</span>
+           <span class="deg tekfont">${kac(String(v.deger))}</span></div>
+           <p class="kucuk sessiz">${kac(v.gerekce)}</p>`).join('')
+        : '<p class="kucuk orta">Otomatik seçim yok — hepsini sen belirledin.</p>'}
+      ${a && a.korunan_secimler && Object.keys(a.korunan_secimler).length
+        ? `<p class="kucuk orta ust-bosluk-kucuk">Senin açık seçimlerin
+           korundu: ${kac(Object.keys(a.korunan_secimler).join(', '))}</p>` : ''}
+    </section>
+
+    <section class="kart">
+      <h3 class="ozet-kart-bas">Üretimde ölçülecek</h3>
+      <!-- ⚠ Bunlarin ON-KONTROL ucu YOK; sayi UYDURULMAZ. -->
       ${ozetSatir('Güvenilir kaynak sayısı', HESAPLANACAK, {hesaplanacak: true})}
       ${ozetSatir('Doğrulanmış iddia', HESAPLANACAK, {hesaplanacak: true})}
       ${ozetSatir('Kullanılabilir medya', HESAPLANACAK, {hesaplanacak: true})}
       ${ozetSatir('Sahne sayısı', HESAPLANACAK, {hesaplanacak: true})}
       ${ozetSatir('Tahmini maliyet', HESAPLANACAK, {hesaplanacak: true})}
-      ${ozetSatir('Render süresi', HESAPLANACAK, {hesaplanacak: true})}
-      ${ozetSatir('Lisans durumu', HESAPLANACAK, {hesaplanacak: true})}
+      ${ozetSatir('Kalite ölçümü (QA)', HESAPLANACAK, {hesaplanacak: true})}
     </section>
   </div>
 
+  ${a && (a.riskler || []).length ? `<div class="ozet-bilgi">${uyariKutu(
+    'Bu konu hassas alan içeriyor: <strong>' +
+    kac((a.riskler || []).map((r) => r.tur).join(', ')) +
+    '</strong>. Üretim engellenmiyor; anlatımın doğruluğunu kontrol et.',
+    'uyari')}</div>` : ''}
+
   <div class="ozet-bilgi">
-    ${uyariKutu('Bu değerler için henüz bir ön-kontrol ucu yok. Üretim ' +
-      'başladığında iş ekranında gerçek ölçülen değerler görünür.', 'bilgi')}
+    ${uyariKutu('Yukarıdaki analiz üretimden <strong>önce</strong> ve ' +
+      'ücretsiz yapıldı (yapay zekâ çağrısı yok). Alt bölümdeki değerler ' +
+      'ancak üretim sırasında ölçülebilir.', 'bilgi')}
   </div>`;
 }
 
@@ -418,6 +487,7 @@ function olaylariBagla(yenidenCiz) {
   const konu = $('#wzKonu');
   if (konu) konu.addEventListener('input', () => {
     taslakYaz({konu: konu.value});
+    _analiz = null;          // metin degisti -> eski analiz gecersiz
     konu.setAttribute('aria-invalid', konu.value.trim().length < 20);
   });
 
@@ -438,6 +508,11 @@ function olaylariBagla(yenidenCiz) {
 
   const uret = $('#wzUret');
   if (uret) uret.addEventListener('click', () => uretimiBaslat(uret));
+
+  // Adim 4'e girildiyse analizi BIR KEZ calistir (ucretsiz, LLM yok)
+  if (adim === 4 && _analiz === null) {
+    analizCalistir(yenidenCiz);
+  }
 
   // Adim 3'un secim deneyimi — yalnizca o adimda bagla
   // Adim 3'un TUM secim mantigi `secim-deneyimi.js` icinde — wizard yalnizca

@@ -23,6 +23,7 @@ import pipeline
 import anim_studyo
 import is_sozlesme   # Faz H: tek tip, geriye donuk uyumlu is sozlesmesi
 import saglik_derin  # Faz H: bagimliliklari GERCEKTEN olcen saglik ucu
+import girdi_analizi # Faz H: otomatik girdi analizi (LLM YOK, ucretsiz)
 
 KOK = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(KOK, "static")
@@ -656,6 +657,28 @@ def profil_capa_sifirla(pid: str):
     if os.path.exists(y):
         os.remove(y)
     return {"ok": True, "kilitli": False}
+
+
+@app.post("/api/analiz")
+async def girdi_analiz_uc(story: str = Form(...), tur: str = Form(""),
+                          sure_dk: str = Form(""), ses: str = Form(""),
+                          edit: str = Form("")):
+    """OTOMATIK GIRDI ANALIZI — uretimden ONCE, UCRETSIZ, LLM cagrisi YOK.
+
+    ⚠ Wizard Adim 4'te "Guvenilir kaynak sayisi / Sahne sayisi / ... ->
+    Uretim sirasinda hesaplanacak" YAZIYORDU ama o alanlarin ON-KONTROL ucu
+    YOKTU. Bu uc olculebilir olanlari (girdi turu, dil, icerik turu, donem,
+    varliklar, risk, onerilen sure) uretimden once verir.
+
+    Kullanicinin ACIK secimi korunur; yalnizca BOS alanlar doldurulur ve
+    hangisinin otomatik secildigi `otomatik_secimler` icinde RAPORLANIR.
+    """
+    if len((story or "").strip()) < 20:
+        raise HTTPException(400, "Metin cok kisa (en az 20 karakter)")
+    secim = {k: v for k, v in (("tur", tur), ("sure_dk", sure_dk),
+                               ("ses", ses), ("edit", edit)) if v.strip()}
+    return await asyncio.to_thread(girdi_analizi.analiz, story,
+                                   kullanici_secimi=secim)
 
 
 @app.post("/api/generate")

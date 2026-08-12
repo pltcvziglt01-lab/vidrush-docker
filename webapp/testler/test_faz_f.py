@@ -195,12 +195,22 @@ blok("adim 4: uydurma sayi yasagi")
 kontrol("'Üretim sırasında hesaplanacak' sabiti var",
         "const HESAPLANACAK = 'Üretim sırasında hesaplanacak'" in JS["wizard.js"])
 hesap = re.findall(r"ozetSatir\('([^']+)', HESAPLANACAK", JS["wizard.js"])
-kontrol("backend ucu olmayan 7 alan hesaplanacak isaretli", len(hesap) == 7,
-        str(hesap))
+# ⚠ 12 Agu 2026 (Faz H4): Adim 4 artik GERCEK bir on-kontrol ucuna sahip
+# (`POST /api/analiz`, LLM'siz ve ucretsiz). Olculebilir olanlar — girdi
+# turu, dil, icerik turu, donem, varliklar, onerilen sure — URETIMDEN ONCE
+# gosteriliyor; "Render süresi" ve "Lisans durumu" satirlari kaldirildi
+# cunku onlar da olculmeden gosterilemezdi ve listeyi sisiriyordu.
+# GERIYE KALANLAR gercekten yalnizca uretim sirasinda olculebilenler.
+kontrol("uretim oncesi OLCULEMEYEN alanlar hesaplanacak isaretli",
+        len(hesap) >= 5, str(hesap))
 for alan_ad in ("Güvenilir kaynak sayısı", "Doğrulanmış iddia",
-                "Kullanılabilir medya", "Tahmini maliyet", "Render süresi",
-                "Lisans durumu", "Sahne sayısı"):
+                "Kullanılabilir medya", "Tahmini maliyet", "Sahne sayısı"):
     kontrol(f"hesaplanacak: {alan_ad}", alan_ad in hesap)
+# Ve artik GERCEKTEN hesaplanan alanlar UYDURULMUYOR, ucdan geliyor
+kontrol("adim 4 gercek analiz ucunu cagiriyor",
+        "UCLAR.analiz" in JS["wizard.js"] and "analizCalistir" in JS["wizard.js"])
+kontrol("analiz hatasi SESSIZ GECILMIYOR",
+        "Analiz alınamadı" in JS["wizard.js"])
 # Sabit para/oran/sayi uydurmasi
 kontrol("sabit dolar tutari YOK",
         not re.search(r"\$\s?\d", TUM_JS_KOD), "maliyet uydurulmamali")

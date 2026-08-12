@@ -17,6 +17,7 @@ export const UCLAR = {
   isler: 'api/isler',
   is: 'api/job/',                    // + is_id
   uret: 'api/generate',
+  analiz: 'api/analiz',            // Faz H: otomatik girdi analizi
   editStilleri: 'api/edit-stilleri',
   animasyonStilleri: 'api/animasyon-stilleri',
   sesler: 'api/sesler',

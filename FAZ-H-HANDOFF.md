@@ -160,7 +160,10 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | H2–H3 araştırma köprüsü + iş sözleşmesi + derin sağlık + UI | `e4af286` | ✅ |
 | 12 Ağu | Deploy engeli belgelendi (main ile ayrışma) | `f19a3f5` | ✅ |
 | 12 Ağu | origin/main birleştirmesi (22 alan, ünlü modu, vbee/clone) | `5739d4e` | ✅ |
-| 12 Ağu | **CANLIYA ÇIKILDI** + Shackleton pilotu | bu commit | ✅ **CANLI** |
+| 12 Ağu | **CANLIYA ÇIKILDI** + Shackleton pilotu | `ee318ca` | ✅ |
+| 12 Ağu | H5 medya doğruluk kapısı (biyom/dönem) | `da44489` | ✅ |
+| 12 Ağu | H6 render sonrası QA kapısı | `171737c` | ✅ |
+| 12 Ağu | H4 otomatik girdi analizi | bu commit | ✅ **CANLI** |
 
 ---
 
@@ -300,7 +303,99 @@ Bu tam olarak `webapp/medya/` (Faz B) modülünün K1–K4 yer doğrulama katman
 
 ---
 
-## 13. Test çalıştırma (yerel)
+## 13. FAZ H4/H5/H6 — kritik kalite açığı kapatıldı (12 Ağu, 2. oturum)
+
+### H5 — Medya doğruluk kapısı (`webapp/medya_kapisi.py`)
+
+Pilotun kanıtladığı hatanın **kök nedeni**: `kaynak.py`'nin yer kapısı
+`YER_TAKMA_AD` tablosuna bağlı ve o tablo **19 ülke** içeriyor.
+`South Georgia`, `Antarctica`, `Elephant Island`, `Patagonia` tabloda **yok** →
+
+```
+_sorgu_yer_terimleri("South Georgia island approach boat")  → []
+_etkin_yer(...)                                            → []
+_yer_dogru_mu(h, [])                                       → True   ← KAPI YOK
+```
+
+Yani **tablonun dışındaki her yer için hiçbir kapı çalışmıyordu.** Canlı logda
+`yer baglami: yok (sayim: {})` bunu birebir doğruluyor.
+
+**Çözüm:** ülke tablosundan **bağımsız** biyom çelişki kapısı.
+`kutup / tropik / col` kuşakları; sahne ile aday çelişiyorsa aday **düşer**.
+Ayrıca dönem kapısı: tarihsel sahnede modern teknoloji işareti → red.
+
+Kural: **emin değilsen geçir** — biyom çıkmıyorsa kapı uygulanmaz
+(yanlış pozitif de kalite kaybıdır).
+
+Bağlantı: `kaynak.py`'nin **dört** eleme noktası (pexels/pixabay/coverr/youtube).
+`pipeline.video_baglami_kur()` genel konu metnini verir. Redler sessiz değil:
+`sonuc["medya_kapisi"]` + `dususler`.
+
+**Canlı kanıt** (konteynerde çalıştırıldı):
+```
+PILOT VAKASI -> REDDEDILDI
+  BIYOM CELISKISI: sahne 'kutup' kusagi, aday 'tropik' kusagi
+MESRU KLIP   -> GECTI
+```
+
+### H6 — Render sonrası QA kapısı (`webapp/qa_kopru.py`)
+
+`editor/qa_son.py` Faz C'de yazılmıştı ama pipeline onu **hiç çağırmıyordu**;
+sözleşmedeki `qa` alanı **her zaman boş sözlüktü**.
+
+Şimdi: ffprobe + siyah + donmuş + kesme + loudness + sessizlik →
+`PASS / WARN / FAIL / OLCULEMEDI`.
+
+- **QA hattı çökertmez.** Ölçüm patlarsa `OLCULEMEDI` yazılır — sessizce PASS denmez.
+- **Kontrollü retry:** yalnızca ses sorunlarında, bir kez, ve yalnızca
+  **ücretsiz + deterministik** yol (loudnorm remaster). Görsel yeniden üretmek gibi
+  **para harcayan retry yok** — test bunu kilitliyor.
+- **QA FAIL işi "başarılı" göstermez:** sözleşmeye `kalite` + `kalite_ok` eklendi.
+  Arayüz FAIL'de "Tamamlandı" **demiyor**, kırmızı **"Kalite: BAŞARISIZ"** rozetini
+  gösteriyor. QA hiç yoksa `OLCULMEDI` → PASS varsayılmıyor.
+
+**Gerçek pilot videosunda doğrulandı** (78 sn Shackleton çıktısı):
+`WARN` — 1920×1080, 24 fps, 77.952 sn, **−14.05 LUFS**, tepe **−1.47 dBTP**,
+LRA 3.3, siyah 0, donmuş 0, kesme 10.
+Yakalanan 3 sorun elle bulduklarımın **aynısı**: `POST-FPS` (24 vs profil 30),
+`POST-SURE-SAPMA` (78 vs 60), `POST-SESSIZLIK` (2.8 sn boşluk).
+
+### H4 — Otomatik girdi analizi (`webapp/girdi_analizi.py`, `POST /api/analiz`)
+
+Kullanıcı yalnızca metin + stil verir; sistem ölçülebilir gerekçeyle seçer.
+
+- **LLM çağrısı YOK** — tamamen deterministik ve ücretsiz (test kilitliyor).
+- Girdi türü (konu / tam-metin), dil, içerik türü (belgesel/seyahat/açıklayıcı/
+  ürün/hikâye), dönem, kişi/yer adları, risk taraması.
+- **Kullanıcının açık seçimi her zaman kazanır**; yalnızca boş alanlar doldurulur
+  ve hangisinin otomatik seçildiği `otomatik_secimler` içinde **raporlanır**.
+- Sinyal zayıfsa **"belirsiz"** der — zorla tür seçmez.
+
+Wizard Adım 4 artık gerçek analizi gösteriyor. Ölçülemeyenler (kaynak sayısı,
+doğrulanmış iddia, kullanılabilir medya, sahne sayısı, maliyet) hâlâ dürüstçe
+**"Üretim sırasında ölçülecek"** diyor — uydurma sayı yok.
+
+### Bu oturumda yaptığım ve düzelttiğim iki hata
+
+1. Kapıyı bağlarken `klip_gecmisi_sifirla()` gövdesini kazara ezdim
+   (blok `_YER_BAGLAM = []` satırını fonksiyon **içinde** yakaladı) ve import
+   fonksiyon içine kaçtı. **H1'de deploy.sh'e eklediğim pyflakes taraması yakaladı** —
+   canlıya gitseydi site açılmazdı. Onarıldı; artık testle kilitli.
+2. `qa_kopru.ozet()` `qa_son`'un anahtarlarını yanlış okuyordu (`"sure"/"I"/"Peak"` —
+   bu adlar `qa_son`'da yok). Süre ve LUFS arayüzde hep boş görünüyordu.
+   Gerçek pilot videosunda ölçerek yakalandı; doğru adlar testle kilitli.
+
+### Bilinen sınır (dürüstçe)
+
+Biyom kapısı **iklim kuşağı** çelişkisini yakalar, **ülke** karışıklığını değil.
+2. koşuda `"small boat South Georgia sea storm"` sorgusuna
+`"maltese pilot motorboat"` geldi — Malta Akdeniz'dir ama tropik/kutup işareti
+taşımadığı için kapı tetiklenmez. Bunun için `medya/vision.py`'nin kare-bakan
+doğrulaması gerekir (§10 madde 1'in kalan yarısı).
+
+---
+
+## 14. Test çalıştırma (yerel)
 
 ```bash
 python3 -m venv .venv-test

@@ -514,6 +514,73 @@ else:
     bloke_yaz("gercek video QA olcumu",
               "QA_TEST_VIDEO ayarlanmadi (opsiyonel)")
 
+# ═══════════════ 6d. OTOMATIK GIRDI ANALIZI (Faz H4) ═══════════════
+blok("6d. Otomatik girdi analizi")
+
+import girdi_analizi as _GA  # noqa: E402
+
+_g = _GA.analiz("Shackleton'in Endurance seferi ve murettebatin kurtulusu: "
+                "geminin buzda sikismasi, Fil Adasi'ndaki bekleyis.")
+kontrol("kisa metin -> 'konu'", _g["girdi_turu"] == "konu", _g["girdi_turu"])
+kontrol("konu icin varsayilan sure 2 dk",
+        _g["otomatik_secimler"]["sure_dk"]["deger"] == 2.0)
+_uzun = ("The Endurance expedition began in 1914. " * 12) + "The crew survived."
+_u = _GA.analiz(_uzun)
+kontrol("uzun metin -> 'tam-metin'", _u["girdi_turu"] == "tam-metin")
+kontrol("tam metinde sure OLCUMDEN geliyor",
+        "kelime" in _u["gerekceler"]["sure"], _u["gerekceler"]["sure"])
+kontrol("dil tespiti TR", _GA.dil_tespit("bu bir Türkçe cümledir ve çok açık")[0] == "tr")
+kontrol("dil tespiti EN", _GA.dil_tespit("this is an english sentence with the words")[0] == "en")
+kontrol("bos metinde cokmuyor", _GA.dil_tespit("")[0] == "")
+
+kontrol("belgesel turu taniniyor",
+        _GA.tur_tespit("1915 keşif seferi arşiv belgesel")[0] == "belgesel")
+kontrol("seyahat turu taniniyor",
+        _GA.tur_tespit("gezi rehberi plaj otel rota destination")[0] == "seyahat")
+kontrol("aciklayici turu taniniyor",
+        _GA.tur_tespit("nasıl çalışır adım adım rehber öğren")[0] == "aciklayici")
+kontrol("sinyal yoksa BELIRSIZ (zorla secmiyor)",
+        _GA.tur_tespit("zzz qqq www")[0] == "belirsiz")
+
+kontrol("belgeselde gorsel strateji GERCEK FOOTAGE",
+        _GA.GORSEL_STRATEJISI["belgesel"][0] == "gercek-footage")
+kontrol("hikayede AI gorsel serbest",
+        _GA.GORSEL_STRATEJISI["hikaye"][0] == "ai-gorsel")
+
+# ⚠ KULLANICININ ACIK SECIMI HER ZAMAN KAZANIR
+_k = _GA.analiz("Bali gezi rehberi plaj otel rota",
+                kullanici_secimi={"sure_dk": 8, "tur": "hikaye"})
+kontrol("kullanici secimi KORUNUYOR",
+        _k["korunan_secimler"]["tur"]["deger"] == "hikaye"
+        and _k["korunan_secimler"]["sure_dk"]["deger"] == 8)
+kontrol("korunan alan OTOMATIGE yazilmiyor",
+        "tur" not in _k["otomatik_secimler"]
+        and "sure_dk" not in _k["otomatik_secimler"])
+kontrol("otomatik secimlerin HEPSINDE gerekce var",
+        all("gerekce" in v and v["gerekce"]
+            for v in _k["otomatik_secimler"].values()))
+
+kontrol("donem tarihsel tespiti",
+        _GA.varlik_cikar("1914 yilinda basladi")["donem"] == "tarihsel")
+kontrol("donem guncel tespiti",
+        _GA.varlik_cikar("2024 yilinda basladi")["donem"] == "guncel")
+kontrol("risk taramasi saglik yakaliyor",
+        any(r["tur"] == "saglik"
+            for r in _GA.risk_tara("kanser tedavisi ilaç aşı")))
+kontrol("risksiz metinde risk URETMIYOR", _GA.risk_tara("kedi videosu") == [])
+kontrol("analiz LLM CAGIRMIYOR (ucretsiz)",
+        all(x not in oku(KOK, "girdi_analizi.py")
+            for x in ("oai_chat", "openai.com", "requests.post")))
+
+kontrol("server /api/analiz ucunu tanimliyor", '"/api/analiz"' in SERVER)
+kontrol("api.js analiz ucunu taniyor", "analiz:" in API_JS)
+kontrol("wizard adim4 gercek analizi kullaniyor",
+        "analizCalistir" in WIZARD and "otomatik_secimler" in WIZARD)
+kontrol("olculemeyenler HALA durustce 'hesaplanacak'",
+        "HESAPLANACAK" in WIZARD and "Üretimde ölçülecek" in WIZARD)
+kontrol("metin degisince analiz gecersiz kilaniyor",
+        "_analiz = null;          // metin degisti" in WIZARD)
+
 # ═══════════════ 7. DERIN SAGLIK ═══════════════
 blok("7. Derin saglik (gercek olcum, anahtar sizmaz)")
 
@@ -606,6 +673,18 @@ if FASTAPI_VAR:
                 c.post("/api/generate",
                        data={"session": "abc123", "story": "x" * 40,
                              "tur": "animasyon"}).status_code == 400)
+        _an = c.post("/api/analiz", data={"story": "1915 kesif seferi arsiv "
+                                          "belgesel buz Antarktika"})
+        kontrol("POST /api/analiz -> 200", _an.status_code == 200,
+                str(_an.status_code))
+        if _an.status_code == 200:
+            _aj = _an.json()
+            kontrol("/api/analiz girdi_turu donduruyor", "girdi_turu" in _aj)
+            kontrol("/api/analiz otomatik_secimler donduruyor",
+                    "otomatik_secimler" in _aj)
+            kontrol("/api/analiz gerekceler donduruyor", "gerekceler" in _aj)
+        kontrol("POST /api/analiz kisa metin -> 400",
+                c.post("/api/analiz", data={"story": "kisa"}).status_code == 400)
         kontrol("POST /api/generate eksik alan -> 422",
                 c.post("/api/generate", data={"session": "abc123"}
                        ).status_code == 422)
