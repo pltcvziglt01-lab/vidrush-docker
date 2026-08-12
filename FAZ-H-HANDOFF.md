@@ -179,7 +179,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-10 edit köprüsü pipeline'a bağlı + manifest dönüşümü** | `477b168` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-11 20 sn GERÇEK render smoke** | `f4e3a5e` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-12 QA WARN raporu + chapter-card kalitesi** | `9be6375` | ✅ **origin'e push edildi**, deploy YOK |
-| 12 Ağu | **I-13 10 sn kaliteli sesli Apollo mini-belgeseli** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
+| 12 Ağu | **I-13 10 sn kaliteli sesli Apollo mini-belgeseli** | `ca023f3` | ✅ **origin'e push edildi**, deploy YOK |
 
 ---
 
@@ -2156,8 +2156,8 @@ gerileme yok.
 
 ## 30. FAZ I-13 — 10 SN KALİTELİ SESLİ APOLLO MİNİ-BELGESELİ (12 Ağu, ölçüldü)
 
-> **Durum: yazıldı + testlendi + GERÇEK MP4 üretildi, dosyalar staged.**
-> **Commit YOK, deploy YOK. Bayraklar varsayılan KAPALI. Maliyet $0.00.**
+> **Durum: commit `ca023f3`, `origin/arastirma-motoru`'na PUSH EDİLDİ.**
+> **Deploy YOK. Bayraklar varsayılan KAPALI. Maliyet $0.00.**
 > Yeni: `webapp/testler/smoke_kaliteli_ses_10sn.py`.
 > Değişen: `webapp/testler/test_faz_i.py`, `outputs/sample/README.md`
 > (+ bu handoff). **Kod tarafında pipeline/UI/editor değişmedi.**
@@ -2241,3 +2241,70 @@ araştırma/fact-check motoru (olgular hazır manifestten) · canlı
 5. **Anlatım ile sahne sınırları hizalanmadı** — tek master ses; sahne başına
    segment eşlemesi yapılmadı.
 6. Kalan 2 QA WARN fixture kaynaklı (tek sağlayıcı, kısa beat).
+
+---
+
+## 31. ⏭ SIRADAKİ ATOM — **I-14: KALİTE KAPILARI** (yeni oturum buradan devralır)
+
+> **Durum: HENÜZ BAŞLANMADI.** Bu bölüm bir *devir belgesidir*, yapılmış iş
+> değildir. `ca023f3` sonrası çalışma ağacı **temiz**, `origin` ile **0/0**.
+
+### Bağlam
+
+I-13'ün ürettiği `outputs/sample/editorv2_quality_voice_10sn.mp4` teknik
+olarak geçerli (h264 1280×720 · aac 48 kHz stereo · 9.643 sn) **ama** bağımsız
+denetimde **yedi somut kalite kusuru** ölçüldü. Bunların hiçbiri şu an QA'da
+FAIL/WARN üretmiyor — yani **kapı yok**.
+
+### Ölçülen yedi kusur (I-14'ün kapsamı)
+
+| # | Kusur | Ölçüm |
+|---|---|---|
+| 1 | **Başlık sağdan kesiliyor** | 10 sn çıktıda hâlâ görülüyor — I-12'nin punto-küçültme düzeltmesi bu yolda yetmiyor |
+| 2 | **Sahne süreleri sabit** | üç sahne de **3.2 sn** — ritim yok, anlatımla hizasız |
+| 3 | **Son iki medya tekrarlı / semantik zayıf** | aynı görsel ailesi arka arkaya; içerik-metin bağı zayıf |
+| 4 | **Ambiyans fiilen duyulmuyor** | kaynak **−48.7 LUFS**; seviye (0.20) + ducking (0.30) sonrası işitilemez |
+| 5 | **Mikste %20 ölü alan** | `5.358–6.374` arası **1.016 sn**, `8.715–son` arası **0.928 sn** sessiz |
+| 6 | **Altyazı ve kaynak künyesi yok** | ekranda ne altyazı ne `source-label` |
+| 7 | **Yalnızca 720p** | smoke 1280×720; 1080p hiç ölçülmedi |
+
+### I-14 için ÇALIŞMA SIRASI (önce test, sonra kapı)
+
+1. **Önce ölçen testleri yaz.** Her kusur için deterministik bir ölçüm
+   fonksiyonu + test. Testler **önce kırmızı** yanmalı — kusurun gerçekten
+   var olduğunu kanıtlasın.
+2. **Sonra QA sözleşmesine çevir.** Her ölçümü `editor/qa_on.py` (ön-render)
+   ya da `qa_kopru`/`qa_son` (render sonrası) içinde **doğru seviyeyle**
+   bağla:
+   - **FAIL** (render başlatılmaz): başlık kesilmesi, ambiyans işitilemez
+     seviye, %15'i aşan ölü alan
+   - **WARN** (render'a izin, görünür uyarı): sabit sahne süresi, tekrarlı
+     medya, altyazı/künye yokluğu, 1080p altı çıktı
+   Seviye seçimini **gerekçesiyle** koda yaz; eşikleri sabit sayı olarak değil
+   **hesaplanmış** ya da ölçülmüş değer olarak koy (I-12'deki `source-label`
+   dersi: üç kez "yeterince aşağı" varsayıldı, hiç hesaplanmadı).
+3. **Aynı 10 sn fixture ile yeniden render et**, ffprobe + 0/5/9 sn kareleri
+   çıkar, **önce/sonra** dürüst karşılaştırma yaz.
+4. Tam A–I yeşilse **stage + handoff**, **commit atmadan dur**.
+
+### I-14 KISITLARI (değişmez)
+
+- Bayraklar **varsayılan kapalı** · **deploy yok** · **ücretli API yok** ·
+  dış ağ yok (edge-tts hariç, o da $0.00)
+- `pipeline.py` varsayılan yolu, **22 alanlık generate sözleşmesi**, modüler
+  UI (basit mod, süre seçici, ünlü modu, ses kütüphanesi, Grok alanları),
+  `deploy.sh` korumaları **değişmeyecek**
+- Lisans duvarı · SSRF · kare kapısı · iş bütçesi (varsayılan USD 0.0)
+  **zayıflatılmayacak**
+- Kapsam boşluğu **rastgele stokla kapatılmayacak**; uydurma sayı/fact/medya
+  **üretilmeyecek**
+- İkili çıktılar (`outputs/sample/*.mp4`, `*.png`) git'e **eklenmeyecek**
+
+### Yeni oturum için başlangıç komutları
+
+```bash
+cd /Users/polatcan/vidrush-docker && git log --oneline -1   # ca023f3 olmalı
+```
+
+Test koşumu ve ortam notları için **§14**'e bak (`edge-tts`, `pyflakes`,
+`fastapi` gerekir; `node` olmadan §25/§27 BLOKE yazar).
