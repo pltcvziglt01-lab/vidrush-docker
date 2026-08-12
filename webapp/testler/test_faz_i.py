@@ -763,6 +763,189 @@ except Exception as e:
     kontrol("taksonomi.py derleniyor", False, str(e)[:140])
 
 
+# ═══════════════ 15. I-2b: SURUMLU BILESIK STIL PROFILLERI ═══════════════
+blok("15. Stil profilleri — surumlu, birlestirilebilir, geriye uyumlu")
+
+import stil_profili as sp                           # noqa: E402
+
+sk = sp.kapsam_ozeti()
+kontrol("kapsam_ozeti sayilabilir",
+        all(isinstance(sk.get(k), int) for k in
+            ("profil", "boyut", "alan", "konsept_baglantisi")), str(sk))
+kontrol("11 bilesik boyut tanimli", sk["boyut"] == 11, str(sk["boyut"]))
+kontrol("en az 10 profil var", sk["profil"] >= 10, str(sk["profil"]))
+kontrol("istenen 11 boyutun hepsi var",
+        set(sp.BOYUTLAR) == {"anlatim", "tempo", "gecis", "kamera", "tipografi",
+                             "palet", "ses", "medya", "dagitim", "kanit", "qa"},
+        str(sp.BOYUTLAR))
+kontrol("stil_profili AG KULLANMIYOR",
+        all(x not in oku(KOK, "stil_profili.py")
+            for x in ("requests", "openai.com", "http://", "https://", "urllib")))
+
+# ── Dogrulama ──
+_hatali = {k: sp.dogrula(p) for k, p in sp.PROFIL.items() if sp.dogrula(p)}
+kontrol("kayittaki TUM profiller semaya uyuyor", not _hatali, str(_hatali)[:200])
+kontrol("eksik boyut yakalaniyor",
+        any("eksik boyut" in h for h in sp.dogrula({"ad": "x", "ozet": "y",
+                                                    "surum": "1.0.0"})))
+_bozuk = sp.profil_al("belgesel-sinematik")
+_bozuk["tempoo"] = {}
+kontrol("BILINMEYEN boyut hata veriyor (sessiz yazim yanlisi yok)",
+        any("bilinmeyen boyut" in h for h in sp.dogrula(_bozuk)), str(sp.dogrula(_bozuk)))
+_tip = sp.profil_al("belgesel-sinematik")
+_tip["tempo"]["plan_sn"] = "yedi"
+kontrol("yanlis tip yakalaniyor",
+        any("sayi degil" in h for h in sp.dogrula(_tip)))
+_eksik = sp.profil_al("belgesel-sinematik")
+del _eksik["qa"]["lufs_hedef"]
+kontrol("eksik alan yakalaniyor",
+        any("qa.lufs_hedef eksik" in h for h in sp.dogrula(_eksik)))
+
+# ── Surumleme ──
+kontrol("her profilin surumu var",
+        all(p.get("surum") for p in sp.PROFIL.values()))
+kontrol("sema uyumu MAJOR'a bakiyor",
+        sp.sema_uyumlu_mu("1.9.9") and not sp.sema_uyumlu_mu("2.0.0"))
+_a = sp.profil_al("belgesel-sinematik")
+_a["tempo"]["plan_sn"] = 999.0
+kontrol("profil_al DERIN KOPYA doner (kayit bozulmaz)",
+        sp.PROFIL["belgesel-sinematik"]["tempo"]["plan_sn"] != 999.0)
+_ank = sp.arsivle("belgesel-sinematik")
+kontrol("arsivle (kimlik, surum) donduruyor",
+        _ank == ("belgesel-sinematik", sp.PROFIL["belgesel-sinematik"]["surum"]),
+        str(_ank))
+kontrol("arsivlenen surum AYNEN geri geliyor",
+        sp.profil_al("belgesel-sinematik", surum=_ank[1])["tempo"]["plan_sn"]
+        == sp.PROFIL["belgesel-sinematik"]["tempo"]["plan_sn"])
+kontrol("surum_listesi arsivi goruyor", _ank[1] in sp.surum_listesi("belgesel-sinematik"))
+try:
+    sp.profil_al("belgesel-sinematik", surum="9.9.9")
+    kontrol("olmayan surum sessizce BASKA surum dondurmuyor", False, "KeyError yok")
+except KeyError:
+    kontrol("olmayan surum sessizce BASKA surum dondurmuyor", True)
+try:
+    sp.profil_al("olmayan-stil")
+    kontrol("bilinmeyen kimlik KeyError", False)
+except KeyError:
+    kontrol("bilinmeyen kimlik KeyError", True)
+
+# ── Birlestirme kurallari ──
+kontrol("ortalama kurali agirlikli",
+        sp._birlestir_alan("ortalama", [10.0, 20.0], [3.0, 1.0]) == 12.5,
+        str(sp._birlestir_alan("ortalama", [10.0, 20.0], [3.0, 1.0])))
+kontrol("agirlikli-secim en agir ebeveyni aliyor",
+        sp._birlestir_alan("agirlikli-secim", ["a", "b"], [0.2, 0.8]) == "b")
+kontrol("en-kati-dogru: yasak izni yener",
+        sp._birlestir_alan("en-kati-dogru", [False, True], [9.0, 0.1]) is True)
+kontrol("en-kati-maks: buyuk deger kati (min kaynak)",
+        sp._birlestir_alan("en-kati-maks", [1.0, 3.0], [9.0, 0.1]) == 3.0)
+kontrol("en-kati-min: kucuk deger kati (siyah kare)",
+        sp._birlestir_alan("en-kati-min", [5.0, 0.0], [9.0, 0.1]) == 0.0)
+kontrol("kesisim lisansta KATI tarafi aliyor",
+        sp._birlestir_alan("kesisim", [("cc0", "pexels"), ("cc0",)], [1.0, 1.0])
+        == ("cc0",))
+kontrol("BOS kesisimde bos liste DONMUYOR (medya kilitlenmez)",
+        sp._birlestir_alan("kesisim", [("cc0",), ("pexels",)], [1.0, 0.5])
+        == ("cc0",))
+try:
+    sp._birlestir_alan("uydurma-kural", [1], [1])
+    kontrol("bilinmeyen kural hata veriyor", False)
+except ValueError:
+    kontrol("bilinmeyen kural hata veriyor", True)
+
+# ── Melez turetme (cekirdek kod degismeden) ──
+_mp, _mg = sp.tureti(["belgesel-sinematik", "korku-gerilim"], [0.6, 0.4])
+kontrol("turetilmis melez SEMAYA uyuyor", not sp.dogrula(_mp), str(sp.dogrula(_mp))[:160])
+kontrol("melez profil kayda YAZILMIYOR (cekirdek kod degismedi)",
+        "melez" not in " ".join(sp.PROFIL.keys()) and len(sp.PROFIL) == sk["profil"])
+kontrol("melez ebeveynlerini raporluyor",
+        _mg["ebeveyn"] == ["belgesel-sinematik", "korku-gerilim"])
+kontrol("gerekce TUM alanlari hesaba katiyor",
+        _mg["alan_sayisi"] == sk["alan"], f"{_mg['alan_sayisi']} vs {sk['alan']}")
+kontrol("her alanin kurali ve kaynagi raporlaniyor (kara kutu yok)",
+        all({"kural", "kaynak", "deger"} <= set(v) for v in _mg["alan"].values()))
+kontrol("melezde sayisal alan agirlikli ortalama (7.0/5.0 -> 6.2)",
+        _mp["tempo"]["plan_sn"] == 6.2, str(_mp["tempo"]["plan_sn"]))
+kontrol("melezde KANIT kurali KATI tarafta kaliyor",
+        _mp["medya"]["ai_gorsel_yasak"] is True
+        and _mp["kanit"]["min_bagimsiz_kaynak"] == 2.0, str(_mp["kanit"]))
+_bp, _bg = sp.tureti(["belgesel-sinematik", "seyahat-4k"], [0.5, 0.5])
+kontrol("lisans kesisimi bos degilse KATI liste secilir",
+        set(_bp["kanit"]["lisans_beyaz_liste"]) == set(sp.LISANS_KATI),
+        str(_bp["kanit"]["lisans_beyaz_liste"]))
+try:
+    sp.tureti(["belgesel-sinematik"])
+    kontrol("tek ebeveynle turetme reddediliyor", False)
+except ValueError:
+    kontrol("tek ebeveynle turetme reddediliyor", True)
+try:
+    sp.tureti(["belgesel-sinematik", "korku-gerilim"], [1.0])
+    kontrol("agirlik sayisi uyusmazsa reddediliyor", False)
+except ValueError:
+    kontrol("agirlik sayisi uyusmazsa reddediliyor", True)
+
+# ── coz(): KULLANICI SECIMI AUTO'YU YENER ──
+_ko = {"yol": "hikaye.korku", "aile": "hikaye", "guven": 0.9, "ikincil": None}
+_c = sp.coz(kullanici_stili="seyahat-4k", konsept=_ko)
+kontrol("kullanici secimi AUTO'yu EZIYOR",
+        _c["kimlik"] == "seyahat-4k" and _c["kaynak"] == "kullanici", str(_c["kimlik"]))
+kontrol("ezme gerekcede yaziyor", "EZILDI" in _c["gerekce"], _c["gerekce"])
+_c2 = sp.coz(konsept=_ko)
+kontrol("kullanici secmezse AUTO calisiyor",
+        _c2["kimlik"] == "korku-gerilim" and _c2["kaynak"] == "auto", str(_c2["kimlik"]))
+_c3 = sp.coz(kullanici_stili="boyle-bir-stil-yok", konsept=_ko)
+kontrol("BILINMEYEN kullanici stili sessizce KABUL EDILMIYOR",
+        _c3["kaynak"] == "auto" and _c3["uyari"], str(_c3["uyari"]))
+_c4 = sp.coz(konsept={"yol": "belirsiz", "aile": "", "guven": 0.0})
+kontrol("belirsiz konseptte VARSAYILANA dusuluyor",
+        _c4["kaynak"] == "varsayilan" and _c4["kimlik"] == sp.VARSAYILAN_PROFIL,
+        str(_c4["kimlik"]))
+_c5 = sp.coz()
+kontrol("hicbir sinyal yoksa varsayilan + gerekce", _c5["kaynak"] == "varsayilan"
+        and _c5["gerekce"])
+_c6 = sp.coz(konsept={"yol": "hikaye.korku", "aile": "hikaye", "guven": 0.5,
+                      "ikincil": "belgesel.tarih"})
+kontrol("MELEZ konsept profil TURETIYOR", _c6["kaynak"] == "turetilmis", str(_c6["kaynak"]))
+kontrol("turetilmis secimde gerekce donuyor",
+        _c6["turetme"] and _c6["turetme"]["alan_sayisi"] == sk["alan"])
+kontrol("turetilmis profil de semaya uyuyor", not sp.dogrula(_c6["profil"]))
+_c7 = sp.coz(kullanici_stili="sinematik-belgesel", konsept=_ko)
+kontrol("ESKI stil kimligi kullanici secimi olarak kabul ediliyor",
+        _c7["kimlik"] == "belgesel-sinematik" and _c7["kaynak"] == "kullanici",
+        str(_c7["kimlik"]))
+
+# ── Geriye uyumluluk ──
+_eski = sp.eski_edit_stiline(sp.profil_al("belgesel-sinematik"))
+kontrol("eski EDIT_STILLERI alanlarinin hepsi uretiliyor",
+        all(a in _eski for a in sp.ESKI_EDIT_ANAHTARLARI),
+        str([a for a in sp.ESKI_EDIT_ANAHTARLARI if a not in _eski]))
+kontrol("eski bicimde tasinamayan boyutlar _profil altinda korunuyor",
+        {"palet", "ses", "kanit", "qa"} <= set(_eski["_profil"]))
+kontrol("belgeselde AI gorsel yasagi eski bayraga tasiniyor",
+        _eski["gorsel_yasak"] is True)
+_pp = oku(KOK, "pipeline.py")
+_kayip = [k for k in sp.ESKI_EDIT_ESLEME if f'"{k}": {{' not in _pp]
+kontrol("ESKI_EDIT_ESLEME anahtarlari pipeline.EDIT_STILLERI'nde GERCEKTEN var",
+        not _kayip, str(_kayip))
+kontrol("pipeline.py BU ADIMDA stil_profili'ni import ETMIYOR (I-2c isi)",
+        "stil_profili" not in _pp)
+_ap = {y.split(".")[0] for y in tx.AGAC} | set(tx.AGAC)
+_gecersiz = [k for k in sp.KONSEPT_PROFIL if k not in _ap]
+kontrol("KONSEPT_PROFIL anahtarlari taksonomide GERCEKTEN var",
+        not _gecersiz, str(_gecersiz))
+_bos_hedef = [v for v in sp.KONSEPT_PROFIL.values() if v not in sp.PROFIL]
+kontrol("KONSEPT_PROFIL hedefleri kayitta var", not _bos_hedef, str(_bos_hedef))
+kontrol("her taksonomi AILESI bir profile baglaniyor",
+        not ({y.split(".")[0] for y in tx.AGAC} - set(sp.KONSEPT_PROFIL)),
+        str({y.split(".")[0] for y in tx.AGAC} - set(sp.KONSEPT_PROFIL)))
+
+try:
+    py_compile.compile(os.path.join(KOK, "stil_profili.py"), doraise=True)
+    kontrol("stil_profili.py derleniyor", True)
+except Exception as e:
+    kontrol("stil_profili.py derleniyor", False, str(e)[:140])
+
+
 print(f"\n{'=' * 60}")
 print(f"GECEN: {gecen}   BASARISIZ: {len(basarisiz)}   BLOKE: {len(bloke)}")
 for b in basarisiz:

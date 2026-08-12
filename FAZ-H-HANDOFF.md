@@ -165,7 +165,8 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | H6 render sonrası QA kapısı | `171737c` | ✅ |
 | 12 Ağu | H4 otomatik girdi analizi | `d40936f` | ✅ **CANLI** |
 | 12 Ağu | **I-1 kare kapısı** — medya seçim akışına bağlandı | `7dd6322` | ✅ yerel yeşil, **deploy YOK** |
-| 12 Ağu | **I-2a hiyerarşik konsept taksonomisi** | bu commit | ✅ yerel yeşil, **deploy YOK** |
+| 12 Ağu | **I-2a hiyerarşik konsept taksonomisi** | `687e004` | ✅ yerel yeşil, **deploy YOK** |
+| 12 Ağu | **I-2b sürümlü bileşik stil profilleri** | (staged, commit YOK) | ✅ Faz I yeşil, **deploy YOK** |
 
 ---
 
@@ -674,3 +675,104 @@ melez}`, gerekçenin ölçülen sayı içermesi, eski etikete indirgenmesi.
   kuralları, QA eşikleri) — **bu adımda yazılmadı.**
 - I-2c: `girdi_analizi.analiz()` içine `konsept` alanı olarak **ek** bağlama
   (eski alanlar korunarak) + Auto ↔ kullanıcı seçimi önceliği.
+
+---
+
+## 17. FAZ I-2b — SÜRÜMLÜ BİLEŞİK STİL PROFİLLERİ (12 Ağu)
+
+> **Durum: yazıldı + testlendi, AKIŞA BAĞLANMADI.** Dosyalar staged; commit,
+> push ve deploy **yapılmadı**.
+
+### Kapatılan açık
+
+Stil bugün **tek bir etiket** (`"sinematik-belgesel"`) ve o etiketin arkasındaki
+sözlük `pipeline.EDIT_STILLERI` içinde düz duruyor:
+
+| Sorun | Ölçülen durum |
+|---|---|
+| **Sürüm yok** | Bir stilin `sahne_sn`'i değişince dün üretilmiş iş yeniden üretilemez; hangi ayarla çıktığı kayıtlı değil |
+| **Boyutlar karışık** | `sahne_sn` (tempo), `altyazi` (tipografi), `mag` (upscale), `gorsel_ek` (palet promptu) aynı düzlemde |
+| **Türetilemez** | Melez istek için sözlüğe **elle** satır gerekiyor; çekirdek kod her yeni stilde büyüyor |
+| **Kanıt/QA stilin parçası değil** | AI görsel yasağı tek bayrak (`gorsel_yasak`); lisans beyaz listesi, min bağımsız kaynak ve QA eşikleri stile bağlı değil |
+
+### Yeni: `webapp/stil_profili.py` (841 satır)
+
+**12 profil · 11 boyut · 44 alan · 15 konsept bağlantısı · 5 eski kimlik eşlemesi**
+(`kapsam_ozeti()` ile ölçülebilir).
+
+11 boyut: `anlatim · tempo · gecis · kamera · tipografi · palet · ses · medya ·
+dagitim · kanit · qa`
+
+Profiller: `belgesel-sinematik · belgesel-arastirmaci · seyahat-4k ·
+ambient-sakin · explainer-hizli · bilim-anlatisi · hikaye-sinematik ·
+korku-gerilim · cocuk-yumusak · urun-tanitim · yasam-dinamik · kultur-muzik`
+
+### Sürümleme
+
+- `SEMA_SURUM = "1.0.0"`; her profil kendi `surum`unu taşır.
+- `arsivle(kimlik)` mevcut sürümü dondurur → `profil_al(kimlik, surum=...)`
+  aynen geri getirir. Bir profili değiştirmeden **önce** çağrılmalı.
+- Olmayan sürüm istenirse **sessizce başka sürüm dönmez** — `KeyError`.
+- `profil_al()` her zaman **derin kopya** döner; kayıt kazara bozulamaz.
+
+### Çekirdek kod değişmeden genişleme
+
+- Yeni profil = `PROFIL`'e satır.
+- Yeni boyut alanı = `BOYUT_KURALI`'ya satır.
+- `_birlestir_alan()` **alan adı bilmez** — 7 kural: `ortalama ·
+  agirlikli-secim · birlesim · kesisim · en-kati-dogru · en-kati-maks ·
+  en-kati-min`.
+
+### Melez türetme + gerekçe
+
+`tureti()` 44 alanın her biri için hangi kuralın uygulandığını ve değerin
+nereden geldiğini raporlar (kara kutu yok). Melez profil **kayda yazılmaz**.
+
+**Katı olan kazanır:** belgesel + korku melezinde `ai_gorsel_yasak=True`,
+`min_bagimsiz_kaynak=2.0`, lisans beyaz listesi katı tarafta kalıyor — testli.
+
+### Kullanıcı seçimi Auto'yu yener
+
+`coz()` sırası: **kullanıcı → auto (konsept) → türetilmiş melez → varsayılan**.
+Kaynak her zaman raporlanır. Kullanıcı **bilinmeyen** bir stil verdiyse sessizce
+yutulmaz: uyarı üretilip auto'ya düşülür.
+
+### Geriye uyumluluk — BOZULMADI
+
+| Kilit | Durum |
+|---|---|
+| `pipeline.py` | ✅ **dokunulmadı**; `stil_profili`'ni import etmiyor (testli) |
+| `server.py` · modüler arayüz · `deploy.sh` | ✅ dokunulmadı |
+| `eski_edit_stiline()` | eski `EDIT_STILLERI` alanlarının hepsini üretiyor (testli) |
+| `ESKI_EDIT_ESLEME` | 5 eski kimliğin `pipeline.EDIT_STILLERI`'nde gerçekten var olduğu statik kontrolle doğrulanıyor |
+| `KONSEPT_PROFIL` | anahtarların `taksonomi.AGAC`'ta gerçekten var olduğu testli; her aile bir profile bağlı |
+
+### Ölçülen test sonucu
+
+`python3 webapp/testler/test_faz_i.py` → **289 geçen / 0 başarısız / 0 bloke**
+(234 → 289; I-2b'den **+55** kontrol).
+
+⚠ **A–H regresyonları bu adımda KOŞULMADI** — istenen kapsam yalnız Faz I
+testiydi. Commit öncesi koşulmalı.
+
+### BİLİNEN SINIRLAR (dürüstçe)
+
+1. **Profil değerleri ölçülmedi.** 12 profildeki tempo/palet/ses sayıları
+   mevcut `EDIT_STILLERI` ölçümlerinden ve tür konvansiyonundan türetilmiş
+   **tasarım kararları** — gerçek videoyla A/B doğrulaması yok.
+2. **Hiçbir yerden import edilmiyor.** Motor yazıldı ve testlendi; akışa
+   bağlanması **I-2c**'ye ait.
+3. **`eski_edit_stiline()` kayıpsız değil.** Eski biçimde palet/ses/kanıt/QA
+   karşılığı yok; bunlar `_profil` altında birlikte taşınıyor. I-2c'de
+   pipeline'ın bunu okuması gerekecek.
+4. **Melez ağırlıkları sezgisel.** `coz()` konsept güvenini ağırlık olarak
+   kullanıyor; bu seçim ölçülmedi.
+5. **Boş lisans kesişiminde** en ağırlıklı ebeveynin listesi alınıyor (medya
+   kilitlenmesin diye). Güvenlik açısından en katı davranış değil — uyarı
+   olarak raporlanıyor.
+
+### SONRAKİ ADIM (I-2c — bu adımda YAPILMADI)
+
+`girdi_analizi.analiz()` içine `konsept` + `stil_profili` alanlarını **ek**
+olarak bağlamak (eski alanlar korunarak), `pipeline`'ın `_profil` bloğunu
+okuması, ve GUI'da tespit edilen konsept + plan özetinin gösterilmesi.
