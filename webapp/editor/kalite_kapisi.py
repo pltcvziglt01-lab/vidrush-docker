@@ -752,18 +752,401 @@ def _satir_bol(metin: str, maks_karakter: int, maks_satir: int) -> list:
     return satirlar[:max(1, int(maks_satir))] or [""]
 
 
+# ═══════════ 7) OPTIK HAREKET / DURAGANLIK (Faz I-17) ═══════════════════
+#
+# I-16 ciktisi teknik olarak temizdi ama IZLEYICI ICIN amatordu: dort statik
+# fotograf 17.6 sn boyunca duruyordu ve bir sahne 5.21 sn boyunca neredeyse
+# HIC DEGISMIYORDU. "hareket=static" plan tarafinda gorunuyordu ama hicbir
+# kapi bunu olcmuyordu. Bu bolum ekranda GERCEKTEN ne kadar hareket
+# oldugunu olcer — plan beyanini degil, cikti karelerini.
+#
+# ⚠ OLCUM SOZLESMESI: `farklar`, videodan `ornek_fps` hizinda alinan
+# ardisik gri kareler arasindaki ORTALAMA MUTLAK FARK degerleridir
+# (0-255 olceginde). Esikler bu ornekleme ile ANLAMLIDIR; ornekleme
+# degisirse esikler de yeniden kalibre edilmelidir. Ornekleyici bu modulde
+# DEGIL (saf kalsin diye) — komutu `optik_ornek_komutu()` uretir.
+
+OPTIK_ORNEK_FPS = 4
+OPTIK_ORNEK_OLCU = (64, 36)
+
+# ⚠ ESIK GERCEK OLCUMDEN TURETILDI (I-16 ciktisi, 4 fps / 64x36):
+#     b002 "static"   -> 0.914   (kusurlu sahne)
+#     b001 push-in    -> 3.551   (olculen EN ZAYIF hareketli sahne)
+#     b003 push-in    -> 5.102
+#     b004 pull-out   -> 7.030
+# Esik iki olcum arasina, DURAGAN tarafa yakin konuldu ki yanlis pozitif
+# uretmesin: 2.0. (Orta nokta 2.23 olurdu; 2.0 daha muhafazakar.)
+OPTIK_DURGUN_ESIGI = 2.0
+# Sureler PROFILDEN turetildi, uydurulmadi:
+#   WARN = shot_min_sn (1.5) — profilin izin verdigi EN KISA cekim kadar
+#          duragan kalmak zaten bir cekim boyu olu demektir
+#   FAIL = 2 x shot_min_sn (3.0)
+OPTIK_DURGUN_WARN_SN = 1.5
+OPTIK_DURGUN_FAIL_SN = 3.0
+# ⚠ UST SINIR — duraganligin AYNASI: kamera COK HIZLI olabilir.
+#
+# ⚠ DURUST SINIR (I-17'de olculdu): bu esik SIYAH KENAR TESPITI DEGILDIR.
+# Siyah bantli kare 38.911, duzeltilmis TEMIZ hizli pan 34.525 olctu —
+# aralarinda yalnizca %12 var, yani optik BUYUKLUK bu iki durumu AYIRT
+# EDEMEZ. Kenar tasmasi icin ayri ve dogru enstruman eklendi:
+# `kenar_siyahligi_olcusu`. Bu esik yalnizca "kamera fazla hizli" sinyalidir
+# ve olculen mesru en hizli panin (24-35 bandi) USTUNE konuldu.
+OPTIK_ASIRI_ESIGI = 45.0
+
+
+# Kenarin "siyah" sayildigi parlaklik (0-255). Gercek goruntu kenari nadiren
+# 16'nin altina duser; tasma bolgesi ise TAM siyahtir (0).
+KENAR_SIYAH_ESIGI = 16.0
+# Kenar seridinin kare genisligine orani (orneklenmis karede en az 1 sutun).
+KENAR_SERIT_ORANI = 0.04
+
+
+def kenar_siyahligi_olcusu(ham: bytes, *, olcu: tuple = OPTIK_ORNEK_OLCU,
+                           siyah_esigi: float = KENAR_SIYAH_ESIGI,
+                           serit_orani: float = KENAR_SERIT_ORANI) -> dict:
+    """Kadrajdan TASMA sonucu kenarda SIYAH BANT olusmus mu?
+
+    ⚠ I-17'de GERCEKTEN yasandi: `pan-left` + `punch-1.6` kadrajinda sag
+    kenarda siyah bant olustu (16.72 sn karesinde goruldu). Kok neden
+    `motion._guvenli_pay`in CSS `scale(S) translate(x%)` sirasini hesaba
+    katmamasiydi — kayma ekranda S KAT buyuyor.
+    """
+    try:
+        g, y = int(olcu[0]), int(olcu[1])
+    except (TypeError, ValueError, IndexError):
+        return {"olculdu": False, "neden": "OLCU-YOK"}
+    n = g * y
+    if not ham or n <= 0 or len(ham) < n:
+        return {"olculdu": False, "neden": "ORNEK-YOK"}
+    serit = max(1, int(g * _sayi(serit_orani, KENAR_SERIT_ORANI)))
+    adet = len(ham) // n
+    kareler = []
+    for k in range(adet):
+        blok = ham[k * n:(k + 1) * n]
+        sol, sag = [], []
+        for satir in range(y):
+            bas = satir * g
+            sol.extend(blok[bas:bas + serit])
+            sag.extend(blok[bas + g - serit:bas + g])
+        genel = sum(blok) / n
+        kareler.append({
+            "kare": k,
+            "sol": round(sum(sol) / max(1, len(sol)), 2),
+            "sag": round(sum(sag) / max(1, len(sag)), 2),
+            "genel": round(genel, 2)})
+    # Kenar SIYAH sayilir: esigin altinda VE genel parlakligin cok altinda
+    # (koyu bir goruntuyu yanlislikla "tasma" saymamak icin).
+    ihlal = [k for k in kareler
+             if (k["sol"] < siyah_esigi or k["sag"] < siyah_esigi)
+             and k["genel"] > siyah_esigi * 2]
+    return {
+        "olculdu": True, "kare": adet, "serit_sutun": serit,
+        "siyah_esigi": siyah_esigi,
+        "ihlal_kare": len(ihlal), "ihlal_orani": round(len(ihlal) / max(1, adet), 4),
+        "ornek_ihlal": ihlal[:3],
+        "en_koyu_sol": min((k["sol"] for k in kareler), default=None),
+        "en_koyu_sag": min((k["sag"] for k in kareler), default=None),
+        "temiz": not ihlal,
+    }
+
+
+def optik_ornek_komutu(video_yolu: str, *, ornek_fps: int = OPTIK_ORNEK_FPS,
+                       olcu: tuple = OPTIK_ORNEK_OLCU) -> list:
+    """Ornekleme komutunu URETIR — bu modul onu CALISTIRMAZ.
+
+    Kisa ve kararli: tek gecis, ham gri bayt akisi, alt surec yok.
+    """
+    g, y = int(olcu[0]), int(olcu[1])
+    return ["ffmpeg", "-nostdin", "-v", "error", "-i", video_yolu, "-vf",
+            f"fps={int(ornek_fps)},scale={g}:{y},format=gray",
+            "-f", "rawvideo", "-"]
+
+
+def optik_farklar(ham: bytes, *, olcu: tuple = OPTIK_ORNEK_OLCU) -> list:
+    """Ham gri kare akisindan ardisik ORTALAMA MUTLAK FARK listesi.
+
+    Saf hesap: dosya acmaz, komut kosturmaz. `ham` disaridan verilir.
+    """
+    try:
+        g, y = int(olcu[0]), int(olcu[1])
+    except (TypeError, ValueError, IndexError):
+        return []
+    n = g * y
+    if not ham or n <= 0 or len(ham) < 2 * n:
+        return []
+    adet = len(ham) // n
+    out = []
+    for i in range(1, adet):
+        a = ham[(i - 1) * n:i * n]
+        b = ham[i * n:(i + 1) * n]
+        out.append(round(sum(abs(a[j] - b[j]) for j in range(n)) / n, 4))
+    return out
+
+
+def optik_hareket_olcusu(farklar, *, ornek_fps: int = OPTIK_ORNEK_FPS,
+                         sahneler=None,
+                         durgun_esigi: float = OPTIK_DURGUN_ESIGI,
+                         asiri_esigi: float = OPTIK_ASIRI_ESIGI,
+                         warn_sn: float = OPTIK_DURGUN_WARN_SN,
+                         fail_sn: float = OPTIK_DURGUN_FAIL_SN,
+                         kesme_payi_sn: float = 0.5) -> dict:
+    """Ekranda GERCEKTEN ne kadar hareket var? Sahne sahne olcer.
+
+    `sahneler`: [{"ad","bas_sn","sure_sn"} ...] — verilirse sahne bazinda,
+    verilmezse yalnizca genel olcum yapilir.
+
+    ⚠ Sahne kenarlarindaki `kesme_payi_sn` DISLANIR: kesme ani devasa bir
+    fark uretir ve duragan bir sahneyi "hareketli" gosterirdi.
+    """
+    try:
+        dizi = [_sayi(f, -1.0) for f in (farklar or [])]
+    except TypeError:
+        return {"olculdu": False, "neden": "GIRDI-BOZUK"}
+    dizi = [f for f in dizi if f >= 0]
+    fps = max(1, int(_sayi(ornek_fps, OPTIK_ORNEK_FPS)))
+    if len(dizi) < 2:
+        return {"olculdu": False, "neden": "ORNEK-YETERSIZ",
+                "ornek": len(dizi)}
+
+    def _an(i):                       # i. farkin karsiligi olan zaman
+        return (i + 1) / fps
+
+    sahne_olcum, ihlaller = [], []
+    if sahneler:
+        for s in sahneler:
+            if not isinstance(s, dict):
+                continue
+            bas = _sayi(s.get("bas_sn"))
+            sure = _sayi(s.get("sure_sn"))
+            if sure <= 0:
+                continue
+            ic = [f for i, f in enumerate(dizi)
+                  if bas + kesme_payi_sn <= _an(i) < bas + sure - kesme_payi_sn]
+            if not ic:
+                ic = [f for i, f in enumerate(dizi)
+                      if bas <= _an(i) < bas + sure]
+            if not ic:
+                continue
+            ort = sum(ic) / len(ic)
+            # En uzun KESINTISIZ duraganlik serisi
+            en_uzun, su_an = 0, 0
+            for f in ic:
+                su_an = su_an + 1 if f < durgun_esigi else 0
+                en_uzun = max(en_uzun, su_an)
+            durgun_sn = round(en_uzun / fps, 3)
+            kayit = {"ad": str(s.get("ad") or ""),
+                     "bas_sn": round(bas, 3), "sure_sn": round(sure, 3),
+                     "ornek": len(ic), "ortalama": round(ort, 3),
+                     "en_dusuk": round(min(ic), 3),
+                     "en_yuksek": round(max(ic), 3),
+                     "durgun_sn": durgun_sn,
+                     "durgun": bool(ort < durgun_esigi),
+                     "asiri": bool(ort > asiri_esigi)}
+            # ⚠ SEVIYE IKI OLCUMDEN BIRDEN turetilir:
+            #   (a) kesintisiz duraganlik serisi
+            #   (b) SAHNE ORTALAMASI duragan + sahne UZUN
+            # Yalniz (a)'ya bakmak yetmiyordu: I-16'nin `static` sahnesinde
+            # ortalama 0.914 (acikca duragan) ama tek tek ornekler esigin
+            # etrafinda salindigi icin en uzun seri 2.0 sn cikiyor ve kapi
+            # 5.21 sn'lik donuklugu WARN'a dusuruyordu. (b) tam olarak
+            # "ayni asset uzun sure optik donuk" vakasini yakalar.
+            uzun_ve_durgun = bool(ort < durgun_esigi and sure > fail_sn)
+            uzun_ve_durgun_warn = bool(ort < durgun_esigi and sure > warn_sn)
+            if durgun_sn > fail_sn or uzun_ve_durgun:
+                kayit["seviye"] = "fail"
+                kayit["gerekce"] = ("kesintisiz seri" if durgun_sn > fail_sn
+                                    else "sahne ortalamasi duragan + uzun")
+                ihlaller.append(kayit)
+            elif durgun_sn > warn_sn or uzun_ve_durgun_warn:
+                kayit["seviye"] = "warn"
+                kayit["gerekce"] = ("kesintisiz seri" if durgun_sn > warn_sn
+                                    else "sahne ortalamasi duragan")
+                ihlaller.append(kayit)
+            elif kayit["asiri"]:
+                kayit["seviye"] = "warn"
+                kayit["gerekce"] = ("optik hareket asiri — kamera cok hizli "
+                                    "ya da kadrajdan tasmis olabilir")
+                ihlaller.append(kayit)
+            sahne_olcum.append(kayit)
+
+    return {
+        "olculdu": True, "ornek": len(dizi), "ornek_fps": fps,
+        "durgun_esigi": durgun_esigi, "asiri_esigi": asiri_esigi,
+        "warn_sn": warn_sn, "fail_sn": fail_sn,
+        "genel_ortalama": round(sum(dizi) / len(dizi), 3),
+        "sahneler": sahne_olcum, "ihlaller": ihlaller,
+        "en_durgun_sahne": (min(sahne_olcum, key=lambda k: k["ortalama"])
+                            if sahne_olcum else None),
+        "temiz": not ihlaller,
+    }
+
+
+# ═══════════ 8) MOTION GRAMMAR (Faz I-17) ═══════════════════════════════
+
+# Ardisik olmayan tekrari da yakalamak icin bakilan pencere. I-16'da
+# push-in b001 ve b003'te kullanildi; komsu olmadiklari icin mevcut
+# `ARDIL-AYNI-HAREKET` kurali gormedi. 3 = bir onceki ve iki onceki.
+HAREKET_PENCERESI = 3
+
+
+def motion_grammar_olcusu(sahneler, *, pencere: int = HAREKET_PENCERESI) -> dict:
+    """Kamera hareketi ve gecis CESITLILIGI — plan uzerinden olcum.
+
+    `sahneler`: [{"beat_id","hareket","gecis","islev","sure_sn"} ...]
+    """
+    try:
+        liste = [s for s in (sahneler or []) if isinstance(s, dict)]
+    except TypeError:
+        return {"olculdu": False, "neden": "GIRDI-BOZUK"}
+    if not liste:
+        return {"olculdu": False, "neden": "SAHNE-YOK"}
+
+    hareketler = [str(s.get("hareket") or "") for s in liste]
+    gecisler = []
+    for s in liste:
+        g = s.get("gecis")
+        if isinstance(g, (list, tuple)):
+            gecisler.extend(str(x) for x in g if x)
+        elif g:
+            gecisler.append(str(g))
+
+    ardisik_tekrar = [{"indeks": i, "hareket": hareketler[i]}
+                      for i in range(1, len(hareketler))
+                      if hareketler[i] and hareketler[i] == hareketler[i - 1]]
+    pencere_tekrar = []
+    for i in range(len(hareketler)):
+        onceki = hareketler[max(0, i - pencere):i]
+        if hareketler[i] and hareketler[i] in onceki:
+            pencere_tekrar.append({"indeks": i, "hareket": hareketler[i],
+                                   "pencere": pencere})
+    statik = [{"indeks": i, "sure_sn": _sayi(liste[i].get("sure_sn"))}
+              for i, h in enumerate(hareketler) if h == "static"]
+
+    return {
+        "olculdu": True,
+        "sahne": len(liste),
+        "hareketler": hareketler,
+        "benzersiz_hareket": len({h for h in hareketler if h}),
+        "ardisik_tekrar": ardisik_tekrar,
+        "pencere_tekrari": pencere_tekrar,
+        "pencere": pencere,
+        "statik_sahneler": statik,
+        "gecisler": gecisler,
+        "benzersiz_gecis": len({g for g in gecisler if g}),
+        "gecis_dagilimi": {g: gecisler.count(g) for g in set(gecisler) if g},
+        # Acilis/kapanis ritmi: ilk ve son sahnenin hareketi ayni olmamali
+        "acilis_hareketi": hareketler[0] if hareketler else "",
+        "kapanis_hareketi": hareketler[-1] if hareketler else "",
+        "acilis_kapanis_ayri": bool(
+            len(hareketler) > 1 and hareketler[0] != hareketler[-1]),
+    }
+
+
+# ═══════════ 9) IZLEYICI KALITE PUANI (Faz I-17) ════════════════════════
+#
+# ⚠ DURUST ETIKET: bu bir IZLEYICI ARASTIRMASI DEGIL. Zaten OLCULEN
+# boyutlarin agirlikli birlesimidir ve her bilesen ham degeriyle birlikte
+# raporlanir (kara kutu yok). "Izleyiciler bunu daha cok begeniyor" gibi
+# bir iddia TASIMAZ; yalnizca "olculen kusur sayisi azaldi" der.
+KALITE_AGIRLIK = {
+    "optik_hareket": 25,      # ekranda gercekten hareket var mi
+    "motion_cesitlilik": 20,  # yon/gecis tekrari
+    "ritim": 15,              # sabit blok / olu final
+    "tipografi": 15,          # guvenli alan + cakisma + altyazi
+    "medya": 15,              # tekrar / benzerlik
+    "ses": 10,                # LUFS / ambiyans dengesi
+}
+
+
+def izleyici_kalite_puani(*, optik=None, grammar=None, ritim=None,
+                          guvenli_alan=None, cakisma=None, altyazi=None,
+                          medya=None, miks=None, ambans=None) -> dict:
+    """0-100 arasi BILESIK puan. Her bilesen kendi gerekcesiyle raporlanir."""
+    bilesenler = {}
+
+    def _ekle(ad, tam_puan, kosul, gerekce, olculdu=True):
+        bilesenler[ad] = {
+            "agirlik": tam_puan,
+            "puan": (round(tam_puan * (1.0 if kosul else 0.0), 2)
+                     if olculdu else None),
+            "olculdu": bool(olculdu),
+            "gerekce": gerekce}
+
+    _ekle("optik_hareket", KALITE_AGIRLIK["optik_hareket"],
+          bool((optik or {}).get("temiz")),
+          f"duragan ihlal: {len((optik or {}).get('ihlaller') or [])}",
+          olculdu=bool((optik or {}).get("olculdu")))
+    g = grammar or {}
+    _ekle("motion_cesitlilik", KALITE_AGIRLIK["motion_cesitlilik"],
+          bool(g.get("olculdu") and not g.get("ardisik_tekrar")
+               and not g.get("pencere_tekrari")
+               and g.get("benzersiz_gecis", 0) >= 2
+               and g.get("acilis_kapanis_ayri")),
+          f"benzersiz hareket {g.get('benzersiz_hareket')}, "
+          f"benzersiz gecis {g.get('benzersiz_gecis')}, "
+          f"pencere tekrari {len(g.get('pencere_tekrari') or [])}",
+          olculdu=bool(g.get("olculdu")))
+    r = ritim or {}
+    _ekle("ritim", KALITE_AGIRLIK["ritim"],
+          bool(r.get("olculdu") and not r.get("sabit_blok")
+               and not r.get("olu_final_asildi")),
+          f"sabit_blok={r.get('sabit_blok')} "
+          f"olu_final={r.get('olu_final_sn')}",
+          olculdu=bool(r.get("olculdu")))
+    ga, ck, ay = guvenli_alan or {}, cakisma or {}, altyazi or {}
+    _ekle("tipografi", KALITE_AGIRLIK["tipografi"],
+          bool(ga.get("temiz") and ck.get("temiz")
+               and (ay.get("temiz") if ay.get("olculdu") else True)),
+          f"guvenli_alan={ga.get('temiz')} cakisma={ck.get('temiz')} "
+          f"altyazi={ay.get('temiz')}",
+          olculdu=bool(ga.get("olculdu")))
+    m = medya or {}
+    _ekle("medya", KALITE_AGIRLIK["medya"],
+          bool(m.get("olculdu") and not m.get("tekrar_eden_asset")
+               and not m.get("bitisik_ayni_asset")
+               and not m.get("benzer_ciftler")),
+          f"tekrar={len(m.get('tekrar_eden_asset') or {})} "
+          f"bitisik={len(m.get('bitisik_ayni_asset') or [])}",
+          olculdu=bool(m.get("olculdu")))
+    mx, am = miks or {}, ambans or {}
+    _ekle("ses", KALITE_AGIRLIK["ses"],
+          bool(not mx.get("sessiz_oran_asildi")
+               and not mx.get("olu_final_asildi")
+               and (am.get("dengeli") if am.get("olculdu") else True)),
+          f"sessiz_asildi={mx.get('sessiz_oran_asildi')} "
+          f"ambans_dengeli={am.get('dengeli')}",
+          olculdu=bool(mx.get("olculdu")))
+
+    olculen = [b for b in bilesenler.values() if b["olculdu"]]
+    toplam_agirlik = sum(b["agirlik"] for b in olculen)
+    kazanilan = sum(b["puan"] or 0 for b in olculen)
+    return {
+        "olculdu": bool(olculen),
+        "puan": (round(100.0 * kazanilan / toplam_agirlik, 1)
+                 if toplam_agirlik else None),
+        "kazanilan": round(kazanilan, 2),
+        "olculen_agirlik": toplam_agirlik,
+        "olculemeyen": [a for a, b in bilesenler.items() if not b["olculdu"]],
+        "bilesenler": bilesenler,
+        "not": ("olculen kusur bilesenlerinin agirlikli birlesimi; "
+                "izleyici arastirmasi DEGILDIR"),
+    }
+
+
 # ═════════════════════════ KAPSAM OZETI ═════════════════════════════════
 
 def kapsam_ozeti() -> dict:
     """Bu modulun NE OLCTUGU sayilabilir olsun — "her seyi olcuyoruz" yok."""
     return {
         "sema_surum": SEMA_SURUM,
-        "olcum": 9,
+        "olcum": 13,
         "olcum_adlari": ["baslik_olcusu", "kelime_ortasi_kesik",
                          "medya_tekrari", "ritim_olcusu",
                          "ambans_duyulabilirligi", "miks_olcusu",
                          "guvenli_alan_olcusu", "yazi_cakismasi",
-                         "altyazi_kupleri"],
+                         "altyazi_kupleri", "optik_hareket_olcusu",
+                         "motion_grammar_olcusu", "izleyici_kalite_puani",
+                         "kenar_siyahligi_olcusu"],
         "render_sabiti": 7,
         "enjekte_edilen_okuyucu": 1,
         "esik": {
@@ -777,10 +1160,16 @@ def kapsam_ozeti() -> dict:
             "altyazi_maks_satir": ALTYAZI_MAKS_SATIR,
             "altyazi_min_sn": ALTYAZI_MIN_SN,
             "altyazi_maks_cps": ALTYAZI_MAKS_CPS,
+            "optik_durgun": OPTIK_DURGUN_ESIGI,
+            "optik_durgun_warn_sn": OPTIK_DURGUN_WARN_SN,
+            "optik_durgun_fail_sn": OPTIK_DURGUN_FAIL_SN,
+            "optik_asiri": OPTIK_ASIRI_ESIGI,
+            "kenar_siyah": KENAR_SIYAH_ESIGI,
+            "hareket_penceresi": HAREKET_PENCERESI,
         },
         # Kapsam DISI oldugunu acikca yaz — sonraki atomlarin isi.
         # ⚠ I-16'da altyazi, kaynak kunyesi ve 1080p KAPSAMA ALINDI; listeden
         # cikarildilar. Kalanlar hala kapsam disidir.
-        "kapsam_disi": ["gelismis motion", "hareketli video B-roll",
-                        "web'den medya bulma"],
+        "kapsam_disi": ["hareketli video B-roll", "web'den medya bulma",
+                        "gercek parallax katman gorselleri"],
     }

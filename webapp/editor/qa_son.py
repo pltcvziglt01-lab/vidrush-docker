@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 from . import kalite_kapisi
+from . import kalite_kapisi as kalite_kapisi_mod
 from .profil import EditProfili, VARSAYILAN
 
 
@@ -196,6 +197,9 @@ def denetle(video_yolu: str, *, beklenen: Optional[dict] = None,
             kosucu: Optional[Callable] = None,
             zaman_asimi: int = 180,
             kalite_kapisi: bool = False,
+            optik_farklar: Optional[list] = None,
+            optik_sahneler: Optional[list] = None,
+            optik_ham: Optional[bytes] = None,
             ambans_lufs: Optional[float] = None,
             anlatim_lufs: Optional[float] = None,
             ambans_seviye: float = 1.0,
@@ -331,6 +335,32 @@ def denetle(video_yolu: str, *, beklenen: Optional[dict] = None,
                   ambans_lufs=ambans_lufs, anlatim_lufs=anlatim_lufs,
                   ambans_seviye=ambans_seviye, ducking=ducking,
                   acik=bool(kalite_kapisi))
+
+    # ── FAZ I-17: OPTIK DURAGANLIK (cikti karelerinden) ──
+    if optik_farklar is not None:
+        ok = kalite_kapisi_mod.optik_hareket_olcusu(
+            optik_farklar, sahneler=optik_sahneler)
+        q.olcumler.setdefault("kalite", {})["optik"] = ok
+        if kalite_kapisi and ok.get("olculdu"):
+            for ih in (ok.get("ihlaller") or []):
+                q.ekle("POST-OPTIK-DURGUN", ih.get("seviye", "warn"),
+                       f"{ih['ad']}: {ih['sure_sn']} sn sahnede optik hareket "
+                       f"ortalamasi {ih['ortalama']} (esik {ok['durgun_esigi']}), "
+                       f"en uzun duragan seri {ih['durgun_sn']} sn "
+                       f"[{ih.get('gerekce')}]",
+                       "cekime Ken Burns yonu/siddeti ver ya da sahneyi kisalt")
+
+    # ── FAZ I-17: KENARDA SIYAH BANT (kadrajdan tasma) ──
+    if optik_ham:
+        ke = kalite_kapisi_mod.kenar_siyahligi_olcusu(optik_ham)
+        q.olcumler.setdefault("kalite", {})["kenar"] = ke
+        if kalite_kapisi and ke.get("olculdu") and not ke.get("temiz"):
+            q.ekle("POST-KENAR-SIYAH", "fail",
+                   f"{ke['ihlal_kare']}/{ke['kare']} karede kenarda siyah bant "
+                   f"(en koyu sol {ke['en_koyu_sol']}, sag {ke['en_koyu_sag']}, "
+                   f"esik {ke['siyah_esigi']}) — kamera kadrajdan tasiyor",
+                   "motion._guvenli_pay hesabini kontrol et; pan payi "
+                   "(S-1)/(2S) sinirini asmamali")
     return q.sonuclandir()
 
 

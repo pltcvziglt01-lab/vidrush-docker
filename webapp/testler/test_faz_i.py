@@ -4775,8 +4775,11 @@ kontrol("KaynakEtiketi GUVENLI KENARI zorluyor",
         and "right: GUVENLI_KENAR" in _TSX_G_KOD)
 kontrol("qa_on I-16 kodlarini FAIL_KODLARI'nda tasiyor",
         {"KALITE-YAZI-CAKISMA", "KALITE-GUVENLI-ALAN"} <= _qon.FAIL_KODLARI)
+# ⚠ I-16'da bu kontrol `olcum == 9` kilitliyordu; I-17 uc olcum daha
+# ekledi. Kontrol SILINMEDI, kuralin niyeti korunarak GUNCELLENDI:
+# I-16 olcumleri kapsamda KALMALI ve sayim buyumeye acik olmali.
 kontrol("kapsam_ozeti I-16 olcumlerini sayiyor",
-        _kk.kapsam_ozeti()["olcum"] == 9
+        _kk.kapsam_ozeti()["olcum"] >= 9
         and "yazi_cakismasi" in _kk.kapsam_ozeti()["olcum_adlari"]
         and "altyazi_kupleri" in _kk.kapsam_ozeti()["olcum_adlari"])
 kontrol("altyazi/kunye/1080p artik KAPSAM DISI listesinde DEGIL",
@@ -4927,6 +4930,297 @@ kontrol("bayraklar HALA varsayilan kapali",
 kontrol("altyazi kupleri verilmezse plan ESKISI GIBI davraniyor",
         '"altyazi_stili": "bant-orta" if _altyazi_var else "yok"'
         in oku(KOK, "editor/plan.py"))
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# §35  FAZ I-17 — BELGESEL MOTION GRAMMAR + OPTIK DURAGANLIK KAPISI
+#
+# ONCE durumu I-16 ciktisinda OLCULDU (4 fps / 64x36 gri):
+#     b001 push-in  2.96 sn -> 3.551      b002 static 5.21 sn -> 0.914
+#     b003 push-in  4.69 sn -> 5.102      b004 pull-out 4.68 sn -> 7.030
+#     gecis 4/4 hard-cut · push-in IKI KEZ
+# Kanit: outputs/sample/motion_i17_rapor.json (izlenen)
+# ═══════════════════════════════════════════════════════════════════════
+
+blok("§35a OPTIK DURAGANLIK OLCUMU — sozlesme ve esik turetimi")
+
+kontrol("optik ornekleme komutu KISA ve tek gecis",
+        len(_kk.optik_ornek_komutu("v.mp4")) <= 12
+        and "fps=4" in " ".join(_kk.optik_ornek_komutu("v.mp4"))
+        and "format=gray" in " ".join(_kk.optik_ornek_komutu("v.mp4")))
+kontrol("modul komutu URETIYOR ama CALISTIRMIYOR (saf kalir)",
+        "subprocess" not in _kod_yalniz(_KK_KAYNAK))
+kontrol("esikler GERCEK olcumden turetildi ve kodda yazili",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0 and "0.914" in _KK_KAYNAK
+        and "3.551" in _KK_KAYNAK)
+kontrol("sure esikleri PROFILDEN turetildi (1.5 / 3.0)",
+        _kk.OPTIK_DURGUN_WARN_SN == 1.5
+        and _kk.OPTIK_DURGUN_FAIL_SN == 2 * _kk.OPTIK_DURGUN_WARN_SN)
+
+# ── KIRMIZI KANIT: I-16'nin OLCULEN degerleriyle kapi FAIL veriyor ──
+_ONCE = [{"ad": "b001 push-in", "bas_sn": 0.0, "sure_sn": 2.962},
+         {"ad": "b002 static", "bas_sn": 2.962, "sure_sn": 5.213},
+         {"ad": "b003 push-in", "bas_sn": 8.175, "sure_sn": 4.688},
+         {"ad": "b004 pull-out", "bas_sn": 12.863, "sure_sn": 4.675}]
+# I-16'nin sahne ortalamalarini yeniden ureten sentetik fark dizisi
+_f16 = []
+for _s, _v in zip(_ONCE, (3.551, 0.914, 5.102, 7.030)):
+    _f16 += [_v] * int(_s["sure_sn"] * 4)
+_o16 = _kk.optik_hareket_olcusu(_f16, sahneler=_ONCE)
+kontrol("KIRMIZI: I-16'nin `static` sahnesi FAIL uretiyor",
+        not _o16["temiz"]
+        and any(i["seviye"] == "fail" and "static" in i["ad"]
+                for i in _o16["ihlaller"]), _o16["ihlaller"])
+# ⚠ GERCEK VERI ESIK ETRAFINDA SALINIYORDU: I-16'nin `static` sahnesinde
+# min 0.674, maks 2.622, ortalama 0.914 olculdu. Yani KESINTISIZ seri kisa
+# kaliyor ama sahne acikca duragan. Bu deseni birebir taklit eden dizi:
+_salinim = ([0.7] * 5 + [2.6]) * 4          # ~5.2 sn @ 4 fps, ort ~1.02
+_o_sal = _kk.optik_hareket_olcusu(
+    _salinim, sahneler=[{"ad": "salinimli", "bas_sn": 0.0, "sure_sn": 5.213}])
+kontrol("uzun+duragan sahne KESINTISIZ SERI olmadan da yakalaniyor",
+        any(i.get("gerekce", "").startswith("sahne ortalamasi")
+            and i["seviye"] == "fail" for i in _o_sal["ihlaller"]),
+        _o_sal["ihlaller"])
+kontrol("hareketli sahneler ihlal URETMIYOR (yanlis pozitif yok)",
+        not any("push-in" in i["ad"] or "pull-out" in i["ad"]
+                for i in _o16["ihlaller"]))
+kontrol("KISA duragan sahne FAIL degil WARN",
+        _kk.optik_hareket_olcusu(
+            [0.5] * 8, sahneler=[{"ad": "k", "bas_sn": 0.0, "sure_sn": 2.0}]
+        )["ihlaller"][0]["seviye"] == "warn")
+for _g in (None, [], "x", 5, [None, "a"], [{"bas_sn": "x"}]):
+    try:
+        _kk.optik_hareket_olcusu(_g)
+        _kk.optik_farklar(_g if isinstance(_g, bytes) else b"")
+        _kk.kenar_siyahligi_olcusu(b"")
+    except Exception as _e:                                       # noqa: BLE001
+        kontrol(f"optik olcum {_g!r} istisna FIRLATMIYOR", False,
+                type(_e).__name__)
+kontrol("optik olcumler bozuk girdide ISTISNA FIRLATMIYOR", True)
+
+blok("§35b KENARDA SIYAH BANT — I-17'de bulunan GERCEK render kusuru")
+
+# ⚠ CSS `scale(S) translate(x%)` sirasi: kayma ekranda S KAT buyuyor.
+kontrol("guvenli pay (S-1)/(2S) sinirini ASMIYOR — 8 kombinasyon",
+        all(max(_emo.kamera_spec(_h, 4.7, _k).parametre["zoom"])
+            * _emo.kamera_spec(_h, 4.7, _k).parametre["guvenli_pay"]
+            <= (max(_emo.kamera_spec(_h, 4.7, _k).parametre["zoom"]) - 1) / 2
+            + 1e-9
+            for _h in ("pan-left", "pan-right", "push-in", "pull-out")
+            for _k in ("tam", "punch-1.6"))
+        if (_emo := __import__("editor.motion", fromlist=["motion"])) else False)
+kontrol("ESKI formul GERCEKTEN tasiyordu (gerileme kaniti)",
+        1.696 * max(0.04, (1.6 - 1.0) / 2 + 0.04) > (1.696 - 1) / 2)
+kontrol("_guvenli_pay olcek 1.0'da 0 doner (pan alani yok)",
+        _emo._guvenli_pay(1.0) == 0.0 and _emo._guvenli_pay(0.5) == 0.0)
+kontrol("_guvenli_pay bozuk girdide ISTISNA FIRLATMIYOR",
+        _emo._guvenli_pay(None) == 0.0 and _emo._guvenli_pay("x") == 0.0)
+
+_G16, _Y16 = _kk.OPTIK_ORNEK_OLCU
+kontrol("kenar dedektoru TEMIZ kareyi gecirir",
+        _kk.kenar_siyahligi_olcusu(bytes([120] * (_G16 * _Y16)))["temiz"])
+kontrol("kenar dedektoru SIYAH BANTLI kareyi YAKALAR",
+        not _kk.kenar_siyahligi_olcusu(
+            bytes(sum([[0, 0] + [120] * (_G16 - 4) + [0, 0]
+                       for _ in range(_Y16)], [])))["temiz"])
+kontrol("TAMAMEN KOYU goruntude yanlis pozitif YOK",
+        _kk.kenar_siyahligi_olcusu(bytes([8] * (_G16 * _Y16)))["temiz"])
+# ⚠ DURUST SINIR: optik BUYUKLUK siyah bandi ayirt edemez.
+kontrol("DURUST SINIR: optik esik siyah bant dedektoru DEGIL (kodda yazili)",
+        "SIYAH KENAR TESPITI DEGILDIR" in _KK_KAYNAK
+        and _kk.OPTIK_ASIRI_ESIGI > 35.0)
+kontrol("qa_son POST-KENAR-SIYAH kodunu tasiyor",
+        "POST-KENAR-SIYAH" in oku(KOK, "editor/qa_son.py"))
+
+blok("§35c MOTION GRAMMAR — duraganlik, yon cesitliligi, gecis ailesi")
+
+from editor import gramer as _gr                                  # noqa: E402
+kontrol("uzun cekimde `static` aday havuzundan CIKARILIYOR",
+        _gr._hareket_sec("medium", 0, sure_sn=5.0) != "static"
+        and _gr.DURAGAN_TAVAN_SN == 1.5)
+kontrol("KISA cekimde `static` hala mumkun (kural asiri genellemiyor)",
+        "static" in _gr.CEKIM_HAREKET["medium"])
+kontrol("Ken Burns havuzu GENISLETILDI (yon cesitliligi)",
+        len(_gr.CEKIM_HAREKET["medium"]) >= 5
+        and {"pan-left", "pan-right", "pull-out"}
+        <= set(_gr.CEKIM_HAREKET["medium"]))
+kontrol("havuzdaki her hareket kamera_spec'te GERCEKTEN destekli",
+        all(h in {"push-in", "pull-out", "pan-left", "pan-right",
+                  "slow-drift", "static", "handheld"}
+            for tur in ("establishing", "medium", "close-detail",
+                        "archive", "atmospheric")
+            for h in _gr.CEKIM_HAREKET[tur]))
+kontrol("`soft-zoom` KASITLI olarak havuzda YOK (spec adi ayrisirdi)",
+        not any("soft-zoom" in v for v in _gr.CEKIM_HAREKET.values()))
+kontrol("PENCERE tekrari engelleniyor (ardisik olmayan da)",
+        _gr._hareket_sec("medium", 0, sure_sn=4.0,
+                         son_hareketler=("push-in",)) != "push-in")
+kontrol("RITIM tercihi CESITLILIGE TABI (tekrar pahasina uygulanmaz)",
+        _gr._hareket_sec("establishing", 0, sure_sn=4.0,
+                         son_hareketler=("pull-out",),
+                         islev="sonuc") != "pull-out")
+kontrol("RITIM tercihi cakisma yoksa UYGULANIR",
+        _gr._hareket_sec("establishing", 1, sure_sn=4.0,
+                         son_hareketler=(), islev="sonuc") == "pull-out")
+kontrol("eski cagri imzasi KORUNDU (gerileme yok)",
+        _gr._hareket_sec("medium", 0) in _gr.CEKIM_HAREKET["medium"])
+kontrol("kapanisa GIRIS gecisi karartma (isleve bagli ikinci aile)",
+        _emo.sec_gecis("aciklama", "sonuc", 3).parametre["tur"] == "karartma")
+kontrol("Faz C'nin kilitledigi davranislar KORUNDU",
+        _emo.sec_gecis("aciklama", "aciklama", 5).parametre["tur"] == "hard-cut"
+        and _emo.sec_gecis("aciklama", "kanit", 3,
+                           j_cut=True).parametre["tur"] == "j-cut")
+
+_MG = _kk.motion_grammar_olcusu([
+    {"hareket": "push-in", "gecis": ["hard-cut"], "sure_sn": 3},
+    {"hareket": "push-in", "gecis": ["hard-cut"], "sure_sn": 3}])
+kontrol("ardisik ayni hareket YAKALANIYOR", len(_MG["ardisik_tekrar"]) == 1)
+kontrol("tek gecis ailesi olculuyor", _MG["benzersiz_gecis"] == 1)
+kontrol("pencere tekrari ARDISIK OLMAYANI da yakalar",
+        len(_kk.motion_grammar_olcusu([
+            {"hareket": "push-in"}, {"hareket": "pan-left"},
+            {"hareket": "push-in"}])["pencere_tekrari"]) == 1)
+kontrol("qa_on I-17 kodlarini tasiyor",
+        "KALITE-OPTIK-DURGUN" in _qon.FAIL_KODLARI
+        and "KALITE-MOTION-TEKRAR" in _qon.KALITE_KODLARI
+        and "KALITE-GECIS-TEKDUZE" in _qon.KALITE_KODLARI)
+
+blok("§35d IZLEYICI KALITE PUANI — seffaf birlesim")
+
+_P = _kk.izleyici_kalite_puani(
+    optik={"olculdu": True, "temiz": True, "ihlaller": []},
+    grammar={"olculdu": True, "ardisik_tekrar": [], "pencere_tekrari": [],
+             "benzersiz_gecis": 2, "acilis_kapanis_ayri": True,
+             "benzersiz_hareket": 4},
+    ritim={"olculdu": True, "sabit_blok": False, "olu_final_asildi": False},
+    guvenli_alan={"olculdu": True, "temiz": True},
+    cakisma={"temiz": True}, altyazi={"olculdu": True, "temiz": True},
+    medya={"olculdu": True, "tekrar_eden_asset": {},
+           "bitisik_ayni_asset": [], "benzer_ciftler": []},
+    miks={"sessiz_oran_asildi": False, "olu_final_asildi": False},
+    ambans={"olculdu": True, "dengeli": True})
+kontrol("tum bilesenler temizken puan 100", _P["puan"] == 100.0)
+kontrol("agirliklar 100'e topluyor", sum(_kk.KALITE_AGIRLIK.values()) == 100)
+kontrol("her bilesen KENDI GEREKCESIYLE raporlaniyor (kara kutu yok)",
+        all(b.get("gerekce") for b in _P["bilesenler"].values()))
+kontrol("DURUST ETIKET: izleyici arastirmasi DEGIL",
+        "izleyici arastirmasi DEGILDIR" in _P["not"])
+kontrol("olculemeyen bilesen puana KATILMIYOR (sahte tam puan yok)",
+        _kk.izleyici_kalite_puani(optik={"olculdu": False})[
+            "olculen_agirlik"] < 100)
+kontrol("duragan sahne puani DUSURUYOR",
+        _kk.izleyici_kalite_puani(
+            optik={"olculdu": True, "temiz": False,
+                   "ihlaller": [{"ad": "x"}]})["bilesenler"][
+            "optik_hareket"]["puan"] == 0.0)
+
+blok("§35e YENIDEN RENDER — olculen ONCE/SONRA")
+
+_R17_YOL = os.path.join(KOK, "..", "outputs", "sample", "motion_i17_rapor.json")
+_R17 = None
+if os.path.exists(_R17_YOL):
+    try:
+        _R17 = _json.load(open(_R17_YOL, encoding="utf-8"))
+    except ValueError:
+        _R17 = None
+if _R17 is None:
+    bloke_yaz("I-17 render raporu", f"yok/bozuk: {_R17_YOL}")
+else:
+    _once = _R17["once_i16"]
+    kontrol("ONCE durumu raporda KAYITLI (I-16 olcumu)",
+            len(_once["sahneler"]) == 4
+            and any(s["optik_ort"] < 1.0 for s in _once["sahneler"])
+            and _once["gecis_dagilimi"] == {"hard-cut": 4})
+    _o17 = _R17["optik_hareket"]
+    kontrol("⭐ SONRA: hicbir sahnede duraganlik ihlali YOK",
+            _o17["temiz"] is True, _o17.get("ihlaller"))
+    _en_dusuk = min(s["ortalama"] for s in _o17["sahneler"])
+    kontrol("⭐ en duragan sahne bile esigin USTUNDE",
+            _en_dusuk > _kk.OPTIK_DURGUN_ESIGI, _en_dusuk)
+    kontrol("ONCE'nin duragan sahnesi SONRA duzeldi (0.914 -> >2.0)",
+            min(s["optik_ort"] for s in _once["sahneler"]) < 1.0
+            and _en_dusuk > 2.0, (0.914, _en_dusuk))
+    _mg17 = _R17["motion_grammar"]
+    kontrol("⭐ ardisik VE pencere hareket tekrari YOK",
+            not _mg17["ardisik_tekrar"] and not _mg17["pencere_tekrari"],
+            _mg17["hareketler"])
+    kontrol("⭐ en az IKI gecis ailesi kullanildi",
+            _mg17["benzersiz_gecis"] >= 2, _mg17["gecis_dagilimi"])
+    kontrol("hard-cut orani referans bandinda kaldi (>=%55)",
+            _mg17["gecis_dagilimi"].get("hard-cut", 0)
+            / max(1, len(_mg17["gecisler"])) >= 0.55,
+            _mg17["gecis_dagilimi"])
+    kontrol("acilis ve kapanis hareketi FARKLI (ritim)",
+            _mg17["acilis_kapanis_ayri"] is True,
+            (_mg17["acilis_hareketi"], _mg17["kapanis_hareketi"]))
+    kontrol("benzersiz hareket sayisi ARTTI (I-16: 3 -> I-17: >=4)",
+            _mg17["benzersiz_hareket"] >= 4
+            and len(set(_once["hareketler"])) == 3)
+    kontrol("⭐ KENARDA SIYAH BANT YOK",
+            (_R17.get("kenar_siyahligi") or {}).get("temiz") is True,
+            _R17.get("kenar_siyahligi"))
+    _pu = _R17["izleyici_kalite_puani"]
+    kontrol("izleyici kalite puani raporda ve BILESENLI",
+            isinstance(_pu["puan"], float) and len(_pu["bilesenler"]) == 6)
+    kontrol("⭐ puan bilesenlerinin hicbiri 0 degil",
+            all((b["puan"] or 0) > 0 for b in _pu["bilesenler"].values()
+                if b["olculdu"]), _pu["bilesenler"])
+
+    # ── I-16 kazanimlari KORUNDU ──
+    _v17 = next((a for a in (_R17["ffprobe"].get("streams") or [])
+                 if a.get("codec_type") == "video"), {})
+    kontrol("1080p KORUNDU", _v17.get("width") == 1920
+            and _v17.get("height") == 1080)
+    kontrol("sure 15-20 sn araliginda",
+            15.0 <= float((_R17["ffprobe"].get("format") or {}).get(
+                "duration") or 0) <= 20.0)
+    kontrol("ALTYAZI KORUNDU", _R17["altyazi"]["kup_sayisi"] >= 4
+            and _R17["altyazi"]["okunabilirlik_temiz"] is True)
+    kontrol("KAYNAK KUNYESI KORUNDU",
+            len(_R17["kaynak_kunyesi"]["katmanlar"]) >= 1)
+    kontrol("guvenli alan + cakisma HALA temiz",
+            (_R17["guvenli_alan"] or {}).get("temiz") is True
+            and (_R17["yazi_cakismasi"] or {}).get("temiz") is True)
+    kontrol("EN AZ 9 kare", len(_R17["kareler"]) >= 9)
+    kontrol("sahne kesimleri olculdu", _R17["kesmeler"]["sayi"] >= 3)
+    kontrol("PRE QA FAIL DEGIL", _R17["plan"]["qa"]["fail"] == 0)
+    kontrol("POST QA FAIL DEGIL", _R17["post_qa"]["durum"] != "FAIL")
+    kontrol("miks hedefte, kirpma yok",
+            abs(_R17["video_ses_olcumu"]["lufs"] + 14.0) <= 1.0
+            and _R17["video_ses_olcumu"]["kirpma_var"] is False)
+    kontrol("B-ROLL BLOKE AYNEN duruyor (sahte B-roll YOK)",
+            _R17["video_broll"]["durum"] == "BLOKE"
+            and "B-roll DEGILDIR" in _R17["video_broll"]["sebep"])
+    kontrol("medya benzerlik esigi HALA degismedi",
+            _R17["medya_cesitliligi"]["esik"] == _kk.BENZERLIK_ESIGI)
+
+blok("§35f I-17 KORUMALARI")
+
+_SM17 = oku(KOK, "testler/smoke_motion_grammar_i17.py")
+kontrol("smoke ffmpeg test kaynagi KULLANMIYOR",
+        not re.search(r"lavfi|testsrc|color=c=", _kod_yalniz(_SM17)))
+kontrol("smoke kendi render ciktilarini B-roll diye KULLANMIYOR",
+        "pilot_master" not in _SM17 and "pilot_ham" not in _SM17)
+kontrol("smoke esikleri DEGISTIRMIYOR",
+        "OPTIK_DURGUN_ESIGI =" not in _SM17
+        and "BENZERLIK_ESIGI =" not in _SM17)
+kontrol("pipeline.py I-17'de de DEGISMEDI",
+        "kalite_kapisi" not in oku(KOK, "pipeline.py")
+        and "optik_hareket" not in oku(KOK, "pipeline.py"))
+kontrol("server.py I-17'de de DEGISMEDI",
+        "kalite_kapisi" not in oku(KOK, "server.py"))
+kontrol("22 alanlik generate sozlesmesi I-17'de de DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("UI I-17'de DEGISMEDI",
+        "basitGovde" in oku(KOK, "static/js/wizard.js")
+        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js"))
+kontrol("deploy.sh ezme korumasi KORUNDU",
+        "GERIDE" in open(os.path.join(KOK, "..", "deploy.sh"),
+                         encoding="utf-8").read())
+kontrol("bayraklar HALA varsayilan kapali",
+        mkp.ACIK is False and ekp.ACIK is False
+        and ekp.kalite_kapisi_acik(None) is False)
 
 
 print(f"\n{'=' * 60}")

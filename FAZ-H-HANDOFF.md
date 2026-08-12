@@ -183,6 +183,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-14 (1. atom) kalite kapıları ölçüldü + QA'ya bağlandı** | `c584020` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-15 gerçek düzeltme + yeniden render (kapı AÇIK, PASS)** | `891a814` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-16 altyazı + kaynak künyesi + 1080p** | `2f16bc6` | ✅ **origin'e push edildi**, deploy YOK |
+| 12 Ağu | **I-17 motion grammar + optik durağanlık kapısı** | `PENDING` | ✅ **origin'e push edildi**, deploy YOK |
 
 ---
 
@@ -2817,3 +2818,173 @@ Gerçek hareketli B-roll'un güvenli bir havuzdan (Wikimedia video, Openverse)
 **gerçekten indirilmesi** — bu, web medya hattının (`medya_kopru`, bayrak
 hâlâ kapalı) ilk gerçek koşusu olur. Yanında: algısal benzerlik ölçümü için
 ikinci bir sinyal ve `altyaziStil` alanının gerçekten uygulanması.
+
+---
+
+## 35. FAZ I-17 — BELGESEL MOTION GRAMMAR + OPTİK DURAĞANLIK KAPISI (12 Ağu)
+
+> **Durum: yerel yeşil, `origin/arastirma-motoru`'na push edildi. Deploy YOK.**
+> **Bayraklar varsayılan KAPALI. Maliyet $0.00.**
+> Yeni: `webapp/testler/smoke_motion_grammar_i17.py`,
+> `outputs/sample/motion_i17_rapor.json`.
+> Değişen: `webapp/editor/kalite_kapisi.py`, `webapp/editor/gramer.py`,
+> `webapp/editor/motion.py`, `webapp/editor/qa_on.py`,
+> `webapp/editor/qa_son.py`, `webapp/testler/test_faz_i.py`,
+> `outputs/sample/README.md` (+ bu handoff).
+> **Dokunulmadı:** `pipeline.py`, `server.py`, tüm arayüz, 22 alanlık generate
+> sözleşmesi, `deploy.sh`, TSX render katmanı, lisans duvarı, SSRF.
+
+### ÖNCE durumu — I-16 çıktısında ölçüldü
+
+Ölçüm: 4 fps / 64×36 gri, ardışık ortalama mutlak fark
+(`kalite_kapisi.optik_ornek_komutu` — tek ffmpeg geçişi).
+
+| Sahne | Süre | `hareket` | Optik ort. |
+|---|---|---|---|
+| b001 | 2.96 s | push-in | 3.551 |
+| **b002** | **5.21 s** | **static** | **0.914** ← durağanlık kusuru |
+| b003 | 4.69 s | push-in | 5.102 |
+| b004 | 4.68 s | pull-out | 7.030 |
+
+Geçiş: **4/4 hard-cut**. Hareket: **push-in iki kez** (b001, b003) — komşu
+olmadıkları için mevcut `ARDIL-AYNI-HAREKET` kuralı görmüyordu.
+
+### SONRA — aynı fixture, aynı süre, ölçülen sonuç
+
+| Ölçüm | I-16 | **I-17** |
+|---|---|---|
+| b001 | push-in 3.551 | push-in **3.517** |
+| b002 | **static 0.914** | **pull-out 5.366** |
+| b003 | push-in 5.102 | **slow-drift 4.629** |
+| b004 | pull-out 7.030 | **pan-left 30.426** |
+| Durağanlık ihlali | **1 (FAIL)** | **0** |
+| Geçiş ailesi | 1 (hard-cut ×4) | **2** (hard-cut ×3 + karartma ×1) |
+| Benzersiz hareket | 3 | **4**, ardışık ve pencere tekrarı **0** |
+| Açılış / kapanış | push-in / pull-out | push-in / pan-left (**ayrı**) |
+| İzleyici kalite puanı | — | **100/100** |
+| PRE / POST QA | WARN(0) / PASS | **WARN(fail=0) / PASS** |
+
+### Dört motor değişikliği
+
+1. **Uzun çekimde `static` yasak.** `gramer.DURAGAN_TAVAN_SN = 1.5`
+   (profilin `shot_min_sn`i). Bir fotoğrafı bir çekim boyu hareketsiz
+   tutmak belgesel dilinde karar değil, ihmal.
+2. **Ken Burns yön havuzu genişletildi.** `CEKIM_HAREKET["medium"]` üç
+   elemanlıydı; `static` elenip önceki hareket de yasaklanınca **geriye tek
+   aday** kalıyor ve `push-in` tekrar ediyordu. Havuzlar `kamera_spec`in
+   **gerçekten desteklediği** yönlerle 5–6 elemana çıkarıldı.
+   ⚠ `soft-zoom` kasıtlı olarak yok: `kamera_spec` onu spec'e `push-in`
+   adıyla yazıyor, plan adı ile render adı ayrışır ve ölçüm yalan söylerdi.
+3. **Pencere tekrarı.** `HAREKET_PENCERESI = 3` — ardışık olmayan tekrar da
+   engelleniyor.
+4. **İşleve bağlı ikinci geçiş ailesi.** `sec_gecis`e "kapanış beat'ine
+   giriş → `karartma`" kuralı eklendi. Faz C'nin kilitlediği
+   `aciklama→aciklama` (hard-cut) ve `j_cut` davranışları **korundu**.
+   hard-cut oranı %75 — ölçülen %79.9 referans bandının içinde kaldı.
+
+⚠ **Açılış/kapanış ritmi çeşitliliğe TABİ.** İlk sürümde `sonuc → pull-out`
+tercihi pencere kontrolünden **önce** dönüyordu ve `pull-out` hem b002'de
+hem b004'te çıkıyordu (ölçüldü). Ritim bir tercihtir, tekrar üretme pahasına
+uygulanmaz; açılış ile kapanışın **farklı** olması zaten korunuyor.
+
+### ⚠ BULUNAN GİZLİ RENDER HATASI — kenarda siyah bant
+
+Pan hareketleri kullanılmaya başlanınca **16.72 sn karesinde sağ kenarda
+siyah bant** göründü. Kök neden ölçüldü:
+
+`Kamera.tsx` şu transformu uyguluyor: `transform: scale(S) translate(x%)`.
+CSS'te transform **sağdan sola** uygulanır ve yüzde kayma **elemanın kendi
+genişliğine** göredir — yani ekrandaki gerçek yer değiştirme **S × x**.
+Siyah kenar olmaması için `S·pay ≤ (S−1)/2`, yani `pay ≤ (S−1)/(2S)`.
+
+Eski formül `max(0.04, (olcek−1)/2 + 0.04)` hem S'yi (pan zoom'u dahil toplam
+ölçeği) görmüyor hem de taşma payına **ekliyordu**. Ölçülen vaka:
+`pan-left` + `punch-1.6` → S=1.696, pay=0.34, yer değiştirme **0.577** vs
+taşma payı **0.348**.
+
+**Bu gizli bir hataydı:** düzeltilmiş formülle 8 kadraj/hareket
+kombinasyonunun 8'i güvenli; eski formülle **5'i taşıyordu** — en yaygın
+`pan-left/tam` dahil. Pan hareketleri seçilmediği için bugüne kadar
+görünmemişti.
+
+### ⚠ DÜRÜST SINIR — optik büyüklük siyah bandı AYIRT EDEMEZ
+
+Aşırı hareket eşiği eklendi ama ölçüm gösterdi ki bu **kenar dedektörü
+değil**: siyah bantlı kare **38.911**, düzeltilmiş temiz hızlı pan
+**34.525** ölçtü — aralarında yalnızca %12 var. Bu yüzden:
+
+- `OPTIK_ASIRI_ESIGI` yalnızca "kamera fazla hızlı" sinyali olarak, ölçülen
+  meşru en hızlı panın üstüne (**45.0**) konuldu.
+- Kenar taşması için **ayrı ve doğru enstrüman** yazıldı:
+  `kenar_siyahligi_olcusu` (kenar şeridi parlaklığı; tamamen koyu görüntüde
+  yanlış pozitif üretmiyor — testli). `POST-KENAR-SIYAH` kodu FAIL.
+
+Ayrıca pan aralığı **%100 → %70**'e çekildi (`slow-drift` zaten %30
+kullanıyordu); ölçülen etki 34.5 → **30.4**.
+
+### Eşikler — gerçek ölçümden türetildi
+
+| Eşik | Değer | Türetme |
+|---|---|---|
+| Durağan | **2.0** | ölçülen 0.914 (durağan) ile 3.551 (en zayıf hareketli) arasında, durağan tarafa yakın |
+| Durağan WARN | **1.5 s** | profilin `shot_min_sn`i |
+| Durağan FAIL | **3.0 s** | iki katı |
+| Aşırı hareket | **45.0** | ölçülen meşru en hızlı panın (30–35) üstü |
+| Kenar siyah | **16/255** | gerçek görüntü kenarı nadiren altına düşer; taşma bölgesi tam siyah |
+
+⚠ Eşikler **bu örneklemeyle** (4 fps / 64×36) anlamlıdır; örnekleme
+değişirse yeniden kalibre edilmeli. Kodda yazılı.
+
+### İzleyici kalite puanı — şeffaf, iddiasız
+
+6 bileşenin ağırlıklı birleşimi (optik 25 · motion çeşitlilik 20 · ritim 15 ·
+tipografi 15 · medya 15 · ses 10). Her bileşen **ham gerekçesiyle** raporlanır;
+ölçülemeyen bileşen puana **katılmaz** (sahte tam puan yok).
+⚠ **İzleyici araştırması DEĞİLDİR** — zaten ölçülen kusur bileşenlerinin
+birleşimidir; "izleyiciler bunu daha çok beğeniyor" iddiası taşımaz.
+
+### Ölçülen test sonucu (12 Ağu) — İKİ ORTAM AYRI
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Zengin venv** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **257** | **1269** | **2683** |
+| **Sistem Python** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **203** | **1269** | **2629** |
+
+0 hata. Faz I 1197 → **1269** (+72). Faz C **148/0** — Faz C'nin geçiş
+kilitleri korundu. `deploy.sh` tanımsız-isim taraması → **0 bulgu**.
+
+⚠ Bir I-16 kontrolü silinmedi, **güncellendi**: `kapsam_ozeti` ölçüm sayısını
+`== 9` kilitliyordu; I-17 üç ölçüm ekledi, kural `>= 9` olarak yeniden
+yazıldı (niyet aynı: I-16 ölçümleri kapsamda kalmalı).
+
+### BİLİNEN SINIRLAR (dürüstçe)
+
+1. **Hareketli video B-roll hâlâ BLOKE** — güvenli havuzda gerçek video yok;
+   depodaki `.mp4`'ler bu projenin kendi render çıktıları. Sahte B-roll
+   kullanılmadı.
+2. **Hareket enerjisi dengesiz.** Ölçülen: 3.5 / 5.4 / 4.6 / **30.4**.
+   Kapı geçiyor ama dağılım düz değil; `pan-left` + `punch-1.6` diğerlerinden
+   ~6 kat enerjik. Dengeleme yapılmadı, açık bırakıldı.
+3. **Parallax UYGULANMADI.** `parallax_spec` yalnızca `archive` çekim türünde
+   tetikleniyor; bu fixture'ın çekimleri `close-detail`/`medium`/
+   `establishing`. Gerçek katman görselleri de yok — `kapsam_ozeti`
+   kapsam dışı listesinde yazılı.
+4. **Geçiş çeşitliliği sahne sayısıyla sınırlı.** 4 sahnede üçüncü bir aile
+   eklemek hard-cut oranını %50'ye düşürür ve ölçülen %79.9 referansını
+   ihlal ederdi. Daha fazla aile için daha çok sahne gerekir; sağlayıcı
+   kotası (4) buna izin vermiyor.
+5. **Altyazı/sahne metni hâlâ İngilizce fixture** — Türkçe içerikle
+   ölçülmedi.
+6. **Kaynak künyesi her sahnede aynı genel etiket** (`NASA / PUBLIC-DOMAIN`);
+   varlık bazlı ayrı künye yok.
+7. **Algısal medya benzerliği hâlâ ölçülemiyor** (§32–§34 aynen geçerli).
+8. **Kenar dedektörü gerçek siyah-bantlı çıktıyla değil**, sentetik kareyle
+   ve aritmetik ispatla doğrulandı; gerçek vaka bir kez görüldü (kareyle) ve
+   kaynağında düzeltildi.
+9. **Canlı `/api/generate` hattı bu kapıları hâlâ görmüyor.**
+
+### SONRAKİ ATOM (I-18 — bu atomda YAPILMADI)
+
+Hareket enerjisi dengelemesi (sahneler arası optik varyansı hedef banda
+çekmek), `archive` çekim türü için gerçek parallax, ve Türkçe içerikle
+uçtan uca bir ölçüm koşusu.

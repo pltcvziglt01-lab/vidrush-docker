@@ -1,17 +1,54 @@
 # EditorV2 render örnekleri
 
-Bu dizinde **dört** örnek var:
+Bu dizinde **beş** örnek var:
 
 | Dosya | Ne | Betik |
 |---|---|---|
-| `editorv2_altyazi_1080p_i16.mp4` | ⭐ **17.6 sn · 1080p · altyazılı + kaynak künyeli Apollo belgeseli** | `webapp/testler/smoke_altyazi_kunye_1080p_i16.py` |
+| `editorv2_motion_i17.mp4` | ⭐ **17.6 sn · 1080p · belgesel motion grammar + optik durağanlık kapısı** | `webapp/testler/smoke_motion_grammar_i17.py` |
+| `editorv2_altyazi_1080p_i16.mp4` | 17.6 sn · 1080p · altyazılı + künyeli (I-16; b002 5.2 sn optik donuk) | `webapp/testler/smoke_altyazi_kunye_1080p_i16.py` |
 | `editorv2_kalite_pass_i15.mp4` | 12.8 sn Apollo belgeseli — kalite kapısı AÇIK ve PASS (720p, altyazısız) | `webapp/testler/smoke_kalite_pass_i15.py` |
 | `editorv2_quality_voice_10sn.mp4` | 10 sn Apollo mini-belgeseli (I-13; kapı açıkken **FAIL(4)** verir) | `webapp/testler/smoke_kaliteli_ses_10sn.py` |
 | `editorv2_smoke_20sn.mp4` | 20 sn motor smoke (sessiz anlatım, konu uyuşmazlıklı) | `webapp/testler/smoke_editorv2_20sn.py` |
 
 ---
 
-# 0) ⭐ I-16 — altyazılı + kaynak künyeli 1080p Apollo belgeseli
+# 0) ⭐ I-17 — belgesel motion grammar + optik durağanlık kapısı
+
+```bash
+python3 webapp/testler/smoke_motion_grammar_i17.py
+```
+
+I-16 teknik olarak temizdi ama izleyici için amatördü: dört statik fotoğraf
+17.6 sn boyunca duruyordu ve bir sahne neredeyse **hiç değişmiyordu**.
+
+**Ölçülen önce/sonra** (4 fps / 64×36 gri, ardışık ortalama mutlak fark):
+
+| Sahne | I-16 | **I-17** |
+|---|---|---|
+| b001 | push-in · 3.551 | push-in · **3.517** |
+| b002 | **static · 0.914** ← donuk | **pull-out · 5.366** |
+| b003 | push-in · 5.102 | **slow-drift · 4.629** |
+| b004 | pull-out · 7.030 | **pan-left · 30.426** |
+| Geçiş | 4/4 hard-cut | **hard-cut ×3 + karartma ×1** |
+| Benzersiz hareket | 3 (push-in ×2) | **4, tekrar yok** |
+| İzleyici kalite puanı | — | **100/100** |
+
+**Bulunan ve kapatılan gizli render hatası:** `pan-left` + `punch-1.6`
+kadrajında **sağ kenarda siyah bant** oluştu (16.72 sn karesinde görüldü).
+Kök neden `motion._guvenli_pay`ın CSS `scale(S) translate(x%)` sırasını
+hesaba katmaması — kayma ekranda **S kat** büyüyor. Doğru sınır
+`pay ≤ (S−1)/(2S)`. Eski formül 8 kadraj/hareket kombinasyonunun **5'inde**
+taşıyordu (en yaygın `pan-left/tam` dahil); pan hareketleri seçilmediği için
+görünmemişti.
+
+**Dürüst sınır:** optik büyüklük siyah bandı ayırt **edemiyor** — bantlı kare
+38.911, temiz hızlı pan 34.525 ölçtü (%12 fark). Bu yüzden ayrı ve doğru
+enstrüman eklendi: `kenar_siyahligi_olcusu`. Hareketli B-roll **BLOKE** aynen
+duruyor; benzerlik eşiği (0.86) değişmedi.
+
+---
+
+# 0b) I-16 — altyazılı + kaynak künyeli 1080p Apollo belgeseli
 
 ```bash
 python3 webapp/testler/smoke_altyazi_kunye_1080p_i16.py

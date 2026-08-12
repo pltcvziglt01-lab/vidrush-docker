@@ -31,6 +31,8 @@ FAIL_KODLARI = {
     "KALITE-RITIM-SABIT", "KALITE-OLU-FINAL",
     # ── Faz I-16: altyazi + kunye + guvenli alan ──
     "KALITE-YAZI-CAKISMA", "KALITE-GUVENLI-ALAN",
+    # ── Faz I-17: optik duraganlik ──
+    "KALITE-OPTIK-DURGUN",
 }
 
 # I-14 kapisinin urettigi kodlar. Kapi KAPALIYKEN bunlarin HICBIRI uretilmez;
@@ -40,7 +42,8 @@ KALITE_KODLARI = ("KALITE-BASLIK-KIRPIK", "KALITE-BASLIK-TASMA",
                   "KALITE-MEDYA-TEKRAR", "KALITE-RITIM-SABIT",
                   "KALITE-OLU-FINAL", "KALITE-MEDYA-BENZER-OLCULEMEDI",
                   "KALITE-YAZI-CAKISMA", "KALITE-GUVENLI-ALAN",
-                  "KALITE-ALTYAZI-OKUNMAZ")
+                  "KALITE-ALTYAZI-OKUNMAZ", "KALITE-OPTIK-DURGUN",
+                  "KALITE-MOTION-TEKRAR", "KALITE-GECIS-TEKDUZE")
 
 
 @dataclass
@@ -339,7 +342,8 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
                     adaylar_index=adaylar_index, p=p, kare_olcu=kare_olcu,
                     anlatim_bitis_sn=anlatim_bitis_sn, toplam=toplam,
                     benzerlik_okuyucu=benzerlik_okuyucu,
-                    altyazi_kupleri=altyazi_kupleri, acik=kalite_kapisi)
+                    altyazi_kupleri=altyazi_kupleri,
+                    motion_specler=motion_specler, acik=kalite_kapisi)
 
     return q.sonuclandir()
 
@@ -347,7 +351,7 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
 def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
                     adaylar_index, p, kare_olcu, anlatim_bitis_sn, toplam,
                     benzerlik_okuyucu, acik: bool,
-                    altyazi_kupleri=None) -> None:
+                    altyazi_kupleri=None, motion_specler=None) -> None:
     """I-14 olcumlerini kos ve (kapi acikken) sorun uret. ASLA COKMEZ."""
     kk = kalite_kapisi
     try:
@@ -521,5 +525,45 @@ def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
                   f"{len(kupe['satirlar'])} satir, en uzun "
                   f"{max((len(s) for s in kupe['satirlar']), default=0)} karakter",
                   "satir uzunlugunu/sayisini dusur")
+
+    # ── (5) MOTION GRAMMAR (I-17) — plan uzerinden, render'a bakmadan ──
+    mg_sahne = []
+    for c2, b2 in zip(cekimler, beatler):
+        mg_sahne.append({
+            "beat_id": getattr(b2, "beat_id", ""),
+            "hareket": getattr(c2, "hareket", ""),
+            "islev": getattr(b2, "islev", ""),
+            "sure_sn": getattr(b2, "sure_sn", 0.0)})
+    _gec = {}
+    for sp in (motion_specler or []):
+        tur = (sp.get("parametre") or {}).get("tur")
+        if tur in motion.GECIS_GEREKCESI:
+            _gec.setdefault(sp.get("beat_id", ""), []).append(tur)
+    for s2 in mg_sahne:
+        s2["gecis"] = _gec.get(s2["beat_id"], [])
+    mg = kk.motion_grammar_olcusu(mg_sahne)
+    olcum["motion_grammar"] = mg
+    if mg.get("olculdu"):
+        for tk in (mg.get("ardisik_tekrar") or []):
+            _ekle("KALITE-MOTION-TEKRAR", "fail",
+                  f"ardisik ayni kamera hareketi: {tk['hareket']} "
+                  f"(sahne {tk['indeks']})",
+                  "komsu cekime farkli yon/siddet ver")
+        for tk in (mg.get("pencere_tekrari") or []):
+            _ekle("KALITE-MOTION-TEKRAR", "warn",
+                  f"son {tk['pencere']} cekimde ayni hareket tekrar etti: "
+                  f"{tk['hareket']} (sahne {tk['indeks']})",
+                  "hareket yonunu/siddetini cesitlendir")
+        if len(mg_sahne) >= 3 and mg.get("benzersiz_gecis", 0) < 2:
+            _ekle("KALITE-GECIS-TEKDUZE", "warn",
+                  f"tek gecis ailesi kullanildi: {mg.get('gecis_dagilimi')} "
+                  f"— isleve bagli en az iki aile beklenir",
+                  "kapanis/kanit gecislerini isleve gore cesitlendir")
+        for st in (mg.get("statik_sahneler") or []):
+            if kk._sayi(st.get("sure_sn")) > kk.OPTIK_DURGUN_FAIL_SN:
+                _ekle("KALITE-OPTIK-DURGUN", "fail",
+                      f"plan {st['sure_sn']} sn'lik sahneye 'static' hareket "
+                      f"veriyor (tavan {kk.OPTIK_DURGUN_FAIL_SN} sn)",
+                      "uzun cekimde Ken Burns yonu ata")
 
     q.olcumler["kalite"] = olcum

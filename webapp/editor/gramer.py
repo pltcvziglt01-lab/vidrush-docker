@@ -32,15 +32,32 @@ ISLEV_CEKIM = {
 }
 
 # Cekim turu -> kamera hareketi adaylari (motion.py bunlari spec'e cevirir)
+#
+# ⚠ FAZ I-17 — KEN BURNS YON CESITLILIGI. Eski havuzlar 2-4 elemanliydi ve
+# `medium` yalnizca ("push-in","pan-left","static") iceriyordu. Uzun cekimde
+# `static` elenip bir onceki hareket de yasaklaninca GERIYE TEK ADAY kaliyor,
+# bu yuzden `push-in` b001 ve b003'te TEKRAR ediyordu (I-16 ciktisinda
+# olculdu). Havuzlar `motion.kamera_spec`in GERCEKTEN destekledigi yonlerle
+# genisletildi.
+#
+# ⚠ `soft-zoom` KASITLI OLARAK YOK: `kamera_spec` onu spec'e "push-in" adiyla
+# yaziyor, yani plan adi ile render adi ayrisirdi ve olcum yalan soylerdi.
+# Sirlama IDIOMATIK: her turun en dogal hareketi basta, `static` en sonda
+# (uzun cekimde zaten eleniyor).
 CEKIM_HAREKET = {
-    "establishing": ("push-in", "pull-out", "pan-right", "static"),
-    "medium":       ("push-in", "pan-left", "static"),
-    "close-detail": ("push-in", "static", "handheld"),
-    "archive":      ("push-in", "static"),
+    "establishing": ("pull-out", "pan-right", "push-in", "pan-left",
+                     "slow-drift", "static"),
+    "medium":       ("push-in", "pan-left", "pull-out", "pan-right",
+                     "slow-drift", "static"),
+    "close-detail": ("push-in", "slow-drift", "pull-out", "pan-right",
+                     "static"),
+    "archive":      ("push-in", "pull-out", "slow-drift", "pan-left",
+                     "static"),
     "document":     ("document-scan", "push-in"),
     "map":          ("map-route", "static"),
     "data":         ("data-reveal", "static"),
-    "atmospheric":  ("slow-drift", "static", "pull-out"),
+    "atmospheric":  ("slow-drift", "pull-out", "pan-right", "push-in",
+                     "static"),
 }
 
 # Fallback turu -> cekim turu (Faz B kapsam.py ile ayni sozluk)
@@ -79,10 +96,68 @@ def _kadraj_sec(indeks: int, cekim_turu: str) -> str:
     return ("tam", "punch-1.35", "ust", "punch-1.6", "alt")[indeks % 5]
 
 
-def _hareket_sec(cekim_turu: str, indeks: int, yasak: str = "") -> str:
-    adaylar = [h for h in CEKIM_HAREKET.get(cekim_turu, ("static",)) if h != yasak]
+# ⚠ FAZ I-17 — DURAGAN CEKIM SINIRI.
+# I-16 ciktisinda `medium` cekimine `static` atandi ve sahne 5.21 sn boyunca
+# ekranda neredeyse HIC DEGISMEDI (optik olcum: ortalama 0.914; hareketli
+# sahneler 3.5-7.0). Hareketsiz bir FOTOGRAFI uzun sure hareketsiz tutmak
+# belgesel dilinde bir karar degil, ihmal. Bu esigin USTUNDEKI cekimlerde
+# `static` aday havuzundan CIKARILIR.
+# Deger profilin `shot_min_sn`inden turetildi (1.5) — bir cekim boyu kadar
+# duragan kalmak zaten sinirin ta kendisi.
+DURAGAN_TAVAN_SN = 1.5
+
+# Ardisik olmayan tekrari da onlemek icin bakilan pencere. I-16'da `push-in`
+# b001 ve b003'te kullanildi; komsu olmadiklari icin eski kural GORMEDI.
+HAREKET_PENCERESI = 3
+
+# Acilis ve kapanis ritmi: belgesel dilinde acilis ICERI girer (push-in),
+# kapanis GERI cekilir (pull-out). Yalnizca aday havuzunda varsa uygulanir;
+# zorla enjekte edilmez.
+RITIM_TERCIHI = {"hook": "push-in", "sonuc": "pull-out"}
+
+
+def _hareket_sec(cekim_turu: str, indeks: int, yasak: str = "",
+                 sure_sn=None, son_hareketler=(), islev: str = "") -> str:
+    """Kamera hareketi sec.
+
+    Faz I-17 ek parametreleri (hepsi OPSIYONEL — verilmezse eski davranis):
+      `sure_sn`        : cekim suresi. `DURAGAN_TAVAN_SN`i asiyorsa `static`
+                         aday havuzundan CIKARILIR.
+      `son_hareketler` : son kullanilan hareketler (pencere). Icindekiler
+                         SON TERCIH edilir; tumu doluysa eski davraniga duser.
+      `islev`          : `hook`/`sonuc` icin acilis-kapanis ritmi tercihi.
+    """
+    taban = list(CEKIM_HAREKET.get(cekim_turu, ("static",)))
+    adaylar = [h for h in taban if h != yasak]
     if not adaylar:
-        adaylar = list(CEKIM_HAREKET.get(cekim_turu, ("static",)))
+        adaylar = list(taban)
+
+    # 1) Uzun cekimde DURAGAN yasak (havuz tamamen bosalmadigi surece)
+    if sure_sn is not None:
+        try:
+            uzun = float(sure_sn) > DURAGAN_TAVAN_SN
+        except (TypeError, ValueError):
+            uzun = False
+        if uzun:
+            hareketli = [h for h in adaylar if h != "static"]
+            if hareketli:
+                adaylar = hareketli
+
+    # 2) PENCERE TEKRARI — yakin gecmiste kullanilmayani tercih et
+    if son_hareketler:
+        taze = [h for h in adaylar if h not in son_hareketler]
+        if taze:
+            adaylar = taze
+
+    # 3) ACILIS/KAPANIS RITMI — ama CESITLILIGE TABI.
+    # ⚠ Ilk surumde bu blok pencere kontrolunden ONCE donuyordu ve kapanis
+    # icin `pull-out` zorlaniyordu; o hareket ortada zaten kullanildiginda
+    # tekrar uretiyordu (I-17'nin ilk render'inda olculdu: b002 ve b004'un
+    # ikisi de pull-out). Ritim bir TERCIHTIR, tekrar uretme pahasina
+    # uygulanmaz — acilis ile kapanisin FARKLI olmasi zaten korunuyor.
+    tercih = RITIM_TERCIHI.get(str(islev or ""))
+    if tercih and tercih in adaylar and tercih != yasak:
+        return tercih
     return adaylar[indeks % len(adaylar)]
 
 
@@ -136,6 +211,7 @@ def gramer_uygula(beatler: list, *, sahne_adaylari: dict,
     kullanilan_asset: set = set()
     saglayici_sayaci: dict = {}
     son_saglayici, son_hareket, son_kadraj, son_asset = "", "", "", ""
+    pencere: list = []          # Faz I-17: son hareketler penceresi
 
     for i, b in enumerate(beatler):
         tercihler = ISLEV_CEKIM.get(b.islev, ("medium",))
@@ -153,7 +229,10 @@ def gramer_uygula(beatler: list, *, sahne_adaylari: dict,
             c.kaynak_turu = "fallback"
             c.fallback_turu = ftur
             c.cekim_turu = FALLBACK_CEKIM.get(ftur, "data")
-            c.hareket = _hareket_sec(c.cekim_turu, i, son_hareket)
+            c.hareket = _hareket_sec(c.cekim_turu, i, son_hareket,
+                                     sure_sn=b.sure_sn,
+                                     son_hareketler=tuple(pencere),
+                                     islev=getattr(b, "islev", ""))
             c.kadraj = "tam"
             c.gerekce = (f"coverage_gap -> {ftur}: "
                          f"{f.get('gerekce') or gerekce}")
@@ -169,7 +248,10 @@ def gramer_uygula(beatler: list, *, sahne_adaylari: dict,
                             if t in _amac_cekim(aday_amaci)), tercihler[0])
             c.cekim_turu = eslesen
             c.kaynak_turu = "medya"
-            c.hareket = _hareket_sec(eslesen, i, son_hareket)
+            c.hareket = _hareket_sec(eslesen, i, son_hareket,
+                                     sure_sn=b.sure_sn,
+                                     son_hareketler=tuple(pencere),
+                                     islev=getattr(b, "islev", ""))
             c.kadraj = _kadraj_sec(i, eslesen)
             c.kaynak_aralik = (0.0, round(min(b.sure_sn, 12.0), 2))
             c.gerekce = gerekce
@@ -182,10 +264,14 @@ def gramer_uygula(beatler: list, *, sahne_adaylari: dict,
             if c.kadraj == son_kadraj:
                 c.kadraj = _kadraj_sec(i + 1, c.cekim_turu)
             if c.hareket == son_hareket:
-                c.hareket = _hareket_sec(c.cekim_turu, i + 2, son_hareket)
+                c.hareket = _hareket_sec(c.cekim_turu, i + 2, son_hareket,
+                                         sure_sn=b.sure_sn,
+                                         son_hareketler=tuple(pencere))
             c.uyarilar.append("ARDIL-AYNI-VARLIK: kadraj+hareket degistirildi")
         if c.hareket == son_hareket and c.hareket != "static":
-            c.hareket = _hareket_sec(c.cekim_turu, i + 1, son_hareket)
+            c.hareket = _hareket_sec(c.cekim_turu, i + 1, son_hareket,
+                                     sure_sn=b.sure_sn,
+                                     son_hareketler=tuple(pencere))
             c.uyarilar.append("ARDIL-AYNI-HAREKET: degistirildi")
         if c.kadraj == son_kadraj and c.kadraj != "tam":
             c.kadraj = _kadraj_sec(i + 3, c.cekim_turu)
@@ -194,6 +280,8 @@ def gramer_uygula(beatler: list, *, sahne_adaylari: dict,
         cikti.append(c)
         son_saglayici = c.saglayici or son_saglayici
         son_hareket, son_kadraj, son_asset = c.hareket, c.kadraj, c.asset_id
+        pencere.append(c.hareket)
+        del pencere[:-HAREKET_PENCERESI]
     return cikti
 
 

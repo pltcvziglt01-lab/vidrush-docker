@@ -76,6 +76,33 @@ GRAFIK_HAREKETI = {
 }
 
 
+def _guvenli_pay(s_maks: float, guvenlik: float = 0.9) -> float:
+    """Pan kaymasinin KENARDA SIYAH BANT uretmeyecegi en buyuk pay.
+
+    ⚠ FAZ I-17'DE OLCULEN KUSUR. Render tarafi (`Kamera.tsx`) su transformu
+    uyguluyor:  `transform: scale(S) translate(x%, y%)`
+    CSS'te transform SAGDAN SOLA uygulanir ve yuzde kayma ELEMANIN KENDI
+    genisligine goredir. Yani ekrandaki gercek yer degistirme `S * x`tir.
+    Siyah kenar olmamasi icin bu, olceklenmis goruntunun tasma payini
+    asmamali:
+
+        S * pay  <=  (S - 1) / 2      ->      pay <= (S - 1) / (2S)
+
+    Eski formul `max(0.04, (olcek-1)/2 + 0.04)` idi; hem S'yi (pan zoom'u
+    dahil TOPLAM olcek) gormuyor hem de tasma payina EKLIYORDU. Olculen
+    vaka: `pan-left` + `punch-1.6` -> S=1.696, pay=0.34, yer degistirme
+    0.577 > tasma 0.348 -> sag kenarda SIYAH BANT (17.6 sn ciktinin
+    16.72 sn karesinde goruldu).
+    """
+    try:
+        s = float(s_maks)
+    except (TypeError, ValueError):
+        return 0.0
+    if s <= 1.0:
+        return 0.0
+    return round(((s - 1.0) / (2.0 * s)) * guvenlik, 4)
+
+
 def kamera_spec(hareket: str, sure_sn: float, kadraj: str, *,
                 p: Optional[EditProfili] = None) -> MotionSpec:
     """Kamera keyframe'leri. Easing OLCULEN egriden (lineere yakin).
@@ -99,7 +126,12 @@ def kamera_spec(hareket: str, sure_sn: float, kadraj: str, *,
     else:
         z0 = z1 = 1.06 if hareket in ("pan-right", "pan-left", "slow-drift") else 1.0
 
-    pan = {"pan-right": (0.0, 1.0), "pan-left": (1.0, 0.0),
+    # ⚠ FAZ I-17 — PAN OLCULULUGU. Eskiden pan TAM aralikta (0.0-1.0)
+    # kosuyordu; olculdu ki bu, 1.6 punch kadrajinda 4.7 sn'lik bir cekimde
+    # optik hareketi 34.5'e cikariyor (komsu sahneler 3.5-5.4). Belgesel
+    # dilinde Ken Burns pani YUMUSAKTIR. Aralik %70'e cekildi; `slow-drift`
+    # zaten %30 kullaniyordu (tutarli aile).
+    pan = {"pan-right": (0.15, 0.85), "pan-left": (0.85, 0.15),
            "slow-drift": (0.35, 0.65)}.get(hareket, (0.5, 0.5))
     olcek = {"tam": 1.0, "punch-1.35": 1.35, "punch-1.6": 1.6,
              "ust": 1.2, "alt": 1.2}.get(kadraj, 1.0)
@@ -109,7 +141,7 @@ def kamera_spec(hareket: str, sure_sn: float, kadraj: str, *,
                  sure_sn=sure_sn, easing="kamera",
                  parametre={"zoom": [round(z0 * olcek, 4), round(z1 * olcek, 4)],
                             "pan_x": list(pan), "odak": list(odak),
-                            "guvenli_pay": round(max(0.04, (olcek - 1.0) / 2 + 0.04), 4),
+                            "guvenli_pay": _guvenli_pay(max(z0, z1) * olcek),
                             "tavan": tavan,
                             "handheld_genlik_px": 9 if hareket == "handheld" else 0},
                  gerekce=(f"{hareket}/{kadraj} — olculen easing, tavan {tavan}"
@@ -346,4 +378,11 @@ def sec_gecis(onceki_islev: str, simdi_islev: str, indeks: int,
         return gecis_spec("karartma", gerekce="perde sonu")
     if onceki_islev != simdi_islev and simdi_islev == "kanit":
         return gecis_spec("crossfade", gerekce="anlatimdan kanita gecis")
+    # ⚠ FAZ I-17 — KAPANISA GIRIS. I-16 ciktisinda dort gecisin DORDU DE
+    # `hard-cut`ti: mevcut kurallarin hicbiri hook->aciklama->aciklama->sonuc
+    # diziliminde tetiklenmiyordu. Kapanis beat'ine GIRIS belgesel dilinde
+    # yumusar; bu, rastgele cesitlilik degil ISLEVE BAGLI bir karardir.
+    # ⚠ `sonuc -> sonuc` yukarida zaten `karartma`; burasi yalnizca GIRIS.
+    if onceki_islev and onceki_islev != simdi_islev and simdi_islev == "sonuc":
+        return gecis_spec("karartma", gerekce="kapanis beat'ine gecis")
     return gecis_spec("hard-cut")
