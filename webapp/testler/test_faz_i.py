@@ -2297,6 +2297,295 @@ for _f2 in ("medya/sorgu_planlayici.py", "medya/siralama.py", "medya/avci.py"):
     kontrol(f"{_f2} derleniyor", _derlenir(os.path.join(KOK, _f2)))
 
 
+# ═══════ 20. FAZ I-6 — MEDYA AVCISI GERCEK HATTA (GUVENLI OPT-IN) ═══════
+# ⚠ KAPATILAN ACIK (§1 / §10 madde 1): `webapp/medya/` paketi yazildi ve
+# testlendi ama `/api/generate` hatti onu HIC CAGIRMIYORDU.
+# ⚠ BU BOLUM GERCEK INDIRME YAPMAZ: saglayici yaniti, indirici ve kare kapisi
+# FIXTURE ile enjekte edilir. Ucretli API ve deploy YOK.
+blok("20. I-6 — medya avcisi koprusu: varsayilan KAPALI ve fail-closed")
+
+import medya_kopru as mkp                              # noqa: E402
+
+# ── (a) VARSAYILAN KAPALI ──
+kontrol("kopru VARSAYILAN KAPALI (opt-in)", mkp.ACIK is False)
+kontrol("bayraksiz acik_mi False", mkp.acik_mi()[0] is False)
+kontrol("kapaliyken sahne_medyasi HICBIR SEY yapmiyor",
+        mkp.sahne_medyasi(sorgu="x", hedef_yol="/tmp/yok.mp4")["neden"]
+        == "KAPALI")
+kontrol("opt-in yol 1: ortam degiskeni belgelenmis",
+        'os.environ.get("MEDYA_AVCISI"' in oku(KOK, "medya_kopru.py"))
+kontrol("opt-in yol 2: DAHILI is ayari",
+        mkp.acik_mi({"medya_avcisi": True})[0] is True)
+kontrol("is ayari yalnizca GERCEK True ile acilir (dize/1 acmaz)",
+        all(mkp.acik_mi(x)[0] is False for x in
+            ({"medya_avcisi": "evet"}, {"medya_avcisi": 1},
+             {"medya_avcisi": "true"}, {}, None, "x", 5)))
+kontrol("acilma gerekcesi RAPORLANIYOR",
+        "is ayari" in mkp.acik_mi({"medya_avcisi": True})[1])
+
+# ── (b) FAIL-CLOSED KAPILAR ──
+mkp.kayit_sifirla()
+_ac = {"medya_avcisi": True}
+kontrol("kare dogrulayici YOKSA aday KABUL EDILMEZ (fail-closed)",
+        mkp.sahne_medyasi(sorgu="x", hedef_yol="/tmp/y.mp4", is_ayar=_ac,
+                          istek=lambda u, **k: None)["neden"]
+        == "DOGRULAYICI-YOK")
+kontrol("ag cagrilabiliri YOKSA durur",
+        mkp.sahne_medyasi(sorgu="x", hedef_yol="/tmp/y.mp4", is_ayar=_ac,
+                          kare_dogrula=lambda *a: True)["neden"] == "ISTEK-YOK")
+kontrol("her durdurma nedeninin ACIKLAMASI var",
+        all(isinstance(v, str) and v for v in mkp.NEDEN.values()))
+kontrol("durdurmalar dususlere YAZILIYOR (sessiz degil)",
+        len(mkp.dususler()) >= 2, str(len(mkp.dususler())))
+
+# Avci patlarsa hat COKMEZ
+import medya.avci as _gercek_avci                      # noqa: E402
+_asil_ara = _gercek_avci.sahne_ara
+try:
+    def _patla(**kw):
+        raise RuntimeError("kasitli avci patlamasi")
+
+    _gercek_avci.sahne_ara = _patla
+    _r = mkp.sahne_medyasi(sorgu="x", hedef_yol="/tmp/y.mp4", is_ayar=_ac,
+                           istek=lambda u, **k: None,
+                           kare_dogrula=lambda *a: True)
+    kontrol("avci PATLARSA kopru cokmuyor, kontrollu duruyor",
+            _r["ok"] is False and _r["neden"] == "HATA")
+    kontrol("patlama gerekcesi GORUNUR",
+            any("kasitli" in d.get("ayrinti", "") for d in _r["dususler"]))
+finally:
+    _gercek_avci.sahne_ara = _asil_ara
+
+
+blok("20b. I-6 — FIXTURE entegrasyonu: uc kapi da BYPASS EDILEMEZ")
+
+from medya import kayit as _mkayit                     # noqa: E402
+from medya.aday import MedyaAdayi as _MA               # noqa: E402
+
+
+class _SahteYanit:
+    def __init__(self, veri, kod=200):
+        self.status_code = kod
+        self._veri = veri
+        self.headers = {"Content-Type": "application/json"}
+
+    def json(self):
+        return self._veri
+
+
+_PX_YANIT = {"videos": [{
+    "id": 4242, "url": "https://www.pexels.com/video/tokyo-street-4242/",
+    "user": {"name": "Test Author"}, "width": 3840, "height": 2160,
+    "duration": 12,
+    "video_files": [{"link": "https://player.vexels.example/4242_2k.mp4",
+                     "width": 2560, "height": 1440, "file_type": "video/mp4"}],
+}]}
+
+
+def _sahte_istek(url, **kw):
+    if "pexels" in url:
+        return _SahteYanit(_PX_YANIT)
+    return _SahteYanit({}, 404)
+
+
+_indirme_cagrisi = {"n": 0, "url": []}
+_kare_cagrisi = {"n": 0}
+from medya import indirme as _mind                     # noqa: E402
+
+_asil_indir = _mind.guvenli_indir
+
+
+def _sahte_indir(url, hedef, **kw):
+    _indirme_cagrisi["n"] += 1
+    _indirme_cagrisi["url"].append(url)
+    with open(hedef, "wb") as f:
+        f.write(b"\x00" * 9000)
+    return {"ok": True, "sebep": "", "okunan_bayt": 9000, "bilgi": {}}
+
+
+_i6_kok = tempfile.mkdtemp(prefix="i6_")
+_eski_px = os.environ.get("PEXELS_KEY")
+try:
+    os.environ["PEXELS_KEY"] = "test"
+    _mkayit.kosu_sifirla()
+    _mind.guvenli_indir = _sahte_indir
+    _hedef = os.path.join(_i6_kok, "sahne.mp4")
+
+    def _kare_ok(*a, **k):
+        _kare_cagrisi["n"] += 1
+        return True
+
+    def _kare_red(*a, **k):
+        _kare_cagrisi["n"] += 1
+        return False
+
+    mkp.kayit_sifirla()
+    _r1 = mkp.sahne_medyasi(
+        sorgu="tokyo street night", hedef_yol=_hedef, sahne_amaci="ortam",
+        iddia_metni="Tokyo street at night in 2024.", fact_id="f001",
+        scene_id="s001", konu="tokyo", is_ayar=_ac, istek=_sahte_istek,
+        kare_dogrula=_kare_ok, coz=lambda h: ["93.184.216.34"],
+        erisim_tarihi="2026-08-12")
+    kontrol("FIXTURE: uctan uca aday bulundu ve secildi", _r1["ok"] is True,
+            str(_r1["neden"]))
+    kontrol("secilen adayin LISANSI tasiniyor", bool(_r1["aday"].get("lisans")),
+            str(_r1["aday"]))
+    kontrol("secilen adayin PROVENANCE url'i tasiniyor",
+            _r1["aday"].get("orijinal_url", "").startswith("http"))
+    kontrol("indirme GUVENLI INDIRICI uzerinden yapildi",
+            _indirme_cagrisi["n"] >= 1)
+    kontrol("KARE KAPISI gercekten cagrildi", _kare_cagrisi["n"] >= 1)
+    kontrol("ozet sayaclari GORUNUR",
+            mkp.ozet()["secilen"] == 1 and mkp.ozet()["denenen"] >= 1,
+            str(mkp.ozet()))
+
+    # ⚠ KARE KAPISI REDDEDERSE aday KABUL EDILMEZ ve dosya SILINIR
+    mkp.kayit_sifirla()
+    _kare_cagrisi["n"] = 0
+    _r2 = mkp.sahne_medyasi(
+        sorgu="tokyo street night", hedef_yol=_hedef, sahne_amaci="ortam",
+        iddia_metni="Tokyo street at night in 2024.", scene_id="s002",
+        konu="tokyo", is_ayar=_ac, istek=_sahte_istek, kare_dogrula=_kare_red,
+        coz=lambda h: ["93.184.216.34"], erisim_tarihi="2026-08-12")
+    kontrol("KARE KAPISI reddederse aday KABUL EDILMIYOR", _r2["ok"] is False)
+    kontrol("reddedilen klip DISKTEN SILINIYOR", not os.path.exists(_hedef))
+    kontrol("kare kapisi reddi dususlere YAZILIYOR",
+            any(d["neden"] == "KARE-KAPISI" for d in mkp.dususler()),
+            str(mkp.dususler()[:2]))
+    kontrol("RASTGELE STOK YOK: red sonrasi ok=False, yol bos",
+            _r2["yol"] == "" and not _r2["aday"])
+
+    # ⚠ KARE DOGRULAYICI PATLARSA da aday KABUL EDILMEZ (fail-closed)
+    mkp.kayit_sifirla()
+
+    def _kare_patla(*a, **k):
+        raise RuntimeError("dogrulayici patladi")
+
+    _r3 = mkp.sahne_medyasi(
+        sorgu="tokyo street night", hedef_yol=_hedef, scene_id="s003",
+        iddia_metni="Tokyo street at night in 2024.", konu="tokyo",
+        is_ayar=_ac, istek=_sahte_istek, kare_dogrula=_kare_patla,
+        coz=lambda h: ["93.184.216.34"], erisim_tarihi="2026-08-12")
+    kontrol("kare dogrulayici PATLARSA aday KABUL EDILMIYOR (fail-closed)",
+            _r3["ok"] is False)
+
+    # ⚠ INDIRME BASARISIZ olursa dusus yazilir, aday tasinmaz
+    mkp.kayit_sifirla()
+
+    def _indir_basarisiz(url, hedef, **kw):
+        return {"ok": False, "sebep": "HTTP 403", "okunan_bayt": 0}
+
+    _mind.guvenli_indir = _indir_basarisiz
+    _r4 = mkp.sahne_medyasi(
+        sorgu="tokyo street night", hedef_yol=_hedef, scene_id="s004",
+        iddia_metni="Tokyo street at night in 2024.", konu="tokyo",
+        is_ayar=_ac, istek=_sahte_istek, kare_dogrula=_kare_ok,
+        coz=lambda h: ["93.184.216.34"], erisim_tarihi="2026-08-12")
+    kontrol("indirme basarisizsa aday TASINMIYOR", _r4["ok"] is False)
+    kontrol("indirme basarisizligi dususlere YAZILIYOR",
+            any(d["neden"] == "INDIRME-BASARISIZ" for d in mkp.dususler()))
+    _mind.guvenli_indir = _sahte_indir
+
+    # ⚠ LISANS DUVARI: render_kullanilabilir OLMAYAN aday ASLA tasinmaz
+    mkp.kayit_sifirla()
+    _asil_sahne_ara = _gercek_avci.sahne_ara
+
+    def _sadece_lisanssiz(**kw):
+        a = _MA(asset_id="bad1", saglayici="pexels", tur="video",
+                indirme_url="https://player.vexels.example/x.mp4",
+                orijinal_url="https://www.pexels.com/video/x/",
+                lisans="unknown", render_kullanilabilir=False,
+                red_nedeni="lisans belirsiz")
+        return {"adaylar": [a], "secilen": [a], "sorgular": [], "sayac": 0,
+                "saglayici_hatalari": [], "kapsam": {}, "red_gerekceleri": []}
+
+    try:
+        _gercek_avci.sahne_ara = _sadece_lisanssiz
+        _indirme_cagrisi["n"] = 0
+        _r5 = mkp.sahne_medyasi(
+            sorgu="x", hedef_yol=_hedef, scene_id="s005", is_ayar=_ac,
+            istek=_sahte_istek, kare_dogrula=_kare_ok)
+        kontrol("LISANS DUVARI: render_kullanilabilir=False aday TASINMIYOR",
+                _r5["ok"] is False and _r5["neden"] == "ADAY-YOK")
+        kontrol("lisanssiz aday INDIRILMIYOR bile", _indirme_cagrisi["n"] == 0)
+    finally:
+        _gercek_avci.sahne_ara = _asil_sahne_ara
+finally:
+    _mind.guvenli_indir = _asil_indir
+    if _eski_px is None:
+        os.environ.pop("PEXELS_KEY", None)
+    else:
+        os.environ["PEXELS_KEY"] = _eski_px
+    _sh.rmtree(_i6_kok, ignore_errors=True)
+
+
+blok("20c. I-6 — pipeline entegrasyonu ve BYPASS EDILEMEZLIK")
+
+_MK = oku(KOK, "medya_kopru.py")
+# ⚠ "dogrudan requests yok" iddiasi DIZE TARAMASIYLA yetinmez: modul kendi
+# dokumantasyonunda zaten "ASLA dogrudan requests cagirmaz" diyor. Olculen
+# sey IMPORT ve CAGRI izi.
+kontrol("kopru DOGRUDAN requests/urllib IMPORT ETMIYOR",
+        not re.search(r"^\s*(import|from)\s+(requests|urllib|http|socket)\b",
+                      _MK, re.M))
+kontrol("kopru DOGRUDAN ag cagrisi YAPMIYOR (SSRF kapisi atlanamaz)",
+        not re.search(r"requests\.(get|post)\(|urlopen\(|socket\.socket\(",
+                      _MK))
+kontrol("indirme YALNIZCA guvenli_indir uzerinden",
+        "indirme.guvenli_indir(" in _MK and _MK.count("guvenli_indir") <= 3)
+kontrol("yalnizca SECILEN + render_kullanilabilir adaylar tasiniyor",
+        'sonuc.get("secilen")' in _MK
+        and 'getattr(a, "render_kullanilabilir", False)' in _MK)
+kontrol("kare dogrulayici ZORUNLU (fail-closed) — kodda kilitli",
+        "if not callable(kare_dogrula)" in _MK)
+kontrol("kare kapisi istisnasi ADAYI REDDEDIYOR",
+        "kare_ok = False" in _MK)
+
+_PP3 = oku(KOK, "pipeline.py")
+kontrol("pipeline kopruyu OPT-IN cagiriyor",
+        "if _avci_acik:" in _PP3 and "medya_kopru.sahne_medyasi(" in _PP3)
+kontrol("pipeline kare dogrulayiciyi GECIYOR",
+        "kare_dogrula=kaynak._kare_dogrula" in _PP3)
+kontrol("pipeline konsept + fact_id + sahne amaci GECIYOR",
+        all(x in _PP3 for x in ("konsept=_avci_konsept", "fact_id=str(",
+                                "sahne_amaci=str(")))
+kontrol("basarisizlikta MEVCUT yol aynen surduruluyor",
+        "if kaynak.footage_getir(" in _PP3)
+kontrol("avci ozeti YALNIZCA acikken ise yaziliyor",
+        'if _avci_acik:\n        sonuc["medya_avcisi"]' in _PP3)
+kontrol("avci dususleri ise TASINIYOR",
+        "sonuc[\"dususler\"].extend(medya_kopru.dususler())" in _PP3)
+kontrol("kaynak.avci_istek yalnizca TASIYICI (kapi iddiasi yok)",
+        "yalnizca tasiyicidir" in oku(KOK, "kaynak.py"))
+
+# ⚠ KAPALIYKEN ESKI DAVRANIS: `sonuc` anahtari HIC eklenmiyor
+kontrol("kapaliyken `medya_avcisi` anahtari EKLENMIYOR",
+        _PP3.count('sonuc["medya_avcisi"]') == 1
+        and 'if _avci_acik:' in _PP3)
+kontrol("mevcut medya kapisi/kare ozeti KORUNDU",
+        'sonuc["medya_kapisi"]' in _PP3 and 'sonuc["kare_kapisi"]' in _PP3)
+
+# ⚠ SOZLESMELER
+kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("server.py medya_avcisi alanini OKUMUYOR (UI'dan gelemez)",
+        "medya_avcisi" not in oku(KOK, "server.py"))
+kontrol("UI medya_avcisi GONDERMIYOR",
+        all("medya_avcisi" not in oku(KOK, f"static/js/{f}")
+            for f in ("api.js", "wizard.js", "basit.js")))
+kontrol("UI ozellikleri KORUNDU",
+        "basitGovde" in oku(KOK, "static/js/wizard.js")
+        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js")
+        and "d.unlu = t.unlu ? '1' : '0'" in oku(KOK, "static/js/wizard.js"))
+kontrol("lisans/SSRF/kare kapisi modulleri DOKUNULMADI",
+        all("medya_kopru" not in oku(KOK, f) for f in
+            ("medya/lisans.py", "medya/guvenlik.py", "medya/indirme.py",
+             "medya/kare_kapisi.py")))
+for _f3 in ("medya_kopru.py", "pipeline.py", "kaynak.py"):
+    kontrol(f"{_f3} derleniyor", _derlenir(os.path.join(KOK, _f3)))
+
+
 print(f"\n{'=' * 60}")
 print(f"GECEN: {gecen}   BASARISIZ: {len(basarisiz)}   BLOKE: {len(bloke)}")
 for b in basarisiz:

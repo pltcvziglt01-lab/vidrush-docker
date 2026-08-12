@@ -171,7 +171,8 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-3 basit "Metin + Stil + Auto" arayüzü** | `37b0b04` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-4 referans video parmak izi sözleşmesi** | `0d45fc8` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-2d görsel imza boşluğu kapatıldı** | `243bad5` | ✅ **origin'e push edildi**, deploy YOK |
-| 12 Ağu | **I-5 konsept farkındalıklı medya seçimi** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
+| 12 Ağu | **I-5 konsept farkındalıklı medya seçimi** | `e3559b2` | ✅ **origin'e push edildi**, deploy YOK |
+| 12 Ağu | **I-6 medya avcısı canlı hatta (opt-in)** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
 
 ---
 
@@ -1348,7 +1349,7 @@ melez stillerin üretime taşınması, referans ölçüm motoru.
 
 ## 22. FAZ I-5 — KONSEPT FARKINDALIKLI MEDYA SEÇİMİ (12 Ağu, ölçüldü)
 
-> **Durum: yazıldı + testlendi, dosyalar staged. Commit YOK, deploy YOK.**
+> **Durum: commit `e3559b2`, `origin/arastirma-motoru`'na PUSH EDİLDİ. Deploy YOK.**
 > Değişen: `webapp/medya/sorgu_planlayici.py`, `webapp/medya/siralama.py`,
 > `webapp/medya/avci.py`, `webapp/testler/test_faz_i.py` (+ bu handoff).
 > **Dokunulmadı:** `medya/lisans.py`, `medya/guvenlik.py` (SSRF),
@@ -1447,10 +1448,9 @@ pyflakes temiz.
 
 ### BİLİNEN SINIRLAR (dürüstçe)
 
-1. **`medya/avci` hâlâ canlı `/api/generate` hattına bağlı değil** (§10 madde 1
-   açık). Bu adım Faz B paketinin **kalitesini** artırdı; canlı hat hâlâ
-   `kaynak.py` üzerinden çalışıyor. Yani ölçülen iyileşme **canlı videoda
-   henüz görünmüyor**.
+1. ~~**`medya/avci` hâlâ canlı `/api/generate` hattına bağlı değil**~~ →
+   ✅ **§23'te (I-6) OPT-IN olarak bağlandı.** Varsayılan hâlâ kapalı;
+   açılmadıkça canlı hat `kaynak.py` üzerinden çalışmaya devam eder.
 2. **Aile dağılımları ölçüm değil**, tür konvansiyonundan türetilmiş tasarım
    kararları; gerçek kanal ölçümüyle doğrulanmadı.
 3. **%43.2 kalan çakışma** giderilmedi: aileler `establishing`/`ortam`/`detay`
@@ -1463,3 +1463,109 @@ pyflakes temiz.
 6. **`belgesel` ailesi sorgu tarafında ayrışmıyor** (kasıtlı) ama sıralama
    tarafında `KONSEPT_TERIM["belgesel"]` var — iki modüldeki `konsept_ailesi`
    fonksiyonları bu yüzden farklı üyelik tablosuna bakıyor.
+
+---
+
+## 23. FAZ I-6 — MEDYA AVCISI CANLI HATTA (GÜVENLİ OPT-IN) (12 Ağu, ölçüldü)
+
+> **Durum: yazıldı + testlendi, dosyalar staged. Commit YOK, deploy YOK.**
+> Yeni: `webapp/medya_kopru.py`.
+> Değişen: `webapp/pipeline.py`, `webapp/kaynak.py`,
+> `webapp/testler/test_faz_i.py` (+ bu handoff).
+> **Dokunulmadı:** `server.py`, tüm arayüz, 22 alanlık generate sözleşmesi,
+> `medya/lisans.py`, `medya/guvenlik.py`, `medya/indirme.py`,
+> `medya/kare_kapisi.py`, `deploy.sh`.
+
+### Kapatılan açık — handoff'un EN ESKİ bulgusu
+
+§1 (12 Ağu, ilk envanter): *"`pipeline.py` bu üç paketin HİÇBİRİNİ import
+etmiyor."* §10 madde 1 bunu en yüksek öncelikli iş olarak bırakmıştı.
+Araştırma (H2), kare kapısı (I-1) ve QA (H6) bağlanmıştı; **medya avcısı
+bağlanmamıştı.** Bu adım onu bağlıyor — ama **varsayılan olarak kapalı**.
+
+### Opt-in — iki yol, ikisi de açık karar
+
+| Yol | Nasıl |
+|---|---|
+| Ortam değişkeni | `MEDYA_AVCISI=1` |
+| Dahili iş ayarı | kanal profilinde `{"medya_avcisi": True}` |
+
+⚠ `is_ayar` **dahili** bir sözlüktür (kanal profili). `/api/generate`in 22
+alanı buraya **ulaşmaz**; `server.py` bu alanı okumuyor, arayüz göndermiyor —
+üçü de testli. Yalnızca gerçek `True` açar: `"evet"`, `1`, `"true"` **açmaz**.
+
+Kapalıyken köprünün hiçbir satırı üretim kararına karışmaz ve `sonuc`
+sözlüğüne `medya_avcisi` anahtarı **hiç eklenmez** → eski işlerde çıktı
+bit-bit aynı.
+
+### Üç kapı da zorunlu — BYPASS EDİLEMEZ (testli)
+
+1. **Lisans + provenance.** Aday listesi değil, avcının **seçtikleri**
+   kullanılır; üstüne `render_kullanilabilir` bir kez daha doğrulanır.
+   Test: `render_kullanilabilir=False` bir aday **indirilmiyor bile**.
+2. **SSRF / indirme.** İndirme yalnızca `medya.indirme.guvenli_indir`
+   üzerinden. Köprü `requests`/`urllib`/`socket` **import etmiyor** ve
+   doğrudan ağ çağrısı yapmıyor — import ve çağrı izi taramasıyla kilitli.
+3. **Kare kapısı.** İndirilen her klip `kare_dogrula` ile sınanır.
+   **Fail-closed:** doğrulayıcı verilmezse hiçbir aday kabul edilmez;
+   doğrulayıcı **patlarsa** da aday reddedilir. Reddedilen klip **diskten
+   silinir**.
+
+### Uydurma/rastgele stok yok
+
+Uygun aday çıkmazsa `ok=False` döner ve çağıran taraf **mevcut güvenli
+yolunu** (`kaynak.footage_getir` → genel yedek → tekrar) aynen sürdürür.
+Sessiz geçiş yok: her red `dususler`e gerekçesiyle yazılır ve iş kaydına
+taşınır. Köprü **hiçbir durumda istisna fırlatmaz** — avcı patlarsa `HATA`,
+modül yüklenemezse `MODUL-YOK`, süre dolarsa `SURE-ASIMI`.
+
+9 durdurma nedeninin hepsi açıklamalı: `KAPALI · MODUL-YOK ·
+DOGRULAYICI-YOK · ISTEK-YOK · SURE-ASIMI · ADAY-YOK · INDIRME-BASARISIZ ·
+KARE-KAPISI · HATA`.
+
+### Aktarılan sinyaller
+
+Konsept (`taksonomi.siniflandir`), sahne amacı, iddia metni, `fact_id`,
+`scene_id`, bilinen yerler, konu ve yer terimleri avcıya geçiriliyor — yani
+I-5'in konsept farkındalıklı sorgu planı ve sıralaması **canlı hatta
+ulaşabiliyor**.
+
+### Fixture entegrasyon testi — GERÇEK İNDİRME YOK
+
+Sağlayıcı yanıtı, indirici, DNS çözücü ve kare kapısı **enjekte edilerek**
+uçtan uca koşuldu: aday bulundu → lisans duvarından geçti → güvenli indirici
+çağrıldı → kare kapısı çağrıldı → seçildi. Ücretli API yok, ağ yok, deploy yok.
+
+### Ölçülen test sonucu (12 Ağu) — İKİ ORTAM AYRI
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Zengin venv** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **257** | **665** | **2079** |
+| **Sistem Python** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **203** | **665** | **2025** |
+
+0 hata. Faz I 614 → **665** (+51). Faz B **200/0** — gerileme yok.
+pyflakes temiz.
+
+### BİLİNEN SINIRLAR (dürüstçe)
+
+1. **Gerçek üretimle hiç koşulmadı.** Bayrak açıkken canlı bir iş
+   çalıştırılmadı; kanıt yalnızca fixture. **Açmadan önce gerçek pilot şart.**
+2. **Maliyet ölçülmedi.** Avcı 6 sağlayıcıya istek atar; `defter`/`sinir`
+   parametreleri destekleniyor ama pipeline şu an **bütçe defteri
+   geçirmiyor** (`defter=None`). Açmadan önce para tavanı bağlanmalı.
+3. **Sahne planı `iddia_metni`/`fact_id` üretmiyor.** Pipeline'ın plan
+   çıktısında bu alanlar çoğunlukla boş; köprü o zaman `footage_sorgu`ya
+   düşüyor. Yani araştırma-bağlantılı seçim henüz tam beslenmiyor.
+4. **Yalnızca footage sahnelerinde devrede.** AI görsel ve Sora/Grok yolları
+   dokunulmadı.
+5. **`kayit_sifirla()` iş başına global durum kullanıyor.** Aynı süreçte
+   paralel iki iş koşarsa sayaçlar karışır — üretimde işler ayrı süreçte,
+   ama bu bir varsayım.
+6. **Hikâye/animasyon hatları test edilmedi**; köprü tür ayrımı yapmıyor,
+   yalnızca footage sahnesi koşuluna bakıyor.
+
+### SONRAKİ ADIM
+
+Bütçe defteri + koşu sınırı bağlanması, plan çıktısına `iddia_metni`/`fact_id`
+taşınması, sonra **kontrollü gerçek pilot** (bayrak açık, tek iş, maliyet
+ölçümü).

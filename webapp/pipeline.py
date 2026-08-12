@@ -32,6 +32,7 @@ import uret as uretmod  # seslendir, altyazi_parcala (DIKKAT: bu dosyada 'uret' 
 import kaynak  # YT/Pexels footage + Magnific upscale
 import arastirma_kopru  # Faz H: arastirma motorunu bu hatta baglar (bkz. modul basligi)
 import qa_kopru         # Faz H: render sonrasi kalite kapisi (bkz. modul basligi)
+import medya_kopru      # Faz I-6: Faz B medya avcisi (OPT-IN, varsayilan KAPALI)
 
 # ⚠ FAZ I-2c — BILESIK STIL PROFILI KOPRUSU (OPSIYONEL, HATTI COKERTMEZ).
 # `stil_profili.py` (Faz I-2b) surumlu/bilesik profil kaydidir. Bu hat onu
@@ -4064,6 +4065,23 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # `gecis_imza_sec` eski tablolariyla BIT-BIT ayni calisir.
     _gorsel_ek = profil_ek_oku(prof) or None
     _gorsel_imza = bilesik_gorsel_imza(_gorsel_ek) if _gorsel_ek else None
+    # ── FAZ I-6: MEDYA AVCISI (OPT-IN, VARSAYILAN KAPALI) ──
+    # ⚠ `_is_ayar` DAHILI kanal profili sozlugudur; `/api/generate`in 22 alani
+    # buraya ULASMAZ. Bayrak kapaliysa `_avci_acik` False kalir ve asagidaki
+    # medya yolu BUGUNKUYLE BIREBIR ayni calisir.
+    _is_ayar = kanal if isinstance(kanal, dict) else None
+    _avci_acik, _avci_gerekce = medya_kopru.acik_mi(_is_ayar)
+    _avci_konsept, _avci_yerler = None, []
+    if _avci_acik:
+        medya_kopru.kayit_sifirla()
+        try:
+            import taksonomi as _tx
+            _avci_konsept = _tx.siniflandir(story or "")
+        except Exception as e:
+            print(f"  avci konsepti cozulemedi: {type(e).__name__}",
+                  file=sys.stderr)
+        print(f"  MEDYA AVCISI ACIK ({_avci_gerekce}); konsept="
+              f"{(_avci_konsept or {}).get('yol') or 'yok'}", file=sys.stderr)
     if _gorsel_imza:
         _ef_adlari = [e["ad"] for e in _gorsel_imza["efektler"]] or ["yok"]
         _gz = _gorsel_imza["gecis_imza"] or "yok"
@@ -4177,6 +4195,30 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         # 1) Footage sahnesi mi?
         if footage_acik and str(s.get("kaynak")) == "footage" and str(s.get("footage_sorgu", "")).strip():
             vyol_full = os.path.join(PUBLIC, "isler", is_adi, f"sahne_{n}.mp4")
+            # ── FAZ I-6: MEDYA AVCISI (OPT-IN, VARSAYILAN KAPALI) ──
+            # ⚠ Kapaliyken bu blok hicbir sey yapmaz ve asagidaki MEVCUT yol
+            # aynen calisir. Acikken bile basarisiz olursa yine eski yola
+            # dusulur — uretim yolu HICBIR DURUMDA bozulmaz.
+            if _avci_acik:
+                _av = medya_kopru.sahne_medyasi(
+                    sorgu=s["footage_sorgu"].strip(), hedef_yol=vyol_full,
+                    sahne_amaci=str(s.get("sahne_amaci") or ""),
+                    iddia_metni=str(s.get("iddia_metni") or s.get("anlatim") or ""),
+                    fact_id=str(s.get("fact_id") or ""),
+                    scene_id=str(s.get("scene_id") or f"s{n:03d}"),
+                    konsept=_avci_konsept, bilinen_yerler=_avci_yerler,
+                    konu=str(story or "")[:120],
+                    yer_terim=kaynak._etkin_yer(s["footage_sorgu"].strip()),
+                    istek=kaynak.avci_istek, kare_dogrula=kaynak._kare_dogrula,
+                    is_ayar=_is_ayar)
+                if _av["ok"]:
+                    if _av.get("atif"):
+                        s["kaynakYazi"] = _av["atif"][:80]
+                    print(f"  sahne {n}: AVCI klibi "
+                          f"{_av['aday'].get('saglayici')}/"
+                          f"{_av['aday'].get('lisans')}", file=sys.stderr)
+                    return ("video", f"isler/{is_adi}/sahne_{n}.mp4")
+                # Basarisizlik SESSIZ degil; sebep dususlere yaziliyor.
             if kaynak.footage_getir(s["footage_sorgu"].strip(), vyol_full, yt_once=yt_once):
                 # CC klip geldiyse ekrana kucuk kaynak yazisi — lisans ATIF ISTIYOR.
                 atif = kaynak.atif_al(vyol_full)
@@ -4611,6 +4653,13 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                  CIKTI_DIR, arastirma_sonuc.manifest_dosya),
              # Gorunur dusus kayitlari: hangi asamada neden geri duselduği.
              "dususler": list(arastirma_sonuc.dususler)}
+    # ── FAZ I-6: MEDYA AVCISI OZETI (yalnizca ACIKKEN yazilir) ──
+    # ⚠ Kapaliyken anahtar HIC eklenmez -> eski islerde `sonuc` bit-bit ayni.
+    # Acikken kapinin hic calismadigi durum da GORUNUR (denenen=0), boylece
+    # "avci kullandik" gibi kanitsiz iddia uretilmez.
+    if _avci_acik:
+        sonuc["medya_avcisi"] = medya_kopru.ozet()
+        sonuc["dususler"].extend(medya_kopru.dususler())
     # ── FAZ I-2c: BILESIK STIL PROFILI KUNYESI (yalnizca VARSA yazilir) ──
     # ⚠ I-2b'nin kapattigi acik: "bir stilin sahne_sn'i degisince dun uretilmis
     # is yeniden uretilemez; hangi ayarla ciktigi kayitli degildi." Kunye o

@@ -1027,6 +1027,17 @@ def _kare_dogrula(video_yolu: str, sorgu: str, yer_terim: list,
     return True
 
 
+def avci_istek(url, **kw):
+    """Faz B avcisi/indiricisi icin `requests.get` TASIYICISI (Faz I-6).
+
+    ⚠ Bu yalnizca tasiyicidir: SSRF dogrulamasi, icerik turu, bayt tavani ve
+    decode kapilari `medya.guvenlik` / `medya.indirme` tarafinda uygulanir.
+    Burada hicbir kapi ATLANMAZ; kopru bu fonksiyonu dogrudan degil, her
+    zaman `guvenli_indir`/`guvenli_istek` uzerinden kullanir.
+    """
+    return requests.get(url, **kw)
+
+
 def _etkin_yer(sorgu: str) -> list:
     """Bu sorgu icin gecerli yer kisiti: sorgununki varsa o, yoksa VIDEONUN yeri."""
     return _sorgu_yer_terimleri(sorgu) or list(_YER_BAGLAM)
