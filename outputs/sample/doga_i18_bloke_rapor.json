@@ -1,0 +1,273 @@
+{
+  "atom": "I-18",
+  "durum": "BLOKE",
+  "ne_bloke": "medya BAYT edinimi (arama ve lisans katmani CALISTI)",
+  "konu_metni": "İzlanda'nın güney kıyısındaki buzul lagünleri, siyah kum plajları ve şelaleleri: dört duraklı bir doğa yolculuğu",
+  "konsept": {
+    "adaylar": [
+      [
+        "seyahat.doga_manzara",
+        4.0,
+        4
+      ],
+      [
+        "belgesel.arastirma",
+        0.0,
+        0
+      ],
+      [
+        "belgesel.biyografi",
+        0.0,
+        0
+      ]
+    ],
+    "kanit": 4,
+    "sinyaller": {},
+    "kapsam": {
+      "aile": 7,
+      "aileler": [
+        "belgesel",
+        "egitim",
+        "hikaye",
+        "kultur",
+        "seyahat",
+        "urun",
+        "yasam"
+      ],
+      "dal": 33,
+      "anahtar": 814,
+      "sinyal": 18,
+      "sinyal_bagi": 50,
+      "karsit": 94
+    },
+    "kaynak": "deterministik",
+    "model_kullanildi": false,
+    "yol": "seyahat.doga_manzara",
+    "aile": "seyahat",
+    "tur": "doga_manzara",
+    "ad": "Doga / manzara",
+    "guven": 0.91,
+    "durum": "kesin",
+    "ikincil": null,
+    "eski_etiket": "seyahat",
+    "gerekce": "seyahat.doga_manzara: puan 4.0 (2. - 0.0), kanit 4 = 4 anahtar + 0 yapisal sinyal"
+  },
+  "stil": {
+    "kimlik": "seyahat-4k",
+    "surum": "1.0.0",
+    "profil": {
+      "ad": "Seyahat 4K",
+      "ozet": "Gercek drone + yer goruntusu derlemesi, AI gorsel YASAK",
+      "surum": "1.0.0",
+      "anlatim": {
+        "yapi": "bolumlu",
+        "acilis": "baslik",
+        "kisi": "3.",
+        "bolum_basligi": true
+      },
+      "tempo": {
+        "plan_sn": 5.5,
+        "maks_plan_sn": 8.0,
+        "kelime_plan": 15.0,
+        "dagilim": "cift-modlu"
+      },
+      "gecis": {
+        "tur": "hard-cut",
+        "sure_sn": 0.0,
+        "oran_pct": 12.0
+      },
+      "kamera": {
+        "hareket": "drone",
+        "yogunluk": 60.0,
+        "zoom_tavan": 1.18
+      },
+      "tipografi": {
+        "altyazi": "yok",
+        "baslik": "sade",
+        "guvenli_alan_pct": 8.0
+      },
+      "palet": {
+        "grade": "dogal-canli",
+        "doygunluk": "yuksek",
+        "kontrast": "orta",
+        "hex": [
+          "#0A6C8F",
+          "#2FBFA0",
+          "#F2E8D5"
+        ]
+      },
+      "ses": {
+        "muzik": "atmosferik",
+        "muzik_db": -20.0,
+        "sfx": "az",
+        "ducking_db": -8.0
+      },
+      "medya": {
+        "strateji": "gercek-footage",
+        "footage_pct": 100.0,
+        "grafik_pct": 0.0,
+        "ai_gorsel_yasak": true
+      },
+      "dagitim": {
+        "oran": "16:9",
+        "kanal": "youtube",
+        "hedef_sn": 600.0,
+        "maks_sn": 1800.0
+      },
+      "kanit": {
+        "lisans_beyaz_liste": [
+          "cc0",
+          "public-domain",
+          "cc-by",
+          "cc-by-sa",
+          "pexels",
+          "pixabay",
+          "coverr",
+          "freepik"
+        ],
+        "atif_zorunlu": true,
+        "min_bagimsiz_kaynak": 1.0,
+        "arsiv_zorunlu": false,
+        "yer_kapisi": true
+      },
+      "qa": {
+        "lufs_hedef": -14.0,
+        "tepe_dbtp_maks": -1.5,
+        "sure_sapma_pct_maks": 20.0,
+        "siyah_kare_maks": 0.0,
+        "donmus_kare_maks": 0.0,
+        "min_kesme": 8.0
+      }
+    },
+    "kaynak": "auto",
+    "gerekce": "konsept 'seyahat.doga_manzara' (guven 0.91) -> seyahat-4k",
+    "turetme": null,
+    "uyari": []
+  },
+  "medya": {
+    "kaynak": "Wikimedia Commons",
+    "maliyet_usd": 0.0,
+    "en_az_genislik": 3840,
+    "sahneler": [
+      {
+        "kimlik": "s01",
+        "sorgu": "Jökulsárlón glacier lagoon Iceland",
+        "denenen": 18,
+        "gecen": 6,
+        "elenen": [],
+        "hata": "",
+        "durum": "INDIRME-BASARISIZ",
+        "sebep": "HTTP 429",
+        "http": 429,
+        "retry_after": "600",
+        "sinif": "AG-HIZ-SINIRI"
+      },
+      {
+        "kimlik": "s02",
+        "sorgu": "Reynisfjara black sand beach Iceland",
+        "denenen": 18,
+        "gecen": 6,
+        "elenen": [
+          {
+            "baslik": "Iceland black sand beach.jpg",
+            "neden": "COZUNURLUK-YETERSIZ (3024 < 3840)"
+          },
+          {
+            "baslik": "Iceland black sand beach rocks rolleicord.jpg",
+            "neden": "COZUNURLUK-YETERSIZ (1818 < 3840)"
+          },
+          {
+            "baslik": "Iceland black sand beach rolleicord view.jpg",
+            "neden": "COZUNURLUK-YETERSIZ (1753 < 3840)"
+          },
+          {
+            "baslik": "Reynisfjara Black Sand Beach Iceland Travel Photography (210387065).jpeg",
+            "neden": "COZUNURLUK-YETERSIZ (2000 < 3840)"
+          }
+        ],
+        "hata": "",
+        "durum": "INDIRME-BASARISIZ",
+        "sebep": "HTTP 429",
+        "http": 429,
+        "retry_after": "600",
+        "sinif": "AG-HIZ-SINIRI"
+      },
+      {
+        "kimlik": "s03",
+        "sorgu": "Skógafoss waterfall Iceland",
+        "denenen": 18,
+        "gecen": 6,
+        "elenen": [
+          {
+            "baslik": "Skógafoss, Iceland, 20230501 1444 3968.jpg",
+            "neden": "COZUNURLUK-YETERSIZ (3372 < 3840)"
+          },
+          {
+            "baslik": "Skógafoss, Iceland, 20230501 1445 3970.jpg",
+            "neden": "COZUNURLUK-YETERSIZ (2877 < 3840)"
+          },
+          {
+            "baslik": "Skógafoss, Iceland, 20230501 1447 3978.jpg",
+            "neden": "COZUNURLUK-YETERSIZ (3350 < 3840)"
+          },
+          {
+            "baslik": "Skógafoss, Iceland, 20230501 1449 3980.jpg",
+            "neden": "COZUNURLUK-YETERSIZ (2557 < 3840)"
+          }
+        ],
+        "hata": "",
+        "durum": "INDIRME-BASARISIZ",
+        "sebep": "HTTP 429",
+        "http": 429,
+        "retry_after": "600",
+        "sinif": "AG-HIZ-SINIRI"
+      },
+      {
+        "kimlik": "s04",
+        "sorgu": "Vestrahorn mountain Iceland",
+        "denenen": 18,
+        "gecen": 6,
+        "elenen": [
+          {
+            "baslik": "Cap Vestrahorn from Vikurfjall Ring Road.JPG",
+            "neden": "COZUNURLUK-YETERSIZ (3758 < 3840)"
+          },
+          {
+            "baslik": "Island Vestrahorn 01.JPG",
+            "neden": "COZUNURLUK-YETERSIZ (3444 < 3840)"
+          },
+          {
+            "baslik": "Island Vestrahorn 12.JPG",
+            "neden": "COZUNURLUK-YETERSIZ (3444 < 3840)"
+          },
+          {
+            "baslik": "Island Vestrahorn 13.JPG",
+            "neden": "COZUNURLUK-YETERSIZ (3444 < 3840)"
+          }
+        ],
+        "hata": "",
+        "durum": "INDIRME-BASARISIZ",
+        "sebep": "HTTP 429",
+        "http": 429,
+        "retry_after": "600",
+        "sinif": "AG-HIZ-SINIRI"
+      }
+    ],
+    "basarili": 0,
+    "dort_k_uygun": false
+  },
+  "siniflandirma": {
+    "AG-HIZ-SINIRI": 4
+  },
+  "sahte_medya_uretildi_mi": false,
+  "video_broll": {
+    "aday": [],
+    "taranan_dizin": [
+      "cikti/_i18_medya",
+      "app/render-studio/public/editorv2"
+    ],
+    "durum": "BLOKE",
+    "sebep": "I-18 yalnizca FOTOGRAF edinir; guvenli havuzda hareketli video adayi YOK ve depodaki .mp4 dosyalari bu projenin kendi render ciktilari, B-roll DEGILDIR"
+  },
+  "not": "arama/metadata/lisans katmani calisti; duran sey upload.wikimedia.org'dan BAYT indirme. Bu ORTAM kaynaklidir (cikis IP hiz siniri), lisans reddi DEGIL."
+}

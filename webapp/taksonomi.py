@@ -194,10 +194,59 @@ AGAC = {
     },
     "seyahat.doga_manzara": {
         "ad": "Doga / manzara",
+        # ⚠ FAZ I-18'DE OLCULEN KAPSAM BOSLUGU. Bu dal yalnizca 19 kelime
+        # tasiyordu ve seyahat ailesi pratikte HIZMET sozluguyle ("gezi",
+        # "rehber", "tur") tetikleniyordu. Olculen sonuc: uc ayri doga metni
+        # de `belirsiz` cikti ve stil `belgesel-sinematik` VARSAYILANINA
+        # dustu — yani "doga metni otomatik seyahat/sinematik siniflanir"
+        # iddiasi KARSILIKSIZDI:
+        #   "İzlanda ... buzul lagunleri ... siyah kum plajlari"  -> belirsiz (0 isaret)
+        #   "Norvec fiyortlarinda ... selaleler ve kayaliklar"     -> belirsiz (1 isaret)
+        #   "Patagonya ... granit kuleler, buzul golleri, pampa"   -> belirsiz (0 isaret)
+        # Eksik olan MANZARA/YER SEKLI sozluguydu. §16'nin tasarim sozu
+        # geregi yalnizca AGAC'a satir eklendi; motor kodu DEGISMEDI.
+        # ⚠ Kisa terimler (gol/dag) ek toleransi ALMAZ (§16 siniri); bu
+        # yuzden cekimli biciimler ayrica yazildi.
         "anahtar": ("doga manzarasi", "doğa manzarası", "dag", "dağ",
                     "mountain", "gol", "göl", "lake", "sahil", "beach",
                     "vadi", "valley", "selale", "şelale", "waterfall",
-                    "milli park", "national park", "patika", "trail"),
+                    "milli park", "national park", "patika", "trail",
+                    # ── I-18: buz / kutup ──
+                    "buzul", "glacier", "buzulu", "gletscher", "aysberg",
+                    "iceberg", "kutup", "arctic", "tundra", "permafrost",
+                    "lagun", "lagün", "lagoon",
+                    # ── I-18: kiyi / deniz yer sekli ──
+                    "fiyort", "fjord", "kiyi", "kıyı", "coastline",
+                    "plaj", "plaji", "plajı", "kumsal", "falez", "cliff",
+                    "kayalik", "kayalık", "kayaliklar", "kayalıklar",
+                    "koy", "körfez", "korfez", "bay ", "delta",
+                    # ── I-18: dag / ic bolge yer sekli ──
+                    "zirve", "zirvesi", "summit", "peak", "yayla",
+                    "plato", "plateau", "kanyon", "canyon", "gorge",
+                    "vadisi", "krater", "crater", "kaldera", "caldera",
+                    "volkan", "yanardag", "yanardağ", "volcano",
+                    "magara", "mağara", "cave", "obruk",
+                    # ── I-18: ortu / iklim kusagi ──
+                    "orman", "ormani", "ormanı", "forest", "ormanlik",
+                    "col ", "çöl", "desert", "bozkir", "bozkır", "step",
+                    "pampa", "savan", "jungle", "yagmur ormani",
+                    "yağmur ormanı", "gokkusagi", "gökkuşağı",
+                    "kuzey isiklari", "kuzey ışıkları", "aurora",
+                    # ── I-18: su ──
+                    "nehir", "nehri", "river", "irmak", "cay ", "çay ",
+                    "kaplica", "kaplıca", "gayzer", "geyser", "hot spring",
+                    "golu", "gölü", "golleri", "gölleri", "lakes",
+                    # ── I-18: cekimli/bilesik yer sekli formlari ──
+                    # ⚠ Kisa kokler (vadi=4, dag=3) ek toleransi ALMIYOR;
+                    # cekimli bicimler bu yuzden AYRICA yazildi (olculdu:
+                    # "vadiler" tek basina hicbir dala isaret uretmiyordu).
+                    "vadiler", "vadileri", "daglar", "dağlar", "daglari",
+                    "dağları", "goller", "göller", "sahiller", "kiyilari",
+                    "kıyıları", "peribacasi", "peribacası", "peri bacasi",
+                    "peri bacası", "peribacalari", "peribacaları", "hoodoo",
+                    "yeralti", "yeraltı", "kumul", "kumullar", "kayalik",
+                    "buzullar", "buzullari", "buzulları", "selaleler",
+                    "şelaleler", "kanyonlar", "magaralar", "mağaralar"),
         "sinyal": {"cozunurluk": 1.0},
         "karsit": ("tarif", "hisse"),
     },

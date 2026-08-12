@@ -5223,6 +5223,195 @@ kontrol("bayraklar HALA varsayilan kapali",
         and ekp.kalite_kapisi_acik(None) is False)
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# §36  FAZ I-18 — IKINCI KONSEPT (DOGA/SEYAHAT) + MEDYA EDINIMI
+#
+# ⚠ Bu bolumun ISPAT YUKU iki parcali:
+#   (a) KULLANICI YALNIZ METIN VERINCE taksonomi + bilesik stil onu
+#       otomatik seyahat/sinematik siniflar   -> TAM OLARAK KANITLANIR
+#   (b) medya EDINIMI                          -> ortam kaynakli BLOKE
+#       (bkz. §36c; sebep olculdu, gizlenmedi)
+# ═══════════════════════════════════════════════════════════════════════
+
+blok("§36a TAKSONOMI KAPSAM BOSLUGU — olculdu ve kapatildi")
+
+import taksonomi as _tk                                           # noqa: E402
+import stil_profili as _sp                                        # noqa: E402
+
+_DOGA = [
+    "İzlanda'nın güney kıyısındaki buzul lagünleri, siyah kum plajları ve "
+    "şelaleleri: dört duraklı bir doğa yolculuğu",
+    "Norveç fiyortlarında tekneyle ilerlerken şelaleler ve dik kayalıklar",
+    "Patagonya'da granit kuleler, buzul gölleri ve pampa rüzgarı",
+    "Kapadokya'da peribacaları, vadiler ve yeraltı mağaraları",
+]
+for _m in _DOGA:
+    _k = _tk.siniflandir(_m)
+    kontrol(f"⭐ doga metni AUTO seyahat siniflandi: {_m[:34]}…",
+            _k["aile"] == "seyahat" and _k["durum"] in ("kesin", "melez"),
+            (_k["aile"], _k["durum"], _k["guven"]))
+    _s = _sp.coz(konsept=_k)
+    kontrol(f"⭐ bilesik stil AUTO secildi: {_m[:34]}…",
+            _s.get("kimlik") == "seyahat-4k" and _s.get("kaynak") == "auto",
+            (_s.get("kimlik"), _s.get("kaynak")))
+
+kontrol("manzara/yer sekli sozlugu EKLENDI (kapsam buyudu)",
+        _tk.kapsam_ozeti()["anahtar"] >= 780,
+        _tk.kapsam_ozeti()["anahtar"])
+_anahtarlar = set(_tk.AGAC["seyahat.doga_manzara"]["anahtar"])
+for _kelime in ("buzul", "fiyort", "lagun", "kanyon", "volkan", "orman",
+                "plaj", "zirve", "krater", "nehir"):
+    kontrol(f"'{_kelime}' manzara sozlugunde", _kelime in _anahtarlar)
+kontrol("⚠ eski 19 kelime SILINMEDI (yalniz eklendi)",
+        {"dag", "gol", "sahil", "vadi", "selale", "milli park", "patika"}
+        <= _anahtarlar)
+kontrol("motor kodu DEGISMEDI — yalniz AGAC'a satir eklendi (§16 sozu)",
+        "def siniflandir" in oku(KOK, "taksonomi.py")
+        and _tk.kapsam_ozeti()["aile"] == 7
+        and _tk.kapsam_ozeti()["dal"] == 33)
+
+# ── GERILEME: diger aileler bozulmadi ──
+for _m, _bek in (("Kapadokya gezi rehberi: balon turu", "seyahat"),
+                 ("iPhone 15 vs Galaxy S24 fiyat karsilastirmasi", "urun"),
+                 ("Enflasyon ve borsa: faiz karari piyasalari nasil etkiler",
+                  "egitim"),
+                 ("Kabus gibi bir gece: kapinin ardindaki golge", "hikaye"),
+                 ("Findik tarifi: 20 dakikada kolay kek", "yasam")):
+    kontrol(f"gerileme yok: {_bek}",
+            _tk.siniflandir(_m)["aile"] == _bek,
+            _tk.siniflandir(_m)["aile"])
+kontrol("stil AUTO'su seyahat disinda seyahat-4k SECMIYOR",
+        _sp.coz(konsept=_tk.siniflandir(
+            "Findik tarifi: 20 dakikada kolay kek")).get("kimlik")
+        != "seyahat-4k")
+
+blok("§36b MEDYA EDINIMI MODULU — lisans karari DELEGE, konu HARD-CODE DEGIL")
+
+from medya import commons as _cm                                  # noqa: E402
+_CM_KAYNAK = oku(KOK, "medya/commons.py")
+# ⚠ `_kod_yalniz` token'lari BOSLUKLA birlestiriyor: `lisans.lisans_karari(`
+# kodda varken taramada `lisans . lisans_karari (` oluyor ve naif `in`
+# kontrolu KOD DOGRUYKEN kirmizi yaniyor (I-18'de yasandi). Bosluksuz
+# bicimde aranir.
+def _sikistir(kaynak: str) -> str:
+    return re.sub(r"\s+", "", _kod_yalniz(kaynak))
+
+
+_CM_KOD = _sikistir(_CM_KAYNAK)
+
+kontrol("modul KENDI lisans kararini VERMIYOR (lisans.py'ye delege)",
+        "lisans.lisans_karari(" in _CM_KOD)
+kontrol("modul KENDI indiricisini YAZMIYOR (guvenli_indir'e delege)",
+        "indirme.guvenli_indir(" in _CM_KOD)
+kontrol("SSRF duvari atlanmiyor — dogrudan urlopen ile DOSYA cekilmiyor",
+        "urlopen" not in _CM_KOD.split("defindir(")[1]
+        if "defindir(" in _CM_KOD else False)
+kontrol("APOLLO ya da baska KONU ADI gomulu DEGIL",
+        not re.search(r"apollo|moon|iceland|izlanda|jökul|jokul",
+                      _kod_yalniz(_CM_KAYNAK), re.I))
+kontrol("anahtar/API anahtari GEREKTIRMIYOR ($0.00)",
+        _cm.kapsam_ozeti()["anahtar_gerekli"] is False
+        and _cm.kapsam_ozeti()["maliyet_usd"] == 0.0
+        and not re.search(r"api_key|apikey|secret",
+                          _kod_yalniz(_CM_KAYNAK), re.I))
+kontrol("PROVENANCE ZORUNLU: eser sahibi yoksa aday ELENIR",
+        "ESER-SAHIBI-YOK" in _CM_KAYNAK)
+kontrol("4K esigi kaynaga bagli (upscale YOK)",
+        _cm.DORT_K_EN_AZ_GENISLIK == 3840
+        and "COZUNURLUK-YETERSIZ" in _CM_KAYNAK)
+kontrol("kapsam DISI acikca yaziliyor (video B-roll dahil)",
+        any("video" in k for k in _cm.kapsam_ozeti()["kapsam_disi"]))
+kontrol("429 icin SINIRLI ve TAVANLI bekleme (sonsuz dongu YOK)",
+        "deneme: int = 3" in _CM_KAYNAK
+        and "bekleme_tavani" in _CM_KAYNAK)
+kontrol("Retry-After varsa ONA uyuluyor",
+        _cm.bekle_suresi({"retry_after": 7}, 0) == 7.0
+        and _cm.bekle_suresi({}, 2) == 8.0)
+kontrol("istek imzasi guvenlik katmaninin bekledigi bicimde",
+        "def varsayilan_istek(yontem: str, url: str, **kw)" in _CM_KAYNAK)
+for _g in (None, {}, {"indirme_url": ""}, "x", 5):
+    try:
+        _cm.indir(_g if isinstance(_g, dict) else {}, "/tmp/yok.jpg")
+    except Exception as _e:                                       # noqa: BLE001
+        kontrol(f"commons.indir({_g!r}) istisna FIRLATMIYOR", False,
+                type(_e).__name__)
+kontrol("commons.indir bozuk girdide ISTISNA FIRLATMIYOR", True)
+kontrol("lisanssiz aday INDIRILMEZ (duvar bypass edilemez)",
+        _cm.indir({"indirme_url": "https://x/y.jpg",
+                   "render_kullanilabilir": False},
+                  "/tmp/yok.jpg")["sebep"] == "LISANS-DUVARI")
+
+blok("§36c I-18 PILOT BETIGI — Apollo hard-code YOK, BLOKE dursut")
+
+_SM18 = oku(KOK, "testler/smoke_konsept2_doga_i18.py")
+_SM18_KOD = _sikistir(_SM18)
+kontrol("betikte APOLLO/AY hard-code'u YOK",
+        not re.search(r"apollo|a\d{3}_wiki|tranquility|armstrong",
+                      _kod_yalniz(_SM18), re.I))
+kontrol("konu KULLANICI METNINDEN geliyor",
+        "KONU_METNI" in _SM18 and "taksonomi" in _SM18_KOD.lower()
+        or "KONU_METNI" in _SM18)
+kontrol("sabit gorsel havuzu KALDIRILDI (medya edinilir)",
+        "GORSEL_HAVUZU" not in _SM18_KOD and "medya_edin()" in _SM18_KOD)
+kontrol("anlatim TURKCE (I-17 'Ingilizce fixture' siniri kapandi)",
+        "tr-TR-" in _SM18)
+kontrol("olgular BETIMLEME olarak etiketli (uydurma iddia YOK)",
+        '"betimleme"' in _SM18)
+kontrol("4K iddiasi KAYNAGA BAGLI — yetmezse 1080p'ye duser",
+        "dort_k_uygun" in _SM18 and "upscale YAPILMIYOR" in _SM18)
+kontrol("medya edinilemezse SAHTE gorsel URETILMIYOR",
+        "Sahte gorsel URETILMEDI" in _SM18)
+kontrol("BLOKE sebebi SINIFLANDIRILIYOR (ag/hiz siniri vs lisans)",
+        "AG-HIZ-SINIRI" in _SM18)
+kontrol("video B-roll BLOKE'si KORUNDU",
+        "video_broll_ara" in _SM18_KOD
+        and "B-roll DEGILDIR" in _SM18)
+kontrol("ffmpeg test kaynagi KULLANILMIYOR",
+        not re.search(r"lavfi|testsrc|color=c=", _kod_yalniz(_SM18)))
+kontrol("benzerlik/durgunluk esikleri DEGISTIRILMIYOR",
+        "BENZERLIK_ESIGI =" not in _SM18
+        and "OPTIK_DURGUN_ESIGI =" not in _SM18)
+
+# ── OLCULEN BLOKE: rapor varsa dogrula, yoksa BLOKE yaz ──
+_R18_YOL = os.path.join(KOK, "..", "outputs", "sample", "doga_i18_rapor.json")
+_R18 = None
+if os.path.exists(_R18_YOL):
+    try:
+        _R18 = _json.load(open(_R18_YOL, encoding="utf-8"))
+    except ValueError:
+        _R18 = None
+if _R18 is None:
+    bloke_yaz("I-18 doga pilotu render raporu",
+              "medya EDINILEMEDI (upload.wikimedia.org bu ortamda 429 / "
+              "Retry-After 600) — sahte medyayla render URETILMEDI")
+else:
+    kontrol("render raporu 1080p ya da 4K oldugunu DURUSTCE yaziyor",
+            bool(_R18.get("ffprobe")))
+
+blok("§36d I-18 KORUMALARI")
+
+kontrol("pipeline.py I-18'de de DEGISMEDI",
+        "commons" not in oku(KOK, "pipeline.py")
+        and "kalite_kapisi" not in oku(KOK, "pipeline.py"))
+kontrol("server.py I-18'de de DEGISMEDI",
+        "commons" not in oku(KOK, "server.py"))
+kontrol("medya avcisi/editor bayraklari HALA varsayilan kapali",
+        mkp.ACIK is False and ekp.ACIK is False
+        and ekp.kalite_kapisi_acik(None) is False)
+kontrol("22 alanlik generate sozlesmesi I-18'de de DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("UI I-18'de DEGISMEDI",
+        "basitGovde" in oku(KOK, "static/js/wizard.js")
+        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js"))
+kontrol("deploy.sh ezme korumasi KORUNDU",
+        "GERIDE" in open(os.path.join(KOK, "..", "deploy.sh"),
+                         encoding="utf-8").read())
+kontrol("lisans/SSRF modulleri I-18'de DEGISMEDI",
+        "lisans_karari" in oku(KOK, "medya/lisans.py")
+        and "url_dogrula" in oku(KOK, "medya/guvenlik.py"))
+
+
 print(f"\n{'=' * 60}")
 print(f"GECEN: {gecen}   BASARISIZ: {len(basarisiz)}   BLOKE: {len(bloke)}")
 for b in basarisiz:

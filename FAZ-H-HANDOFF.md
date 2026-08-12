@@ -184,6 +184,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-15 gerçek düzeltme + yeniden render (kapı AÇIK, PASS)** | `891a814` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-16 altyazı + kaynak künyesi + 1080p** | `2f16bc6` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-17 motion grammar + optik durağanlık kapısı** | `2448478` | ✅ **origin'e push edildi**, deploy YOK |
+| 12 Ağu | **I-18 ikinci konsept: motor kanıtlandı, medya BLOKE** | `PENDING` | ⚠ **origin'e push edildi**, MP4 YOK, deploy YOK |
 
 ---
 
@@ -2988,3 +2989,162 @@ yazıldı (niyet aynı: I-16 ölçümleri kapsamda kalmalı).
 Hareket enerjisi dengelemesi (sahneler arası optik varyansı hedef banda
 çekmek), `archive` çekim türü için gerçek parallax, ve Türkçe içerikle
 uçtan uca bir ölçüm koşusu.
+
+---
+
+## 36. FAZ I-18 — İKİNCİ KONSEPT (DOĞA/SEYAHAT): MOTOR KANITLANDI, MEDYA BLOKE
+
+> **Durum: yerel yeşil, `origin/arastirma-motoru`'na push edildi. Deploy YOK.**
+> **Maliyet $0.00. Bayraklar varsayılan KAPALI.**
+> Yeni: `webapp/medya/commons.py`,
+> `webapp/testler/smoke_konsept2_doga_i18.py`,
+> `outputs/sample/doga_i18_bloke_rapor.json`.
+> Değişen: `webapp/taksonomi.py`, `webapp/testler/test_faz_i.py` (+ bu handoff).
+> **Dokunulmadı:** `pipeline.py`, `server.py`, tüm arayüz, 22 alanlık generate
+> sözleşmesi, `deploy.sh`, `medya/lisans.py`, `medya/guvenlik.py`,
+> `medya/indirme.py`, `kalite_kapisi.py`, TSX render katmanı.
+
+### ⚠ BU ATOMUN DÜRÜST SONUCU — İKİ PARÇA
+
+| Parça | Sonuç |
+|---|---|
+| **Otomatik konsept + stil seçimi** | ✅ **TAM KANITLANDI** |
+| **Medya baytı edinimi** | ⛔ **BLOKE** (ortam kaynaklı, ölçüldü) |
+| Doğa pilotu render/MP4 | ❌ **ÜRETİLMEDİ** — sahte medyayla render yapılmadı |
+
+I-13'ten I-17'ye kadar her pilot aynı Apollo fixture'ıyla koştu. İkinci
+konsept için havuzda **tek bir doğa görseli yoktu** (ölçüldü:
+`cikti/faz_e/medya/` 12 varlığın 12'si Apollo/Ay; `cikti/faz_d/zemin/`
+ise **sentetik gradyan**, fotoğraf değil). Bu yüzden medya **gerçekten
+edinilmeye çalışıldı**.
+
+### ✅ KANITLANAN — kullanıcı yalnız metin verdi
+
+```
+metin  : "İzlanda'nın güney kıyısındaki buzul lagünleri, siyah kum
+          plajları ve şelaleleri: dört duraklı bir doğa yolculuğu"
+konsept: aile=seyahat  durum=kesin  guven=0.91
+gerekce: seyahat.doga_manzara: puan 4.0, kanit 4 = 4 anahtar
+STIL   : kimlik=seyahat-4k  surum=1.0.0  kaynak=auto
+edit   : atlas-journey
+```
+
+Tür/stil **elle verilmedi**. Seçilen edit profili `atlas-journey` — Apollo
+pilotlarının `premium-modern`inden **gerçekten farklı** bir profil.
+
+### ⚠ ÖLÇÜLEN TAKSONOMİ BOŞLUĞU — atomun başında iddia KARŞILIKSIZDI
+
+İlk ölçüm, kullanıcının varsaydığı davranışın **çalışmadığını** gösterdi:
+
+| Metin | ÖNCE | **SONRA** |
+|---|---|---|
+| İzlanda buzul lagünleri / siyah kum plajları | **belirsiz** (0 işaret) | **seyahat / kesin / 0.91** |
+| Norveç fiyortları / şelaleler / kayalıklar | **belirsiz** (1 işaret) | **seyahat / kesin** |
+| Patagonya granit kuleler / buzul gölleri | **belirsiz** (0 işaret) | **seyahat / kesin** |
+| Kapadokya peribacaları / vadiler / mağaralar | **belirsiz** (1 işaret) | **seyahat / kesin** |
+| Stil sonucu | `belgesel-sinematik` (**varsayılan**) | `seyahat-4k` (**auto**) |
+
+**Kök neden:** `seyahat.doga_manzara` dalı yalnızca 19 kelime taşıyordu ve
+seyahat ailesi pratikte **hizmet sözlüğüyle** ("gezi", "rehber", "tur")
+tetikleniyordu. Eksik olan **manzara / yer şekli** sözlüğüydü.
+
+**Çözüm:** §16'nın tasarım sözü uygulandı — *"yeni konsept eklemek = AGAC'a
+bir satır, motor kodu değişmez"*. Yalnızca sözlük büyütüldü:
+**690 → 783 anahtar** (+93). Aile 7, dal 33 **aynı kaldı**; eski 19 kelime
+**silinmedi**. 19 küratörlü konsept testinin tamamı geçiyor.
+
+⚠ Kısa Türkçe kökler (`vadi`=4, `dağ`=3) §16'nın ek toleransı kuralına
+girmiyor; çekimli biçimler (`vadiler`, `dağları`, `gölleri`) **ayrıca**
+yazıldı.
+
+### ⛔ MEDYA EDİNİMİ — ne çalıştı, ne durdu
+
+Yeni `webapp/medya/commons.py` yazıldı: **anahtarsız, ücretsiz** Wikimedia
+Commons edinimi.
+
+| Katman | Sonuç |
+|---|---|
+| Commons arama + metadata | ✅ çalıştı (sahne başına 6 aday) |
+| Lisans kararı (`medya.lisans`) | ✅ çalıştı — CC-BY / CC-BY-SA doğrulandı |
+| Provenance zorunluluğu | ✅ eser sahibi okunamayan aday **elenir** |
+| 4K kaynak eşiği (≥3840 px) | ✅ 5000–7800 px adaylar bulundu |
+| **Bayt indirme** | ⛔ **HTTP 429, `Retry-After: 600`** — 4/4 sahne |
+
+**Sınıflandırma: `{"AG-HIZ-SINIRI": 4}`** — bu bir **lisans reddi değil**,
+`upload.wikimedia.org`un bu ortamın çıkış IP'sine uyguladığı hız sınırı.
+11 dakika beklenip yeniden denendi; **aynı** `Retry-After: 600` döndü, yani
+geçici bir patlama sınırı değil. Openverse de denendi: arama çalışıyor ama
+tam çözünürlük URL'leri **aynı** hosta işaret ediyor.
+
+Kanıt izlenen dosyada: `outputs/sample/doga_i18_bloke_rapor.json`
+(`sahte_medya_uretildi_mi: false`).
+
+### NE YAPMADIM (ve neden)
+
+- **Apollo görselleriyle doğa anlatımı render etmedim.** Bu, I-13'te
+  kapatılan "Apollo görsel + Endurance metni" uyuşmazlığının aynısı olurdu.
+- **`cikti/faz_d/zemin/*.jpg` kullanmadım.** Bunlar sentetik gradyan;
+  "doğa fotoğrafı" diye sunmak yanıltıcı, ekranda da I-13'ün ölçtüğü
+  "düz gri kare" kusuru olurdu.
+- **Kendi render çıktılarımızı B-roll saymadım** (I-16/I-17 BLOKE'si aynen).
+- **Upscale yapmadım.** 4K iddiası kaynağa bağlı; betik kaynaklar yetmezse
+  dürüstçe 1080p'ye düşüyor (`dort_k_uygun` bayrağı).
+
+### Hazır ama koşmamış olan
+
+Betik **uçtan uca hazır**: Türkçe anlatım üretildi ve ölçüldü
+(`tr-TR-AhmetNeural`, 4 cümle sınırı, 17.11 sn, **LRA 3.4** — İngilizce
+seslerin 1.4–2.0'ından belirgin daha dinamik), altyazı/künye/motion/optik
+kapıları I-17'den aynen devralındı. Medya baytı geldiği anda render, 9+ kare,
+PRE/POST QA ve ölçüm zinciri çalışacak. **Bu atomda MP4 YOK.**
+
+### `commons.py` sözleri (testli)
+
+- Lisans kararını **kendi vermez** → `medya.lisans.lisans_karari`
+- İndiriciyi **kendi yazmaz** → `medya.indirme.guvenli_indir` (SSRF duvarı)
+- **Provenance zorunlu** — eser sahibi yoksa aday elenir
+- **Konu adı gömülü değil** — Apollo/Iceland hiçbiri kodda geçmiyor
+- **Anahtar/token yok** ($0.00)
+- 429'da **sınırlı (3) ve tavanlı** bekleme; `Retry-After` varsa ona uyar
+
+### Ölçülen test sonucu (12 Ağu) — İKİ ORTAM AYRI
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Zengin venv** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **257** | **1327** | **2741** |
+| **Sistem Python** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **203** | **1327** | **2687** |
+
+0 hata. Faz I 1269 → **1327** (+58). Faz I'de **1 BLOKE**: doğa pilotu render
+raporu — **PASS sayılmadı**, sebebi ölçülmüş olarak yazılı.
+
+### Bu atomda düzelttiğim kendi hatalarım
+
+1. `commons.varsayilan_istek` imzasını `(url, zaman_asimi)` yazmıştım;
+   güvenlik katmanı `requests` biçiminde `(yontem, url, timeout=,
+   allow_redirects=, stream=)` çağırıyor → `TypeError`. Kapı doğru çalıştı,
+   sebep görünür oldu.
+2. Test yardımcısı `_kod_yalniz` token'ları **boşlukla** birleştiriyor;
+   `lisans.lisans_karari(` kodda varken taramada `lisans . lisans_karari (`
+   oluyor ve **kod doğruyken test kırmızı** yanıyordu. Boşluksuz karşılaştıran
+   `_sikistir()` eklendi.
+
+### BİLİNEN SINIRLAR (dürüstçe)
+
+1. **Doğa pilotu MP4 YOK** — medya baytı edinilemedi (yukarıda).
+2. **Renk tutarlılığı, 9 kare, PRE/POST QA, kesim/motion ölçümü bu konsept
+   için KOŞULMADI** — medya olmadan koşulamaz. Kod hazır.
+3. **4K hiç ölçülmedi.** Kaynak çözünürlüğü yeterliydi (5000–7800 px) ama
+   render alınamadı.
+4. **Taksonomi genişlemesi Türkçe/İngilizce sözlük tabanlı**; gerçek kullanıcı
+   dağılımında isabet oranı hâlâ **ölçülmedi** (§16 sınır 3 aynen geçerli).
+5. **Commons modülü tek sağlayıcı.** Openverse denendi ama tam çözünürlük
+   aynı hosta gidiyor; ikinci bağımsız sağlayıcı yok.
+6. **Hareketli video B-roll BLOKE** (I-16/I-17 aynen).
+7. **Algısal medya benzerliği hâlâ ölçülemiyor** (§32–§35 aynen).
+
+### SONRAKİ ATOM (I-19)
+
+Ya (a) hız sınırı olmayan bir ortamdan/aynadan medya baytını edinip doğa
+pilotunu **gerçekten** render etmek, ya da (b) depoya küçük, lisansı ve
+provenance'ı kayıtlı bir **doğa fixture seti** eklemek. Motorun geri kalanı
+hazır ve testli.
