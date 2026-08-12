@@ -73,25 +73,31 @@ FPS = 30
 # ══════════ KULLANICI GIRDISI — YALNIZ METIN ══════════
 # ⚠ Tur/stil ELLE VERILMEZ. Asagidaki metin `taksonomi.siniflandir` ile
 # siniflanir, `stil_profili.coz` bilesik stili SECER. Kanit raporda.
-KONU_METNI = ("İzlanda'nın güney kıyısındaki buzul lagünleri, siyah kum "
-              "plajları ve şelaleleri: dört duraklı bir doğa yolculuğu")
+KONU_METNI = ("İzlanda yörüngeden: volkan külü, buzul hareketi ve "
+              "kıyı sularındaki plankton girdapları")
 
-# ══════════ SAHNELER — her cumle KENDI varliginin konusunu anlatir ══════════
-# ⚠ UYDURMA OLGU YOK: her cumle, o sahneye edinilen Commons varliginin
-# KENDI basligindaki yer/olguyu betimler (baglama raporda `dayanak` olarak
-# yazilir). Sayisal iddia KULLANILMAZ — dogrulanacak kaynak yok.
-# ⚠ ANLATIM TURKCE: I-17'nin "icerik hala Ingilizce fixture" siniri kapandi.
+# ══════════ SAHNELER — her cumle EDINILEN varligin KENDI basligini betimler
+# ⚠ I-19'DA DURUSTCE DEGISTI. I-18'in metni yer seviyesi manzarayi
+# anlatiyordu (buzul lagunu, siyah kum plaji, selale). Wikimedia'dan BAYT
+# indirilemedigi icin (HTTP 429 / Retry-After 600, uc olcumde dogrulandi)
+# medya NASA kutuphanesinden edinildi ve o kutuphane YORUNGE/UYDU
+# goruntusudur. Metni degistirmeden render etmek, I-13'te kapatilan
+# "gorsel ile anlatim ortusmuyor" kusurunu geri getirirdi.
+# Bu yuzden ANLATIM GORUNENE UYDURULDU, gorunen anlatima degil.
 SAHNE_TANIMI = [
-    {"kimlik": "s01", "sorgu": "Jökulsárlón glacier lagoon Iceland",
-     "metin": "Buzullar denize doğru yürüyor."},
-    {"kimlik": "s02", "sorgu": "Reynisfjara black sand beach Iceland",
-     "metin": "Reynisfjara'da siyah volkanik kum Kuzey Atlantik'le "
-              "buluşuyor."},
-    {"kimlik": "s03", "sorgu": "Skógafoss waterfall Iceland",
-     "metin": "Skógafoss'ta erimiş kar geniş bir perde halinde düşüyor."},
-    {"kimlik": "s04", "sorgu": "Vestrahorn mountain Iceland",
-     "metin": "Vestrahorn'da dağ, kara kumulların ardından dimdik "
-              "yükseliyor."},
+    {"kimlik": "s01", "sorgu": "Eruption of Eyjafjallajokull Volcano Iceland",
+     # ⚠ ACILIS SURESI TAHMIN EDILMEDI, OLCULDU. `atlas-journey`
+     # profilinde hook/acilis bolunme esigi 3.06 sn ve `shot_min_sn` 2.0 —
+     # yani acilis [2.0, 3.06) araliginda olmali. 4.025 ve 3.362 sn'lik iki
+     # deneme de bolundu ve kapi dogru sekilde FAIL verdi.
+     "metin": "Bir yanardağ patladı."},
+    {"kimlik": "s02", "sorgu": "Wind-blown volcanic ash off Iceland",
+     "metin": "Rüzgar, kül bulutunu Kuzey Atlantik üzerine yaydı."},
+    {"kimlik": "s03", "sorgu": "Phytoplankton bloom off Iceland",
+     "metin": "Kıyı sularında plankton, akıntıların izini çizdi."},
+    {"kimlik": "s04", "sorgu": "NASA Radar Maps Iceland Glaciers",
+     "metin": "Radar ise buzulların kış boyunca ne kadar ilerlediğini "
+              "ölçtü."},
 ]
 SAHNE_METINLERI = [(s["kimlik"], s["metin"]) for s in SAHNE_TANIMI]
 # ⚠ Bunlar DOGRULANMIS IDDIA degil, BETIMLEMEdir: her cumle o sahneye
@@ -317,68 +323,93 @@ def benzerlik(a, b):
 
 
 def medya_edin():
-    """Her sahne icin Commons'tan LISANSLI gorsel edin (onbellekli).
+    """Sahne basina medyayi SAGLAYICI ZINCIRINDEN edin (devre kesicili).
 
-    Doner: (secilenler, rapor). Bir sahne icin aday bulunamazsa o sahne
-    `None` doner ve sebep raporlanir — SAHTE gorsel URETILMEZ.
+    ⚠ I-19: tek saglayici yerine sirali zincir. Wikimedia 429 verirse
+    ayni host ZORLANMAZ; devre acilir ve NASA'ya gecilir. Gecis SURESI
+    olculur. Arama/metadata ile GERCEK BAYT ayri sayilir.
     """
-    from medya import commons
+    from medya import commons, edinim, nasa
     os.makedirs(MEDYA_ONBELLEK, exist_ok=True)
-    secilen, rapor = [], {"kaynak": "Wikimedia Commons", "maliyet_usd": 0.0,
-                          "en_az_genislik": commons.DORT_K_EN_AZ_GENISLIK,
-                          "sahneler": []}
-    kullanilan = set()
+    kesici = edinim.DevreKesici()
+    onbellek: dict = {}
+    secilen, rapor = [], {
+        "mimari": "medya.edinim saglayici zinciri + devre kesici",
+        "maliyet_usd": 0.0,
+        "saglayici_sirasi": ["commons", "nasa"],
+        "atlanan_saglayicilar": [
+            {"ad": "pexels", "sebep": "mevcut anahtar GECERSIZ (HTTP 401) — "
+                                      "yeni anahtar ALINMADI"}],
+        "en_az_genislik": 1920, "sahneler": []}
     for tanim in SAHNE_TANIMI:
-        kayit = {"kimlik": tanim["kimlik"], "sorgu": tanim["sorgu"]}
-        ara = commons.ara(tanim["sorgu"], adet=6,
-                          en_az_genislik=commons.DORT_K_EN_AZ_GENISLIK)
-        kayit.update({"denenen": ara["denenen"], "gecen": len(ara["adaylar"]),
-                      "elenen": ara["elenen"][:4], "hata": ara["hata"]})
-        aday = next((a for a in ara["adaylar"]
-                     if a["orijinal_url"] not in kullanilan), None)
-        if not aday:
-            kayit["durum"] = "BLOKE"
-            kayit["sebep"] = ara["hata"] or "lisans/provenance duvarini gecen aday yok"
-            rapor["sahneler"].append(kayit)
-            secilen.append(None)
-            continue
-        kullanilan.add(aday["orijinal_url"])
-        ad = re.sub(r"[^a-zA-Z0-9_.-]", "_", aday["baslik"])[:60] or tanim["kimlik"]
-        hedef = os.path.join(MEDYA_ONBELLEK, f"{tanim['kimlik']}_{ad}")
-        if not hedef.lower().endswith((".jpg", ".jpeg", ".png")):
-            hedef += ".jpg"
-        if os.path.exists(hedef) and os.path.getsize(hedef) > 10000:
-            ind = {"ok": True, "sebep": "ONBELLEK"}
+        ad = re.sub(r"[^a-zA-Z0-9_.-]", "_", tanim["sorgu"])[:50]
+        hedef = os.path.join(MEDYA_ONBELLEK, f"{tanim['kimlik']}_{ad}.jpg")
+        # ⚠ ONBELLEK PROVENANCE'I DA SAKLAR. Ilk surumde yalniz DOSYA
+        # onbellekleniyordu; ikinci kosumda telif/atif bilgisi olmadigi icin
+        # kural dogru sekilde REDDEDIYORDU (ONBELLEK-PROVENANCE-YOK).
+        # Kusur kuralda degil onbellekteydi: kunye dosyanin YANINA yazilir.
+        kunye_yolu = hedef + ".kunye.json"
+        onbellekte = (os.path.exists(hedef) and os.path.getsize(hedef) > 10000
+                      and os.path.exists(kunye_yolu))
+        if onbellekte:
+            try:
+                with open(kunye_yolu, encoding="utf-8") as f:
+                    _kunye = json.load(f)
+            except (ValueError, OSError):
+                _kunye = {}
+            son = {"ok": bool(_kunye.get("lisans")
+                              and _kunye.get("eser_sahibi")),
+                   "kullanilan_saglayici": "ONBELLEK",
+                   "failover_sn": 0.0, "metadata_bulundu": 0,
+                   "bayt_indirildi": 0, "denemeler": [], "onbellekten": True,
+                   "aday": dict(_kunye, yol=hedef)}
         else:
-            ind = commons.indir(aday, hedef)
-        if not ind.get("ok"):
-            kayit["durum"] = "INDIRME-BASARISIZ"
-            kayit["sebep"] = str(ind.get("sebep"))[:120]
-            # ⚠ SEBEP AYRIMI ONEMLI: lisans/provenance reddi ile AG/HIZ
-            # SINIRI ayni sey degil. Ikincisi ortam kaynaklidir ve motorun
-            # kusuru degildir; rapor bunu ayirt edilebilir yazar.
-            kayit["http"] = ind.get("http")
-            kayit["retry_after"] = ind.get("retry_after")
-            kayit["sinif"] = ("AG-HIZ-SINIRI"
-                              if ind.get("http") == 429
-                              or "429" in str(ind.get("sebep", ""))
-                              else "INDIRME")
+            son = edinim.edin(
+                tanim["sorgu"], hedef, en_az_genislik=1920, kesici=kesici,
+                onbellek=onbellek,
+                saglayicilar=[
+                    {"ad": "commons", "modul": commons,
+                     "sorgu": tanim["sorgu"] + " Iceland"},
+                    {"ad": "nasa", "modul": nasa, "sorgu": tanim["sorgu"]}],
+                olcu_okuyucu=_olcu_oku)
+        kayit = {"kimlik": tanim["kimlik"], "sorgu": tanim["sorgu"],
+                 "saglayici": son.get("kullanilan_saglayici"),
+                 "failover_sn": son.get("failover_sn"),
+                 "metadata_bulundu": son.get("metadata_bulundu"),
+                 "bayt_indirildi": son.get("bayt_indirildi"),
+                 "onbellekten": bool(son.get("onbellekten")),
+                 "denemeler": son.get("denemeler"),
+                 "devre": son.get("devre")}
+        if not son.get("ok"):
+            kayit["durum"] = "BLOKE"
+            kayit["sebep"] = "hicbir saglayici GERCEK BAYT veremedi"
+            kayit["sinif"] = "TUM-SAGLAYICILAR-DUSTU"
             rapor["sahneler"].append(kayit)
             secilen.append(None)
             continue
-        aday = dict(aday)
-        aday["asset_id"] = f"{tanim['kimlik']}_{abs(hash(aday['orijinal_url'])) % 10**8}"
+        aday = dict(son["aday"])
+        if onbellekte and not aday.get("lisans"):
+            # Onbellekten geldi ama provenance yok -> KESIN RED.
+            kayit["durum"] = "ONBELLEK-PROVENANCE-YOK"
+            rapor["sahneler"].append(kayit)
+            secilen.append(None)
+            continue
+        if not onbellekte:
+            with open(kunye_yolu, "w", encoding="utf-8") as f:
+                json.dump({k2: v for k2, v in aday.items()
+                           if k2 != "yol"}, f, ensure_ascii=False)
+        aday["asset_id"] = f"{tanim['kimlik']}_{abs(hash(aday.get('orijinal_url') or hedef)) % 10**8}"
         aday["yol"] = hedef
         aday["detay_std"] = gorsel_detay(hedef)
+        olcu = _olcu_oku(hedef)
+        aday["genislik"], aday["yukseklik"] = olcu
         kayit.update({"durum": "OK", "asset_id": aday["asset_id"],
-                      "baslik": aday["baslik"], "lisans": aday["lisans"],
-                      "eser_sahibi": aday["eser_sahibi"],
-                      "olcu": [aday["genislik"], aday["yukseklik"]],
-                      "detay_std": aday["detay_std"],
-                      "orijinal_url": aday["orijinal_url"],
-                      "indirme": ind.get("sebep") or "indirildi",
-                      "dayanak": ("cumle bu varligin Commons basligindaki "
-                                  "yeri betimliyor")})
+                      "baslik": aday.get("baslik"),
+                      "lisans": aday.get("lisans"),
+                      "eser_sahibi": aday.get("eser_sahibi"),
+                      "olcu": list(olcu), "detay_std": aday["detay_std"],
+                      "orijinal_url": aday.get("orijinal_url"),
+                      "dayanak": "cumle bu varligin KENDI basligini betimliyor"})
         if aday["detay_std"] < DETAY_ESIGI:
             kayit["durum"] = "DETAY-ESIK-ALTI"
             rapor["sahneler"].append(kayit)
@@ -388,9 +419,23 @@ def medya_edin():
         secilen.append(aday)
     rapor["basarili"] = sum(1 for s in secilen if s)
     rapor["dort_k_uygun"] = bool(
-        secilen and all(s and s["genislik"] >= commons.DORT_K_EN_AZ_GENISLIK
-                        for s in secilen))
+        secilen and all(s and s["genislik"] >= 3840 for s in secilen))
+    rapor["en_hizli_failover_sn"] = min(
+        [k["failover_sn"] for k in rapor["sahneler"]
+         if k.get("failover_sn") is not None] or [None])
+    rapor["devre_ozeti"] = kesici.ozet()
     return secilen, rapor
+
+
+def _olcu_oku(yol):
+    """Indirilen dosyanin GERCEK piksel olcusu — arama beyanina guvenilmez."""
+    r = kos(["ffprobe", "-v", "error", "-select_streams", "v:0",
+             "-show_entries", "stream=width,height", "-of", "csv=p=0", yol], 60)
+    try:
+        g, y = (r.stdout or "0,0").strip().split(",")[:2]
+        return int(g), int(y)
+    except (ValueError, IndexError):
+        return 0, 0
 
 
 def video_broll_ara():
@@ -599,14 +644,26 @@ def main() -> int:
     secilen, medya_rapor = medya_edin()
     eksik = [s for s in secilen if s is None]
     print(f"\n[2/7] MEDYA EDINIMI (Wikimedia Commons, anahtarsiz, $0.00)")
+    print(f"      mimari: {medya_rapor['mimari']}")
+    print(f"      zincir: {medya_rapor['saglayici_sirasi']} | atlanan: "
+          f"{[a['ad'] + '=' + a['sebep'][:32] for a in medya_rapor['atlanan_saglayicilar']]}")
     for k in medya_rapor["sahneler"]:
         if k["durum"] == "OK":
-            print(f"      {k['kimlik']} {k['durum']:<8} {k['olcu'][0]}x{k['olcu'][1]} "
-                  f"{k['lisans']:<10} {k['eser_sahibi'][:22]:<22} "
-                  f"detay={k['detay_std']}")
-            print(f"           {k['baslik'][:72]}")
+            print(f"      {k['kimlik']} OK  [{k['saglayici']:<8}] "
+                  f"{k['olcu'][0]}x{k['olcu'][1]} {k['lisans']:<12} "
+                  f"{str(k['eser_sahibi'])[:18]:<18} detay={k['detay_std']} "
+                  f"failover={k['failover_sn']}s")
+            print(f"           {str(k['baslik'])[:70]}")
+            for d in (k.get("denemeler") or []):
+                print(f"             - {d['saglayici']:<9} {d['durum']:<12} "
+                      f"meta={d['metadata']:<3} sn={d['sn']} "
+                      f"{str(d.get('sebep'))[:40]}")
         else:
-            print(f"      {k['kimlik']} {k['durum']:<8} {k.get('sebep', '')[:70]}")
+            print(f"      {k['kimlik']} {k['durum']:<8} {k.get('sebep', '')[:64]}")
+    print(f"      metadata toplam={sum(k.get('metadata_bulundu') or 0 for k in medya_rapor['sahneler'])} "
+          f"bayt toplam={sum(k.get('bayt_indirildi') or 0 for k in medya_rapor['sahneler'])} "
+          f"(AYRI sayilir)")
+    print(f"      devre: {medya_rapor['devre_ozeti']}")
     if eksik:
         # ⚠ BLOKE KANITI IZLENEN BIR RAPORA YAZILIR. "Denedik olmadi" demek
         # yetmez; NE denendigi, NEYIN gectigi ve NEREDE durduldugu sayilabilir
@@ -621,6 +678,7 @@ def main() -> int:
             "konu_metni": KONU_METNI,
             "konsept": konsept, "stil": stil,
             "medya": medya_rapor, "siniflandirma": sinif,
+            "edinim_mimarisi": medya_rapor.get("mimari"),
             "sahte_medya_uretildi_mi": False,
             "video_broll": broll,
             "not": ("arama/metadata/lisans katmani calisti; duran sey "
@@ -1021,6 +1079,7 @@ def main() -> int:
         "yazi_cakismasi": (on_qa.get("olcumler", {}).get("kalite", {})
                            .get("yazi_cakismasi")),
         "video_broll": broll,
+        "medya_edinim": medya_rapor,
         "auto_siniflandirma": {
             "konu_metni": KONU_METNI,
             "tur_elle_verildi_mi": False,

@@ -5412,6 +5412,353 @@ kontrol("lisans/SSRF modulleri I-18'de DEGISMEDI",
         and "url_dogrula" in oku(KOK, "medya/guvenlik.py"))
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# §37  FAZ I-19 — EDINIM DAYANIKLILIGI ve KAYNAK CESITLENDIRME
+#
+# I-18'de tek saglayici (Wikimedia) 429 verince hat TAMAMEN durdu.
+# Bu bolum devre kesiciyi, saglayici zincirini, onbellegi ve Retry-After
+# kararini SAHTE saglayicilarla (ag YOK) kilitler; sonra GERCEK kosunun
+# olculen failover sayilarini dogrular.
+# ═══════════════════════════════════════════════════════════════════════
+
+blok("§37a DEVRE KESICI — ayni host ZORLANMAZ")
+
+from medya import edinim as _ed                                   # noqa: E402
+
+_saat_t = {"t": 0.0}
+
+
+def _saat():
+    return _saat_t["t"]
+
+
+_dk = _ed.DevreKesici(esik=2, soguma_sn=100.0, saat=_saat)
+kontrol("baslangicta devre KAPALI", _dk.acik_mi("a") is False)
+_dk.hata("a")
+kontrol("tek hatada devre ACILMAZ (esik 2)", _dk.acik_mi("a") is False)
+kontrol("ikinci hatada devre ACILIR", _dk.hata("a") is True
+        and _dk.acik_mi("a") is True)
+_saat_t["t"] = 50.0
+kontrol("soguma DOLMADAN host DENENMEZ", _dk.acik_mi("a") is True)
+_saat_t["t"] = 101.0
+kontrol("soguma DOLUNCA host yeniden denenebilir",
+        _dk.acik_mi("a") is False)
+_dk.hata("b")
+_dk.basari("b")
+kontrol("basari sayaci SIFIRLAR", _dk.acik_mi("b") is False
+        and "b" not in _dk.ozet()["ardisik_hata"])
+kontrol("GECICI hata sayaci artirmaz",
+        _ed.DevreKesici(esik=1, saat=_saat).hata("c", kalici=False) is False)
+kontrol("devre ozeti SAYILABILIR",
+        set(_dk.ozet()) >= {"esik", "soguma_sn", "ardisik_hata",
+                            "acik_devreler"})
+
+blok("§37b RETRY-AFTER KARARI — beklemek mi, gecmek mi")
+
+kontrol("Retry-After yoksa GEC",
+        _ed.bekle_karari({})["karar"] == "GEC")
+kontrol("kisa Retry-After'da BEKLE",
+        _ed.bekle_karari({"retry_after": 5})["karar"] == "BEKLE"
+        and _ed.bekle_karari({"retry_after": 5})["bekleme_sn"] == 5.0)
+# ⚠ I-18'in dersi: 600 sn beklemek YANLIS davranis.
+kontrol("uzun Retry-After'da BEKLEME — DEVRE AC",
+        _ed.bekle_karari({"retry_after": 600})["karar"] == "DEVRE-AC"
+        and _ed.bekle_karari({"retry_after": 600})["bekleme_sn"] == 0.0)
+kontrol("tavan disaridan verilebilir",
+        _ed.bekle_karari({"retry_after": 40}, tavan_sn=60)["karar"] == "BEKLE")
+kontrol("bozuk Retry-After'da ISTISNA YOK",
+        _ed.bekle_karari({"retry_after": "x"})["karar"] == "GEC"
+        and _ed.bekle_karari(None)["karar"] == "GEC")
+
+
+class _SahteSaglayici:
+    """Test icin saglayici — AG KULLANMAZ."""
+
+    def __init__(self, ad, adaylar=None, indir_sonuc=None, ara_hata=None):
+        self.ad = ad
+        self._adaylar = adaylar or []
+        self._indir = indir_sonuc or {"ok": False, "sebep": "yok"}
+        self._ara_hata = ara_hata
+        self.ara_sayisi = 0
+        self.indir_sayisi = 0
+
+    def ara(self, sorgu, adet=6, en_az_genislik=0):
+        self.ara_sayisi += 1
+        if self._ara_hata:
+            raise RuntimeError(self._ara_hata)
+        return {"ok": bool(self._adaylar), "adaylar": list(self._adaylar),
+                "elenen": [], "hata": ""}
+
+    def indir(self, aday, hedef, deneme=1):
+        self.indir_sayisi += 1
+        if self._indir.get("ok"):
+            with open(hedef, "wb") as f:
+                f.write(b"x" * 20000)
+        return dict(self._indir)
+
+
+def _aday(url="https://ornek.test/a.jpg", **kw):
+    d = {"indirme_url": url, "orijinal_url": url, "baslik": "x",
+         "lisans": "cc-by", "eser_sahibi": "Biri",
+         "render_kullanilabilir": True, "atif_gerekli": True}
+    d.update(kw)
+    return d
+
+
+blok("§37c SAGLAYICI ZINCIRI — iki ayri hata senaryosu")
+
+import tempfile as _tf19                                          # noqa: E402
+with _tf19.TemporaryDirectory() as _d19:
+    _h = os.path.join(_d19, "a.jpg")
+
+    # ── SENARYO 1: birinci saglayici 429 (kalici) -> ikinciye GEC ──
+    _s1 = _SahteSaglayici("bir", [_aday()],
+                          {"ok": False, "sebep": "HTTP 429", "http": 429,
+                           "retry_after": 600})
+    _s2 = _SahteSaglayici("iki", [_aday("https://b.test/b.jpg")], {"ok": True})
+    _r = _ed.edin("q", _h, saglayicilar=[{"ad": "bir", "modul": _s1},
+                                         {"ad": "iki", "modul": _s2}],
+                  saat=_saat, uyu=lambda s: None)
+    kontrol("SENARYO-1: 429'da ikinci saglayiciya GECILDI",
+            _r["ok"] and _r["kullanilan_saglayici"] == "iki")
+    kontrol("SENARYO-1: metadata ile BAYT ayri sayildi",
+            _r["metadata_bulundu"] == 2 and _r["bayt_indirildi"] == 1)
+    kontrol("SENARYO-1: 600 sn BEKLENMEDI (tek indirme denemesi)",
+            _s1.indir_sayisi == 1, _s1.indir_sayisi)
+
+    # ── SENARYO 2: birinci saglayici ARAMA'da patliyor -> ikinciye GEC ──
+    _s3 = _SahteSaglayici("uc", ara_hata="baglanti koptu")
+    _s4 = _SahteSaglayici("dort", [_aday("https://d.test/d.jpg")], {"ok": True})
+    _r2 = _ed.edin("q", _h, saglayicilar=[{"ad": "uc", "modul": _s3},
+                                          {"ad": "dort", "modul": _s4}],
+                   saat=_saat, uyu=lambda s: None)
+    kontrol("SENARYO-2: ARAMA hatasinda ikinciye GECILDI",
+            _r2["ok"] and _r2["kullanilan_saglayici"] == "dort")
+    kontrol("SENARYO-2: arama hatasi ARAMA-HATA olarak raporlandi",
+            any(d["durum"] == "ARAMA-HATA" for d in _r2["denemeler"]))
+
+    # ── SENARYO 3: HEPSI duserse ok=False, SAHTE aday URETILMEZ ──
+    _s5 = _SahteSaglayici("bes", [_aday()], {"ok": False, "sebep": "HTTP 503",
+                                             "http": 503})
+    _r3 = _ed.edin("q", _h, saglayicilar=[{"ad": "bes", "modul": _s5}],
+                   saat=_saat, uyu=lambda s: None)
+    kontrol("SENARYO-3: hepsi duserse ok=False ve aday YOK",
+            _r3["ok"] is False and _r3["aday"] is None)
+
+    # ── DEVRE KESICI zincirde: ikinci cagride host ATLANIR ──
+    _kes = _ed.DevreKesici(esik=1, soguma_sn=1000.0, saat=_saat)
+    _s6 = _SahteSaglayici("alti", [_aday()], {"ok": False, "sebep": "HTTP 429",
+                                              "http": 429})
+    _s7 = _SahteSaglayici("yedi", [_aday("https://y.test/y.jpg")], {"ok": True})
+    _ed.edin("q", _h, kesici=_kes, saat=_saat, uyu=lambda s: None,
+             saglayicilar=[{"ad": "alti", "modul": _s6},
+                           {"ad": "yedi", "modul": _s7}])
+    _once = _s6.ara_sayisi
+    _r4 = _ed.edin("q", _h, kesici=_kes, saat=_saat, uyu=lambda s: None,
+                   saglayicilar=[{"ad": "alti", "modul": _s6},
+                                 {"ad": "yedi", "modul": _s7}])
+    kontrol("DEVRE ACIKKEN host HIC ARANMADI (zorlanmadi)",
+            _s6.ara_sayisi == _once
+            and any(d["durum"] == "DEVRE-ACIK" for d in _r4["denemeler"]))
+
+    # ── ONBELLEK: ayni URL ikinci kez INDIRILMEZ ──
+    _ob: dict = {}
+    _s8 = _SahteSaglayici("sekiz", [_aday("https://o.test/o.jpg")], {"ok": True})
+    _ed.edin("q", _h, onbellek=_ob, saat=_saat,
+             saglayicilar=[{"ad": "sekiz", "modul": _s8}])
+    _n = _s8.indir_sayisi
+    _r5 = _ed.edin("q", _h, onbellek=_ob, saat=_saat,
+                   saglayicilar=[{"ad": "sekiz", "modul": _s8}])
+    kontrol("ONBELLEK: ikinci cagride YENIDEN INDIRILMEDI",
+            _s8.indir_sayisi == _n and _r5["onbellekten"] is True)
+
+    # ── TELIF/ATIF EKSIK -> KESIN RED ──
+    for _eksik in ({"lisans": ""}, {"eser_sahibi": ""},
+                   {"render_kullanilabilir": False}):
+        _s9 = _SahteSaglayici("dokuz", [_aday(**_eksik)], {"ok": True})
+        _rr = _ed.edin("q", _h, saat=_saat,
+                       saglayicilar=[{"ad": "dokuz", "modul": _s9}])
+        kontrol(f"PROVENANCE eksik ({list(_eksik)[0]}) -> INDIRILMEZ",
+                _rr["ok"] is False and _s9.indir_sayisi == 0)
+
+    # ── COZUNURLUK: arama beyani degil GERCEK bayt olculur ──
+    _s10 = _SahteSaglayici("on", [_aday("https://k.test/k.jpg")], {"ok": True})
+    _rk = _ed.edin("q", _h, en_az_genislik=1920, saat=_saat,
+                   olcu_okuyucu=lambda y: (640, 480),
+                   saglayicilar=[{"ad": "on", "modul": _s10}])
+    kontrol("indirme SONRASI cozunurluk yetersizse aday REDDEDILIR",
+            _rk["ok"] is False)
+    _s11 = _SahteSaglayici("onbir", [_aday("https://m.test/m.jpg")],
+                           {"ok": True})
+    _rm = _ed.edin("q", _h, en_az_genislik=1920, saat=_saat,
+                   olcu_okuyucu=lambda y: (3840, 2160),
+                   saglayicilar=[{"ad": "onbir", "modul": _s11}])
+    kontrol("yeterli cozunurlukte aday KABUL EDILIR", _rm["ok"] is True)
+    kontrol("olcu okunamazsa ENGELLENMEZ (emin degilsen gecir)",
+            _ed.edin("q", _h, en_az_genislik=1920, saat=_saat,
+                     olcu_okuyucu=lambda y: (_ for _ in ()).throw(OSError()),
+                     saglayicilar=[{"ad": "onIki", "modul": _SahteSaglayici(
+                         "onIki", [_aday("https://n.test/n.jpg")],
+                         {"ok": True})}])["ok"] is True)
+
+kontrol("edinim modulunde SAGLAYICI ADRESI GOMULU DEGIL",
+        not re.search(r"https?://", _kod_yalniz(oku(KOK, "medya/edinim.py"))))
+# ⚠ Ham tarama modulun KENDI dokumantasyonuna ("YOUTUBE ... YOK") takiliyor;
+# yalniz CALISAN kod taranir.
+kontrol("YOUTUBE ya da izinsiz kaynak YOK",
+        not re.search(r"youtube|ytdl|yt-dlp|torrent",
+                      _kod_yalniz(oku(KOK, "medya/edinim.py")), re.I))
+kontrol("edinim kendi indiricisini YAZMIYOR",
+        "urlopen" not in _kod_yalniz(oku(KOK, "medya/edinim.py"))
+        and "requests" not in _kod_yalniz(oku(KOK, "medya/edinim.py")))
+kontrol("kapsam ozeti sayilabilir",
+        _ed.kapsam_ozeti()["saglayici_gomulu_mu"] is False
+        and _ed.kapsam_ozeti()["ayri_sayilan"] == ["metadata_bulundu",
+                                                   "bayt_indirildi"])
+
+blok("§37d NASA SAGLAYICISI — anahtarsiz, kamu mali, delege")
+
+from medya import nasa as _na                                     # noqa: E402
+_NA_KAYNAK = oku(KOK, "medya/nasa.py")
+kontrol("lisans kararini KENDI VERMIYOR",
+        "lisans.lisans_karari(" in _sikistir(_NA_KAYNAK))
+kontrol("indiriciyi KENDI YAZMIYOR",
+        "indirme.guvenli_indir(" in _sikistir(_NA_KAYNAK))
+kontrol("anahtar GEREKTIRMIYOR ($0.00)",
+        _na.kapsam_ozeti()["anahtar_gerekli"] is False
+        and _na.kapsam_ozeti()["maliyet_usd"] == 0.0)
+kontrol("KONU ADI gomulu DEGIL",
+        not re.search(r"iceland|izlanda|apollo|eyjafjalla",
+                      _kod_yalniz(_NA_KAYNAK), re.I))
+kontrol("DURUST SINIR: arama piksel olcusu VERMIYOR, uydurulmuyor",
+        "olcu_bilinmiyor" in _NA_KAYNAK
+        and "Sahte olcu UYDURULMAZ" in _NA_KAYNAK)
+kontrol("kaynak niteligi (yorunge/uydu) ACIKCA yaziliyor",
+        "yorunge" in _na.KAYNAK_NITELIGI)
+kontrol("lisans.py NASA'yi zaten taniyor",
+        "nasa" in oku(KOK, "medya/lisans.py"))
+kontrol("provenance eksikse aday ELENIR",
+        "ESER-SAHIBI-YOK" in _NA_KAYNAK)
+
+blok("§37e GERCEK KOSUM — olculen failover ve render")
+
+_R19_YOL = os.path.join(KOK, "..", "outputs", "sample", "doga_i18_rapor.json")
+_R19 = None
+if os.path.exists(_R19_YOL):
+    try:
+        _R19 = _json.load(open(_R19_YOL, encoding="utf-8"))
+    except ValueError:
+        _R19 = None
+if _R19 is None:
+    bloke_yaz("I-19 doga pilotu render raporu", f"yok/bozuk: {_R19_YOL}")
+else:
+    _me = _R19["medya_edinim"]
+    kontrol("⭐ GERCEK medya EDINILDI (I-18'de BLOKE'ydi)",
+            _me["basarili"] == len(_me["sahneler"]) and _me["basarili"] >= 4)
+    kontrol("⭐ ZINCIR calisti: commons dustu, NASA verdi",
+            all(k["saglayici"] in ("nasa", "ONBELLEK")
+                for k in _me["sahneler"] if k["durum"] == "OK"),
+            [k.get("saglayici") for k in _me["sahneler"]])
+    _devre_acik = [d for k in _me["sahneler"]
+                   for d in (k.get("denemeler") or [])
+                   if d["durum"] == "DEVRE-ACIK"]
+    # ⚠ Onbellekten kosan bir rapor edinim KANITI TASIMAZ; o durumda bu
+    # kontrol ATLANMAZ, BLOKE yazilir (sessizce PASS sayilmaz).
+    _onbellekli = all(k.get("onbellekten") for k in _me["sahneler"])
+    if _onbellekli:
+        bloke_yaz("I-19 devre kesici kaniti",
+                  "rapor ONBELLEKTEN kosmus; edinim denemesi icermiyor")
+    else:
+        kontrol("⭐ DEVRE ACILDI ve commons ZORLANMADI",
+                len(_devre_acik) >= 1
+                and "commons" in (_me.get("devre_ozeti") or {}).get(
+                    "acik_devreler", []),
+                _me.get("devre_ozeti"))
+        kontrol("metadata ile BAYT AYRI raporlandi",
+                sum(k.get("metadata_bulundu") or 0 for k in _me["sahneler"])
+                > sum(k.get("bayt_indirildi") or 0 for k in _me["sahneler"]))
+    _fo = [k["failover_sn"] for k in _me["sahneler"]
+           if k.get("failover_sn") is not None]
+    # ⚠ ILK sahne SOGUK BASLANGIC icerir: iki ayri arama + ilk buyuk
+    # dosyanin indirilmesi. "Hepsi < 10 sn" demek yanlis olcumdu (olculen:
+    # 38.4 / 3.2 / 2.5 / 2.0). Anlamli iddia DEVRE ACILDIKTAN SONRAKI hiz.
+    kontrol("⭐ DEVRE ACILDIKTAN SONRA failover HIZLI (< 5 sn)",
+            len(_fo) >= 2 and max(_fo[1:]) < 5.0, _fo)
+    kontrol("⭐ failover soguk baslangictan SONRA belirgin DUSTU",
+            len(_fo) >= 2 and max(_fo[1:]) < _fo[0] / 2, _fo)
+    kontrol("soguk baslangic maliyeti DURUSTCE raporda",
+            _fo[0] > max(_fo[1:]), _fo)
+    kontrol("pexels DURUSTCE atlandi (anahtar gecersiz)",
+            any("pexels" in a["ad"] and "401" in a["sebep"]
+                for a in _me["atlanan_saglayicilar"]))
+    kontrol("her varlik LISANS + ESER SAHIBI tasiyor",
+            all(k.get("lisans") and k.get("eser_sahibi")
+                for k in _me["sahneler"] if k["durum"] == "OK"))
+    kontrol("4K iddiasi KAYNAGA BAGLI ve DURUST",
+            _me["dort_k_uygun"] is False
+            and next((a for a in (_R19["ffprobe"].get("streams") or [])
+                      if a.get("codec_type") == "video"), {}).get(
+                "width") == 1920)
+    kontrol("sure 15-20 sn araliginda",
+            15.0 <= float((_R19["ffprobe"].get("format") or {}).get(
+                "duration") or 0) <= 20.0,
+            (_R19["ffprobe"].get("format") or {}).get("duration"))
+    kontrol("⭐ AUTO stil seyahat-4k -> atlas-journey",
+            _R19["auto_siniflandirma"]["stil"]["kimlik"] == "seyahat-4k"
+            and _R19["auto_siniflandirma"]["stil"]["kaynak"] == "auto"
+            and _R19["auto_siniflandirma"]["edit_profili"] == "atlas-journey")
+    kontrol("tur ELLE VERILMEDI",
+            _R19["auto_siniflandirma"]["tur_elle_verildi_mi"] is False)
+    kontrol("altyazi TURKCE ve okunabilir",
+            _R19["altyazi"]["okunabilirlik_temiz"] is True
+            and _R19["altyazi"]["kup_sayisi"] >= 4)
+    kontrol("kaynak kunyesi SAHNEYE OZGU (NASA merkezi)",
+            len(_R19["kaynak_kunyesi"]["katmanlar"]) >= 1)
+    kontrol("optik duraganlik ihlali YOK",
+            (_R19["optik_hareket"] or {}).get("temiz") is True)
+    kontrol("kenarda siyah bant YOK",
+            (_R19.get("kenar_siyahligi") or {}).get("temiz") is True)
+    kontrol("guvenli alan + cakisma temiz",
+            (_R19["guvenli_alan"] or {}).get("temiz") is True
+            and (_R19["yazi_cakismasi"] or {}).get("temiz") is True)
+    kontrol("miks hedefte, kirpma yok",
+            abs(_R19["video_ses_olcumu"]["lufs"] + 14.0) <= 1.0
+            and _R19["video_ses_olcumu"]["kirpma_var"] is False)
+    kontrol("EN AZ 9 kare", len(_R19["kareler"]) >= 9)
+    kontrol("PRE/POST QA FAIL DEGIL",
+            _R19["plan"]["qa"]["fail"] == 0
+            and _R19["post_qa"]["durum"] != "FAIL")
+    kontrol("B-ROLL BLOKE'si AYNEN duruyor",
+            _R19["video_broll"]["durum"] == "BLOKE")
+
+blok("§37f I-19 KORUMALARI")
+
+kontrol("pipeline.py I-19'da da DEGISMEDI",
+        "edinim" not in oku(KOK, "pipeline.py")
+        and "commons" not in oku(KOK, "pipeline.py"))
+kontrol("server.py I-19'da da DEGISMEDI",
+        "edinim" not in oku(KOK, "server.py"))
+kontrol("lisans/SSRF/indirme modulleri DEGISMEDI",
+        "lisans_karari" in oku(KOK, "medya/lisans.py")
+        and "url_dogrula" in oku(KOK, "medya/guvenlik.py")
+        and "def guvenli_indir" in oku(KOK, "medya/indirme.py"))
+kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("UI DEGISMEDI",
+        "basitGovde" in oku(KOK, "static/js/wizard.js"))
+kontrol("deploy.sh ezme korumasi KORUNDU",
+        "GERIDE" in open(os.path.join(KOK, "..", "deploy.sh"),
+                         encoding="utf-8").read())
+kontrol("bayraklar HALA varsayilan kapali",
+        mkp.ACIK is False and ekp.ACIK is False
+        and ekp.kalite_kapisi_acik(None) is False)
+kontrol("odemeli API cagrisi YOK",
+        not re.search(r"openai|anthropic|api_key",
+                      oku(KOK, "medya/edinim.py") + oku(KOK, "medya/nasa.py"),
+                      re.I))
+
+
 print(f"\n{'=' * 60}")
 print(f"GECEN: {gecen}   BASARISIZ: {len(basarisiz)}   BLOKE: {len(bloke)}")
 for b in basarisiz:

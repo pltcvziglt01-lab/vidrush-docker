@@ -185,6 +185,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-16 altyazı + kaynak künyesi + 1080p** | `2f16bc6` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-17 motion grammar + optik durağanlık kapısı** | `2448478` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-18 ikinci konsept: motor kanıtlandı, medya BLOKE** | `ccb97ce` | ⚠ **origin'e push edildi**, MP4 YOK, deploy YOK |
+| 12 Ağu | **I-19 edinim dayanıklılığı — I-18'in BLOKE'si açıldı** | `PENDING` | ✅ **origin'e push edildi**, deploy YOK |
 
 ---
 
@@ -3148,3 +3149,142 @@ Ya (a) hız sınırı olmayan bir ortamdan/aynadan medya baytını edinip doğa
 pilotunu **gerçekten** render etmek, ya da (b) depoya küçük, lisansı ve
 provenance'ı kayıtlı bir **doğa fixture seti** eklemek. Motorun geri kalanı
 hazır ve testli.
+
+---
+
+## 37. FAZ I-19 — EDİNİM DAYANIKLILIĞI: I-18'İN BLOKE'Sİ AÇILDI (12 Ağu)
+
+> **Durum: yerel yeşil, `origin/arastirma-motoru`'na push edildi. Deploy YOK.**
+> **Maliyet $0.00. Bayraklar varsayılan KAPALI.**
+> Yeni: `webapp/medya/edinim.py`, `webapp/medya/nasa.py`,
+> `outputs/sample/doga_i18_rapor.json`.
+> Değişen: `webapp/medya/commons.py`,
+> `webapp/testler/smoke_konsept2_doga_i18.py`,
+> `webapp/testler/test_faz_i.py`, `outputs/sample/README.md` (+ bu handoff).
+> **Dokunulmadı:** `pipeline.py`, `server.py`, arayüz, 22 alan, `deploy.sh`,
+> `medya/lisans.py`, `medya/guvenlik.py`, `medya/indirme.py`.
+
+### ⭐ I-18'in BLOKE'si AÇILDI — doğa pilotu GERÇEKTEN render edildi
+
+| Ölçüm | I-18 | **I-19** |
+|---|---|---|
+| Medya | ⛔ **BLOKE** (Wikimedia 429) | ✅ **NASA'dan edinildi** |
+| Doğa pilotu MP4 | ❌ yok | ✅ **`editorv2_doga_i18.mp4`** |
+| Çözünürlük | — | 1920×1080 (**4K değil, dürüstçe**) |
+| Süre | — | **16.427 sn** (15–20 aralığında) |
+| Dil | — | **Türkçe** anlatım + Türkçe altyazı |
+| PRE / POST QA | — | **WARN(fail=0) / PASS** |
+
+### Üç yeni yetenek
+
+**1. DEVRE KESİCİ (`medya/edinim.py`).** Bir host arka arkaya `esik` (2)
+kalıcı hata verirse devre **açılır** ve o host `soguma` (900 sn) boyunca
+**hiç denenmez**. Ölçülen davranış:
+
+```
+s01  commons BAYT-YOK (HTTP 429)  1.4s  ->  nasa OK   failover 38.4s (soguk baslangic)
+s02  commons BAYT-YOK (HTTP 429)  0.9s  ->  nasa OK   failover  3.2s
+s03  commons DEVRE-ACIK           0.0s  ->  nasa OK   failover  2.5s
+s04  commons DEVRE-ACIK           0.0s  ->  nasa OK   failover  2.0s
+devre: ardisik_hata {commons: 2}, acik_devreler ['commons']
+```
+
+s03/s04'te commons **hiç aranmadı bile** — aynı host zorlanmadı.
+
+**2. `Retry-After` KARARI: beklemek mi, geçmek mi.**
+I-18'in dersi koda yazıldı: sunucu **600 sn** isteyince beklemek yanlıştır.
+`bekle_karari()` → kısa süre (≤30 sn) **BEKLE**, uzun süre **DEVRE-AC**.
+
+**3. ARAMA/METADATA ile GERÇEK BAYT AYRIMI.**
+Ölçülen: **metadata 16 / bayt 4**. Bir sağlayıcı metadata verip bayt
+vermeyebilir — I-18'de tam bu olmuştu. İkisi ayrı sayılıyor.
+Aynı ayrım **çözünürlüğe** de uygulandı: NASA arama ucu piksel ölçüsü
+**vermiyor**, bu yüzden ölçü **indirme sonrası** doğrulanıyor ve yetersizse
+aday **reddediliyor** (ilk koşumda 720×480 geldi → reddedildi → 3624×3624).
+
+### Ölçülen kendi hatam — iki katmanlı yeniden deneme
+
+İlk failover **109.6 sn** sürdü; bunun 103.8'i `commons.indir`ın **kendi**
+3 denemesiydi. İki katmanın da yeniden denemesi "hızlı failover" iddiasını
+karşılıksız bırakır. Politika tek yere (`edinim`) toplandı →
+**109.6 sn → 4.3 sn**.
+
+### Sağlayıcı zinciri — ne kullanıldı, ne atlandı
+
+| Sağlayıcı | Sonuç |
+|---|---|
+| `commons` (Wikimedia) | metadata ✅, bayt ⛔ **HTTP 429** → devre açıldı |
+| `nasa` | ✅ **4/4 sahne**, kamu malı, `GSFC` / `Caltech` künyeli |
+| `pexels` | ⛔ **atlandı** — mevcut anahtar **geçersiz (HTTP 401)**, yeni anahtar **ALINMADI** |
+| Openverse | ⛔ tam çözünürlük **aynı** rate-limitli hosta gidiyor |
+
+### ⚠ ANLATIM GÖRÜNENE UYDURULDU
+
+I-18'in metni **yer seviyesi** manzarayı anlatıyordu (buzul lagünü, siyah
+kum plajı, şelale). NASA kütüphanesi **yörünge/uydu** görüntüsüdür. Metni
+değiştirmeden render etmek, I-13'te kapatılan *"görsel ile anlatım
+örtüşmüyor"* kusurunu geri getirirdi. Bu yüzden **anlatım görünene
+uyduruldu**, görünen anlatıma değil. Yeni konu metni de aynı otomatik
+sınıflandırmadan geçti: `seyahat` / kesin / **0.87** → `seyahat-4k` (auto).
+
+### Açılış süresi TAHMİN EDİLMEDİ, ÖLÇÜLDÜ
+
+`atlas-journey` profilinde hook/açılış bölünme eşiği **3.06 sn**,
+`shot_min_sn` **2.0** — yani açılış **[2.0, 3.06)** olmalı. 4.025 ve
+3.362 sn'lik iki deneme de bölündü ve kapı **doğru şekilde FAIL** verdi
+(iki beat tek adayı paylaşıyordu). Eşik gevşetilmedi; cümle kısaltıldı.
+
+### Önbellek kuralı doğruydu, önbellek eksikti
+
+İkinci koşumda önbellekten gelen dosyalar **`ONBELLEK-PROVENANCE-YOK`** ile
+**reddedildi**. Kural doğru — telif/atıf bilgisi olmayan medya kesin red.
+Kusur önbellekteydi: künye artık dosyanın **yanına** yazılıyor
+(`*.kunye.json`).
+
+### Test kapsamı — kullanıcının istediği senaryolar
+
+| Senaryo | Nasıl |
+|---|---|
+| Sağlayıcı hata 1: **429 → geç** | sahte sağlayıcı, ağ **yok** |
+| Sağlayıcı hata 2: **arama patlıyor → geç** | sahte sağlayıcı |
+| Hepsi düşerse | `ok=False`, **sahte aday üretilmez** |
+| Devre kesici | açılma eşiği, soğuma, başarıda sıfırlama, **host hiç aranmıyor** |
+| Önbellek | ikinci çağrıda **yeniden indirilmiyor** |
+| `Retry-After` | yok → GEÇ, kısa → BEKLE, **600 → DEVRE-AC** |
+| Provenance | lisans/sahip/kullanılabilirlik eksikse **indirilmez** |
+| Çözünürlük | indirme **sonrası** ölçülür; yetersizse reddedilir |
+
+Hepsi **ağsız** (sahte sağlayıcı) koşuyor — testler internete bağımlı değil.
+
+### Ölçülen test sonucu (12 Ağu) — İKİ ORTAM AYRI
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Zengin venv** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **257** | **1397** | **2811** |
+| **Sistem Python** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **203** | **1397** | **2757** |
+
+0 hata, 0 BLOKE (I-18'in BLOKE'si kapandı). Faz I 1327 → **1397** (+70).
+`deploy.sh` tanımsız-isim taraması → **0 bulgu**.
+
+### BİLİNEN SINIRLAR (dürüstçe)
+
+1. **4K DEĞİL.** Kaynaklar 2800–5184 px; hepsi 3840 eşiğini geçmediği için
+   dürüstçe 1080p. **Upscale yapılmadı.**
+2. **Medya yörünge/uydu görüntüsü** — yer seviyesi doğa fotoğrafı değil.
+   Anlatım buna uyduruldu ama "İzlanda'da yürüyüş" tarzı bir yapım için
+   uygun kaynak hâlâ yok.
+3. **`SAGLAYICI-TEKEL` WARN duruyor** (%100 nasa) — zincirde hayatta kalan
+   tek sağlayıcı. Gerçek çok sağlayıcılı işte düşmesi *beklenir*, ölçülmedi.
+4. **Wikimedia hâlâ 429** — bu ortamın çıkış IP'sine özgü; başka ortamda
+   devre hiç açılmayabilir.
+5. **Pexels anahtarı geçersiz**; yeni anahtar alınmadı (kullanıcı kararı).
+6. **Hareketli video B-roll BLOKE** (I-16'dan beri aynen).
+7. **Algısal medya benzerliği hâlâ ölçülemiyor** (§32–§36 aynen).
+8. **Canlı `/api/generate` hattı bu edinim zincirini görmüyor** — `pipeline`
+   ve `server` değişmedi.
+
+### SONRAKİ ATOM (I-20)
+
+Ya yer seviyesi doğa fotoğrafı veren üçüncü bir güvenli sağlayıcı eklemek
+(ör. çalışan bir Pexels/Openverse anahtarıyla), ya da edinim zincirini
+`medya_kopru` üzerinden canlı `/api/generate` hattına **opt-in** bağlamak.

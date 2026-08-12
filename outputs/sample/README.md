@@ -1,9 +1,10 @@
 # EditorV2 render örnekleri
 
-Bu dizinde **beş** örnek var:
+Bu dizinde **altı** örnek var:
 
 | Dosya | Ne | Betik |
 |---|---|---|
+| `editorv2_doga_i18.mp4` | ⭐ **16.4 sn · 1080p · TÜRKÇE doğa/seyahat — Auto stil + gerçek web medyası** | `webapp/testler/smoke_konsept2_doga_i18.py` |
 | `editorv2_motion_i17.mp4` | ⭐ **17.6 sn · 1080p · belgesel motion grammar + optik durağanlık kapısı** | `webapp/testler/smoke_motion_grammar_i17.py` |
 | `editorv2_altyazi_1080p_i16.mp4` | 17.6 sn · 1080p · altyazılı + künyeli (I-16; b002 5.2 sn optik donuk) | `webapp/testler/smoke_altyazi_kunye_1080p_i16.py` |
 | `editorv2_kalite_pass_i15.mp4` | 12.8 sn Apollo belgeseli — kalite kapısı AÇIK ve PASS (720p, altyazısız) | `webapp/testler/smoke_kalite_pass_i15.py` |
@@ -12,7 +13,35 @@ Bu dizinde **beş** örnek var:
 
 ---
 
-# 0) ⭐ I-17 — belgesel motion grammar + optik durağanlık kapısı
+# 0) ⭐ I-18/I-19 — ikinci konsept: Türkçe doğa/seyahat, gerçek web medyası
+
+```bash
+python3 webapp/testler/smoke_konsept2_doga_i18.py
+```
+
+İlk beş örnek hep aynı Apollo fixture'ıydı. Bu, **ikinci konsept** ve
+**gerçekten edinilmiş** medyayla üretildi.
+
+| Ölçüm | Değer |
+|---|---|
+| Konu | kullanıcı **yalnız metin** verdi → `seyahat` / kesin / 0.87 |
+| Stil | **`seyahat-4k`** (kaynak `auto`) → edit profili **`atlas-journey`** |
+| Medya | **NASA** (kamu malı) — Wikimedia 429 verince devre açıldı |
+| Failover | 38.4 sn (soğuk başlangıç) → **2.0–3.2 sn** |
+| Anlatım | **Türkçe** (`tr-TR-AhmetNeural`), altyazı Türkçe |
+| Künye | sahneye özgü: `GSFC / NASA-PUBLIC`, `Caltech / NASA-PUBLIC` |
+| Çıktı | 1920×1080, 16.427 sn, LUFS −14.x, PRE WARN(0) / **POST PASS** |
+
+**Dürüst sınırlar:** çıktı **1080p, 4K değil** — kaynakların hepsi 3840 px
+eşiğini geçmiyor (2800–5184 px) ve **upscale yapılmadı**. Medya
+**yörünge/uydu** görüntüsüdür; anlatım buna uydurulmuştur (görüntüye
+uymayan yer-seviyesi metni kullanılmadı). Tek sağlayıcı hayatta kaldığı
+için `SAGLAYICI-TEKEL` WARN'ı duruyor. Hareketli B-roll hâlâ **BLOKE**.
+Pexels anahtarı **geçersiz** (HTTP 401) — yeni anahtar alınmadı.
+
+---
+
+# 0b) I-17 — belgesel motion grammar + optik durağanlık kapısı
 
 ```bash
 python3 webapp/testler/smoke_motion_grammar_i17.py
