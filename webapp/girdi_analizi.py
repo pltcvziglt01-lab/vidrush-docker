@@ -23,6 +23,26 @@ from __future__ import annotations
 import os
 import re
 
+# ⚠ FAZ I-2c — KONSEPT + BILESIK STIL KOPRUSU (YALNIZCA EK ALAN).
+# `taksonomi` (I-2a, 7 aile/33 dal) ve `stil_profili` (I-2b, 12 surumlu bilesik
+# profil) BU MODULDE akisa baglanir. Eski sozlesme AYNEN gecerlidir:
+# `TUR_SINYALI` hala 5 etiket, `tur_tespit()` / `GORSEL_STRATEJISI` /
+# `PIPELINE_TURU` yollari DEGISMEDI ve eski alanlarin hepsi uretilmeye devam
+# eder. Yeni bilgi SADECE `konsept` ve `stil_profili` anahtarlariyla EKLENIR.
+#
+# ⚠ HATTI COKERTMEZ: `server.py` bu modulu IMPORT ANINDA yukluyor. Bir alt
+# modul yuklenemezse `None` kalir ve `analiz()` eski sozlesmesini EKSIKSIZ
+# dondurur (testle kilitli). Ayrica ikisi de AG KULLANMAZ, PARA HARCAMAZ:
+# `siniflandir()` burada `model_coz` ALMADAN cagrilir -> %100 deterministik.
+try:
+    import taksonomi
+except Exception:  # pragma: no cover - ortam sorunu
+    taksonomi = None
+try:
+    import stil_profili
+except Exception:  # pragma: no cover - ortam sorunu
+    stil_profili = None
+
 # Olculen TTS hizi (pipeline `veri/ses_hizi.json` ile kendini kalibre ediyor;
 # burada yalnizca SURE TAHMINI icin taban deger kullaniliyor)
 VARSAYILAN_WPM = float(os.environ.get("ANALIZ_WPM", "160"))
@@ -179,6 +199,64 @@ def sure_oner(metin: str, girdi_tur: str, kelime: int) -> tuple:
     return 2.0, "konu verildi; anlatim uretilecek — varsayilan 2 dk"
 
 
+def konsept_coz(metin: str) -> dict:
+    """Hiyerarsik konsept tespiti (`taksonomi.siniflandir`). Modul yoksa {}.
+
+    ⚠ `model_coz` VERILMEZ -> ag yok, para yok, sonuc deterministik.
+    ⚠ Istisna yukari SIZMAZ: analiz hatti bu yuzden cokmez, hata gorunur olur.
+    """
+    if taksonomi is None:
+        return {}
+    try:
+        return taksonomi.siniflandir(metin)
+    except Exception as e:
+        return {"_hata": f"{type(e).__name__}: {str(e)[:120]}"}
+
+
+def _eski_edit_bicimi(profil) -> dict:
+    """Bilesik profili eski `EDIT_STILLERI` bicimine cevir (`_profil` dahil)."""
+    if stil_profili is None or not isinstance(profil, dict):
+        return {}
+    try:
+        return stil_profili.eski_edit_stiline(profil)
+    except Exception:
+        return {}
+
+
+def stil_coz(konsept: dict = None, kullanici_stili: str = None) -> dict:
+    """Bilesik stil profili cozumu (`stil_profili.coz`). Modul yoksa {}.
+
+    ⚠ KULLANICI SECIMI AUTO'YU YENER — sira `coz()` icinde uygulanir.
+    Donus TASINABILIR ozettir; melez turetmenin 44 alanlik ayrinti dokumu
+    `/api/analiz` govdesini gereksiz sisirecegi icin ozete indirgenir
+    (ebeveyn, agirlik, alan sayisi, uyari korunur — kara kutu yok).
+    """
+    if stil_profili is None:
+        return {}
+    try:
+        c = stil_profili.coz(kullanici_stili=kullanici_stili or None,
+                             konsept=konsept or None)
+    except Exception as e:
+        return {"_hata": f"{type(e).__name__}: {str(e)[:120]}"}
+    t = c.get("turetme")
+    return {
+        "kimlik": c.get("kimlik"),
+        "surum": c.get("surum"),
+        "sema_surum": getattr(stil_profili, "SEMA_SURUM", ""),
+        "kaynak": c.get("kaynak"),
+        "gerekce": c.get("gerekce"),
+        "uyari": list(c.get("uyari") or []),
+        "profil": c.get("profil"),
+        "turetme": ({"ebeveyn": t.get("ebeveyn"), "agirlik": t.get("agirlik"),
+                     "alan_sayisi": t.get("alan_sayisi"),
+                     "ozet": t.get("ozet"), "uyari": t.get("uyari")}
+                    if isinstance(t, dict) else None),
+        # Uretim hattinin okudugu bicim; `_profil` blogu eski bicime sigmayan
+        # boyutlari (palet/ses/kanit/qa/gecis/dagitim) birlikte tasir.
+        "eski_edit": _eski_edit_bicimi(c.get("profil")),
+    }
+
+
 def analiz(metin: str, *, kullanici_secimi: dict = None) -> dict:
     """Tam analiz + otomatik secimler.
 
@@ -214,6 +292,19 @@ def analiz(metin: str, *, kullanici_secimi: dict = None) -> dict:
     _ata("gorsel_strateji", strateji, strateji_gerekce)
     _ata("dil", dil or "tr", dil_gerekce)
 
+    # ── FAZ I-2c: KONSEPT + BILESIK STIL (EK ALAN) ──
+    konsept = konsept_coz(metin)
+    stil = stil_coz(konsept, secim.get("edit"))
+    # ⚠ Stil onerisi YALNIZCA gercek bir sinyal varken uretilir. `kaynak`
+    # "varsayilan" ise (yani ne kullanici sectI ne de konsept guvenilir cikti)
+    # oneri YAZILMAZ: aksi halde hicbir sinyali olmayan her is icin uretim
+    # hattinin kendi varsayilanini sessizce baska bir profille degistirmis
+    # olurduk. Emin degilsen karisma — eski davranis kalir.
+    if stil.get("kimlik") and stil.get("kaynak") in ("kullanici", "auto",
+                                                     "turetilmis"):
+        _ata("edit", stil["kimlik"],
+             stil.get("gerekce") or "bileşik stil profili çözüldü")
+
     return {
         "girdi_turu": gtur,
         "kelime_sayisi": kelime,
@@ -224,11 +315,19 @@ def analiz(metin: str, *, kullanici_secimi: dict = None) -> dict:
         "riskler": riskler,
         "otomatik_secimler": otomatik,
         "korunan_secimler": korunan,
+        # ── FAZ I-2c EK ALANLARI (eski alanlarin HICBIRI degismedi) ──
+        # `konsept`: 7 aile / 33 dal hiyerarsik tespit + olculen kanit
+        # `stil_profili`: surumlu bilesik profil cozumu + eski bicim koprusu
+        # Modul yoksa ikisi de {} olur; eski sozlesme yine eksiksiz doner.
+        "konsept": konsept,
+        "stil_profili": stil,
         "gerekceler": {
             "girdi_turu": gtur_gerekce,
             "dil": dil_gerekce,
             "icerik_turu": tur_gerekce,
             "sure": sure_gerekce,
             "gorsel_strateji": strateji_gerekce,
+            "konsept": konsept.get("gerekce", ""),
+            "stil_profili": stil.get("gerekce", ""),
         },
     }

@@ -927,8 +927,8 @@ _pp = oku(KOK, "pipeline.py")
 _kayip = [k for k in sp.ESKI_EDIT_ESLEME if f'"{k}": {{' not in _pp]
 kontrol("ESKI_EDIT_ESLEME anahtarlari pipeline.EDIT_STILLERI'nde GERCEKTEN var",
         not _kayip, str(_kayip))
-kontrol("pipeline.py BU ADIMDA stil_profili'ni import ETMIYOR (I-2c isi)",
-        "stil_profili" not in _pp)
+kontrol("pipeline.py stil_profili'ni GUVENLI (try/except) import ediyor — I-2c",
+        "import stil_profili" in _pp and "stil_profili = None" in _pp)
 _ap = {y.split(".")[0] for y in tx.AGAC} | set(tx.AGAC)
 _gecersiz = [k for k in sp.KONSEPT_PROFIL if k not in _ap]
 kontrol("KONSEPT_PROFIL anahtarlari taksonomide GERCEKTEN var",
@@ -944,6 +944,309 @@ try:
     kontrol("stil_profili.py derleniyor", True)
 except Exception as e:
     kontrol("stil_profili.py derleniyor", False, str(e)[:140])
+
+
+# ═══════════════ 15. FAZ I-2c — AKISA BAGLAMA (EK ALAN, GERILEME YOK) ═══════════════
+# ⚠ BU BOLUMUN IDDIASI: taksonomi (I-2a) + stil_profili (I-2b) `analiz()`
+# sozlesmesine YALNIZCA EK ALAN olarak baglandi ve uretim hatti `_profil`
+# blogunu GUVENLI/OPSIYONEL tuketiyor. Eski girdilerde davranis DEGISMEDI.
+# Ag yok, para yok: `siniflandir()` model_coz ALMADAN cagriliyor.
+blok("15. I-2c — girdi_analizi ek alanlari + geriye uyumluluk")
+
+import json                                          # noqa: E402
+
+_BELGESEL = ("John D. Rockefeller ve Standard Oil'in yukselisi: 1870'te "
+             "kurulan sirketin 1911'deki mahkeme kararıyla parcalanmasina "
+             "uzanan tarih, arsiv belgeleriyle anlatiliyor.")
+
+_a = ga.analiz(_BELGESEL)
+
+# ── (a) ESKI SOZLESME: tek bir alan bile kaybolmadi ──
+ESKI_ALANLAR = {"girdi_turu", "kelime_sayisi", "dil", "icerik_turu",
+                "tur_puanlari", "varliklar", "riskler", "otomatik_secimler",
+                "korunan_secimler", "gerekceler"}
+kontrol("eski analiz() alanlarinin HEPSI duruyor",
+        ESKI_ALANLAR <= set(_a), str(ESKI_ALANLAR - set(_a)))
+ESKI_GEREKCE = {"girdi_turu", "dil", "icerik_turu", "sure", "gorsel_strateji"}
+kontrol("eski gerekce anahtarlari duruyor",
+        ESKI_GEREKCE <= set(_a["gerekceler"]),
+        str(ESKI_GEREKCE - set(_a["gerekceler"])))
+kontrol("eski otomatik secim anahtarlari duruyor",
+        {"tur", "sure_dk", "gorsel_strateji", "dil"} <= set(_a["otomatik_secimler"]),
+        str(set(_a["otomatik_secimler"])))
+kontrol("eski DEGERLER degismedi: konu -> varsayilan 2 dk",
+        _a["otomatik_secimler"]["sure_dk"]["deger"] == 2.0)
+kontrol("eski DEGERLER degismedi: belgesel -> documentary",
+        _a["otomatik_secimler"]["tur"]["deger"] == "documentary")
+kontrol("eski DEGERLER degismedi: gorsel strateji gercek footage",
+        _a["otomatik_secimler"]["gorsel_strateji"]["deger"] == "gercek-footage")
+_au = ga.analiz(("The Endurance expedition began in 1914. " * 12)
+                + "The crew survived.")
+kontrol("uzun metin HALA 'tam-metin'", _au["girdi_turu"] == "tam-metin")
+kontrol("tam metinde sure HALA olcumden geliyor",
+        "kelime" in _au["gerekceler"]["sure"])
+kontrol("otomatik secimlerin HEPSINDE gerekce var (yeni 'edit' dahil)",
+        all(v.get("gerekce") for v in _a["otomatik_secimler"].values()),
+        str([k for k, v in _a["otomatik_secimler"].items() if not v.get("gerekce")]))
+_ak = ga.analiz("Bali gezi rehberi plaj otel rota",
+                kullanici_secimi={"sure_dk": 8, "tur": "hikaye"})
+kontrol("kullanici secimi HALA korunuyor",
+        _ak["korunan_secimler"]["tur"]["deger"] == "hikaye"
+        and "tur" not in _ak["otomatik_secimler"])
+
+# ── (b) YENI EK ALANLAR ──
+kontrol("analiz() 'konsept' EK alanini donduruyor", "konsept" in _a)
+kontrol("analiz() 'stil_profili' EK alanini donduruyor", "stil_profili" in _a)
+kontrol("konsept gercekten siniflandirdi (belgesel ailesi)",
+        _a["konsept"].get("aile") == "belgesel", str(_a["konsept"].get("yol")))
+kontrol("konsept kararinda OLCULEN sayi var (kara kutu yok)",
+        any(c.isdigit() for c in _a["konsept"].get("gerekce", "")),
+        _a["konsept"].get("gerekce", "")[:80])
+kontrol("stil profili cozuldu ve SURUMLU",
+        _a["stil_profili"].get("kimlik") == "belgesel-sinematik"
+        and _a["stil_profili"].get("surum"),
+        str(_a["stil_profili"].get("kimlik")))
+kontrol("stil kaynagi AUTO (konsept sinyalinden)",
+        _a["stil_profili"].get("kaynak") == "auto",
+        str(_a["stil_profili"].get("kaynak")))
+kontrol("sema surumu raporlaniyor",
+        _a["stil_profili"].get("sema_surum") == sp.SEMA_SURUM)
+_ee = _a["stil_profili"].get("eski_edit") or {}
+kontrol("eski_edit ESKI EDIT_STILLERI alanlarinin hepsini uretiyor",
+        all(x in _ee for x in sp.ESKI_EDIT_ANAHTARLARI),
+        str([x for x in sp.ESKI_EDIT_ANAHTARLARI if x not in _ee]))
+kontrol("eski_edit icinde `_profil` blogu tasiniyor",
+        {"palet", "ses", "kanit", "qa", "gecis", "dagitim", "surum"}
+        <= set(_ee.get("_profil") or {}), str(sorted(_ee.get("_profil") or {})))
+kontrol("gerekcelere konsept + stil satiri EKLENDI",
+        _a["gerekceler"].get("konsept") and _a["gerekceler"].get("stil_profili"))
+
+# KULLANICI SECIMI AUTO'YU YENER
+_ku = ga.analiz(_BELGESEL, kullanici_secimi={"edit": "korku-gerilim"})
+kontrol("kullanici stili AUTO'yu yeniyor",
+        _ku["stil_profili"]["kimlik"] == "korku-gerilim"
+        and _ku["stil_profili"]["kaynak"] == "kullanici",
+        str(_ku["stil_profili"]["kimlik"]))
+kontrol("kullanici stili korunan_secimler'e yaziliyor",
+        _ku["korunan_secimler"].get("edit", {}).get("deger") == "korku-gerilim")
+_kb = ga.analiz(_BELGESEL, kullanici_secimi={"edit": "boyle-bir-stil-yok"})
+kontrol("BILINMEYEN kullanici stili sessizce yutulmuyor",
+        _kb["stil_profili"]["uyari"] and _kb["stil_profili"]["kaynak"] == "auto",
+        str(_kb["stil_profili"]["uyari"]))
+
+# ⚠ SINYAL YOKSA KARISMA: uretim hattinin kendi varsayilani KORUNUR
+_bs = ga.analiz("zzz qqq www yyy xxx vvv uuu ttt sss rrr")
+kontrol("sinyalsiz metinde stil kaynagi VARSAYILAN",
+        _bs["stil_profili"].get("kaynak") == "varsayilan",
+        str(_bs["stil_profili"].get("kaynak")))
+kontrol("sinyalsiz metinde 'edit' OTOMATIK SECILMIYOR (hat varsayilani duruyor)",
+        "edit" not in _bs["otomatik_secimler"], str(sorted(_bs["otomatik_secimler"])))
+kontrol("sinyalsiz metinde konsept BELIRSIZ diyor (zorla etiket yok)",
+        _bs["konsept"].get("yol") == "belirsiz", str(_bs["konsept"].get("yol")))
+
+# ── (c) DAYANIKLILIK: modul yoksa / patlarsa eski sozlesme AYNEN doner ──
+_yedek = (ga.taksonomi, ga.stil_profili)
+try:
+    ga.taksonomi, ga.stil_profili = None, None
+    _ay = ga.analiz(_BELGESEL)
+    kontrol("modul YOKKEN eski alanlarin hepsi yine doner",
+            ESKI_ALANLAR <= set(_ay), str(ESKI_ALANLAR - set(_ay)))
+    kontrol("modul YOKKEN ek alanlar BOS (uydurma yok)",
+            _ay["konsept"] == {} and _ay["stil_profili"] == {})
+    kontrol("modul YOKKEN 'edit' onerisi URETILMIYOR",
+            "edit" not in _ay["otomatik_secimler"])
+    kontrol("modul YOKKEN eski degerler ayni",
+            _ay["otomatik_secimler"]["sure_dk"]["deger"] == 2.0
+            and _ay["icerik_turu"] == _a["icerik_turu"])
+
+    class _Patlayan:
+        SEMA_SURUM = "1.0.0"
+
+        @staticmethod
+        def siniflandir(_m, **_k):
+            raise RuntimeError("kasitli patlama")
+
+        @staticmethod
+        def coz(**_k):
+            raise RuntimeError("kasitli patlama")
+
+    ga.taksonomi, ga.stil_profili = _Patlayan, _Patlayan
+    _ap = ga.analiz(_BELGESEL)
+    kontrol("alt modul PATLARSA analiz cokmuyor", ESKI_ALANLAR <= set(_ap))
+    kontrol("patlama SESSIZ degil, `_hata` ile gorunur",
+            "_hata" in _ap["konsept"] and "_hata" in _ap["stil_profili"],
+            str(_ap["konsept"])[:80])
+finally:
+    ga.taksonomi, ga.stil_profili = _yedek
+
+# ⚠ "Ucretsiz" iddiasi DIZE TARAMASIYLA YETINMEZ: modele giden TEK yol
+# `siniflandir(..., model_coz=...)` anahtar argumanidir. Once o arguman
+# kaynakta hic gecmiyor mu diye bakilir, sonra CAGRI CASUSLANARAK olculur.
+kontrol("konsept koprusu AG kutuphanesi kullanmiyor (ucretsiz)",
+        all(x not in oku(KOK, "girdi_analizi.py")
+            for x in ("requests", "openai.com", "http://", "https://",
+                      "urllib", "model_coz=")))
+_casus = {}
+_yedek2 = ga.taksonomi
+
+
+class _Casus:
+    @staticmethod
+    def siniflandir(metin, **kw):
+        _casus.update(kw)
+        return {"yol": "belgesel.tarih", "aile": "belgesel", "guven": 0.7,
+                "durum": "kesin", "ikincil": None, "gerekce": "casus 1 kanit"}
+
+
+try:
+    ga.taksonomi = _Casus
+    ga.analiz(_BELGESEL)
+finally:
+    ga.taksonomi = _yedek2
+kontrol("siniflandir MODEL ARGUMANI ALMADAN cagriliyor (olculdu)",
+        "model_coz" not in _casus, str(sorted(_casus)))
+# ⚠ KATI serilestirme: `default=` KULLANILMAZ. Gevsek bir donusturucu,
+# `/api/analiz`i calisma aninda 500 verecek bir tipi TESTTE gizlerdi.
+try:
+    _govde = json.dumps(_a, ensure_ascii=False)
+    kontrol("analiz ciktisi KATI JSON'a serilestirilebiliyor (/api/analiz govdesi)",
+            bool(_govde))
+except Exception as e:
+    kontrol("analiz ciktisi KATI JSON'a serilestirilebiliyor (/api/analiz govdesi)",
+            False, f"{type(e).__name__}: {str(e)[:100]}")
+_a2 = ga.analiz(_BELGESEL)
+kontrol("analiz DETERMINISTIK (ayni girdi -> ayni cikti)",
+        json.dumps(_a, sort_keys=True, ensure_ascii=False)
+        == json.dumps(_a2, sort_keys=True, ensure_ascii=False))
+
+
+blok("15b. I-2c — pipeline `_profil` tuketimi (GUVENLI/OPSIYONEL)")
+
+# Statik kilitler (pipeline import edilemese de kosar)
+kontrol("pipeline `_profil` icin GUVENLI okuyucu tanimliyor",
+        "def profil_ek_oku(" in _pp)
+kontrol("okuyucu istisna firlatmiyor (try/except)",
+        "except Exception:\n        return {}" in _pp)
+kontrol("profil_coz opsiyonel `ek_profil` aliyor",
+        "def profil_coz(tur, edit_id, ek_profil=None)" in _pp)
+kontrol("kunye YALNIZCA `_profil` varken yaziliyor",
+        'if _stil_ek:' in _pp and 'sonuc["stil_profili"]' in _pp)
+kontrol("mevcut sonuc alanlari KORUNDU (gerileme yok)",
+        all(x in _pp for x in ('sonuc["kare_kapisi"]', 'sonuc["medya_kapisi"]',
+                               'sonuc["qa"]', '"atiflar": kaynak.atif_listesi()')))
+
+# Gercek fonksiyonel kosum — pipeline import edilebiliyorsa
+_pkok = os.path.join(KOK, "..", "cikti", "_i2c_kok")
+try:
+    os.makedirs(_pkok, exist_ok=True)
+    _uret_kaynak = os.path.join(KOK, "..", "app", "uret.py")
+    if os.path.exists(_uret_kaynak):
+        import shutil as _sh
+        _sh.copy(_uret_kaynak, os.path.join(_pkok, "uret.py"))
+    os.environ["VIDRUSH_KOK"] = os.path.abspath(_pkok)
+    import pipeline as _pl                            # noqa: E402
+
+    # ⚠ GERILEME KANITI: eski kimliklerin hepsi BIREBIR AYNI NESNE doner.
+    _fark = [k for k in _pl.EDIT_STILLERI
+             if _pl.profil_coz("documentary", k) is not _pl.EDIT_STILLERI[k]]
+    kontrol("ESKI stil kimlikleri BIREBIR ayni sozlugu donduruyor",
+            not _fark, str(_fark))
+    kontrol("bos/None edit_id eski varsayilani donduruyor",
+            _pl.profil_coz("documentary", "") is _pl.EDIT_STILLERI[_pl.VARSAYILAN_EDIT]
+            and _pl.profil_coz("documentary", None)
+            is _pl.EDIT_STILLERI[_pl.VARSAYILAN_EDIT])
+    kontrol("hikaye/animasyon yollari DEGISMEDI",
+            _pl.profil_coz("hikaye", None)
+            is _pl.HIKAYE_STILLERI[_pl.VARSAYILAN_HIKAYE]
+            and _pl.profil_coz("animasyon", None)
+            is _pl.ANIMASYON_STILLERI[_pl.VARSAYILAN_ANIM])
+    kontrol("eski kimlikte `_profil` YOK -> kunye de yazilmaz",
+            _pl.profil_ek_oku(_pl.profil_coz("documentary", "sinematik-belgesel")) == {})
+
+    # YENI NESIL kimlik: bugune kadar SESSIZCE varsayilana dusuyordu
+    _yeni = _pl.profil_coz("documentary", "korku-gerilim")
+    kontrol("yeni-nesil stil kimligi GERCEKTEN cozuluyor",
+            _yeni["ad"] == sp.PROFIL["korku-gerilim"]["ad"], str(_yeni["ad"]))
+    kontrol("yeni-nesil stil artik sessizce varsayilana DUSMUYOR",
+            _yeni["ad"] != _pl.EDIT_STILLERI[_pl.VARSAYILAN_EDIT]["ad"])
+    kontrol("yeni bicimin tasiyamadigi eski alanlar TABANDAN geliyor",
+            _yeni.get("gorsel_ek") and _yeni.get("mag"),
+            str(sorted(set(_pl.EDIT_STILLERI[_pl.VARSAYILAN_EDIT]) - set(_yeni))))
+    kontrol("zorunlu eski alanlarin HEPSI dolu (KeyError riski yok)",
+            all(x in _yeni for x in sp.ESKI_EDIT_ANAHTARLARI))
+    kontrol("`_profil` blogu uretim hattina TASINIYOR",
+            {"palet", "ses", "kanit", "qa", "gecis", "dagitim"}
+            <= set(_pl.profil_ek_oku(_yeni)), str(sorted(_pl.profil_ek_oku(_yeni))))
+    kontrol("kunye icin stil kimligi tasiniyor",
+            _yeni.get("_stil_kimligi") == "korku-gerilim")
+    kontrol("motion degeri uretim hattinin BILDIGI bir deger",
+            _yeni["motion"] in {v["motion"] for v in _pl.EDIT_STILLERI.values()}
+            | {"hikaye"}, str(_yeni["motion"]))
+
+    # ⚠ OLCULEN BILINEN SINIR — testle KILITLI, sessiz kalmasin:
+    # EFEKT_TEMEL / GECIS_IMZASI tablolari ESKI kimliklerle anahtarli. Yeni
+    # kimlikte gorsel imza gelmiyor; kod bunu stderr'e YAZIYOR (I-2d isi).
+    kontrol("eski kimlik gorsel imzasini ALIYOR (karsilastirma tabani)",
+            len(_pl.EFEKT_TEMEL.get("sinematik-belgesel", [])) > 0
+            and _pl.GECIS_IMZASI.get("sinematik-belgesel"))
+    kontrol("yeni-nesil kimlikte gorsel imza YOK — bilinen sinir kilitlendi",
+            "korku-gerilim" not in _pl.EFEKT_TEMEL
+            and "korku-gerilim" not in _pl.GECIS_IMZASI)
+    kontrol("bu eksiklik SESSIZ degil, kod uyari basiyor",
+            "efekt/gecis imzasi tablosunda karsilik YOK" in _pp)
+    kontrol("efekt/gecis aramalari KeyError riski tasimiyor (.get ile)",
+            "EFEKT_TEMEL.get(edit_id" in _pp and "GECIS_IMZASI.get(edit_id" in _pp)
+
+    # BILINMEYEN kimlik: eski sessiz-varsayilan davranisi KORUNUR
+    _bil = _pl.profil_coz("documentary", "boyle-bir-stil-yok")
+    kontrol("bilinmeyen kimlik eski varsayilan davranisini KORUYOR",
+            _bil is _pl.EDIT_STILLERI[_pl.VARSAYILAN_EDIT])
+    kontrol("bilesik cevirici bilinmeyen kimlikte None donuyor",
+            _pl.bilesik_stile_cevir("boyle-bir-stil-yok") is None)
+    kontrol("bilesik cevirici bos kimlikte None donuyor",
+            _pl.bilesik_stile_cevir("") is None
+            and _pl.bilesik_stile_cevir(None) is None)
+
+    # Okuyucu HICBIR girdide patlamiyor
+    kontrol("profil_ek_oku bozuk girdilerde COKMUYOR",
+            all(_pl.profil_ek_oku(x) == {} for x in
+                (None, {}, {"_profil": "bozuk"}, {"_profil": None},
+                 {"_profil": 5}, "sozluk degil")))
+
+    # Modul yoksa: eski davranisa duser
+    _sp_yedek = _pl.stil_profili
+    try:
+        _pl.stil_profili = None
+        kontrol("stil_profili YOKKEN yeni kimlik eski varsayilana duser",
+                _pl.profil_coz("documentary", "korku-gerilim")
+                is _pl.EDIT_STILLERI[_pl.VARSAYILAN_EDIT])
+        kontrol("stil_profili YOKKEN cevirici None donuyor",
+                _pl.bilesik_stile_cevir("korku-gerilim") is None)
+    finally:
+        _pl.stil_profili = _sp_yedek
+
+    # Elle verilen ek_profil de taban uzerine yazilir
+    _elle = _pl.profil_coz("documentary", "sinematik-belgesel",
+                           ek_profil={"sahne_sn": 3, "_profil": {"surum": "9.9.9"}})
+    kontrol("elle verilen ek_profil TABAN uzerine yaziliyor",
+            _elle["sahne_sn"] == 3 and _elle.get("gorsel_ek"))
+    kontrol("elle verilen ek_profil kaydi BOZMUYOR",
+            _pl.EDIT_STILLERI["sinematik-belgesel"]["sahne_sn"] != 3)
+    kontrol("bos/gecersiz ek_profil tabani AYNEN birakir",
+            _pl.profil_coz("documentary", "sinematik-belgesel", ek_profil={})
+            is _pl.EDIT_STILLERI["sinematik-belgesel"]
+            and _pl.profil_coz("documentary", "sinematik-belgesel",
+                               ek_profil="bozuk")
+            is _pl.EDIT_STILLERI["sinematik-belgesel"])
+except Exception as e:
+    bloke_yaz("pipeline `_profil` fonksiyonel kosumu", f"{type(e).__name__}: {str(e)[:110]}")
+
+for f in ("girdi_analizi.py", "pipeline.py"):
+    try:
+        py_compile.compile(os.path.join(KOK, f), doraise=True)
+        kontrol(f"{f} derleniyor (I-2c sonrasi)", True)
+    except Exception as e:
+        kontrol(f"{f} derleniyor (I-2c sonrasi)", False, str(e)[:140])
 
 
 print(f"\n{'=' * 60}")

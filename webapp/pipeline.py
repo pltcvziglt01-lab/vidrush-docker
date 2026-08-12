@@ -33,6 +33,20 @@ import kaynak  # YT/Pexels footage + Magnific upscale
 import arastirma_kopru  # Faz H: arastirma motorunu bu hatta baglar (bkz. modul basligi)
 import qa_kopru         # Faz H: render sonrasi kalite kapisi (bkz. modul basligi)
 
+# ⚠ FAZ I-2c — BILESIK STIL PROFILI KOPRUSU (OPSIYONEL, HATTI COKERTMEZ).
+# `stil_profili.py` (Faz I-2b) surumlu/bilesik profil kaydidir. Bu hat onu
+# YALNIZCA eski `EDIT_STILLERI` sozlugunde BULUNMAYAN bir stil kimligi
+# geldiginde kullanir. Eski kimlikler (sinematik-belgesel, anlati-video-essay,
+# seyahat-belgeseli, veri-anlatisi, hizli-explainer) bu koddan HIC gecmez ->
+# ESKI GIRDILERDE DAVRANIS AYNEN KORUNUR (testle kilitli).
+# Modul yuklenemezse `None` kalir ve hat bugunku davranisina duser.
+try:
+    import stil_profili
+except Exception as _sp_hata:  # pragma: no cover - ortam sorunu
+    stil_profili = None
+    print(f"  stil_profili yuklenemedi, yalnizca eski stil sozlugu "
+          f"kullanilacak: {type(_sp_hata).__name__}", file=sys.stderr)
+
 OPENAI_KEY = os.environ.get("OPENAI_KEY", "")
 STUDYO = os.path.join(KOK_YOL, "render-studio")
 PUBLIC = os.path.join(STUDYO, "public")
@@ -1559,15 +1573,96 @@ def arkaplan_prompt(secim: str) -> str:
     return ek
 
 
-def profil_coz(tur, edit_id):
-    """tur: 'animasyon' -> ANIMASYON_STILLERI; 'hikaye' -> HIKAYE_STILLERI; digeri -> EDIT_STILLERI."""
+def profil_ek_oku(prof) -> dict:
+    """Stil sozlugundeki `_profil` blogunu GUVENLI oku (Faz I-2c).
+
+    `_profil`, eski `EDIT_STILLERI` bicimine SIGMAYAN boyutlari tasir
+    (palet, ses, kanit, qa, gecis, dagitim, surum).
+
+    ⚠ Eski stil girdilerinde bu blok YOKTUR -> `{}` doner ve cagiran taraf
+    bugunku davranisini AYNEN surdurur. Bozuk/eksik tipte de `{}` doner:
+    bu okuyucu HICBIR DURUMDA istisna firlatmaz.
+    """
+    try:
+        ek = (prof or {}).get("_profil")
+        return dict(ek) if isinstance(ek, dict) else {}
+    except Exception:
+        return {}
+
+
+def bilesik_stile_cevir(edit_id):
+    """Yeni-nesil (Faz I-2b) bilesik profil kimligini eski stil alanlarina cevir.
+
+    ⚠ NEDEN VAR: `EDIT_STILLERI` disindaki her kimlik bugune kadar SESSIZCE
+    `VARSAYILAN_EDIT`e dusuyordu — kullanici bambaska bir stil sectigini
+    saniyordu. Artik kimlik `stil_profili` kaydinda varsa GERCEKTEN o profille
+    uretilir; yoksa eski sessiz-varsayilan davranisi korunur.
+
+    Donus: eski bicimde stil sozlugu (`_profil` blogu dahil) ya da None.
+    ISTISNA FIRLATMAZ — cozulemezse cagiran taraf eski yolunu kullanir.
+    """
+    if not edit_id or stil_profili is None:
+        return None
+    try:
+        p = stil_profili.profil_al(edit_id)
+    except KeyError:
+        return None          # kayitta yok -> eski sessiz-varsayilan davranisi
+    except Exception as e:
+        print(f"  bilesik stil okunamadi ({edit_id}): {type(e).__name__}",
+              file=sys.stderr)
+        return None
+    try:
+        eski = stil_profili.eski_edit_stiline(p)
+    except Exception as e:
+        print(f"  bilesik stil eski bicime cevrilemedi ({edit_id}): "
+              f"{type(e).__name__}", file=sys.stderr)
+        return None
+    eski["_stil_kimligi"] = edit_id
+    print(f"  BILESIK STIL: '{edit_id}' v{p.get('surum')} kullaniliyor "
+          f"(sema {getattr(stil_profili, 'SEMA_SURUM', '?')})", file=sys.stderr)
+    # ⚠ OLCULEN EKSIK — SESSIZ KALMASIN: `EFEKT_TEMEL` ve `GECIS_IMZASI`
+    # tablolari ESKI kimliklerle anahtarlanmis durumda. Yeni-nesil bir kimlik
+    # geldiginde ikisi de varsayilanina duser (0 efekt, imzasiz sert kesme) —
+    # yani grain/vinyet/grade ve gecis imzasi UYGULANMAZ. Profil `_profil.gecis`
+    # icinde gecis bilgisini TASIYOR ama bu tablolara henuz baglanmadi (I-2d).
+    # Bunu bastan sesli soylemek, kullanicinin sebebini bilmedigi bir kalite
+    # dususu yasamasindan iyidir.
+    if edit_id not in EFEKT_TEMEL or edit_id not in GECIS_IMZASI:
+        print(f"  ⚠ '{edit_id}' icin efekt/gecis imzasi tablosunda karsilik YOK "
+              f"-> efekt={len(EFEKT_TEMEL.get(edit_id, []))}, "
+              f"gecis imzasi yok. Tempo/footage/altyazi profilden GELIYOR, "
+              f"gorsel imza GELMIYOR (bkz. FAZ-H-HANDOFF §18 bilinen sinir).",
+              file=sys.stderr)
+    return eski
+
+
+def profil_coz(tur, edit_id, ek_profil=None):
+    """tur: 'animasyon' -> ANIMASYON_STILLERI; 'hikaye' -> HIKAYE_STILLERI; digeri -> EDIT_STILLERI.
+
+    ⚠ FAZ I-2c: `ek_profil` verilirse (ya da `edit_id` eski sozlukte YOK ama
+    `stil_profili` kaydinda VARSA) sonuc eski stil sozlugunun UZERINE yazilir.
+    Ustune yazma her zaman bir TABAN sozluk uzerinde olur; boylece yeni bicimin
+    tasiyamadigi eski alanlar (`gorsel_ek`, `mag`, `saha_etiketi`, `etiket_pct`)
+    tabandan gelir ve asagidaki `prof["gorsel_ek"]` gibi zorunlu okumalar
+    KeyError vermez.
+
+    ⚠ GERILEME YOK: `ek_profil` None ve `edit_id` eski sozlukte varsa (ya da
+    bosza) fonksiyon eskisiyle BIREBIR ayni sozlugu dondurur.
+    """
     if tur == "animasyon":
-        return ANIMASYON_STILLERI.get(edit_id or VARSAYILAN_ANIM,
-                                      ANIMASYON_STILLERI[VARSAYILAN_ANIM])
-    if tur == "hikaye":
-        return HIKAYE_STILLERI.get(edit_id or VARSAYILAN_HIKAYE,
-                                   HIKAYE_STILLERI[VARSAYILAN_HIKAYE])
-    return EDIT_STILLERI.get(edit_id or VARSAYILAN_EDIT, EDIT_STILLERI[VARSAYILAN_EDIT])
+        taban = ANIMASYON_STILLERI.get(edit_id or VARSAYILAN_ANIM,
+                                       ANIMASYON_STILLERI[VARSAYILAN_ANIM])
+    elif tur == "hikaye":
+        taban = HIKAYE_STILLERI.get(edit_id or VARSAYILAN_HIKAYE,
+                                    HIKAYE_STILLERI[VARSAYILAN_HIKAYE])
+    else:
+        taban = EDIT_STILLERI.get(edit_id or VARSAYILAN_EDIT,
+                                  EDIT_STILLERI[VARSAYILAN_EDIT])
+        if ek_profil is None and edit_id and edit_id not in EDIT_STILLERI:
+            ek_profil = bilesik_stile_cevir(edit_id)
+    if not isinstance(ek_profil, dict) or not ek_profil:
+        return taban
+    return {**taban, **ek_profil}
 
 
 def karakter_analiz(kar_yol: str) -> str:
@@ -4342,6 +4437,20 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                  CIKTI_DIR, arastirma_sonuc.manifest_dosya),
              # Gorunur dusus kayitlari: hangi asamada neden geri duselduği.
              "dususler": list(arastirma_sonuc.dususler)}
+    # ── FAZ I-2c: BILESIK STIL PROFILI KUNYESI (yalnizca VARSA yazilir) ──
+    # ⚠ I-2b'nin kapattigi acik: "bir stilin sahne_sn'i degisince dun uretilmis
+    # is yeniden uretilemez; hangi ayarla ciktigi kayitli degildi." Kunye o
+    # kaydin ta kendisi: kimlik + profil surumu + sema surumu.
+    # Eski stil girdilerinde `_profil` YOKTUR -> anahtar HIC eklenmez, yani
+    # eski isler icin `sonuc` sozlugu bit-bit ayni kalir.
+    _stil_ek = profil_ek_oku(prof)
+    if _stil_ek:
+        sonuc["stil_profili"] = {
+            "kimlik": prof.get("_stil_kimligi") or edit_id or "",
+            "surum": _stil_ek.get("surum") or "",
+            "sema_surum": getattr(stil_profili, "SEMA_SURUM", ""),
+            "boyutlar": sorted(k for k in _stil_ek if k != "surum"),
+        }
     # ── FAZ H: MEDYA KAPISI — reddedilen adaylar GORUNUR olur ──
     # Sessiz dusus yasak: kapi bir klibi attiysa kullanici NEDEN atildigini
     # gorebilmeli. Uydurma yok, gercek red kayitlari.

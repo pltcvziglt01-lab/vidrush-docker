@@ -166,7 +166,8 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | H4 otomatik girdi analizi | `d40936f` | ✅ **CANLI** |
 | 12 Ağu | **I-1 kare kapısı** — medya seçim akışına bağlandı | `7dd6322` | ✅ yerel yeşil, **deploy YOK** |
 | 12 Ağu | **I-2a hiyerarşik konsept taksonomisi** | `687e004` | ✅ yerel yeşil, **deploy YOK** |
-| 12 Ağu | **I-2b sürümlü bileşik stil profilleri** | (staged, commit YOK) | ✅ Faz I yeşil, **deploy YOK** |
+| 12 Ağu | **I-2b sürümlü bileşik stil profilleri** | `fff3f36` | ✅ **origin'e push edildi**, deploy YOK |
+| 12 Ağu | **I-2c akışa bağlama** (taksonomi + stil profili → `analiz()`) | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
 
 ---
 
@@ -402,10 +403,14 @@ doğrulaması gerekir (§10 madde 1'in kalan yarısı).
 
 ```bash
 python3 -m venv .venv-test
-.venv-test/bin/pip install fastapi python-multipart httpx pillow requests edge-tts
-for t in a b c d e f g i; do python3 webapp/testler/test_faz_$t.py; done
-.venv-test/bin/python webapp/testler/test_faz_h.py
+.venv-test/bin/pip install fastapi python-multipart httpx pillow requests edge-tts pyflakes
+for t in a b c d e f g h i; do .venv-test/bin/python webapp/testler/test_faz_$t.py; done
 ```
+
+⚠ **`edge-tts` ve `pyflakes` şart** (12 Ağu ölçümü): ikisi eksikken Faz H
+`202/1 hata + 2 BLOKE` veriyor; ikisi kuruluyken **257/0/1 BLOKE**. Kalan tek
+BLOKE `QA_TEST_VIDEO` (opsiyonel ölçüm videosu). Paketleri sistem python'ıyla
+koşmak da çalışır ama Faz H'nin **gerçek FastAPI uç testleri bloke kalır**.
 
 Faz H fastapi olmadan da koşar; gerçek uç bloğu **BLOKE** yazar ve başarı saymaz.
 Faz I ağ/para harcamaz — kapı kararı saf fonksiyondur, entegrasyon sahte okuyucuyla koşar.
@@ -680,8 +685,8 @@ melez}`, gerekçenin ölçülen sayı içermesi, eski etikete indirgenmesi.
 
 ## 17. FAZ I-2b — SÜRÜMLÜ BİLEŞİK STİL PROFİLLERİ (12 Ağu)
 
-> **Durum: yazıldı + testlendi, AKIŞA BAĞLANMADI.** Dosyalar staged; commit,
-> push ve deploy **yapılmadı**.
+> **Durum (güncellendi): commit `fff3f36`, `origin/arastirma-motoru`'na PUSH EDİLDİ.**
+> Akışa bağlanması **I-2c**'de yapıldı (bkz. §18). Deploy **yapılmadı**.
 
 ### Kapatılan açık
 
@@ -752,8 +757,12 @@ yutulmaz: uyarı üretilip auto'ya düşülür.
 `python3 webapp/testler/test_faz_i.py` → **289 geçen / 0 başarısız / 0 bloke**
 (234 → 289; I-2b'den **+55** kontrol).
 
-⚠ **A–H regresyonları bu adımda KOŞULMADI** — istenen kapsam yalnız Faz I
-testiydi. Commit öncesi koşulmalı.
+⚠ **A–H regresyonları I-2b yazılırken KOŞULMAMIŞTI.** Push öncesi bağımsız
+denetimde yapılan ölçüm: `test_faz_i.py` **289/0/0**, `kapsam_ozeti()` sayıları
+commit iddiasıyla birebir uyuştu (12 profil · 11 boyut · 44 alan · 15 konsept
+bağı · 5 eski eşleme) ve üretim kodunda `stil_profili` importu bulunmadığı
+doğrulandı. **A–H regresyonları bu noktada değil, I-2c sonrasında koşuldu**
+(§18 tablosu).
 
 ### BİLİNEN SINIRLAR (dürüstçe)
 
@@ -771,8 +780,141 @@ testiydi. Commit öncesi koşulmalı.
    kilitlenmesin diye). Güvenlik açısından en katı davranış değil — uyarı
    olarak raporlanıyor.
 
-### SONRAKİ ADIM (I-2c — bu adımda YAPILMADI)
+### SONRAKİ ADIM (I-2c)
 
 `girdi_analizi.analiz()` içine `konsept` + `stil_profili` alanlarını **ek**
 olarak bağlamak (eski alanlar korunarak), `pipeline`'ın `_profil` bloğunu
 okuması, ve GUI'da tespit edilen konsept + plan özetinin gösterilmesi.
+→ İlk ikisi **§18'de yapıldı**; GUI bacağı **yapılmadı** (kapsam dışı).
+
+---
+
+## 18. FAZ I-2c — TAKSONOMİ + STİL PROFİLİ AKIŞA BAĞLANDI (12 Ağu, ölçüldü)
+
+> **Durum: yazıldı + testlendi, dosyalar staged. Commit YOK, deploy YOK.**
+> Dokunulan dosyalar: `webapp/girdi_analizi.py`, `webapp/pipeline.py`,
+> `webapp/testler/test_faz_i.py` (+ bu handoff).
+> **Dokunulmayan:** `server.py`, GUI (`static/**`), `deploy.sh`, `stil_profili.py`,
+> `taksonomi.py`, `is_sozlesme.py`.
+
+### Kapatılan açık
+
+I-2a ve I-2b motorları yazılmıştı ama **hiçbir yerden import edilmiyordu**
+(§16 limit 6, §17 limit 2). Yani 7 aile / 33 dal taksonomisi ve 12 sürümlü
+bileşik profil, canlı akışta **hiç çalışmıyordu**.
+
+### `girdi_analizi.py` — YALNIZCA EK ALAN
+
+| Eski sözleşme | Durum |
+|---|---|
+| `TUR_SINYALI` (5 etiket) | ✅ dokunulmadı |
+| `tur_tespit()` · `GORSEL_STRATEJISI` · `PIPELINE_TURU` | ✅ dokunulmadı |
+| `analiz()` eski 10 anahtarı | ✅ hepsi aynen dönüyor (testli) |
+| eski `gerekceler` 5 anahtarı | ✅ duruyor (2 yeni anahtar **eklendi**) |
+| eski `otomatik_secimler` 4 anahtarı | ✅ duruyor, değerleri **değişmedi** (testli) |
+
+Yeni: `analiz()` iki **ek** anahtar döndürüyor —
+`konsept` (`taksonomi.siniflandir()` çıktısı) ve `stil_profili`
+(`stil_profili.coz()` özeti + `eski_edit` köprüsü, `_profil` bloğu dahil).
+
+- **Ağ/para yok.** `siniflandir()` `model_coz` **almadan** çağrılıyor; bu iddia
+  dize taramasıyla değil, **çağrı casuslanarak** ölçülüyor (testli).
+- **Çökertmez.** `server.py` bu modülü import anında yüklüyor; alt modüller
+  `try/except` ile alınıyor. Modül yoksa ek alanlar `{}` olur ve eski sözleşme
+  **eksiksiz** döner. Alt modül patlarsa `_hata` ile **görünür** olur, sessiz geçmez.
+- **Deterministik.** Aynı girdi → bayt bayt aynı çıktı (testli).
+- **Katı JSON.** Gövde `default=` kullanmadan serileşiyor (4.5 KB) — gevşek bir
+  dönüştürücü, `/api/analiz`i çalışma anında 500 verecek tipi testte gizlerdi.
+
+**Emin değilsen karışma:** stil önerisi yalnızca `kaynak ∈ {kullanici, auto,
+turetilmis}` iken `otomatik_secimler["edit"]`e yazılır. Sinyal yoksa
+(`kaynak == "varsayilan"`) **öneri üretilmez** — üretim hattının kendi
+varsayılanı sessizce başka bir profille değiştirilmez (testli).
+
+### `pipeline.py` — `_profil`i GÜVENLİ / OPSİYONEL tüketme
+
+| Ekleme | Ne yapıyor |
+|---|---|
+| `profil_ek_oku(prof)` | `_profil` bloğunu okur. Yok/bozuk → `{}`. **Hiçbir girdide istisna fırlatmaz** (testli: `None`, `{}`, `"bozuk"`, `5`, dize) |
+| `bilesik_stile_cevir(id)` | Yeni-nesil kimliği eski stil alanlarına çevirir. Bulunamazsa `None` → eski yol |
+| `profil_coz(tur, edit_id, ek_profil=None)` | 3. parametre **opsiyonel**; verilirse TABAN sözlüğün üzerine yazılır |
+| `sonuc["stil_profili"]` | Künye: kimlik + profil sürümü + şema sürümü. **Yalnızca `_profil` varsa** yazılır |
+
+**Gerileme kanıtı (ölçüldü, testle kilitli):** `EDIT_STILLERI`'ndeki her eski
+kimlik için `profil_coz()` **birebir aynı sözlük nesnesini** (`is`) döndürüyor.
+Boş/`None` `edit_id`, `hikaye` ve `animasyon` yolları da aynı. Eski girdiler
+yeni kodun tek satırından geçmiyor.
+
+**Kapatılan sessiz hata:** `EDIT_STILLERI` dışındaki her kimlik bugüne kadar
+**sessizce** `VARSAYILAN_EDIT`e düşüyordu — kullanıcı başka bir stil seçtiğini
+sanıyordu. Artık kimlik `stil_profili` kaydında varsa gerçekten o profille
+üretiliyor; kayıtta da yoksa eski sessiz-varsayılan davranış korunuyor.
+
+`eski_edit_stiline()` kayıpsız olmadığı için (§17 limit 3) çevrim her zaman bir
+**taban sözlük üzerine** yazılır: yeni biçimin taşıyamadığı `gorsel_ek`, `mag`,
+`saha_etiketi`, `etiket_pct` tabandan gelir → `prof["gorsel_ek"]` gibi zorunlu
+okumalarda **KeyError riski yok** (testli).
+
+### ⚠ ÖLÇÜLEN BİLİNEN SINIR — görsel imza yeni kimlikle GELMİYOR
+
+`EFEKT_TEMEL` ve `GECIS_IMZASI` tabloları **eski kimliklerle** anahtarlanmış.
+Ölçüm:
+
+```
+sinematik-belgesel     efekt=3  gecis_imza=('karartma', 0.2)
+korku-gerilim          efekt=0  gecis_imza=yok
+belgesel-sinematik     efekt=0  gecis_imza=yok
+```
+
+Yani yeni-nesil bir kimlikle üretilirse tempo/footage/altyazı **profilden
+gelir**, ama grain/vinyet/grade ve geçiş imzası **gelmez**. Profil geçiş
+bilgisini `_profil.gecis` içinde (`{'tur': 'hard-cut', 'sure_sn': 0.0,
+'oran_pct': 5.0}`) **taşıyor** ama bu tablolara henüz bağlanmadı.
+
+**Sessiz bırakılmadı:** kod bu durumda stderr'e açık uyarı basıyor ve iki
+tabloya erişim `.get()` ile (KeyError yok). Üçü de testle kilitli.
+**Bağlanması I-2d'ye ait.**
+
+### Ölçülen test sonucu (12 Ağu)
+
+| Paket | Geçen | Başarısız |
+|---|---|---|
+| A | 125 | 0 |
+| B | 200 | 0 |
+| C | 148 | 0 |
+| D | 95 | 0 |
+| E | 127 | 0 |
+| F | 242 | 0 |
+| G | 217 | 0 |
+| H | **257** | 0 (**1 BLOKE**) |
+| I | **356** | 0 |
+| **TOPLAM** | **1767** | **0** |
+
+Faz I 289 → **356** (+67 kontrol). Faz H 203 → **257**: bu oturumda scratchpad'de
+venv kurulduğu için **gerçek FastAPI uç testleri koştu** — `POST /api/analiz -> 200`
+dahil. Kalan tek BLOKE `QA_TEST_VIDEO` (opsiyonel, ölçüm videosu yok).
+
+`deploy.sh`'nin tanımsız-isim taraması ayrıca elle koşuldu → **temiz**.
+
+### BİLİNEN SINIRLAR (dürüstçe)
+
+1. **Görsel imza boşluğu** (yukarıda ölçüldü) — I-2d.
+2. **GUI'da hiçbir şey değişmedi.** Wizard Adım 4 `otomatik_secimler`i zaten
+   listeliyor, bu yüzden yeni `edit` satırı gerekçesiyle **kendiliğinden**
+   görünür; ama `konsept` / `stil_profili` blokları arayüzde **gösterilmiyor**.
+3. **`sonuc["stil_profili"]` künyesi iş sözleşmesine ULAŞMIYOR.** `server.py`
+   `sonuc`tan alanları **tek tek** seçiyor; künyeyi işe taşımak `server.py` +
+   `is_sozlesme` değişikliği ister — bu adımda kasıtlı olarak yapılmadı.
+4. **Bileşik profil `/api/generate`e otomatik akmıyor.** Wizard önerilen `edit`i
+   forma **yazmıyor** (yalnızca gösteriyor). Yeni-nesil kimlik ancak elle
+   gönderilirse üretime girer.
+5. **Profil değerleri hâlâ ölçülmedi** (§17 limit 1 aynen geçerli) — gerçek
+   videoyla A/B doğrulaması yok.
+6. **Gerçek kullanıcı girdisiyle isabet oranı ölçülmedi** (§16 limit 3 geçerli):
+   konsept→profil eşlemesinin canlı dağılımdaki başarımı **bilinmiyor**.
+
+### SONRAKİ ADIM (I-2d — bu adımda YAPILMADI)
+
+`_profil.gecis` → `GECIS_IMZASI` ve profil → `EFEKT_TEMEL` bağı; künyenin
+`server.py` + `is_sozlesme` üzerinden işe taşınması; konsept/stil özetinin
+arayüzde gösterilmesi.
