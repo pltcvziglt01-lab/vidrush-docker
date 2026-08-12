@@ -183,7 +183,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-14 (1. atom) kalite kapıları ölçüldü + QA'ya bağlandı** | `c584020` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-15 gerçek düzeltme + yeniden render (kapı AÇIK, PASS)** | `891a814` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-16 altyazı + kaynak künyesi + 1080p** | `2f16bc6` | ✅ **origin'e push edildi**, deploy YOK |
-| 12 Ağu | **I-17 motion grammar + optik durağanlık kapısı** | `PENDING` | ✅ **origin'e push edildi**, deploy YOK |
+| 12 Ağu | **I-17 motion grammar + optik durağanlık kapısı** | `2448478` | ✅ **origin'e push edildi**, deploy YOK |
 
 ---
 
