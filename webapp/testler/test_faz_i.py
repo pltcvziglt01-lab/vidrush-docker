@@ -3068,6 +3068,291 @@ for _f5 in ("arastirma_kopru.py", "medya_kopru.py", "pipeline.py"):
     kontrol(f"{_f5} derleniyor", _derlenir(os.path.join(KOK, _f5)))
 
 
+# ═══ 23. FAZ I-9 — UCTAN UCA EDIT PLANI ORKESTRASYONU (FIXTURE) ═══
+# ⚠ KAPATILAN ACIK: parcalar tek tek vardi ama ARALARINDA BAG YOKTU. Analiz +
+# stil profili + dogrulanmis olgu + secilmis medya, profesyonel edit planina
+# (EditorV2) hic birlikte akmamisti.
+# ⚠ GERCEK RENDER / AG / UCRETLI API YOK — tamamen deterministik fixture.
+blok("23. I-9 — orkestrasyon: opt-in, lisans duvari, QA karari")
+
+import edit_kopru as ekp                               # noqa: E402
+
+kontrol("orkestrasyon VARSAYILAN KAPALI", ekp.ACIK is False
+        and ekp.acik_mi()[0] is False)
+kontrol("opt-in yol 1: ortam degiskeni",
+        'os.environ.get("EDITOR_V2"' in oku(KOK, "edit_kopru.py"))
+kontrol("opt-in yol 2: DAHILI is ayari",
+        ekp.acik_mi({"editor_v2": True})[0] is True)
+kontrol("is ayari yalnizca GERCEK True ile acilir",
+        all(ekp.acik_mi(x)[0] is False for x in
+            ({"editor_v2": "evet"}, {"editor_v2": 1}, {}, None, "x")))
+kontrol("kapaliyken plan_kur HICBIR SEY yapmiyor",
+        ekp.plan_kur(cumleler=[{"metin": "x"}],
+                     medya_manifest={})["neden"] == "KAPALI")
+
+_EK_AC = {"editor_v2": True}
+_CUMLE = [
+    {"scene_id": "s001", "fact_id": "f001", "sure_sn": 3.2,
+     "metin": "The Endurance became trapped in pack ice in January 1915 "
+              "near Antarctica."},
+    {"scene_id": "s001", "fact_id": "f001", "sure_sn": 2.8,
+     "metin": "The ship drifted for months before it was finally crushed."},
+    {"scene_id": "s002", "fact_id": "f002", "sure_sn": 4.1,
+     "metin": "The crew camped on Elephant Island for four months awaiting "
+              "rescue."},
+    {"scene_id": "s003", "fact_id": "", "sure_sn": 3.0,
+     "metin": "A rescue ship finally reached the island in August 1916."},
+]
+
+
+def _medya_fix():
+    return {"adaylar": [
+        {"asset_id": "a1", "scene_id": "s001", "fact_id": "f001",
+         "saglayici": "wikimedia", "tur": "video", "medya_turu": "video",
+         "medya_yolu": "/tmp/a1.mp4", "lisans": "cc-by",
+         "render_kullanilabilir": True, "toplam_skor": 82,
+         "baslik": "ship in pack ice", "sure_sn": 12,
+         "orijinal_url": "https://commons.wikimedia.org/a1",
+         "eser_sahibi": "X"},
+        {"asset_id": "a2", "scene_id": "s002", "fact_id": "f002",
+         "saglayici": "pexels", "tur": "video", "medya_turu": "video",
+         "medya_yolu": "/tmp/a2.mp4", "lisans": "pexels",
+         "render_kullanilabilir": True, "toplam_skor": 75,
+         "baslik": "island camp", "sure_sn": 10,
+         "orijinal_url": "https://pexels.com/a2", "eser_sahibi": "Y"},
+        # ⚠ LISANSSIZ aday — render planina GIREMEZ
+        {"asset_id": "BAD", "scene_id": "s003", "fact_id": "f003",
+         "saglayici": "x", "tur": "video", "medya_turu": "video",
+         "medya_yolu": "/tmp/bad.mp4", "lisans": "unknown",
+         "render_kullanilabilir": False, "red_nedeni": "lisans belirsiz",
+         "baslik": "unlicensed clip"},
+    ], "kapsam_bosluklari": [{"scene_id": "s003",
+                              "neden": "lisansli aday yok"}]}
+
+
+_OLGU9 = [{"fact_id": "f001", "guven": "dogrulandi",
+           "metin": "Endurance trapped in pack ice 1915."},
+          {"fact_id": "f002", "guven": "dogrulandi",
+           "metin": "Crew camped on Elephant Island."}]
+_STIL9 = {"kimlik": "belgesel-arastirmaci", "surum": "1.0.0", "kaynak": "auto",
+          "profil": sp.profil_al("belgesel-arastirmaci")}
+
+_i9_kok = tempfile.mkdtemp(prefix="i9_")
+try:
+    _R9 = ekp.plan_kur(cumleler=_CUMLE, medya_manifest=_medya_fix(),
+                       olgular=_OLGU9, stil=_STIL9, cikti_dizin=_i9_kok,
+                       is_ayar=_EK_AC)
+    kontrol("FIXTURE orkestrasyon UCTAN UCA calisti", _R9["ok"] is True,
+            str(_R9["neden"]))
+
+    # ── (a) STIL PROFILI -> EDIT PROFILI ve PROPS ──
+    kontrol("stil profili EDIT profiline cevriliyor",
+            _R9["profil_adi"] == "investigative-essay", _R9["profil_adi"])
+    kontrol("profil secimi GEREKCELI", "belgesel-arastirmaci"
+            in _R9["profil_gerekce"])
+    kontrol("bilinmeyen stil VARSAYILANA duser (uydurma profil yok)",
+            ekp.edit_profili_sec("boyle-stil-yok")[0]
+            == ekp.VARSAYILAN_EDIT_PROFILI
+            and "varsayilan" in ekp.edit_profili_sec("")[1])
+    kontrol("STIL KARARLARI props'a TASINIYOR",
+            "stilProfili" in (_R9["props"] or {}))
+    _sk = _R9["stil_kararlari"]
+    kontrol("stil kararlari 7 boyutu tasiyor",
+            {"tempo", "gecis", "kamera", "tipografi", "renk", "ses"} <= set(_sk),
+            str(sorted(_sk)))
+    kontrol("ritim karari (plan_sn) tasiniyor",
+            isinstance(_sk["tempo"]["plan_sn"], (int, float)))
+    kontrol("gecis karari tasiniyor", bool(_sk["gecis"]["tur"]))
+    kontrol("tipografi karari tasiniyor", bool(_sk["tipografi"]["altyazi"]))
+    kontrol("renk karari tasiniyor", bool(_sk["renk"]["grade"]))
+    kontrol("ses/ducking karari tasiniyor",
+            isinstance(_sk["ses"]["ducking_db"], (int, float)))
+
+    # ── (b) SAHNE ZINCIRI KORUNUYOR ──
+    _zincir = ekp.sahne_zinciri(_R9["props"])
+    kontrol("her sahne icin zincir cikarilabiliyor",
+            len(_zincir) == len(_CUMLE), f"{len(_zincir)}/{len(_CUMLE)}")
+    _bagli = [z for z in _zincir if z["asset_id"]]
+    kontrol("scene_id her sahnede KORUNDU",
+            all(z["scene_id"] for z in _zincir))
+    kontrol("fact_id lisansli sahnelerde KORUNDU",
+            all(z["fact_id"] for z in _bagli), str([z["fact_id"] for z in _zincir]))
+    kontrol("asset_id + saglayici + LISANS zinciri KORUNDU",
+            all(z["asset_id"] and z["saglayici"] and z["lisans"]
+                for z in _bagli))
+    kontrol("cekim suresi (ritim) KORUNDU",
+            all(isinstance(z["sure_sn"], (int, float)) and z["sure_sn"] > 0
+                for z in _zincir))
+    kontrol("motion kararlari KORUNDU",
+            all(z["motion"] for z in _zincir))
+    kontrol("GECIS kararlari KORUNDU (motion spec icinde)",
+            all(z["gecis"] for z in _zincir),
+            str([z["gecis"] for z in _zincir]))
+    kontrol("kamera kararlari (hareket/kadraj) KORUNDU",
+            all(z["hareket"] or z["kadraj"] for z in _zincir))
+    # ⚠ Tipografi IKI yoldan tasinir: altyazi dizisi (TTS zamanlamasindan
+    # gelir, bu fixture'da yok) VE motion spec katmanlari (baslik/etiket).
+    # Ikisini birden olcmek gerekiyordu; yalnizca diziye bakmak tipografiyi
+    # "kayboldu" gosteriyordu — olculdu, duzeltildi.
+    kontrol("tipografi katmani KORUNDU (spec ya da altyazi dizisi)",
+            sum(len(z["tipografi"]) + z["altyazi_adet"] for z in _zincir) > 0,
+            str([z["tipografi"] for z in _zincir]))
+    kontrol("tipografi STILI props ust duzeyinde tasiniyor",
+            "altyaziStil" in (_R9["props"] or {}),
+            str(sorted(_R9["props"] or {})))
+    kontrol("ses/ducking kararlari (j_cut/l_cut) TASINIYOR",
+            all("j_cut" in z and "l_cut" in z for z in _zincir))
+    kontrol("anlatim islevi KORUNDU", all(z["islev"] for z in _zincir))
+
+    # ── (c) LISANS DUVARI ve KAPSAM BOSLUGU ──
+    kontrol("LISANSSIZ aday render planina GIREMEDI",
+            all(z["asset_id"] != "BAD" for z in _zincir),
+            str([z["asset_id"] for z in _zincir]))
+    kontrol("elenen aday GORUNUR (sessiz degil)",
+            any(e["asset_id"] == "BAD" for e in _R9["elenen_medya"]),
+            str(_R9["elenen_medya"]))
+    kontrol("elenme NEDENI raporlaniyor",
+            all(e.get("neden") for e in _R9["elenen_medya"]))
+    kontrol("KAPSAM BOSLUGU aynen tasindi (kapatilmadi)",
+            any(b.get("scene_id") == "s003"
+                for b in _R9["kapsam_bosluklari"]),
+            str(_R9["kapsam_bosluklari"]))
+    _bos_sahne = [z for z in _zincir if not z["asset_id"]]
+    kontrol("bosluk RASTGELE STOKLA KAPANMADI (asset bos kaldi)",
+            len(_bos_sahne) >= 1 and all(not z["lisans"] for z in _bos_sahne),
+            str(_bos_sahne[:1]))
+    kontrol("lisans_suz yalnizca render_kullanilabilir gecirir",
+            len(ekp.lisans_suz(_medya_fix())[0]["adaylar"]) == 2)
+    kontrol("lisans_suz kapsam bosluklarini SILMEZ",
+            len(ekp.lisans_suz(_medya_fix())[0]["kapsam_bosluklari"]) == 1)
+
+    # ── (d) QA-ON KARARI ──
+    kontrol("QA durumu RAPORLANIYOR", _R9["qa"]["durum"] in
+            ("PASS", "WARN", "FAIL"), str(_R9["qa"]))
+    kontrol("PASS/WARN ayrimi GORUNUR",
+            "fail" in _R9["qa"] and "warn" in _R9["qa"])
+    kontrol("WARN render'i ENGELLEMIYOR",
+            _R9["render_edilebilir"] is True if _R9["qa"]["durum"] == "WARN"
+            else True)
+
+    # ⚠ QA FAIL -> RENDER BASLATILMAZ (qa_on ciktisi sahte FAIL yapilarak)
+    from editor import plan as _eplan                   # noqa: E402
+    _asil_uret = _eplan.uret
+
+    def _fail_uret(**kw):
+        c = _asil_uret(**kw)
+        c = dict(c)
+        c["editor_qa"] = {"durum": "FAIL", "fail": 2, "warn": 0,
+                          "sorunlar": [{"kod": "X"}, {"kod": "Y"}]}
+        return c
+
+    try:
+        _eplan.uret = _fail_uret
+        _RF = ekp.plan_kur(cumleler=_CUMLE, medya_manifest=_medya_fix(),
+                           olgular=_OLGU9, stil=_STIL9,
+                           cikti_dizin=_i9_kok, is_ayar=_EK_AC)
+        kontrol("QA FAIL -> RENDER BASLATILMAZ",
+                _RF["render_edilebilir"] is False and _RF["neden"] == "QA-FAIL",
+                str(_RF["neden"]))
+        kontrol("QA FAIL sebebi UYARILARDA gorunur",
+                any("RENDER BASLATILMAZ" in u for u in _RF["uyarilar"]))
+        kontrol("QA FAIL'de plan yine de URETILIYOR (inceleme icin)",
+                _RF["ok"] is True and _RF["props"])
+    finally:
+        _eplan.uret = _asil_uret
+
+    # ── (e) DESTEKLENMEYEN EFEKT GORUNUR KAYIP ──
+    kontrol("efekt kapsami SAYILIYOR",
+            isinstance((_R9["efekt_kapsami"] or {}).get("sayim"), dict),
+            str(_R9["efekt_kapsami"])[:80])
+    kontrol("desteklenmeyen efekt GORUNUR KAYIP olarak raporlaniyor",
+            any("kayip efekt" in u for u in _R9["uyarilar"]),
+            str(_R9["uyarilar"][:2]))
+    kontrol("fallback karari GEREKCESIYLE gorunur",
+            any("fallback" in str(u) for u in _R9["uyarilar"]))
+
+    # ── (f) DAYANIKLILIK ──
+    kontrol("cumle yoksa kontrollu dur",
+            ekp.plan_kur(cumleler=[], medya_manifest=_medya_fix(),
+                         is_ayar=_EK_AC)["neden"] == "CUMLE-YOK")
+    _hepsi_lisanssiz = {"adaylar": [{"asset_id": "z", "scene_id": "s001",
+                                     "render_kullanilabilir": False}],
+                        "kapsam_bosluklari": []}
+    _RM = ekp.plan_kur(cumleler=_CUMLE, medya_manifest=_hepsi_lisanssiz,
+                       is_ayar=_EK_AC, cikti_dizin=_i9_kok)
+    kontrol("lisansli aday YOKSA kontrollu dur (rastgele stok yok)",
+            _RM["neden"] == "MEDYA-YOK" and not _RM["props"])
+    kontrol("MEDYA-YOK durumunda bosluk RASTGELE KAPANMADIGI yaziliyor",
+            any("RASTGELE STOKLA" in u for u in _RM["uyarilar"]))
+    kontrol("bozuk girdide COKMUYOR",
+            all(isinstance(ekp.plan_kur(cumleler=c, medya_manifest=m,
+                                        is_ayar=_EK_AC,
+                                        cikti_dizin=_i9_kok), dict)
+                for c, m in ((None, None), ([], "x"), (_CUMLE, None),
+                             (_CUMLE, {"adaylar": "bozuk"}))))
+    kontrol("stil verilmezse VARSAYILAN profil (cokme yok)",
+            ekp.plan_kur(cumleler=_CUMLE, medya_manifest=_medya_fix(),
+                         is_ayar=_EK_AC, cikti_dizin=_i9_kok)["profil_adi"]
+            == ekp.VARSAYILAN_EDIT_PROFILI)
+    kontrol("orkestrasyon DETERMINISTIK (ayni girdi -> ayni zincir)",
+            ekp.sahne_zinciri(ekp.plan_kur(
+                cumleler=_CUMLE, medya_manifest=_medya_fix(), olgular=_OLGU9,
+                stil=_STIL9, cikti_dizin=_i9_kok, is_ayar=_EK_AC)["props"])
+            == _zincir)
+finally:
+    _sh.rmtree(_i9_kok, ignore_errors=True)
+
+
+blok("23b. I-9 — mevcut yol DEGISMEDI ve korumalar aynen")
+
+_EK = oku(KOK, "edit_kopru.py")
+# ⚠ "render etmiyor" iddiasi HAM DIZE TARAMASIYLA olculemez: modul kendi
+# dokumantasyonunda zaten "render `remotion_v2.render()` isidir" diyor.
+# Bu yuzden GERCEK KOD uzerinde AST ile CAGRI arariz — yorum/docstring
+# icindeki metin koda dahil degildir.
+import ast                                            # noqa: E402
+_EK_AGAC = ast.parse(_EK)
+_EK_CAGRI = set()
+for _n in ast.walk(_EK_AGAC):
+    if isinstance(_n, ast.Call):
+        _f = _n.func
+        if isinstance(_f, ast.Attribute):
+            _EK_CAGRI.add(_f.attr)
+        elif isinstance(_f, ast.Name):
+            _EK_CAGRI.add(_f.id)
+kontrol("kopru RENDER CAGRISI YAPMIYOR (AST ile olculdu)",
+        "render" not in _EK_CAGRI and "Popen" not in _EK_CAGRI
+        and "run" not in _EK_CAGRI, str(sorted(_EK_CAGRI))[:120])
+kontrol("kopru ALT SUREC baslatmiyor",
+        not [n for n in ast.walk(_EK_AGAC)
+             if isinstance(n, (ast.Import, ast.ImportFrom))
+             and "subprocess" in ast.dump(n)])
+kontrol("kopru AG CAGIRMIYOR",
+        not re.search(r"^\s*(import|from)\s+(requests|urllib|socket)\b",
+                      _EK, re.M))
+kontrol("pipeline MEVCUT hizli render yolunu KORUYOR (VidrushVideo)",
+        "edit_kopru" not in oku(KOK, "pipeline.py"))
+kontrol("remotion_v2 opt-in oldugunu HALA soyluyor",
+        "MEVCUT RENDER YOLUNA DOKUNMUYOR" in oku(KOK, "editor/remotion_v2.py"))
+kontrol("editor paketi bu adimda DEGISMEDI",
+        all("edit_kopru" not in oku(KOK, f) for f in
+            ("editor/plan.py", "editor/adapter.py", "editor/qa_on.py",
+             "editor/remotion_v2.py")))
+kontrol("medya avcisi bayragi HALA kapali", mkp.ACIK is False)
+kontrol("butce korumalari KORUNDU", mkp.VARSAYILAN_MAKS_USD == 0.0)
+kontrol("kare kapisi fail-closed KORUNDU",
+        "if not callable(kare_dogrula)" in oku(KOK, "medya_kopru.py"))
+kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("UI DEGISMEDI",
+        "basitGovde" in oku(KOK, "static/js/wizard.js")
+        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js"))
+kontrol("server.py editor_v2 alanini OKUMUYOR",
+        "editor_v2" not in oku(KOK, "server.py"))
+kontrol("edit_kopru.py derleniyor", _derlenir(os.path.join(KOK, "edit_kopru.py")))
+
+
 print(f"\n{'=' * 60}")
 print(f"GECEN: {gecen}   BASARISIZ: {len(basarisiz)}   BLOKE: {len(bloke)}")
 for b in basarisiz:

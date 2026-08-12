@@ -174,7 +174,8 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-5 konsept farkındalıklı medya seçimi** | `e3559b2` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-6 medya avcısı canlı hatta (opt-in)** | `1e9c288` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-7 iş başına bütçe + paralel izolasyon** | `6294369` | ✅ **origin'e push edildi**, deploy YOK |
-| 12 Ağu | **I-8 doğrulanmış olgu → sahne/medya bağı** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
+| 12 Ağu | **I-8 doğrulanmış olgu → sahne/medya bağı** | `e450aa0` | ✅ **origin'e push edildi**, deploy YOK |
+| 12 Ağu | **I-9 uçtan uca edit planı orkestrasyonu** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
 
 ---
 
@@ -1674,7 +1675,7 @@ yalnızca özetin kaynağı iş bütçesine taşındı).
 
 ## 25. FAZ I-8 — DOĞRULANMIŞ OLGU → SAHNE ve MEDYA BAĞI (12 Ağu, ölçüldü)
 
-> **Durum: yazıldı + testlendi, dosyalar staged. Commit YOK, deploy YOK.**
+> **Durum: commit `e450aa0`, `origin/arastirma-motoru`'na PUSH EDİLDİ. Deploy YOK.**
 > **Bayrak HÂLÂ varsayılan KAPALI.**
 > Değişen: `webapp/arastirma_kopru.py`, `webapp/pipeline.py`,
 > `webapp/medya_kopru.py`, `webapp/testler/test_faz_i.py` (+ bu handoff).
@@ -1763,3 +1764,100 @@ lisansla"* sorusu sonradan cevaplanabilir.
 4. **Bir iddia birden çok sahneye bağlanabilir**; tekrar sınırı yok.
 5. `iddia_metni` 180 karaktere kırpılıyor — uzun iddialarda bağlam kaybı olur.
 6. Yalnızca footage sahneleri hedeflenir (AI/Sora sahneleri kasıtlı dışarıda).
+
+---
+
+## 26. FAZ I-9 — UÇTAN UCA EDİT PLANI ORKESTRASYONU (12 Ağu, ölçüldü)
+
+> **Durum: yazıldı + testlendi, dosyalar staged. Commit YOK, deploy YOK.**
+> **Bayrak varsayılan KAPALI.**
+> Yeni: `webapp/edit_kopru.py`.
+> Değişen: `webapp/testler/test_faz_i.py` (+ bu handoff).
+> **Dokunulmadı:** `pipeline.py`, `server.py`, tüm arayüz, 22 alanlık generate
+> sözleşmesi, `editor/` paketi (plan/adapter/qa_on/remotion_v2), `deploy.sh`.
+
+### Kapatılan açık
+
+Parçalar tek tek vardı ama **aralarında bağ yoktu**:
+
+| Parça | Üretiyordu | Ama |
+|---|---|---|
+| `girdi_analizi` | konsept + stil | edit planına **gitmiyordu** |
+| `stil_profili` | tempo/geçiş/palet/ses | EditorV2 props'a **gitmiyordu** |
+| `arastirma_kopru` | doğrulanmış olgular | plan onları **görmüyordu** |
+| `medya_kopru` | lisanslı klipler | render planına **geçmiyordu** |
+
+Yani *"tek akışta araştırma + medya + kurgu"* iddiası uçtan uca
+**kanıtlanmamıştı**. Bu adım zinciri fixture ile kurup **ölçüyor**.
+
+### Ölçülen uçtan uca zincir (fixture, gerçek render/ağ YOK)
+
+```
+stil 'belgesel-arastirmaci' -> edit profili 'investigative-essay'
+lisans duvari: 3 adaydan 1'i (lisans=unknown) ELENDI
+kapsam boslugu s003 AYNEN tasindi (rastgele stokla KAPANMADI)
+QA-on: WARN (fail=0, warn=2) -> render_edilebilir = True
+efekt kapsami: 23 gercek / 0 bilinmeyen
+props: 4 sahne + stilProfili + altyaziStil
+```
+
+Her sahnede korunduğu **test edilen** alanlar: `scene_id` · `fact_id` ·
+`asset_id` · `saglayici` · **`lisans`** · `sure_sn`/`bas_sn` (ritim) ·
+`cekim_turu`/`hareket`/`kadraj` (kamera) · `motion` · **geçiş** (motion spec
+içinde) · tipografi katmanı · `ses`/`j_cut`/`l_cut` (ducking) · `islev`.
+
+### Sert kurallar — hepsi testli
+
+1. **Lisanssız medya render planına giremez.** `lisans_suz()` yalnızca
+   `render_kullanilabilir` olanları geçirir; elenenler `elenen_medya` içinde
+   **nedeniyle** görünür.
+2. **Kapsam boşluğu rastgele stokla kapanmaz.** Boşluk aynen taşınır; boş
+   sahne `asset_id`/`lisans` **boş** kalır. Hiç lisanslı aday yoksa
+   `MEDYA-YOK` ile kontrollü durulur.
+3. **QA-on FAIL → render başlatılmaz.** `render_edilebilir=False`,
+   `neden="QA-FAIL"`, uyarıda açıkça yazılır. PASS/WARN ayrımı `qa` içinde
+   görünür; WARN render'ı engellemez. FAIL'de plan yine üretilir (inceleme için).
+4. **Desteklenmeyen efekt gizlenmez.** `efekt_kapsami` sayımı + adapter'ın
+   `kayip_efektler` listesi uyarılara yazılır (ör. `light-sweep → flash`,
+   `data-chart → callout`).
+
+### Stil profili kararları props'a taşınıyor
+
+`props["stilProfili"]` — kimlik/sürüm/kaynak + 6 boyut (tempo, geçiş, kamera,
+tipografi, renk, ses/ducking). Remotion bilmediği alanı yok sayar; amaç
+**izlenebilirlik**: "hangi stil kararı hangi videoda uygulandı".
+
+Bilinmeyen stil kimliği **varsayılan** profile düşer — uydurma profil üretilmez.
+
+### Mevcut yol değişmedi
+
+`pipeline.py` bu modülü **import etmiyor**; `VidrushVideo` hızlı render yolu
+aynen duruyor. Köprü **render etmiyor** ve **ağ çağırmıyor** — ikisi de
+**AST ile** ölçüldü (ham dize taraması modülün kendi dokümantasyonunu
+yakalıyordu; ölçüm yöntemi düzeltildi).
+
+### Ölçülen test sonucu (12 Ağu) — İKİ ORTAM AYRI
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Zengin venv** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **257** | **823** | **2237** |
+| **Sistem Python** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **203** | **823** | **2183** |
+
+0 hata. Faz I 760 → **823** (+63). **Faz C 148/0** — editor paketinde
+gerileme yok. pyflakes temiz.
+
+### BİLİNEN SINIRLAR (dürüstçe)
+
+1. **Pipeline'a bağlanmadı.** Köprü yazıldı ve fixture ile kanıtlandı ama
+   `pipeline.py` onu çağırmıyor — yani canlı bir işte **hâlâ çalışmıyor**.
+   Bağlamak ayrı bir atom.
+2. **Gerçek render denenmedi.** `render_edilebilir` bir **karardır**;
+   `remotion_v2.render()` çağrılmadı, çıktı videosu görülmedi.
+3. **Altyazı dizisi fixture'da boş** (TTS zamanlamasından gelir); tipografi
+   kanıtı motion spec katmanlarına dayanıyor.
+4. **Stil → edit profili eşlemesi 12 satırlık elle tablo**; ölçümle değil tür
+   konvansiyonuyla kuruldu.
+5. **QA FAIL senaryosu sahte FAIL ile sınandı** — gerçek bir FAIL üreten plan
+   girdisiyle değil.
+6. `medya_kopru` çıktısı doğrudan `medya_manifest` biçiminde değil; bu adımda
+   fixture manifest kullanıldı, gerçek dönüşüm yazılmadı.
