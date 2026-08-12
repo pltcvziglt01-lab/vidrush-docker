@@ -66,6 +66,11 @@ class Sonuc:
     dususler: list = field(default_factory=list)   # {asama, neden, etki}
     maliyet_usd: float = 0.0
     sure_sn: float = 0.0
+    # ⚠ FAZ I-8: SENARYOYA GIREBILEN iddialarin hafif kopyasi. Manifest
+    # nesnesinin kendisi tasinmaz (agir); sahneye baglamak icin gereken
+    # asgari alanlar tutulur. `sozluk()` BU ALANI YAZMAZ — is sozlesmesi ve
+    # arayuz sozlesmesi DEGISMEDI.
+    olgular: list = field(default_factory=list)   # [{fact_id, metin, ...}]
 
     def dusus_ekle(self, asama: str, neden: str, etki: str) -> None:
         # ⚠ `neden` KULLANICIYA GORUNUR (is sozlugu -> /api/job -> arayuz).
@@ -133,6 +138,158 @@ def olgu_blogu(manifest, sinir: int = MAKS_OLGU) -> str:
         kaynak_not = f" [{', '.join(sorted(set(alanlar))[:3])}]" if alanlar else ""
         satirlar.append(f"- {i.metin}{kaynak_not}")
     return "\n".join(satirlar)
+
+
+# ═══════════ FAZ I-8: DOGRULANMIS OLGU -> SAHNE BAGI ═══════════
+# ⚠ NEDEN VAR: sahne plani `fact_id`/`iddia_metni` URETMIYORDU; medya koprusu
+# (I-6) bu alanlari okuyor ama hep bos buluyor ve `footage_sorgu`ya dusuyordu.
+# Yani "arastirma-bagli medya secimi" iddiasi karsiliksizdi. Bu blok bagi
+# kurar — ama YALNIZCA gercekten dogrulanmis iddialarla.
+#
+# ⚠ UYDURMA fact_id YOK. Esik altinda kalan sahne fact_id ALMAZ; bu bir
+# KAPSAM BOSLUGU olarak gorunur kilinir. Bos bir kimlik uydurmak, atif
+# zincirini yalanlamak olurdu.
+#
+# ⚠ DESTEKSIZ/CELISKILI IDDIA SAHNEYE GIREMEZ: aday havuzu yalnizca
+# `manifest.kullanilabilir_iddialar()` (yani `senaryoya_girebilir`) ile kurulur;
+# `celiskili` ve `cozulmedi` durumlari o filtrede zaten eleniyor.
+
+# Sahne metni ile iddia metni arasindaki asgari ortusme. Altinda kalan sahne
+# BAGLANMAZ. Deger sezgisel; test bunu sabitliyor, uydurma degil ama olculmedi.
+FACT_ESIK = float(os.environ.get("FACT_BAGLAMA_ESIGI", "0.16"))
+# Sahneye yazilan iddia metninin ust siniri (prompt/sorgu sismesin).
+FACT_METIN_SINIRI = int(os.environ.get("FACT_METIN_SINIRI", "180"))
+
+_FACT_KELIME = re.compile(r"[0-9a-zA-ZçğıöşüÇĞİÖŞÜ]{3,}")
+_FACT_YAYGIN = frozenset((
+    "the", "and", "for", "with", "that", "this", "from", "was", "were", "has",
+    "have", "been", "are", "its", "their", "which", "into", "over", "after",
+    "ve", "bir", "bu", "icin", "ile", "olarak", "daha", "gibi", "kadar",
+    "sonra", "once", "olan", "oldu", "var", "yok"))
+
+
+def _fact_belirtec(metin: str) -> set:
+    return {k.lower() for k in _FACT_KELIME.findall(str(metin or ""))
+            if k.lower() not in _FACT_YAYGIN}
+
+
+def olgu_listesi(manifest, sinir: int = 200) -> list:
+    """Manifestten SENARYOYA GIREBILEN iddialarin hafif kopyasi.
+
+    ⚠ `celiskili` / `cozulmedi` iddialar `kullanilabilir_iddialar()` filtresinde
+    zaten eleniyor; bu liste onlari HIC gormez.
+    """
+    cikti = []
+    try:
+        for i in manifest.kullanilabilir_iddialar()[:sinir]:
+            kaynaklar = []
+            for k in (getattr(i, "kaynaklar", None) or [])[:4]:
+                kaynaklar.append({"alan": str(getattr(k, "alan", "") or ""),
+                                  "url": str(getattr(k, "url", "") or ""),
+                                  "tur": str(getattr(k, "tur", "") or "")})
+            cikti.append({
+                "fact_id": str(getattr(i, "fact_id", "") or ""),
+                "metin": str(getattr(i, "metin", "") or ""),
+                "guven": str(getattr(i, "guven", "") or ""),
+                "kategori": str(getattr(i, "kategori", "") or ""),
+                "kritik": bool(getattr(i, "kritik", False)),
+                "kaynaklar": kaynaklar,
+            })
+    except Exception as e:
+        print(f"  olgu listesi cikarilamadi: {type(e).__name__}", file=sys.stderr)
+    return [o for o in cikti if o["fact_id"] and o["metin"]]
+
+
+def fact_bagla(scenes, olgular, *, esik: float = None,
+               yalnizca_footage: bool = True) -> dict:
+    """Sahneleri DOGRULANMIS iddialara bagla. Sahneleri YERINDE gunceller.
+
+    Her eslesen sahneye `fact_id` ve kisa `iddia_metni` yazilir. Eslesmeyen
+    sahne fact_id ALMAZ (uydurma yok) ve `bosluklar` icinde gorunur.
+
+    Doner: {"baglanan", "hedef", "kapsam_pct", "bosluklar", "esik",
+            "olgu_sayisi", "kullanilan_fact"}
+
+    ⚠ ISTISNA FIRLATMAZ. Olgu yoksa ya da girdi bozuksa hicbir sahne
+    degistirilmez ve uretim hatti ESKISI GIBI surer.
+    """
+    esik = FACT_ESIK if esik is None else float(esik)
+    rapor = {"baglanan": 0, "hedef": 0, "kapsam_pct": 0.0, "bosluklar": [],
+             "esik": esik, "olgu_sayisi": 0, "kullanilan_fact": []}
+    try:
+        sahne_listesi = list(scenes or [])
+        havuz = [o for o in (olgular or [])
+                 if isinstance(o, dict) and o.get("fact_id") and o.get("metin")]
+        rapor["olgu_sayisi"] = len(havuz)
+        if not sahne_listesi:
+            return rapor
+        if not havuz:
+            # ⚠ HAVUZ BOSSA DA SESSIZ KALMA: arastirma kostu ama senaryoya
+            # girebilen tek bir iddia bile cikmadiysa bu bir KAPSAM
+            # BOSLUGUDUR. Ilk surumde sessizce donuyordu; test yakaladi.
+            for idx, s in enumerate(sahne_listesi):
+                if not isinstance(s, dict):
+                    continue
+                if yalnizca_footage and str(s.get("kaynak")) != "footage":
+                    continue
+                rapor["hedef"] += 1
+                rapor["bosluklar"].append(
+                    {"sahne": idx,
+                     "neden": "dogrulanmis olgu havuzu bos"})
+            rapor["bosluklar"] = rapor["bosluklar"][:40]
+            return rapor
+        onbellek = [(o, _fact_belirtec(o["metin"])) for o in havuz]
+        kullanilan = []
+        for idx, s in enumerate(sahne_listesi):
+            if not isinstance(s, dict):
+                continue
+            if yalnizca_footage and str(s.get("kaynak")) != "footage":
+                continue
+            rapor["hedef"] += 1
+            # ⚠ Kullanicinin/planin ACIK fact_id'si varsa KORUNUR, ezilmez.
+            if str(s.get("fact_id") or "").strip():
+                rapor["baglanan"] += 1
+                kullanilan.append(str(s["fact_id"]))
+                continue
+            sahne_bt = _fact_belirtec(
+                f"{s.get('anlatim', '')} {s.get('footage_sorgu', '')} "
+                f"{s.get('scene_prompt', '')}")
+            if not sahne_bt:
+                rapor["bosluklar"].append({"sahne": idx,
+                                           "neden": "sahne metni bos"})
+                continue
+            en_iyi, en_puan = None, 0.0
+            for o, bt in onbellek:
+                if not bt:
+                    continue
+                ortak = len(sahne_bt & bt)
+                if not ortak:
+                    continue
+                puan = ortak / float(len(sahne_bt | bt))
+                if puan > en_puan:
+                    en_iyi, en_puan = o, puan
+            if en_iyi is None or en_puan < esik:
+                # ⚠ UYDURMA fact_id YOK — bosluk GORUNUR kilinir.
+                rapor["bosluklar"].append({
+                    "sahne": idx,
+                    "neden": (f"esik alti ortusme ({en_puan:.2f} < {esik:.2f})"
+                              if en_iyi is not None else "eslesen olgu yok")})
+                continue
+            s["fact_id"] = en_iyi["fact_id"]
+            s["iddia_metni"] = str(en_iyi["metin"])[:FACT_METIN_SINIRI]
+            if en_iyi.get("kategori"):
+                s.setdefault("sahne_amaci", "")
+            rapor["baglanan"] += 1
+            kullanilan.append(en_iyi["fact_id"])
+        rapor["kullanilan_fact"] = sorted(set(kullanilan))
+        if rapor["hedef"]:
+            rapor["kapsam_pct"] = round(
+                100.0 * rapor["baglanan"] / rapor["hedef"], 1)
+        rapor["bosluklar"] = rapor["bosluklar"][:40]
+    except Exception as e:
+        print(f"  fact baglama hatasi: {type(e).__name__}: {e}",
+              file=sys.stderr)
+    return rapor
 
 
 def brief_kur(story: str, manifest, sonuc: Sonuc) -> str:
@@ -235,6 +392,9 @@ def arastir_ve_zenginlestir(story: str, *, mod: str, is_adi: str,
                                 if getattr(i, "guven", "") == "celiskili")
         s.kaynak_sayisi = len(manifest.arastirma_url_kumesi)
         s.sorgular = list(manifest.arama_sorgulari)
+        # ⚠ YALNIZCA `senaryoya_girebilir` olanlar. `celiskili`/`cozulmedi`
+        # iddialar BURAYA GIRMEZ, dolayisiyla sahneye de giremez.
+        s.olgular = olgu_listesi(manifest)
     except Exception as e:
         s.dusus_ekle("sayim", f"{type(e).__name__}: {e}", "Sayilar okunamadi.")
 

@@ -4059,6 +4059,21 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     panlar = ["right", "left", "top", "bottom"]
     props_sahneler = []
     toplam = len(scenes)
+    # ── FAZ I-8: DOGRULANMIS OLGU -> SAHNE BAGI ──
+    # ⚠ YALNIZCA arastirma GERCEKTEN kostuysa ve senaryoya girebilen iddia
+    # varsa calisir. Arastirma kapali/basarisizsa `olgular` bos kalir, hicbir
+    # sahne degistirilmez ve hat ESKISIYLE BIT-BIT ayni surer.
+    # ⚠ UYDURMA fact_id YOK: eslesmeyen sahne kimlik ALMAZ, bosluk GORUNUR.
+    _fact_rapor = None
+    if getattr(arastirma_sonuc, "calisti", False):
+        _olgular = list(getattr(arastirma_sonuc, "olgular", None) or [])
+        if _olgular:
+            _fact_rapor = arastirma_kopru.fact_bagla(scenes, _olgular)
+            print(f"  OLGU BAGI: {_fact_rapor['baglanan']}/"
+                  f"{_fact_rapor['hedef']} footage sahnesi dogrulanmis iddiaya "
+                  f"baglandi (%{_fact_rapor['kapsam_pct']}), "
+                  f"{len(_fact_rapor['bosluklar'])} kapsam boslugu",
+                  file=sys.stderr)
     # ── FAZ I-2d: GORSEL IMZA KAYNAGI ──
     # Bilesik profil varsa efekt/gecis imzasi ONDAN turetilir. Eski stil
     # kimliklerinde `_profil` blogu YOKTUR -> `None` kalir ve `efekt_ata` /
@@ -4660,6 +4675,17 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                  CIKTI_DIR, arastirma_sonuc.manifest_dosya),
              # Gorunur dusus kayitlari: hangi asamada neden geri duselduği.
              "dususler": list(arastirma_sonuc.dususler)}
+    # ── FAZ I-8: OLGU BAGI OZETI (yalnizca bag KURULDUYSA yazilir) ──
+    # ⚠ Arastirma kapaliysa anahtar HIC eklenmez -> eski islerde `sonuc`
+    # bit-bit ayni. Kapsam bosluklari GORUNUR: "her sahne kaynakli" gibi
+    # kanitsiz iddia uretilmez.
+    if _fact_rapor is not None:
+        sonuc["olgu_bagi"] = _fact_rapor
+        for _b in _fact_rapor["bosluklar"][:20]:
+            sonuc["dususler"].append({
+                "asama": "olgu-bagi", "neden": _b["neden"],
+                "etki": (f"sahne {_b['sahne']} dogrulanmis bir iddiaya "
+                         f"baglanamadi; medya secimi genel sorguyla yapildi")})
     # ── FAZ I-6: MEDYA AVCISI OZETI (yalnizca ACIKKEN yazilir) ──
     # ⚠ Kapaliyken anahtar HIC eklenmez -> eski islerde `sonuc` bit-bit ayni.
     # Acikken kapinin hic calismadigi durum da GORUNUR (denenen=0), boylece

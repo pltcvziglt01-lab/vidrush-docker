@@ -450,11 +450,18 @@ def sahne_medyasi(*, sorgu: str, hedef_yol: str, sahne_amaci: str = "",
 
         b.secildi()
         return {"ok": True, "yol": hedef_yol, "neden": "",
+                # ⚠ FAZ I-8: ATIF ZINCIRI fact_id'yi KORUR. Aday, sorgu ve
+                # atif ayni olguya baglidir; "hangi iddia icin hangi klip"
+                # sorusu sonradan cevaplanabilir olmali.
+                "fact_id": str(fact_id or getattr(aday, "fact_id", "") or ""),
                 "aday": {"saglayici": str(getattr(aday, "saglayici", "")),
                          "asset_id": str(getattr(aday, "asset_id", "")),
                          "lisans": str(getattr(aday, "lisans", "")),
                          "orijinal_url": str(getattr(aday, "orijinal_url", "")),
                          "eser_sahibi": str(getattr(aday, "eser_sahibi", "")),
+                         "fact_id": str(fact_id or getattr(aday, "fact_id", "")
+                                        or ""),
+                         "sorgu": str(getattr(aday, "sorgu", "") or ""),
                          "skor": getattr(aday, "toplam_skor", 0)},
                 "atif": str(getattr(aday, "atif_metni", "") or ""),
                 "dususler": []}

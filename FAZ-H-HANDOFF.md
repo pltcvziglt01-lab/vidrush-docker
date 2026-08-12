@@ -173,7 +173,8 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-2d görsel imza boşluğu kapatıldı** | `243bad5` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-5 konsept farkındalıklı medya seçimi** | `e3559b2` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-6 medya avcısı canlı hatta (opt-in)** | `1e9c288` | ✅ **origin'e push edildi**, deploy YOK |
-| 12 Ağu | **I-7 iş başına bütçe + paralel izolasyon** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
+| 12 Ağu | **I-7 iş başına bütçe + paralel izolasyon** | `6294369` | ✅ **origin'e push edildi**, deploy YOK |
+| 12 Ağu | **I-8 doğrulanmış olgu → sahne/medya bağı** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
 
 ---
 
@@ -1573,7 +1574,7 @@ pyflakes temiz.
 
 ## 24. FAZ I-7 — İŞ BAŞINA BÜTÇE ve PARALEL İŞ İZOLASYONU (12 Ağu, ölçüldü)
 
-> **Durum: yazıldı + testlendi, dosyalar staged. Commit YOK, deploy YOK.**
+> **Durum: commit `6294369`, `origin/arastirma-motoru`'na PUSH EDİLDİ. Deploy YOK.**
 > **Bayrak HÂLÂ varsayılan KAPALI.**
 > Değişen: `webapp/medya_kopru.py`, `webapp/pipeline.py`,
 > `webapp/testler/test_faz_i.py` (+ bu handoff).
@@ -1655,8 +1656,8 @@ yalnızca özetin kaynağı iş bütçesine taşındı).
 
 1. **Gerçek üretimle hâlâ koşulmadı.** Bayrak kapalı; kanıt yalnızca fixture.
    **Açmadan önce kontrollü pilot şart.**
-2. **Plan çıktısı `iddia_metni`/`fact_id` üretmiyor** (§23 sınır 3) — bu adımda
-   **kasıtlı olarak çözülmedi**, ayrı bir iş.
+2. ~~**Plan çıktısı `iddia_metni`/`fact_id` üretmiyor** (§23 sınır 3)~~ →
+   ✅ **§25'te (I-8) kapatıldı.**
 3. **USD sayacı yalnızca `MaliyetDefteri`ye yazılanı görür.** Avcı bir maliyeti
    deftere kaydetmezse bütçe onu bilemez; yani tavan "deftere yazılan" harcama
    içindir, ölçülmeyen harcamayı yakalamaz.
@@ -1668,3 +1669,97 @@ yalnızca özetin kaynağı iş bütçesine taşındı).
    tavan bir dosya kadar aşılabilir.
 6. Yalnızca footage sahnelerinde devrede; hikâye/animasyon hatları test
    edilmedi (§23 sınır 4 ve 6 aynen geçerli).
+
+---
+
+## 25. FAZ I-8 — DOĞRULANMIŞ OLGU → SAHNE ve MEDYA BAĞI (12 Ağu, ölçüldü)
+
+> **Durum: yazıldı + testlendi, dosyalar staged. Commit YOK, deploy YOK.**
+> **Bayrak HÂLÂ varsayılan KAPALI.**
+> Değişen: `webapp/arastirma_kopru.py`, `webapp/pipeline.py`,
+> `webapp/medya_kopru.py`, `webapp/testler/test_faz_i.py` (+ bu handoff).
+> **Dokunulmadı:** `server.py`, tüm arayüz, 22 alanlık generate sözleşmesi,
+> `medya/lisans.py`, `medya/guvenlik.py`, `medya/indirme.py`,
+> `medya/kare_kapisi.py`, `deploy.sh`.
+
+### Kapatılan açık (§23 sınır 3 / §24 sınır 2)
+
+Sahne planı `fact_id`/`iddia_metni` **üretmiyordu**. Medya köprüsü (I-6) bu
+alanları okuyordu ama hep boş buluyor ve `footage_sorgu`ya düşüyordu — yani
+*"araştırma-bağlantılı medya seçimi"* iddiası karşılıksızdı.
+
+### Yalnızca doğrulanmış iddia sahneye girer
+
+`olgu_listesi(manifest)` **yalnızca** `manifest.kullanilabilir_iddialar()`
+okur — yani `senaryoya_girebilir` olanları. O filtre zaten şunları eliyor:
+
+| Durum | Sahneye girer mi? |
+|---|---|
+| `dogrulandi` (kaynaklı) | ✅ |
+| `celiskili` | ❌ **testli** |
+| `cozulmedi` | ❌ **testli** |
+| kritik ama tek **zayıf** kaynak (ansiklopedi/blog/forum) | ❌ **testli** |
+
+Havuzun tek kapısı bu fonksiyondur — test bunu da kilitliyor.
+
+### Uydurma fact_id YOK
+
+`fact_bagla(scenes, olgular)` deterministik belirteç örtüşmesiyle eşleştirir
+(eşik `FACT_BAGLAMA_ESIGI`, varsayılan 0.16). Eşik altında kalan sahne
+**kimlik almaz** ve `bosluklar` içinde görünür kılınır. Ölçülen fixture:
+
+```
+sahne0 "Endurance … pack ice"      -> f001
+sahne1 "crew camped Elephant Isl." -> f002
+sahne2 "cooking recipe vegetables" -> fact_id YOK, kapsam boşluğu
+sahne3 (AI sahnesi)                -> hedefe girmez
+kapsam %66.7
+```
+
+Rapor `esik`, `olgu_sayisi`, `kullanilan_fact`, `kapsam_pct` ve boşlukları
+birlikte verir — *"her sahne kaynaklı"* gibi kanıtsız iddia üretilmez.
+
+### Bu adımda bulunan ve düzeltilen GERÇEK kusur
+
+İlk sürümde **olgu havuzu boşsa** fonksiyon sessizce dönüyordu: araştırma
+koşmuş ama senaryoya girebilen tek iddia çıkmamışsa hiçbir kapsam boşluğu
+yazılmıyordu. Test yakaladı; artık her footage sahnesi için
+`"dogrulanmis olgu havuzu bos"` boşluğu kaydediliyor.
+
+### Atıf zinciri fact_id'yi korur
+
+Medya köprüsü dönüşü artık `fact_id`'yi hem üst düzeyde hem `aday` kaydında
+taşıyor (`sorgu` alanıyla birlikte). *"Hangi iddia için hangi klip, hangi
+lisansla"* sorusu sonradan cevaplanabilir.
+
+### Geriye uyumluluk — bit-bit
+
+- Bağ **yalnızca** `arastirma_sonuc.calisti` **ve** olgu listesi doluysa kurulur.
+  Araştırma kapalı/başarısızsa hiçbir sahne değişmez.
+- `Sonuc.sozluk()` **değişmedi** — `olgular` alanı iş sözleşmesine yazılmıyor
+  (testli). `sonuc["olgu_bagi"]` yalnızca bağ kurulduğunda eklenir.
+- Planın/kullanıcının **açık `fact_id`'si ezilmez** (testli).
+- Bozuk girdide (`None`, dize, sayı, karışık liste) **çökmez**.
+- Faz A **125/0** — araştırma paketinde gerileme yok.
+
+### Ölçülen test sonucu (12 Ağu) — İKİ ORTAM AYRI
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Zengin venv** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **257** | **760** | **2174** |
+| **Sistem Python** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **203** | **760** | **2120** |
+
+0 hata. Faz I 715 → **760** (+45). pyflakes temiz. Gerçek ağ / ücretli API /
+üretim / deploy **yok**; bayrak açılmadı.
+
+### BİLİNEN SINIRLAR (dürüstçe)
+
+1. **Eşleştirme kelime örtüşmesidir, anlam değil.** Eşik 0.16 sezgisel;
+   gerçek plan çıktısıyla kalibre edilmedi. Yanlış eşleşme mümkün — ama
+   yanlış eşleşme bile **doğrulanmış** bir iddiaya bağlanır, uydurmaya değil.
+2. **Anlatım dili ile iddia dili farklıysa örtüşme düşer.** Türkçe anlatım +
+   İngilizce iddia metni durumunda çoğu sahne boşlukta kalır (görünür).
+3. **Gerçek üretimle koşulmadı** — kanıt yalnızca fixture; bayrak kapalı.
+4. **Bir iddia birden çok sahneye bağlanabilir**; tekrar sınırı yok.
+5. `iddia_metni` 180 karaktere kırpılıyor — uzun iddialarda bağlam kaybı olur.
+6. Yalnızca footage sahneleri hedeflenir (AI/Sora sahneleri kasıtlı dışarıda).

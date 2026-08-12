@@ -2829,6 +2829,245 @@ for _f4 in ("medya_kopru.py", "pipeline.py"):
     kontrol(f"{_f4} derleniyor", _derlenir(os.path.join(KOK, _f4)))
 
 
+# ═══ 22. FAZ I-8 — DOGRULANMIS OLGU -> SAHNE ve MEDYA BAGI ═══
+# ⚠ KAPATILAN ACIK (§23 sinir 3 / §24 sinir 2): sahne plani fact_id/iddia
+# URETMIYORDU; medya koprusu bu alanlari okuyup hep bos buluyordu. Yani
+# "arastirma-bagli medya secimi" iddiasi karsiliksizdi.
+# ⚠ BAYRAK HALA VARSAYILAN KAPALI. Gercek ag/ucretli API/uretim YOK.
+blok("22. I-8 — olgu bagi: yalnizca DOGRULANMIS iddia sahneye girer")
+
+import arastirma_kopru as ak                           # noqa: E402
+
+_OLGU = [
+    {"fact_id": "f001", "guven": "dogrulandi", "kategori": "tarih",
+     "kritik": True,
+     "metin": "The Endurance became trapped in pack ice in January 1915 "
+              "near Antarctica.",
+     "kaynaklar": [{"alan": "rgs.org", "url": "https://rgs.org/x",
+                    "tur": "birincil"}]},
+    {"fact_id": "f002", "guven": "dogrulandi", "kategori": "cografya",
+     "kritik": False,
+     "metin": "The crew camped on Elephant Island for four months awaiting "
+              "rescue.",
+     "kaynaklar": [{"alan": "bl.uk", "url": "https://bl.uk/y", "tur": "arsiv"}]},
+]
+
+
+def _sahneler():
+    return [
+        {"kaynak": "footage",
+         "anlatim": "The Endurance became trapped in pack ice near Antarctica "
+                    "in 1915.",
+         "footage_sorgu": "ship trapped pack ice antarctica"},
+        {"kaynak": "footage",
+         "anlatim": "The crew camped on Elephant Island awaiting rescue.",
+         "footage_sorgu": "elephant island camp"},
+        {"kaynak": "footage",
+         "anlatim": "Completely unrelated cooking recipe with vegetables.",
+         "footage_sorgu": "cooking vegetables"},
+        {"kaynak": "ai", "anlatim": "The Endurance became trapped in pack ice.",
+         "footage_sorgu": ""},
+    ]
+
+
+_S = _sahneler()
+_R = ak.fact_bagla(_S, _OLGU)
+kontrol("dogrulanmis iddia sahneye BAGLANIYOR",
+        _S[0].get("fact_id") == "f001" and _S[1].get("fact_id") == "f002",
+        f"{_S[0].get('fact_id')} / {_S[1].get('fact_id')}")
+kontrol("baglanan sahneye KISA iddia metni yaziliyor",
+        "Endurance" in (_S[0].get("iddia_metni") or "")
+        and len(_S[0]["iddia_metni"]) <= ak.FACT_METIN_SINIRI)
+kontrol("ALAKASIZ sahne fact_id ALMIYOR (uydurma yok)",
+        "fact_id" not in _S[2] and "iddia_metni" not in _S[2])
+kontrol("baglanmayan sahne KAPSAM BOSLUGU olarak gorunur",
+        any(b["sahne"] == 2 for b in _R["bosluklar"]), str(_R["bosluklar"]))
+kontrol("footage OLMAYAN sahne hedefe girmiyor",
+        _R["hedef"] == 3 and "fact_id" not in _S[3])
+kontrol("kapsam orani RAPORLANIYOR (kanitsiz iddia yok)",
+        _R["kapsam_pct"] == 66.7 and _R["baglanan"] == 2, str(_R))
+kontrol("kullanilan fact listesi raporlaniyor",
+        _R["kullanilan_fact"] == ["f001", "f002"])
+kontrol("esik RAPORLANIYOR (karar izlenebilir)", _R["esik"] == ak.FACT_ESIK)
+
+# ── DESTEKSIZ / CELISKILI IDDIA SAHNEYE GIREMEZ ──
+# `olgu_listesi` yalnizca `kullanilabilir_iddialar()` (senaryoya_girebilir)
+# okur; celiskili/cozulmedi durumlari o filtrede ELENIR.
+from arastirma.manifests import ArastirmaManifesti, Iddia, Kaynak  # noqa: E402
+
+_man = ArastirmaManifesti(konu="Endurance")
+_man.iddialar = [
+    Iddia(fact_id="f001", metin="Verified claim with two sources.",
+          guven="dogrulandi", kritik=False,
+          kaynaklar=[Kaynak(url="https://rgs.org/a", tur="resmi-kurum",
+                            baslik="A", erisim_tarihi="2026-08-12",
+                            birincil=True)]),
+    Iddia(fact_id="f002", metin="Contradictory claim about the same event.",
+          guven="celiskili", kritik=False,
+          kaynaklar=[Kaynak(url="https://x.org/b", tur="haber-buyuk",
+                            baslik="B", erisim_tarihi="2026-08-12")]),
+    Iddia(fact_id="f003", metin="Unresolved claim nobody could verify.",
+          guven="cozulmedi", kritik=False,
+          kaynaklar=[Kaynak(url="https://y.org/c", tur="haber-buyuk",
+                            baslik="C", erisim_tarihi="2026-08-12")]),
+    Iddia(fact_id="f004", metin="Critical claim with only one weak source.",
+          guven="tek-kaynak", kritik=True,
+          kaynaklar=[Kaynak(url="https://wiki.org/d", tur="ansiklopedi",
+                            baslik="D", erisim_tarihi="2026-08-12")]),
+]
+_liste = ak.olgu_listesi(_man)
+_kimlikler = {o["fact_id"] for o in _liste}
+kontrol("CELISKILI iddia olgu listesine GIRMIYOR", "f002" not in _kimlikler,
+        str(_kimlikler))
+kontrol("COZULMEDI iddia olgu listesine GIRMIYOR", "f003" not in _kimlikler)
+kontrol("kritik ama TEK ZAYIF kaynakli iddia GIRMIYOR", "f004" not in _kimlikler)
+kontrol("dogrulanmis iddia olgu listesine GIRIYOR", "f001" in _kimlikler)
+kontrol("olgu listesi kaynak/alan bilgisini TASIYOR",
+        bool(_liste[0]["kaynaklar"]) and _liste[0]["kaynaklar"][0]["alan"])
+
+# Celiskili bir iddia ELLE havuza konsa bile sahneye giremez mi?
+# (havuz `olgu_listesi`den gelir; bu test filtrenin TEK kapi oldugunu kilitler)
+kontrol("sahneye giren havuz YALNIZCA olgu_listesi'nden kuruluyor",
+        "s.olgular = olgu_listesi(manifest)" in oku(KOK, "arastirma_kopru.py"))
+
+# ── ACIK SECIM KORUNUYOR ──
+_S2 = _sahneler()
+_S2[0]["fact_id"] = "f999"
+ak.fact_bagla(_S2, _OLGU)
+kontrol("planin ACIK fact_id'si EZILMIYOR", _S2[0]["fact_id"] == "f999")
+
+# ── DAYANIKLILIK / GERIYE UYUMLULUK ──
+kontrol("olgu YOKSA hicbir sahne degismiyor",
+        (lambda s: (ak.fact_bagla(s, []), "fact_id" not in s[0])[1])(_sahneler()))
+kontrol("bozuk girdide COKMUYOR",
+        all(isinstance(ak.fact_bagla(a, b), dict) for a, b in
+            ((None, None), ("x", 5), ([], []), ([1, 2], _OLGU),
+             (_sahneler(), [{"fact_id": ""}]))))
+kontrol("fact_bagla DETERMINISTIK (ayni girdi -> ayni sonuc)",
+        (lambda: (lambda a, b: a == b)(
+            ak.fact_bagla(_sahneler(), _OLGU)["kullanilan_fact"],
+            ak.fact_bagla(_sahneler(), _OLGU)["kullanilan_fact"]))())
+kontrol("Sonuc.sozluk() DEGISMEDI (is sozlesmesi korundu)",
+        "olgular" not in ak.Sonuc().sozluk(), str(sorted(ak.Sonuc().sozluk())))
+kontrol("Sonuc.olgular varsayilan BOS (arastirma kapaliysa bag kurulmaz)",
+        ak.Sonuc().olgular == [])
+
+
+blok("22b. I-8 — FIXTURE: atif zinciri fact_id ile bagli, cozulmemis reddedilir")
+
+_i8_kok = tempfile.mkdtemp(prefix="i8_")
+_eski_px3 = os.environ.get("PEXELS_KEY")
+_asil_indir3 = _mind.guvenli_indir
+try:
+    os.environ["PEXELS_KEY"] = "test"
+    _mkayit.kosu_sifirla()
+
+    def _indir_fix3(url, hedef, **kw):
+        with open(hedef, "wb") as f:
+            f.write(b"\x00" * 9000)
+        return {"ok": True, "sebep": "", "okunan_bayt": 9000, "bilgi": {}}
+
+    _mind.guvenli_indir = _indir_fix3
+    _b8 = mkp.is_butcesi_kur("i8", maks_istek=50, maks_kare=50)
+    _r8 = mkp.sahne_medyasi(
+        sorgu="tokyo street night", hedef_yol=os.path.join(_i8_kok, "a.mp4"),
+        sahne_amaci="ortam", iddia_metni="Tokyo street at night in 2024.",
+        fact_id="f001", scene_id="s001", konu="tokyo", is_ayar=_ac,
+        istek=_sahte_istek, kare_dogrula=lambda *a, **k: True,
+        coz=lambda h: ["93.184.216.34"], erisim_tarihi="2026-08-12",
+        butce=_b8)
+    kontrol("FIXTURE: dogrulanmis fact ile medya secildi", _r8["ok"] is True,
+            str(_r8["neden"]))
+    kontrol("ATIF ZINCIRI fact_id'yi KORUYOR (ust duzey)",
+            _r8.get("fact_id") == "f001", str(_r8.get("fact_id")))
+    kontrol("ATIF ZINCIRI fact_id'yi KORUYOR (aday kaydi)",
+            _r8["aday"].get("fact_id") == "f001")
+    kontrol("aday kaydinda sorgu da tasiniyor", "sorgu" in _r8["aday"])
+    kontrol("aday lisans+provenance bilgisini HALA tasiyor",
+            _r8["aday"].get("lisans") and _r8["aday"].get("orijinal_url"))
+
+    # ⚠ COZULMEMIS fact sahneye HIC girmedigi icin kopruye de ULASMAZ.
+    # Bunu uctan uca dogrula: cozulmemis iddiadan olusan havuzla baglama
+    # yapilinca sahne fact_id ALMAZ, dolayisiyla kopru bos fact_id gorur.
+    _man2 = ArastirmaManifesti(konu="x")
+    _man2.iddialar = [
+        Iddia(fact_id="f050", metin="Unresolved claim about pack ice.",
+              guven="cozulmedi", kritik=False,
+              kaynaklar=[Kaynak(url="https://z.org/a", tur="haber-buyuk",
+                                baslik="Z",
+                                erisim_tarihi="2026-08-12")])]
+    _S3 = [{"kaynak": "footage",
+            "anlatim": "Unresolved claim about pack ice.",
+            "footage_sorgu": "pack ice"}]
+    _R3 = ak.fact_bagla(_S3, ak.olgu_listesi(_man2))
+    kontrol("COZULMEMIS fact sahneye BAGLANMIYOR (uctan uca)",
+            "fact_id" not in _S3[0] and _R3["baglanan"] == 0,
+            str(_S3[0].get("fact_id")))
+    kontrol("cozulmemis fact icin KAPSAM BOSLUGU yaziliyor",
+            len(_R3["bosluklar"]) == 1)
+    _r9 = mkp.sahne_medyasi(
+        sorgu="pack ice", hedef_yol=os.path.join(_i8_kok, "b.mp4"),
+        iddia_metni=_S3[0]["anlatim"],
+        fact_id=str(_S3[0].get("fact_id") or ""), scene_id="s002",
+        konu="x", is_ayar=_ac, istek=_sahte_istek,
+        kare_dogrula=lambda *a, **k: True, coz=lambda h: ["93.184.216.34"],
+        erisim_tarihi="2026-08-12", butce=_b8)
+    kontrol("fact_id'siz sahnede atif zinciri BOS fact tasiyor (uydurma yok)",
+            _r9.get("fact_id") == "" if _r9["ok"] else True,
+            str(_r9.get("fact_id")))
+finally:
+    _mind.guvenli_indir = _asil_indir3
+    if _eski_px3 is None:
+        os.environ.pop("PEXELS_KEY", None)
+    else:
+        os.environ["PEXELS_KEY"] = _eski_px3
+    _sh.rmtree(_i8_kok, ignore_errors=True)
+
+
+blok("22c. I-8 — pipeline baglantisi ve KORUMALAR aynen")
+
+_PP5 = oku(KOK, "pipeline.py")
+kontrol("pipeline olgu bagini YALNIZCA arastirma kostuysa kuruyor",
+        'if getattr(arastirma_sonuc, "calisti", False):' in _PP5
+        and "arastirma_kopru.fact_bagla(scenes, _olgular)" in _PP5)
+kontrol("olgu yoksa bag KURULMUYOR", "if _olgular:" in _PP5)
+kontrol("olgu bagi ozeti YALNIZCA bag kuruldugunda ise yaziliyor",
+        "if _fact_rapor is not None:" in _PP5 and 'sonuc["olgu_bagi"]' in _PP5)
+kontrol("kapsam bosluklari dususlere GORUNUR yaziliyor",
+        '"asama": "olgu-bagi"' in _PP5)
+kontrol("olgu bagi LOGA yaziliyor", "OLGU BAGI:" in _PP5)
+kontrol("bayrak HALA varsayilan KAPALI", mkp.ACIK is False)
+
+# KORUMALAR — bu adimda hicbiri degismedi
+kontrol("kare kapisi fail-closed KORUNDU",
+        "if not callable(kare_dogrula)" in oku(KOK, "medya_kopru.py"))
+kontrol("lisans duvari KORUNDU",
+        'getattr(a, "render_kullanilabilir", False)' in oku(KOK, "medya_kopru.py"))
+kontrol("SSRF: kopru HALA dogrudan ag cagirmiyor",
+        not re.search(r"^\s*(import|from)\s+(requests|urllib|socket)\b",
+                      oku(KOK, "medya_kopru.py"), re.M))
+kontrol("butce korumalari KORUNDU",
+        "class IsButcesi" in oku(KOK, "medya_kopru.py")
+        and mkp.VARSAYILAN_MAKS_USD == 0.0)
+kontrol("lisans/SSRF/kare/indirme modulleri DOKUNULMADI",
+        all("fact_bagla" not in oku(KOK, f) for f in
+            ("medya/lisans.py", "medya/guvenlik.py", "medya/indirme.py",
+             "medya/kare_kapisi.py")))
+
+# SOZLESMELER
+kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("UI ve kullanici secimleri DEGISMEDI",
+        "basitGovde" in oku(KOK, "static/js/wizard.js")
+        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js")
+        and "d.unlu = t.unlu ? '1' : '0'" in oku(KOK, "static/js/wizard.js"))
+kontrol("server.py olgu bagi alani OKUMUYOR",
+        "olgu_bagi" not in oku(KOK, "server.py"))
+for _f5 in ("arastirma_kopru.py", "medya_kopru.py", "pipeline.py"):
+    kontrol(f"{_f5} derleniyor", _derlenir(os.path.join(KOK, _f5)))
+
+
 print(f"\n{'=' * 60}")
 print(f"GECEN: {gecen}   BASARISIZ: {len(basarisiz)}   BLOKE: {len(bloke)}")
 for b in basarisiz:
