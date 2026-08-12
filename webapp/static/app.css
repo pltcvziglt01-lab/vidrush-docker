@@ -932,3 +932,25 @@ img, svg, video { max-width: 100%; }
 .iskart-dusus { margin-top: 4px; }
 .iskart-dusus ul { margin: 0; padding-left: 18px; }
 .iskart-dusus li { margin-bottom: 6px; }
+
+/* ══ FAZ I-3 — BASIT URETIM ("Metin + Stil + Auto") ══
+   Yeni Proje artik iki modlu: BASIT (metin + stil + tek eylem) ve ADIM ADIM
+   (5 adimli wizard, kaldirilmadi). Asagidaki kurallar yalnizca basit modun
+   yerlesimi icin; mevcut siniflarin hicbiri degistirilmedi. */
+.mod-cip { flex: 0 0 auto; }
+.bs-govde { display: flex; flex-direction: column; gap: 18px; }
+.bs-auto { display: flex; flex-direction: column; gap: 4px; }
+.bs-adim-not { margin-top: 14px; }
+.bs-eylem {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+/* 44px dokunma hedefi (Faz F erisilebilirlik kurali) */
+.bs-eylem .dugme { min-height: 44px; }
+.bs-eylem-not { flex: 1 1 220px; min-width: 0; }
+@media (max-width: 720px) {
+  .bs-eylem .dugme { width: 100%; }
+  .bs-eylem-not { flex-basis: 100%; }
+}

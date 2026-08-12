@@ -17,7 +17,13 @@ const ISLER_ANAHTAR = 'bedosaho_isler_v1';
 export function bosTaslak() {
   return {
     surum: 1,
+    // Kurulum bicimi: 'basit' (metin + stil + tek eylem) ya da 'adim'
+    // (5 adimli wizard). Varsayilan BASIT; adim adim akis KALDIRILMADI.
+    mod: 'basit',
     tur: '',
+    // Turu KIM secti? 'kullanici' ise Auto ona DOKUNMAZ. Bos ise basit mod
+    // `/api/analiz`in onerisini uygulayabilir (bkz. basit.js `autoTuru`).
+    turKaynak: '',
     konu: '',
     girisYontemi: 'konu',
     sureDk: '2',

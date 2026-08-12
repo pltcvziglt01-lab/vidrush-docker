@@ -23,6 +23,8 @@ import {$, $$, alan, anahtar, duyur, etiket, gelismis, grupBagla, kac,
         ozetSatir, secKart, secimAlani, uyariKutu, yukleniyor} from './bilesenler.js';
 import {ikon, ikonlariBagla} from './ikon.js';
 import {adim3Govde, adim3Kur, bosDurum, sesDurdur} from './secim-deneyimi.js';
+import {autoPaneli, autoStilKimligi, autoTuru, basitGovde, basitKur,
+        modCipleri} from './basit.js';
 
 /** Uzun yer tutucu metinleri — sablon dizesi ICINDE kesme isareti kullanmak
  *  kacis sorunu yaratiyor, bu yuzden ayri sabit. */
@@ -389,6 +391,7 @@ export function wizardHtml() {
       <h1>Yeni Proje</h1>
       <p>Adım ${adim}/5 — ${kac(ADIMLAR[adim - 1].tam)}</p>
     </div>
+    ${modCipleri('adim')}
     <button type="button" class="dugme dugme-hayalet" id="wzSifirla">
       ${ikon('cop', {boyut: 17})} Taslağı sil</button>
   </div>
@@ -476,7 +479,8 @@ function olaylariBagla(yenidenCiz) {
   });
 
   grupBagla(document, 'tur', (v) => {
-    taslakYaz({tur: v});
+    // ⚠ Kullanicinin ACIK secimi isaretlenir; Auto bir daha turu EZMEZ.
+    taslakYaz({tur: v, turKaynak: 'kullanici'});
     // Tur degisince stil secimi karismasin
     taslakYaz(v === 'animasyon' ? {editStili: ''} : {animStili: ''});
   });
@@ -574,7 +578,15 @@ function generateDegerleri() {
     altyazi: t.altyazi ? '1' : '0',
   };
   const stil = t.tur === 'animasyon' ? t.animStili : t.editStili;
-  if (stil) d.edit = stil;
+  // ⚠ FAZ I-3 — AUTO KOPRUSU, YENI ALAN EKLEMEDEN.
+  // Kullanici acik bir stil sectiyse o kazanir (degismeyen davranis).
+  // Secmediyse ve `/api/analiz` GUVENILIR bir bilesik profil cozduyse o
+  // kimlik MEVCUT `edit` alaniyla gonderilir; 22 alanlik sozlesme buyumez.
+  // `autoStilKimligi()` yalnizca uretim hattinin GERCEKTEN cozebilecegi
+  // kimlikleri gecirir (melez ve varsayilan durumlar elenir) — aksi halde
+  // "stil uygulandi" demek yalan olurdu.
+  const otoStil = stil ? '' : autoStilKimligi(_analiz, t.tur);
+  if (stil || otoStil) d.edit = stil || otoStil;
   if (t.profil) d.profil = t.profil;
   if (t.altyazi && t.altyaziSablon) {
     d.altyazi_sablon = JSON.stringify(t.altyaziSablon);
@@ -605,13 +617,17 @@ function generateDegerleri() {
 // dogrulanabilsin.
 export {generateDegerleri};
 
-async function uretimiBaslat(dugme) {
-  const durum = $('#wzUretimDurum');
+async function uretimiBaslat(dugme, durumSecici = '#wzUretimDurum') {
+  const durum = $(durumSecici);
+  const basitMi = durumSecici !== '#wzUretimDurum';
   for (const n of [1, 2]) {
     const g = adimGecerli(n);
     if (!g.ok) {
       if (durum) durum.textContent = g.sebep;
-      adim = n;
+      // ⚠ Basit modda ADIM YOK; kullaniciyi gormedigi bir adima atlatmayiz.
+      // Eksik olan sey ekranda zaten gorunur (metin alani) ya da yalnizca
+      // adim adim modda ayarlanabilir (animasyon referans karesi).
+      if (!basitMi) adim = n;
       return;
     }
   }
@@ -653,23 +669,108 @@ async function uretimiBaslat(dugme) {
 
 /* ════════════════ GIRIS NOKTASI ════════════════ */
 
+/* ════════════════ BASIT MOD ════════════════ */
+
+/** Analiz istegini geciktirici — her tusa basista uc cagirmayalim. */
+let _analizZaman = null;
+
+/**
+ * Auto panelini YERINDE tazele. Tum ekrani yeniden cizmek metin alanindaki
+ * imleci kaybettirirdi; yalnizca `#bsAuto` govdesi degisir.
+ */
+function autoPaneliniTazele(kap) {
+  const kutu = $('#bsAuto', kap);
+  if (!kutu) return;
+  // ⚠ Auto'nun OLCTUGU uretim hattini uygula — kullanici turu kendisi
+  // secmediyse. Aksi halde acik bir hikaye metni belgesel hattinda uretilirdi.
+  const oneriTur = autoTuru(_analiz, taslak());
+  if (oneriTur) taslakYaz({tur: oneriTur});
+  const bas = kutu.querySelector('.ozet-kart-bas');
+  const t = taslak();
+  kutu.innerHTML = `${bas ? bas.outerHTML : ''}${
+    autoPaneli(_analiz, t.tur || 'documentary',
+      {metinVar: (t.konu || '').trim().length >= 20})}`;
+  ikonlariBagla(kutu);
+}
+
+function basitCizim(kap) {
+  const ciz = () => {
+    kap.innerHTML = basitGovde({
+      t: taslak(), kaynak, analiz: _analiz, durum: a3, dosyalar,
+    });
+    ikonlariBagla(kap);
+    modCipleriniBagla(kap);
+    // Stil/ses/marka/palet/pro kontrollerinin TAMAMI adim3Kur icinde
+    // baglanir — burada tekrar baglanmaz (cift baglama olurdu).
+    adim3Kur({
+      kap, durum: a3, taslak, taslakYaz, kaynak, dosyalar,
+      dosyaAlaniBagla, duyur, yenidenCiz: ciz,
+    });
+    basitKur({
+      kok: kap, taslak, taslakYaz, yenidenCiz: ciz,
+      analizTazele: ({hemen} = {}) => {
+        _analiz = null;
+        autoPaneliniTazele(kap);
+        if (_analizZaman) clearTimeout(_analizZaman);
+        _analizZaman = setTimeout(() => {
+          analizCalistir(() => autoPaneliniTazele(kap));
+        }, hemen ? 0 : 700);
+      },
+      uret: (dugme) => uretimiBaslat(dugme, '#bsUretimDurum'),
+    });
+    duyur('');
+  };
+  _yenidenCiz = ciz;
+  ciz();
+  // Ilk cizimde analizi BIR KEZ calistir (ucretsiz, LLM cagrisi YOK)
+  if (_analiz === null && (taslak().konu || '').trim().length >= 20) {
+    analizCalistir(() => autoPaneliniTazele(kap));
+  }
+}
+
+function modCipleriniBagla(kap) {
+  grupBagla(kap, 'mod', (v) => {
+    taslakYaz({mod: v === 'adim' ? 'adim' : 'basit'});
+    sesDurdur();
+    if (_ekranKap) ekraniCiz(_ekranKap);
+  });
+}
+
+/* ════════════════ GIRIS NOKTASI ════════════════ */
+
+let _ekranKap = null;
+
+function ekraniCiz(kap) {
+  if (taslak().mod === 'adim') {
+    const ciz = () => {
+      kap.innerHTML = wizardHtml();
+      ikonlariBagla(kap);
+      modCipleriniBagla(kap);
+      olaylariBagla(ciz);
+      // Yeni adim cizildi: onceki adimin hata duyurusu artik gecerli degil
+      duyur('');
+    };
+    _yenidenCiz = ciz;
+    ciz();
+    return;
+  }
+  basitCizim(kap);
+}
+
 export async function wizardCiz(kap, {adimNo} = {}) {
-  if (adimNo) adim = Math.max(1, Math.min(5, Number(adimNo)));
+  // Hash'te adim numarasi varsa (or. #/yeni/3) ADIM ADIM mod istenmis demektir
+  if (adimNo) {
+    adim = Math.max(1, Math.min(5, Number(adimNo)));
+    taslakYaz({mod: 'adim'});
+  }
   kap.innerHTML = `<div class="sayfa-bas"><div class="sayfa-bas-yazi">
     <h1>Yeni Proje</h1><p>Seçenekler yükleniyor…</p></div></div>
     ${yukleniyor(3, 84)}`;
   if (!kaynak.yuklendi) {
     kaynak = {...(await kaynaklariYukle()), yuklendi: true};
   }
-  _yenidenCiz = () => ciz();
-  const ciz = () => {
-    kap.innerHTML = wizardHtml();
-    ikonlariBagla(kap);
-    olaylariBagla(ciz);
-    // Yeni adim cizildi: onceki adimin hata duyurusu artik gecerli degil
-    duyur('');
-  };
-  ciz();
+  _ekranKap = kap;
+  ekraniCiz(kap);
 }
 
 export function wizardAdim() { return adim; }

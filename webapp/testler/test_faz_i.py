@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import os
 import re
+import subprocess
 import sys
 import threading
 
@@ -1247,6 +1248,179 @@ for f in ("girdi_analizi.py", "pipeline.py"):
         kontrol(f"{f} derleniyor (I-2c sonrasi)", True)
     except Exception as e:
         kontrol(f"{f} derleniyor (I-2c sonrasi)", False, str(e)[:140])
+
+
+# ═══════════════ 16. FAZ I-3 — BASIT "METIN + STIL + AUTO" ARAYUZU ═══════════════
+# ⚠ IDDIA: Yeni Proje artik varsayilan olarak TEK EKRAN (metin + stil + tek
+# eylem). Adim adim wizard KALDIRILMADI, hicbir backend alani KAYBOLMADI ve
+# Auto secimi `generate` sozlesmesine YENI ALAN EKLEMEDEN tasiniyor.
+blok("16. I-3 — basit uretim arayuzu sozlesmesi")
+
+_ST = os.path.join(KOK, "static")
+
+
+def _oku_st(*p):
+    with open(os.path.join(_ST, *p), encoding="utf-8") as f:
+        return f.read()
+
+
+BASIT = _oku_st("js", "basit.js")
+WZ_JS = _oku_st("js", "wizard.js")
+DURUM_JS = _oku_st("js", "durum.js")
+SD_JS = _oku_st("js", "secim-deneyimi.js")
+CSS_ST = _oku_st("app.css")
+
+# ── Varsayilan deneyim: metin + stil + TEK ana eylem ──
+kontrol("basit.js modulu var", len(BASIT) > 1000)
+kontrol("varsayilan mod BASIT", "mod: 'basit'" in DURUM_JS)
+kontrol("wizard basit modu cagiriyor",
+        "basitGovde" in WZ_JS and "basitKur" in WZ_JS)
+kontrol("metin alani var", 'id="bsMetin"' in BASIT)
+kontrol("stil secimi var (Otomatik dahil)", "stilBolumu({" in BASIT)
+kontrol("sure secici KORUNDU", 'id: \'bsSure\'' in BASIT
+        and "SURE_SECENEKLERI" in BASIT)
+_eylem = re.findall(r'id="(bs[A-Za-z]+)"[^>]*>\s*\$\{ikon', BASIT)
+kontrol("TEK ana uretim eylemi", BASIT.count('id="bsUret"') == 1,
+        str(BASIT.count('id="bsUret"')))
+kontrol("gelismis ayarlar TEK acilir alanda", "gelismis('Gelişmiş ayarlar'"
+        in BASIT)
+
+# ── HICBIR BACKEND ALANI KAYBOLMADI ──
+# Basit mod, adim 3'un bilesenlerini YENIDEN KULLANIR (kopyalamaz).
+for ad, iz in [("ses kutuphanesi", "sesBolumu({"), ("marka kiti", "markaBolumu({"),
+               ("hizli tercihler", "hizliTercihler({"),
+               ("profesyonel ayarlar", "proPanel({")]:
+    kontrol(f"basit modda korundu: {ad}", iz in BASIT)
+kontrol("secim kontrolleri TEK yerden baglaniyor (cift baglama yok)",
+        BASIT.count("radyoBagla") == 0 and "adim3Kur({" in WZ_JS)
+kontrol("adim adim wizard KALDIRILMADI",
+        len(re.findall(r"\{no: \d, ad: '", WZ_JS)) == 5)
+kontrol("iki mod arasinda gidip gelinebiliyor",
+        "modCipleri" in BASIT and "modCipleri" in WZ_JS
+        and "data-grup=\"mod\"" in BASIT)
+kontrol("unlu modu HALA uretiliyor", "d.unlu = t.unlu ? '1' : '0'" in WZ_JS)
+kontrol("Grok/maliyet alanlarina dokunulmadi (gorsel model secimi duruyor)",
+        "wzModel" in SD_JS)
+
+# ── AUTO -> GENERATE: YENI ALAN YOK ──
+_gd = WZ_JS[WZ_JS.find("function generateDegerleri()"):]
+_gd = _gd[:_gd.find("export {generateDegerleri}")]
+_yeni_alan = set(re.findall(r"d\.(\w+)\s*=", _gd)) - {
+    "session", "story", "tur", "sure_dk", "gecis", "zoom", "altyazi", "edit",
+    "profil", "altyazi_sablon", "palet", "palet_ozel", "arkaplan", "ses",
+    "isik", "gorsel_model", "acilis", "sora", "unlu", "karakter", "stil",
+    "sahne_ref"}
+kontrol("Auto sozlesmeye YENI ALAN EKLEMIYOR", not _yeni_alan, str(_yeni_alan))
+kontrol("Auto stili MEVCUT `edit` alaniyla tasiniyor",
+        "autoStilKimligi(_analiz, t.tur)" in WZ_JS
+        and "d.edit = stil || otoStil" in WZ_JS)
+kontrol("kullanicinin acik stili Auto'yu YENIYOR",
+        "stil ? '' : autoStilKimligi" in WZ_JS)
+kontrol("kullanicinin acik TUR secimi isaretleniyor",
+        "turKaynak: 'kullanici'" in WZ_JS and "turKaynak" in DURUM_JS)
+
+# ── Auto sonucu GORUNUR ve ANLASILIR ──
+kontrol("konsept ekranda gosteriliyor", "'Konu türü'" in BASIT)
+kontrol("uretim hatti ekranda gosteriliyor", "'Üretim hattı'" in BASIT)
+kontrol("secilen stil ve SURUMU gosteriliyor",
+        "'Seçilen stil'" in BASIT and "'Stil sürümü'" in BASIT)
+kontrol("gerekce INSAN DILINE cevriliyor (ham backend metni degil)",
+        "export function kanitMetni" in BASIT
+        and "bağımsız işaret ölçüldü" in BASIT
+        and "k.gerekce" not in BASIT)
+kontrol("uygulanamayan Auto sonucu SESSIZ GECILMIYOR",
+        "(uygulanmadı)" in BASIT and "melez stiller henüz üretime" in BASIT)
+kontrol("analiz hatasi durustce bildiriliyor", "Analiz alınamadı" in BASIT)
+kontrol("basit mod CSS'i eklendi", ".bs-govde" in CSS_ST and ".bs-eylem" in CSS_ST)
+kontrol("44px dokunma hedefi korundu", ".bs-eylem .dugme { min-height: 44px; }"
+        in CSS_ST)
+kontrol("SAHTE sayi/oran uretilmiyor",
+        not re.search(r"\$\s?\d", BASIT)
+        and "kalite puan" not in BASIT.lower())
+
+# ── DAVRANIS DOGRULUK TABLOSU (node ile GERCEKTEN kosturulur) ──
+_dt = r"""
+import {autoStilKimligi, autoTuru, kanitMetni, guvenMetni} from './basit.js';
+const A = (kaynak, kimlik) => ({stil_profili: {kaynak, kimlik}});
+const c = [];
+const e = (ad, alinan, beklenen) =>
+  c.push({ad, ok: JSON.stringify(alinan) === JSON.stringify(beklenen),
+          alinan, beklenen});
+
+e('auto + belgesel hatti -> kimlik TASINIR',
+  autoStilKimligi(A('auto', 'belgesel-sinematik'), 'documentary'),
+  'belgesel-sinematik');
+e('MELEZ kimlik TASINMAZ (hat cozemez, sessizce varsayilana duserdi)',
+  autoStilKimligi(A('turetilmis', 'melez:a+b'), 'documentary'), '');
+e('VARSAYILAN kaynak TASINMAZ (hat kendi varsayilanini korur)',
+  autoStilKimligi(A('varsayilan', 'belgesel-sinematik'), 'documentary'), '');
+e('KULLANICI kaynagi bu yoldan TASINMAZ (normal yoldan gider)',
+  autoStilKimligi(A('kullanici', 'belgesel-sinematik'), 'documentary'), '');
+e('hikaye hattinda TASINMAZ', autoStilKimligi(A('auto', 'korku-gerilim'),
+  'hikaye'), '');
+e('animasyon hattinda TASINMAZ',
+  autoStilKimligi(A('auto', 'belgesel-sinematik'), 'animasyon'), '');
+e('analiz yoksa TASINMAZ', autoStilKimligi(null, 'documentary'), '');
+e('stil_profili yoksa TASINMAZ', autoStilKimligi({}, 'documentary'), '');
+e('bos kimlik TASINMAZ', autoStilKimligi(A('auto', ''), 'documentary'), '');
+
+const K = (etiket, oto) => ({konsept: {eski_etiket: etiket},
+  otomatik_secimler: oto ? {tur: {deger: oto}} : {}});
+e('YENI taksonomi hikayeyi yakaliyor (eski dedektor belirsiz dese bile)',
+  autoTuru(K('hikaye', 'documentary'), {tur: 'documentary', turKaynak: ''}),
+  'hikaye');
+e('ayni tur zaten secili ise degisiklik YOK',
+  autoTuru(K('belgesel', ''), {tur: 'documentary', turKaynak: ''}), '');
+e('KULLANICI turu sectiyse Auto EZMEZ',
+  autoTuru(K('hikaye', ''), {tur: 'documentary', turKaynak: 'kullanici'}), '');
+e('konsept belirsizse ESKI alana dusulur',
+  autoTuru(K('belirsiz', 'hikaye'), {tur: 'documentary', turKaynak: ''}),
+  'hikaye');
+e('analiz hatasinda tur DEGISMEZ',
+  autoTuru({_hata: 'HTTP 500'}, {tur: 'documentary', turKaynak: ''}), '');
+e('analiz yoksa tur DEGISMEZ', autoTuru(null, {tur: 'documentary'}), '');
+e('animasyon Auto tarafindan ASLA secilmez',
+  autoTuru(K('belirsiz', 'animasyon'), {tur: 'documentary', turKaynak: ''}), '');
+
+e('kanit metni OLCULEN sayilari tasiyor',
+  kanitMetni({kanit: 3, guven: 0.72}),
+  'Metinde 3 bağımsız işaret ölçüldü; kararın güveni yüzde 72.');
+e('kanit yoksa CUMLE UYDURULMAZ', kanitMetni({kanit: 0}), '');
+e('guven metni belirsizi belirsiz diyor', guvenMetni({durum: 'belirsiz'}),
+  'Belirsiz');
+e('guven metni kesini kesin diyor', guvenMetni({durum: 'kesin'}), 'Sinyal net');
+
+console.log(JSON.stringify(c));
+"""
+
+if subprocess.run(["node", "-v"], capture_output=True).returncode == 0:
+    _dt_yol = os.path.join(_ST, "js", "_i3_dogruluk.mjs")
+    try:
+        with open(_dt_yol, "w", encoding="utf-8") as f:
+            f.write(_dt)
+        _r = subprocess.run(["node", _dt_yol], capture_output=True, text=True,
+                            cwd=os.path.join(_ST, "js"))
+        if _r.returncode != 0:
+            kontrol("davranis dogruluk tablosu kosuyor", False,
+                    (_r.stderr or "").strip().splitlines()[-1:])
+        else:
+            for _c in json.loads(_r.stdout):
+                kontrol(f"I-3: {_c['ad']}", _c["ok"],
+                        f"alinan={_c['alinan']!r} beklenen={_c['beklenen']!r}")
+    finally:
+        if os.path.exists(_dt_yol):
+            os.unlink(_dt_yol)
+else:
+    bloke_yaz("I-3 davranis dogruluk tablosu", "node kurulu degil")
+
+for _f in ("js/basit.js", "js/wizard.js", "js/durum.js"):
+    _p = os.path.join(_ST, _f)
+    _r = subprocess.run(["node", "--check", _p], capture_output=True, text=True) \
+        if subprocess.run(["node", "-v"], capture_output=True).returncode == 0 \
+        else None
+    if _r is not None:
+        kontrol(f"sozdizimi temiz: {_f}", _r.returncode == 0,
+                (_r.stderr or "").strip().splitlines()[:1])
 
 
 print(f"\n{'=' * 60}")

@@ -167,7 +167,8 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-1 kare kapısı** — medya seçim akışına bağlandı | `7dd6322` | ✅ yerel yeşil, **deploy YOK** |
 | 12 Ağu | **I-2a hiyerarşik konsept taksonomisi** | `687e004` | ✅ yerel yeşil, **deploy YOK** |
 | 12 Ağu | **I-2b sürümlü bileşik stil profilleri** | `fff3f36` | ✅ **origin'e push edildi**, deploy YOK |
-| 12 Ağu | **I-2c akışa bağlama** (taksonomi + stil profili → `analiz()`) | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
+| 12 Ağu | **I-2c akışa bağlama** (taksonomi + stil profili → `analiz()`) | `0945a2f` | ✅ **origin'e push edildi**, deploy YOK |
+| 12 Ağu | **I-3 basit "Metin + Stil + Auto" arayüzü** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
 
 ---
 
@@ -411,6 +412,16 @@ for t in a b c d e f g h i; do .venv-test/bin/python webapp/testler/test_faz_$t.
 `202/1 hata + 2 BLOKE` veriyor; ikisi kuruluyken **257/0/1 BLOKE**. Kalan tek
 BLOKE `QA_TEST_VIDEO` (opsiyonel ölçüm videosu). Paketleri sistem python'ıyla
 koşmak da çalışır ama Faz H'nin **gerçek FastAPI uç testleri bloke kalır**.
+
+⚠ **`node` şart** (Faz I-3): `autoStilKimligi`/`autoTuru` doğruluk tabloları
+node ile gerçekten çalıştırılır. node yoksa o 20 kontrol **BLOKE** yazılır,
+PASS sayılmaz.
+
+⚠ **Arayüzü yerelde açmak** (ücretsiz, ücretli çağrı yok):
+```bash
+cd webapp && VIDRUSH_KOK=/tmp/vidrush-kok ../.venv-test/bin/python -m uvicorn server:app --port 8799
+```
+`/opt/vidrush` yerine geçici kök kullanılır; `app/uret.py` o kökte bulunmalı.
 
 Faz H fastapi olmadan da koşar; gerçek uç bloğu **BLOKE** yazar ve başarı saymaz.
 Faz I ağ/para harcamaz — kapı kararı saf fonksiyondur, entegrasyon sahte okuyucuyla koşar.
@@ -791,7 +802,7 @@ okuması, ve GUI'da tespit edilen konsept + plan özetinin gösterilmesi.
 
 ## 18. FAZ I-2c — TAKSONOMİ + STİL PROFİLİ AKIŞA BAĞLANDI (12 Ağu, ölçüldü)
 
-> **Durum: yazıldı + testlendi, dosyalar staged. Commit YOK, deploy YOK.**
+> **Durum: commit `0945a2f`, `origin/arastirma-motoru`'na PUSH EDİLDİ. Deploy YOK.**
 > Dokunulan dosyalar: `webapp/girdi_analizi.py`, `webapp/pipeline.py`,
 > `webapp/testler/test_faz_i.py` (+ bu handoff).
 > **Dokunulmayan:** `server.py`, GUI (`static/**`), `deploy.sh`, `stil_profili.py`,
@@ -916,5 +927,152 @@ dahil. Kalan tek BLOKE `QA_TEST_VIDEO` (opsiyonel, ölçüm videosu yok).
 ### SONRAKİ ADIM (I-2d — bu adımda YAPILMADI)
 
 `_profil.gecis` → `GECIS_IMZASI` ve profil → `EFEKT_TEMEL` bağı; künyenin
-`server.py` + `is_sozlesme` üzerinden işe taşınması; konsept/stil özetinin
-arayüzde gösterilmesi.
+`server.py` + `is_sozlesme` üzerinden işe taşınması.
+→ Konsept/stil özetinin arayüzde gösterilmesi **§19'da yapıldı**.
+
+---
+
+## 19. FAZ I-3 — BASİT "METİN + STİL + AUTO" ARAYÜZÜ (12 Ağu, ölçüldü)
+
+> **Durum: yazıldı + testlendi + tarayıcıda doğrulandı, dosyalar staged.**
+> **Commit YOK, deploy YOK.**
+> Yeni: `webapp/static/js/basit.js`.
+> Değişen: `webapp/static/js/wizard.js`, `js/durum.js`, `app.css`,
+> `webapp/testler/test_faz_i.py` (+ bu handoff).
+> **Dokunulmadı:** `server.py`, `pipeline.py`, `deploy.sh`, `api.js`,
+> `secim-deneyimi.js`, `bilesenler.js`, `gorunumler.js`, `index.html`.
+
+### Kapatılan açık
+
+Bir video başlatmanın **tek yolu** 5 adımlı wizard'dı: tür kartı → konu →
+görsel yön → özet → onay. Çoğu iş için gereken üç şey vardı: **metin, stil,
+başlat.** Ayrıca I-2c'nin bağladığı konsept/stil motoru arayüzde **hiç
+görünmüyordu** (§18 bilinen sınır 2 ve 4).
+
+### Yeni varsayılan: tek ekran
+
+`Yeni Proje` artık iki modlu. Varsayılan **Basit**:
+
+```
+[Basit] [Adım adım]          ← her iki ekranın başında, geri dönülebilir
+Ne anlatalım?                ← metin (en az 20 karakter)
+Görsel stil                  ← Otomatik + öneriler (mevcut bileşen)
+Hedef süre                   ← KORUNDU
+Sistemin okuduğu             ← Auto sonucu (aşağıda)
+▸ Gelişmiş ayarlar           ← tek açılır alan
+[Videoyu oluştur]            ← TEK ana üretim eylemi
+```
+
+**Adım adım wizard KALDIRILMADI** — 5 adım aynen duruyor (testli), `#/yeni/3`
+gibi adım bağlantısı otomatik olarak o moda geçiriyor.
+
+### Hiçbir backend alanı kaybolmadı
+
+Gelişmiş açılır alan, adım 3'ün bileşenlerini **yeniden yazmıyor, yeniden
+kullanıyor**: `sesBolumu()` (ses kütüphanesi: 6 sağlayıcı, arama, dinleme),
+`markaBolumu()`, `hizliTercihler()`, `proPanel()` (4 profesyonel bölüm: renk,
+hareket, altyazı, üretim). Bağlama tek yerden — `adim3Kur()` — yapılıyor,
+çift bağlama yok (testli).
+
+`unlu` (22. alan), Grok/görsel model seçimi, süre seçici, altyazı şablonu,
+palet/hex, ışık, arkaplan, açılış, Sora, karakter/stil görseli ve referans
+kareler: hepsi erişilebilir durumda.
+
+### Auto → generate: YENİ ALAN EKLENMEDİ
+
+22 alanlık sözleşme **büyümedi** (testli). Auto'nun çözdüğü bileşik profil
+kimliği **mevcut `edit` alanıyla** taşınıyor — I-2c'nin pipeline köprüsü bu
+kimlikleri zaten çözebiliyor.
+
+**Tarayıcıda ölçülen kanıt** (fetch kesildi, gerçek üretim başlatılmadı):
+
+```
+POST /api/analiz -> 200
+gönderilen: {session, story, tur: "documentary",
+             edit: "belgesel-sinematik", sure_dk, gecis, zoom, altyazi}
+```
+
+**Taşınmayan durumlar sessiz değil** — `autoStilKimligi()` yalnızca üretim
+hattının **gerçekten çözebileceği** kimlikleri geçirir:
+
+| Durum | Davranış | Sebep |
+|---|---|---|
+| `kaynak=auto`, gerçek kimlik | **taşınır** | hat çözebiliyor |
+| `kaynak=turetilmis` (`melez:a+b`) | taşınmaz, ekranda **"(uygulanmadı)"** | kayıtta böyle satır yok; gönderilse sessizce varsayılana düşerdi |
+| `kaynak=varsayilan` | taşınmaz | gerçek sinyal yok; hattın kendi varsayılanı korunur |
+| `hikaye` / `animasyon` hattı | taşınmaz | o hatların kendi stil sözlükleri var |
+
+### Auto sonucu görünür ve ANLAŞILIR
+
+Ekranda: **Konu türü** (+ sinyal gücü) · **Üretim hattı** · **Seçilen stil** ·
+**Stil sürümü** · ölçülen kanıt cümlesi.
+
+⚠ Backend'in `gerekce` alanı geliştirici metnidir
+(`belgesel.tarih: puan 8.0 (2. belgesel.biyografi 4.5), kanit 4 = 2 anahtar
++ 2 yapisal sinyal`) — ham gösterilmesi "görünür" yapardı ama **anlaşılır**
+yapmazdı. Aynı ölçüm yapısal alanlardan yeniden kuruluyor:
+*"Metinde 3 bağımsız işaret ölçüldü; kararın güveni yüzde 72."* Uydurma yok.
+
+### Tarayıcıda bulunan ve düzeltilen GERÇEK hata
+
+Basit mod türü sabit `documentary` bırakıyordu. Ölçüm:
+
+```
+metin : "kabus gibi bir gece: kapının ardındaki gölge…"
+eski `otomatik_secimler.tur` : documentary   ← BES-ETIKETLI dedektör, 'belirsiz'
+yeni `konsept`               : hikaye.korku  ← DOĞRU
+```
+
+Yani açık bir korku hikâyesi **belgesel hattında** üretilecekti. Bu, §16'nın
+zaten belgelediği eski dedektör zaafının canlı sonucu. Düzeltme: `autoTuru()`
+birincil kaynak olarak `konsept.eski_etiket` okuyor, eski alan yalnızca
+yedek. Eşleme sunucunun `PIPELINE_TURU` tablosuyla aynı.
+
+**Kullanıcının açık tür seçimi Auto'yu yener:** adım 1'de tür seçilince
+`turKaynak: 'kullanici'` işaretleniyor ve Auto bir daha türe dokunmuyor.
+`animasyon` Auto tarafından **asla** seçilmez (referans kare zorunlu).
+
+### Ölçülen test sonucu (12 Ağu) — İKİ ORTAM AYRI
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Zengin venv** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **257** | **409** | **1823** |
+| **Sistem Python** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **203** | **409** | **1769** |
+
+0 hata. Zengin venv'de 1 BLOKE (`QA_TEST_VIDEO`, opsiyonel); sistem
+Python'da 2 çevresel BLOKE (`fastapi` kurulu değil + `QA_TEST_VIDEO`).
+**BLOKE'ler PASS sayılmadı.** Faz I 356 → **409** (+53), F 242 → 244,
+G 217 → 218 (yeni dosya dosya-başına döngülere girdiği için).
+
+I-3 testleri **string eşleştirmeyle yetinmiyor**: `autoStilKimligi` ve
+`autoTuru` doğruluk tabloları `node` ile **gerçekten çalıştırılıyor**
+(20 davranış kontrolü). node yoksa dürüstçe BLOKE yazılır.
+
+`deploy.sh` tanımsız-isim taraması elle koşuldu → temiz.
+
+### Tarayıcı doğrulaması (yerel, ücretsiz)
+
+Uygulama yerelde `VIDRUSH_KOK` ile ayağa kaldırıldı (`127.0.0.1:8799`),
+`/ui/js/basit.js` 200, konsolda **hata yok**, `POST /api/analiz` 200.
+Üretim eylemi `fetch` kesilerek sınandı — **gerçek üretim başlatılmadı,
+ücretli çağrı yapılmadı.**
+
+⚠ `preview_start` `.claude/launch.json` ister; Faz F testi o dosyanın diskte
+**bulunmamasını** şart koşuyor. Bu yüzden sunucu doğrudan başlatıldı ve
+tarayıcı URL'ye açıldı — `.claude/` oluşturulmadı.
+
+### BİLİNEN SINIRLAR (dürüstçe)
+
+1. **Adım adım modda Auto paneli yok.** Konsept/stil özeti yalnızca basit
+   modda gösteriliyor; wizard Adım 4 eski özet kartlarını kullanıyor.
+2. **Melez stiller hâlâ üretime taşınamıyor** (§18 ile aynı kök): pipeline
+   `melez:a+b` kimliğini çözemiyor. Arayüz bunu açıkça söylüyor.
+3. **Hikâye hattında bileşik profil uygulanmıyor** — `HIKAYE_STILLERI` ayrı
+   bir sözlük. Auto o hatta stil taşımıyor (sessiz düşüş yerine dürüst not).
+4. **Görsel imza boşluğu** (§18 sınır 1) aynen geçerli: yeni-nesil kimlikle
+   `EFEKT_TEMEL`/`GECIS_IMZASI` gelmiyor.
+5. **Gerçek kullanıcıyla kullanılabilirlik ölçülmedi.** İddia "akış kısaldı
+   ve alan kaybı yok" — bu testlerle kanıtlı; "kullanıcılar daha hızlı
+   üretiyor" iddiası **ölçülmedi**.
+6. **Ücretli uçtan uca üretim denenmedi.** `edit` alanının doğru gittiği
+   ölçüldü; o kimlikle çıkan videonun kalitesi bu adımın iddiası değil.
