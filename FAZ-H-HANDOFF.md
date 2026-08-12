@@ -172,7 +172,8 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-4 referans video parmak izi sözleşmesi** | `0d45fc8` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-2d görsel imza boşluğu kapatıldı** | `243bad5` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-5 konsept farkındalıklı medya seçimi** | `e3559b2` | ✅ **origin'e push edildi**, deploy YOK |
-| 12 Ağu | **I-6 medya avcısı canlı hatta (opt-in)** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
+| 12 Ağu | **I-6 medya avcısı canlı hatta (opt-in)** | `1e9c288` | ✅ **origin'e push edildi**, deploy YOK |
+| 12 Ağu | **I-7 iş başına bütçe + paralel izolasyon** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
 
 ---
 
@@ -1468,7 +1469,7 @@ pyflakes temiz.
 
 ## 23. FAZ I-6 — MEDYA AVCISI CANLI HATTA (GÜVENLİ OPT-IN) (12 Ağu, ölçüldü)
 
-> **Durum: yazıldı + testlendi, dosyalar staged. Commit YOK, deploy YOK.**
+> **Durum: commit `1e9c288`, `origin/arastirma-motoru`'na PUSH EDİLDİ. Deploy YOK.**
 > Yeni: `webapp/medya_kopru.py`.
 > Değişen: `webapp/pipeline.py`, `webapp/kaynak.py`,
 > `webapp/testler/test_faz_i.py` (+ bu handoff).
@@ -1550,22 +1551,120 @@ pyflakes temiz.
 
 1. **Gerçek üretimle hiç koşulmadı.** Bayrak açıkken canlı bir iş
    çalıştırılmadı; kanıt yalnızca fixture. **Açmadan önce gerçek pilot şart.**
-2. **Maliyet ölçülmedi.** Avcı 6 sağlayıcıya istek atar; `defter`/`sinir`
-   parametreleri destekleniyor ama pipeline şu an **bütçe defteri
-   geçirmiyor** (`defter=None`). Açmadan önce para tavanı bağlanmalı.
+2. ~~**Maliyet ölçülmedi.** Pipeline bütçe defteri geçirmiyor (`defter=None`).~~
+   → ✅ **§24'te (I-7) kapatıldı**: iş başına `IsButcesi`, varsayılan USD 0.0.
 3. **Sahne planı `iddia_metni`/`fact_id` üretmiyor.** Pipeline'ın plan
    çıktısında bu alanlar çoğunlukla boş; köprü o zaman `footage_sorgu`ya
    düşüyor. Yani araştırma-bağlantılı seçim henüz tam beslenmiyor.
 4. **Yalnızca footage sahnelerinde devrede.** AI görsel ve Sora/Grok yolları
    dokunulmadı.
-5. **`kayit_sifirla()` iş başına global durum kullanıyor.** Aynı süreçte
-   paralel iki iş koşarsa sayaçlar karışır — üretimde işler ayrı süreçte,
-   ama bu bir varsayım.
+5. ~~**`kayit_sifirla()` iş başına global durum kullanıyor.**~~ →
+   ✅ **§24'te (I-7) kapatıldı**: sayaçlar iş başına izole `IsButcesi`
+   nesnesinde; iki paralel fixture işiyle kanıtlandı.
 6. **Hikâye/animasyon hatları test edilmedi**; köprü tür ayrımı yapmıyor,
    yalnızca footage sahnesi koşuluna bakıyor.
 
 ### SONRAKİ ADIM
 
-Bütçe defteri + koşu sınırı bağlanması, plan çıktısına `iddia_metni`/`fact_id`
-taşınması, sonra **kontrollü gerçek pilot** (bayrak açık, tek iş, maliyet
-ölçümü).
+~~Bütçe defteri + koşu sınırı bağlanması~~ → §24'te yapıldı. Kalan: plan
+çıktısına `iddia_metni`/`fact_id` taşınması, sonra **kontrollü gerçek pilot**.
+
+---
+
+## 24. FAZ I-7 — İŞ BAŞINA BÜTÇE ve PARALEL İŞ İZOLASYONU (12 Ağu, ölçüldü)
+
+> **Durum: yazıldı + testlendi, dosyalar staged. Commit YOK, deploy YOK.**
+> **Bayrak HÂLÂ varsayılan KAPALI.**
+> Değişen: `webapp/medya_kopru.py`, `webapp/pipeline.py`,
+> `webapp/testler/test_faz_i.py` (+ bu handoff).
+> **Dokunulmadı:** `server.py`, tüm arayüz, 22 alanlık generate sözleşmesi,
+> `medya/lisans.py`, `medya/guvenlik.py`, `medya/indirme.py`,
+> `medya/kare_kapisi.py`, `deploy.sh`.
+
+### Kapatılan iki açık (§23 sınır 2 ve 5)
+
+1. **Para tavanı yoktu.** Pipeline avcıya `defter=None` geçiyordu; "para
+   tavanı bağlanmadan açılmamalı" uyarısı bunun içindi.
+2. **Sayaçlar global sözlükteydi.** Aynı süreçte iki iş koşarsa sayaçlar
+   karışıyordu; "iş başına tavan" iddiası karşılıksızdı.
+
+### `IsButcesi` — beş tavan, tek nesne, iş başına
+
+| Tavan | Env | Varsayılan |
+|---|---|---|
+| USD | `MEDYA_AVCI_MAKS_USD` | **0.0** |
+| Süre (sn) | `MEDYA_AVCI_IS_SN` | 240 |
+| İstek | `MEDYA_AVCI_MAKS_ISTEK` | 60 |
+| Bayt | `MEDYA_AVCI_MAKS_BAYT` | 400 MB |
+| Kare çağrısı | `MEDYA_AVCI_MAKS_KARE` | 40 |
+
+⚠ **Varsayılan USD 0.0** — hiçbir ücretli çağrıya yer ayrılmaz; açmak açık bir
+karardır. Negatif tavan `ValueError`. Sıfır geçmek kapıyı **kapatır**,
+sınırsız yapmaz.
+
+`ozet()` **beşini birlikte** raporlar: harcanan/tavan USD, istek, bayt, kare
+çağrısı, geçen süre, `tavan_doldu`, `durma_nedeni`, denenen/seçilen, düşüşler.
+
+**Para tavanı artık gerçekten uygulanıyor:** `IsButcesi` bir `MaliyetDefteri`
+(tavanlı) ve bir `KosuSiniri` kuruyor ve bunları avcıya **geçiriyor** —
+sağlayıcı katmanında `ButceAsimi` yakalanıp koşu durduruluyor.
+
+### Thread güvenliği ve izolasyon — ölçüldü
+
+- `istek_ayir` / `kare_ayir` / `bayt_ayir` kontrol+harcamayı **tek kilit
+  altında** yapıyor. 8 thread × 20 deneme, tavan 10 → **tam 10** verildi.
+- **İki paralel fixture işi:** A 3 sahne, B 1 sahne → `istek` 6 vs 2,
+  `kare_cagrisi` 3 vs 1, `bayt` 27000 vs 9000, düşüşler 7 vs 3.
+  **Sayaçlar karışmıyor**, bütçe nesneleri ayrı, birinin tavanı dolunca
+  diğeri etkilenmiyor.
+
+### Limit aşılınca kontrollü dur
+
+Her tavan için ayrı fixture testi: istek tavanı → `BUTCE`; kare tavanı 0 →
+klip **doğrulanamaz, dolayısıyla kabul edilmez** (fail-closed) ve **diskten
+silinir**; bayt tavanı → klip kabul edilmez. Hepsinde `ok=False`, yol boş,
+aday boş — **rastgele stok yok**, çağıran taraf mevcut güvenli yolunu sürdürür.
+
+### Bu adımda bulunan ve düzeltilen GERÇEK kusur
+
+Döngü bütçe yüzünden kırıldığında fonksiyonun **son dönüşü sabit
+`KARE-KAPISI`** diyordu — yani bütçe durdurmasını "kare kapısı reddetti" diye
+raporluyordu. `son_neden` izleyicisi eklendi; artık gerçek sebep dönüyor
+(`BUTCE` / `SURE-ASIMI` / `INDIRME-BASARISIZ` / `KARE-KAPISI` / `ADAY-YOK`).
+Test bunu yakaladı ve şimdi kilitliyor.
+
+### Geriye uyumluluk
+
+`butce` verilmeden yapılan eski çağrı yolu hâlâ çalışıyor (modül düzeyinde
+varsayılan bütçeye düşer); `ozet()`/`dususler()` eski imzalarıyla duruyor ve
+`ozet()` hâlâ `acik` bayrağını taşıyor. Pipeline artık **global sayaç
+kullanmıyor** (testli).
+
+### Ölçülen test sonucu (12 Ağu) — İKİ ORTAM AYRI
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Zengin venv** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **257** | **715** | **2129** |
+| **Sistem Python** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **203** | **715** | **2075** |
+
+0 hata. Faz I 665 → **715** (+50). Faz B 200/0 — gerileme yok. pyflakes temiz.
+§20c'deki iki bağlantı kontrolü **silinmedi, güncellendi** (kural aynı kaldı,
+yalnızca özetin kaynağı iş bütçesine taşındı).
+
+### BİLİNEN SINIRLAR (dürüstçe)
+
+1. **Gerçek üretimle hâlâ koşulmadı.** Bayrak kapalı; kanıt yalnızca fixture.
+   **Açmadan önce kontrollü pilot şart.**
+2. **Plan çıktısı `iddia_metni`/`fact_id` üretmiyor** (§23 sınır 3) — bu adımda
+   **kasıtlı olarak çözülmedi**, ayrı bir iş.
+3. **USD sayacı yalnızca `MaliyetDefteri`ye yazılanı görür.** Avcı bir maliyeti
+   deftere kaydetmezse bütçe onu bilemez; yani tavan "deftere yazılan" harcama
+   içindir, ölçülmeyen harcamayı yakalamaz.
+4. **Kare çağrısı tavanı `kare_kapisi.KareButce`den ayrıdır.** İkisi ayrı
+   sayar; toplam vision maliyeti iki tavanın **toplamıyla** sınırlıdır, tek
+   bir sayıyla değil.
+5. **Bayt tavanı indirme sonrası uygulanır.** `guvenli_indir` kendi akış
+   tavanını uygular ama iş toplamı ancak dosya indikten sonra bilinir; yani
+   tavan bir dosya kadar aşılabilir.
+6. Yalnızca footage sahnelerinde devrede; hikâye/animasyon hatları test
+   edilmedi (§23 sınır 4 ve 6 aynen geçerli).

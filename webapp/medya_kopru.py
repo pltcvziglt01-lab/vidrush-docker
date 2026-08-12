@@ -55,11 +55,192 @@ NEDEN = {
     "ADAY-YOK": "lisans+provenance duvarindan gecen aday cikmadi",
     "INDIRME-BASARISIZ": "aday indirilemedi ya da dosya dogrulamasi tutmadi",
     "KARE-KAPISI": "indirilen klip kare kapisindan gecemedi",
+    "BUTCE": "is butcesi tavani doldu (para/sure/istek/bayt/kare)",
     "HATA": "beklenmeyen hata",
 }
 
+# ── FAZ I-7: BUTCE VARSAYILANLARI ──
+# ⚠ `MEDYA_AVCI_MAKS_USD` VARSAYILAN 0.0 — yani hicbir UCRETLI cagriya yer
+# ayrilmaz. Acmak ACIK bir karardir ve env/config ile yapilir.
+VARSAYILAN_MAKS_USD = float(os.environ.get("MEDYA_AVCI_MAKS_USD", "0"))
+VARSAYILAN_MAKS_ISTEK = int(os.environ.get("MEDYA_AVCI_MAKS_ISTEK", "60"))
+VARSAYILAN_MAKS_BAYT = int(os.environ.get("MEDYA_AVCI_MAKS_BAYT",
+                                          str(400 * 1024 * 1024)))
+VARSAYILAN_MAKS_KARE = int(os.environ.get("MEDYA_AVCI_MAKS_KARE", "40"))
+
+
+class IsButcesi:
+    """TEK ISE ait para / sure / istek / bayt / kare tavani (Faz I-7).
+
+    ⚠ NEDEN VAR: I-6'da sayaclar MODUL DUZEYINDE global bir sozlukteydi. Ayni
+    surecte iki is kosarsa sayaclar birbirine karisiyordu ve "is basina tavan"
+    iddiasi karsiliksiz kaliyordu. Artik her is KENDI nesnesini tasir.
+
+    ⚠ BES TAVAN DA ZORUNLU: `None` gecmek `ValueError`. Sinirsiz butce bu
+    depoda yasak (`arastirma.butce`, `kare_kapisi.KareButce` ile ayni kural).
+    Sifir gecmek kapiyi KAPATIR, sinirsiz yapmaz.
+
+    ⚠ THREAD GUVENLI: `_sahne_medya` paralel thread'lerde kosar. Kontrol ve
+    harcama TEK kilit altinda (`*_ayir`) yapilir; kilitsiz sayacla iki thread
+    ayni anda kontrol edip tavani asardi.
+    """
+
+    def __init__(self, is_adi: str = "is", *, maks_usd: float = None,
+                 maks_sure_sn: float = None, maks_istek: int = None,
+                 maks_bayt: int = None, maks_kare: int = None, saat=None):
+        maks_usd = VARSAYILAN_MAKS_USD if maks_usd is None else maks_usd
+        maks_sure_sn = (IS_SURE_TAVANI_SN if maks_sure_sn is None
+                        else maks_sure_sn)
+        maks_istek = VARSAYILAN_MAKS_ISTEK if maks_istek is None else maks_istek
+        maks_bayt = VARSAYILAN_MAKS_BAYT if maks_bayt is None else maks_bayt
+        maks_kare = VARSAYILAN_MAKS_KARE if maks_kare is None else maks_kare
+        degerler = (float(maks_usd), float(maks_sure_sn), float(maks_istek),
+                    float(maks_bayt), float(maks_kare))
+        if min(degerler) < 0:
+            raise ValueError("IsButcesi: negatif tavan olamaz")
+        self.is_adi = str(is_adi)
+        self.maks_usd = float(maks_usd)
+        self.maks_sure_sn = float(maks_sure_sn)
+        self.maks_istek = int(maks_istek)
+        self.maks_bayt = int(maks_bayt)
+        self.maks_kare = int(maks_kare)
+        self._saat = saat or time.monotonic
+        self._kilit = threading.Lock()
+        self.baslangic = self._saat()
+        self.istek = 0
+        self.bayt = 0
+        self.kare = 0
+        self.denenen = 0
+        self.secilen = 0
+        self._dususler = []
+        # Faz A/B nesneleri — avciya GECIRILIR, boylece para tavani gercekten
+        # saglayici katmaninda uygulanir (I-6'da `defter=None` geciyordu).
+        self.defter = None
+        self.sinir = None
+        try:
+            from arastirma.butce import KosuSiniri
+            from arastirma.cache import MaliyetDefteri
+            self.defter = MaliyetDefteri(self.is_adi, tavan_usd=self.maks_usd)
+            self.sinir = KosuSiniri(toplam_sure_sn=int(self.maks_sure_sn))
+        except Exception as e:                     # ortam sorunu COKERTMEZ
+            print(f"  butce nesneleri kurulamadi: {type(e).__name__}",
+                  file=sys.stderr)
+
+    # ── sayac + tavan ──
+    def gecen_sn(self) -> float:
+        return max(0.0, self._saat() - self.baslangic)
+
+    def _sure_doldu(self) -> bool:
+        return self.gecen_sn() >= self.maks_sure_sn
+
+    def bitti_mi(self) -> tuple:
+        """(bitti, neden). Herhangi bir tavan dolduysa True."""
+        with self._kilit:
+            return self._bitti_mi()
+
+    def _bitti_mi(self) -> tuple:
+        if self._sure_doldu():
+            return True, (f"sure tavani doldu "
+                          f"({self.gecen_sn():.1f}/{self.maks_sure_sn:.0f} sn)")
+        if self.istek >= self.maks_istek:
+            return True, f"istek tavani doldu ({self.istek}/{self.maks_istek})"
+        if self.bayt >= self.maks_bayt:
+            return True, f"bayt tavani doldu ({self.bayt}/{self.maks_bayt})"
+        if self.kare >= self.maks_kare:
+            return True, f"kare cagrisi tavani doldu ({self.kare}/{self.maks_kare})"
+        harcanan = self.defter.toplam if self.defter is not None else 0.0
+        if harcanan > self.maks_usd:
+            return True, (f"USD tavani asildi "
+                          f"(${harcanan:.4f}/${self.maks_usd:.4f})")
+        return False, ""
+
+    def istek_ayir(self, adet: int = 1) -> tuple:
+        """Kontrol + harcama TEK kilit altinda (kontrol-sonra-harca yarisi yok)."""
+        with self._kilit:
+            bitti, neden = self._bitti_mi()
+            if bitti:
+                return False, neden
+            if self.istek + adet > self.maks_istek:
+                return False, (f"istek tavani doldu "
+                               f"({self.istek}+{adet}/{self.maks_istek})")
+            self.istek += adet
+            return True, ""
+
+    def kare_ayir(self, adet: int = 1) -> tuple:
+        with self._kilit:
+            bitti, neden = self._bitti_mi()
+            if bitti:
+                return False, neden
+            if self.kare + adet > self.maks_kare:
+                return False, (f"kare cagrisi tavani doldu "
+                               f"({self.kare}+{adet}/{self.maks_kare})")
+            self.kare += adet
+            return True, ""
+
+    def bayt_ayir(self, adet: int) -> tuple:
+        with self._kilit:
+            bitti, neden = self._bitti_mi()
+            if bitti:
+                return False, neden
+            if self.bayt + int(adet or 0) > self.maks_bayt:
+                return False, (f"bayt tavani doldu "
+                               f"({self.bayt}+{int(adet or 0)}/{self.maks_bayt})")
+            self.bayt += int(adet or 0)
+            return True, ""
+
+    def denendi(self) -> None:
+        with self._kilit:
+            self.denenen += 1
+
+    def secildi(self) -> None:
+        with self._kilit:
+            self.secilen += 1
+
+    def dusus(self, neden_kodu: str, ayrinti: str = "", sahne: str = "") -> dict:
+        kayit = {"asama": "medya-avcisi", "neden": neden_kodu,
+                 "etki": NEDEN.get(neden_kodu, neden_kodu),
+                 "ayrinti": str(ayrinti)[:200]}
+        if sahne:
+            kayit["sahne"] = str(sahne)
+        with self._kilit:
+            if len(self._dususler) < 60:
+                self._dususler.append(kayit)
+        return kayit
+
+    def dususler(self) -> list:
+        with self._kilit:
+            return list(self._dususler)
+
+    def ozet(self) -> dict:
+        """BES TAVAN BIRLIKTE raporlanir — biri gizlenmez."""
+        with self._kilit:
+            harcanan = self.defter.toplam if self.defter is not None else 0.0
+            bitti, neden = self._bitti_mi()
+            return {
+                "is_adi": self.is_adi,
+                "denenen": self.denenen, "secilen": self.secilen,
+                "usd": round(harcanan, 6), "maks_usd": self.maks_usd,
+                "istek": self.istek, "maks_istek": self.maks_istek,
+                "bayt": self.bayt, "maks_bayt": self.maks_bayt,
+                "kare_cagrisi": self.kare, "maks_kare": self.maks_kare,
+                "gecen_sn": round(self.gecen_sn(), 2),
+                "maks_sure_sn": self.maks_sure_sn,
+                "tavan_doldu": bitti, "durma_nedeni": neden,
+                "dusus_sayisi": len(self._dususler),
+                "dususler": list(self._dususler[:20]),
+            }
+
+
+def is_butcesi_kur(is_adi: str = "is", **ez) -> IsButcesi:
+    """Her is icin YENI ve IZOLE butce. Sayaclar onceki isten TASINMAZ."""
+    return IsButcesi(is_adi, **ez)
+
+
+# ⚠ GERIYE UYUMLULUK: `butce` verilmeden cagrilan eski yollar icin MODUL
+# duzeyinde varsayilan bir butce tutulur. Pipeline artik IS BASINA nesne
+# kuruyor; bu varsayilan yalnizca eski imzayi kirmamak icin var.
 _KILIT = threading.Lock()
-_DURUM = {"baslangic": None, "denenen": 0, "secilen": 0, "dususler": []}
+_VARSAYILAN_BUTCE = [None]
 
 
 def acik_mi(is_ayar=None) -> tuple:
@@ -78,47 +259,35 @@ def acik_mi(is_ayar=None) -> tuple:
     return False, NEDEN["KAPALI"]
 
 
-def kayit_sifirla() -> None:
-    """Her isin basinda cagrilir. Sayaclar ONCEKI isten TASINMAZ."""
+def kayit_sifirla(is_adi: str = "is", **ez) -> IsButcesi:
+    """MODUL varsayilan butcesini yeniler ve DONDURUR.
+
+    ⚠ Faz I-7: is-basi izolasyon icin `is_butcesi_kur()` kullanilmali ve
+    donen nesne `sahne_medyasi(butce=...)` ile gecirilmelidir. Bu fonksiyon
+    yalnizca `butce` verilmeyen ESKI cagri yolunu kirmamak icin duruyor.
+    """
+    b = IsButcesi(is_adi, **ez)
     with _KILIT:
-        _DURUM["baslangic"] = time.monotonic()
-        _DURUM["denenen"] = 0
-        _DURUM["secilen"] = 0
-        _DURUM["dususler"] = []
+        _VARSAYILAN_BUTCE[0] = b
+    return b
 
 
-def _dusus(neden_kodu: str, ayrinti: str = "", sahne: str = "") -> dict:
-    kayit = {"asama": "medya-avcisi", "neden": neden_kodu,
-             "etki": NEDEN.get(neden_kodu, neden_kodu),
-             "ayrinti": str(ayrinti)[:200]}
-    if sahne:
-        kayit["sahne"] = str(sahne)
+def _varsayilan_butce() -> IsButcesi:
     with _KILIT:
-        if len(_DURUM["dususler"]) < 60:
-            _DURUM["dususler"].append(kayit)
-    return kayit
-
-
-def _sure_doldu() -> bool:
-    with _KILIT:
-        bas = _DURUM["baslangic"]
-    if bas is None:
-        return False
-    return (time.monotonic() - bas) >= IS_SURE_TAVANI_SN
+        if _VARSAYILAN_BUTCE[0] is None:
+            _VARSAYILAN_BUTCE[0] = IsButcesi("varsayilan")
+        return _VARSAYILAN_BUTCE[0]
 
 
 def ozet() -> dict:
-    """Ise yazilacak GORUNUR ozet. Kapi hic calismadiysa bu da gorunur."""
-    with _KILIT:
-        return {"acik": bool(ACIK), "denenen": _DURUM["denenen"],
-                "secilen": _DURUM["secilen"],
-                "dusus_sayisi": len(_DURUM["dususler"]),
-                "dususler": list(_DURUM["dususler"][:20])}
+    """MODUL varsayilan butcesinin ozeti (eski cagri yolu)."""
+    o = _varsayilan_butce().ozet()
+    o["acik"] = bool(ACIK)
+    return o
 
 
 def dususler() -> list:
-    with _KILIT:
-        return list(_DURUM["dususler"])
+    return _varsayilan_butce().dususler()
 
 
 def _avci_yukle():
@@ -138,7 +307,7 @@ def sahne_medyasi(*, sorgu: str, hedef_yol: str, sahne_amaci: str = "",
                   yer_terim=None, erisim_tarihi: str = "",
                   istek=None, kare_dogrula=None, sinir=None, defter=None,
                   onbellek=None, is_ayar=None, medya_turu: str = "video",
-                  coz=None) -> dict:
+                  coz=None, butce=None) -> dict:
     """Tek sahne icin Faz B avcisiyla medya bul, indir, KARE KAPISINDAN gecir.
 
     Doner: {"ok": bool, "yol": str, "neden": str, "aday": {...},
@@ -154,20 +323,30 @@ def sahne_medyasi(*, sorgu: str, hedef_yol: str, sahne_amaci: str = "",
     acik, _g = acik_mi(is_ayar)
     if not acik:
         return {**bos, "neden": "KAPALI"}
+    # ⚠ FAZ I-7: butce IS BASINA nesnedir. Verilmezse modul varsayilanina
+    # dusulur (eski cagri yolu); pipeline her is icin KENDI nesnesini kurar.
+    b = butce if isinstance(butce, IsButcesi) else _varsayilan_butce()
     if not callable(kare_dogrula):
         return {**bos, "neden": "DOGRULAYICI-YOK",
-                "dususler": [_dusus("DOGRULAYICI-YOK", sahne=scene_id)]}
+                "dususler": [b.dusus("DOGRULAYICI-YOK", sahne=scene_id)]}
     if not callable(istek):
         return {**bos, "neden": "ISTEK-YOK",
-                "dususler": [_dusus("ISTEK-YOK", sahne=scene_id)]}
-    if _sure_doldu():
-        return {**bos, "neden": "SURE-ASIMI",
-                "dususler": [_dusus("SURE-ASIMI", "is tavani", scene_id)]}
+                "dususler": [b.dusus("ISTEK-YOK", sahne=scene_id)]}
+    _bitti, _neden = b.bitti_mi()
+    if _bitti:
+        return {**bos, "neden": "BUTCE",
+                "dususler": [b.dusus("BUTCE", _neden, scene_id)]}
 
     avci, indirme = _avci_yukle()
     if avci is None:
         return {**bos, "neden": "MODUL-YOK",
-                "dususler": [_dusus("MODUL-YOK", sahne=scene_id)]}
+                "dususler": [b.dusus("MODUL-YOK", sahne=scene_id)]}
+
+    # ⚠ Saglayici arama TEK istek hakki tuketir; tavan dolarsa ARAMA YAPILMAZ.
+    _ok_i, _n_i = b.istek_ayir(1)
+    if not _ok_i:
+        return {**bos, "neden": "BUTCE",
+                "dususler": [b.dusus("BUTCE", _n_i, scene_id)]}
 
     sahne_bas = time.monotonic()
     try:
@@ -179,12 +358,14 @@ def sahne_medyasi(*, sorgu: str, hedef_yol: str, sahne_amaci: str = "",
             konu=konu, bilinen_yerler=list(bilinen_yerler or []),
             erisim_tarihi=erisim_tarihi or "",
             medya_turu=medya_turu,
-            sinir=sinir, onbellek=onbellek, defter=defter, istek=istek,
-            coz=coz, konsept=konsept)
+            sinir=sinir if sinir is not None else b.sinir,
+            onbellek=onbellek,
+            defter=defter if defter is not None else b.defter,
+            istek=istek, coz=coz, konsept=konsept)
     except Exception as e:
         return {**bos, "neden": "HATA",
-                "dususler": [_dusus("HATA", f"{type(e).__name__}: {e}",
-                                    scene_id)]}
+                "dususler": [b.dusus("HATA", f"{type(e).__name__}: {e}",
+                                     scene_id)]}
 
     # ── LISANS + PROVENANCE DUVARI ──
     # Aday listesi DEGIL, avcinin SECTIKLERI kullanilir; ustune
@@ -194,17 +375,25 @@ def sahne_medyasi(*, sorgu: str, hedef_yol: str, sahne_amaci: str = "",
                and str(getattr(a, "indirme_url", "") or "").strip()]
     if not adaylar:
         return {**bos, "neden": "ADAY-YOK",
-                "dususler": [_dusus(
+                "dususler": [b.dusus(
                     "ADAY-YOK",
                     f"{len(sonuc.get('adaylar') or [])} aday tarandi, "
                     f"lisans/alaka duvarindan gecen yok", scene_id)]}
 
+    son_neden = "ADAY-YOK"
     for aday in adaylar[:MAKS_DENEME]:
-        if _sure_doldu() or (time.monotonic() - sahne_bas) >= SAHNE_SURE_TAVANI_SN:
-            _dusus("SURE-ASIMI", "sahne tavani", scene_id)
+        _bitti, _neden = b.bitti_mi()
+        if _bitti or (time.monotonic() - sahne_bas) >= SAHNE_SURE_TAVANI_SN:
+            son_neden = "BUTCE" if _bitti else "SURE-ASIMI"
+            b.dusus(son_neden, _neden or "sahne tavani", scene_id)
             break
-        with _KILIT:
-            _DURUM["denenen"] += 1
+        b.denendi()
+        # Indirme de bir ISTEK hakki tuketir (tavan dolarsa indirilmez).
+        _ok_d, _n_d = b.istek_ayir(1)
+        if not _ok_d:
+            son_neden = "BUTCE"
+            b.dusus("BUTCE", _n_d, scene_id)
+            break
         # ── SSRF-GUVENLI INDIRME (dogrudan requests YOK) ──
         # ⚠ `guvenli_indir` SOZLUK doner: {"ok", "sebep", ...}. SSRF, icerik
         # turu, bayt tavani ve decode kapilari ORADA uygulanir; bu kopru
@@ -219,11 +408,31 @@ def sahne_medyasi(*, sorgu: str, hedef_yol: str, sahne_amaci: str = "",
         except Exception as e:
             ok_ind, ind_not = False, f"{type(e).__name__}: {e}"
         if not ok_ind:
-            _dusus("INDIRME-BASARISIZ", f"{aday.saglayici}: {ind_not}", scene_id)
+            son_neden = "INDIRME-BASARISIZ"
+            b.dusus("INDIRME-BASARISIZ", f"{aday.saglayici}: {ind_not}",
+                    scene_id)
             _sil(hedef_yol)
             continue
 
+        # Inen bayt is tavanina yazilir; tavan asildiysa klip KABUL EDILMEZ.
+        _inen = int((ind or {}).get("okunan_bayt") or 0) if isinstance(ind, dict) else 0
+        _ok_b, _n_b = b.bayt_ayir(_inen)
+        if not _ok_b:
+            son_neden = "BUTCE"
+            b.dusus("BUTCE", f"{_n_b} ({aday.saglayici})", scene_id)
+            _sil(hedef_yol)
+            break
+
         # ── KARE KAPISI (BYPASS EDILEMEZ) ──
+        # ⚠ Kare cagrisi PARA harcayabilir (vision). Tavan dolduysa klip
+        # DOGRULANAMAZ, dolayisiyla KABUL DE EDILMEZ (fail-closed).
+        _ok_k, _n_k = b.kare_ayir(1)
+        if not _ok_k:
+            son_neden = "BUTCE"
+            b.dusus("BUTCE", f"{_n_k} — kare dogrulanamadi, aday reddedildi",
+                    scene_id)
+            _sil(hedef_yol)
+            break
         try:
             kare_ok = bool(kare_dogrula(hedef_yol, sorgu, list(yer_terim or []),
                                         str(getattr(aday, "asset_id", "")),
@@ -233,12 +442,13 @@ def sahne_medyasi(*, sorgu: str, hedef_yol: str, sahne_amaci: str = "",
             kare_ok = False
             ind_not = f"kare dogrulayici hatasi: {type(e).__name__}: {e}"
         if not kare_ok:
-            _dusus("KARE-KAPISI", f"{aday.saglayici}/{aday.asset_id}", scene_id)
+            son_neden = "KARE-KAPISI"
+            b.dusus("KARE-KAPISI", f"{aday.saglayici}/{aday.asset_id}",
+                    scene_id)
             _sil(hedef_yol)
             continue
 
-        with _KILIT:
-            _DURUM["secilen"] += 1
+        b.secildi()
         return {"ok": True, "yol": hedef_yol, "neden": "",
                 "aday": {"saglayici": str(getattr(aday, "saglayici", "")),
                          "asset_id": str(getattr(aday, "asset_id", "")),
@@ -249,10 +459,12 @@ def sahne_medyasi(*, sorgu: str, hedef_yol: str, sahne_amaci: str = "",
                 "atif": str(getattr(aday, "atif_metni", "") or ""),
                 "dususler": []}
 
-    return {**bos, "neden": "KARE-KAPISI",
-            "dususler": [_dusus("ADAY-YOK",
-                                "tum adaylar indirme/kare kapisinda dustu",
-                                scene_id)]}
+    # ⚠ Son neden GERCEK sebebi bildirir: butce yuzunden durduysak
+    # "kare kapisi" demek yanlis olurdu (olculdu, duzeltildi).
+    return {**bos, "neden": son_neden,
+            "dususler": [b.dusus(
+                son_neden,
+                "tum adaylar denendi; son sebep yukarida", scene_id)]}
 
 
 def _sil(yol: str) -> None:

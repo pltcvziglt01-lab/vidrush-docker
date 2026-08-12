@@ -2551,10 +2551,13 @@ kontrol("pipeline konsept + fact_id + sahne amaci GECIYOR",
                                 "sahne_amaci=str(")))
 kontrol("basarisizlikta MEVCUT yol aynen surduruluyor",
         "if kaynak.footage_getir(" in _PP3)
+# ⚠ I-7'de bu baglanti IS BASINA butce nesnesine tasindi (§24). Kural ayni
+# kaliyor: ozet YALNIZCA acikken yazilir; yalnizca kaynagi degisti.
 kontrol("avci ozeti YALNIZCA acikken ise yaziliyor",
-        'if _avci_acik:\n        sonuc["medya_avcisi"]' in _PP3)
+        'if _avci_acik and _avci_butce is not None:' in _PP3
+        and 'sonuc["medya_avcisi"]' in _PP3)
 kontrol("avci dususleri ise TASINIYOR",
-        "sonuc[\"dususler\"].extend(medya_kopru.dususler())" in _PP3)
+        'sonuc["dususler"].extend(_avci_butce.dususler())' in _PP3)
 kontrol("kaynak.avci_istek yalnizca TASIYICI (kapi iddiasi yok)",
         "yalnizca tasiyicidir" in oku(KOK, "kaynak.py"))
 
@@ -2584,6 +2587,246 @@ kontrol("lisans/SSRF/kare kapisi modulleri DOKUNULMADI",
              "medya/kare_kapisi.py")))
 for _f3 in ("medya_kopru.py", "pipeline.py", "kaynak.py"):
     kontrol(f"{_f3} derleniyor", _derlenir(os.path.join(KOK, _f3)))
+
+
+# ═══ 21. FAZ I-7 — IS BASINA BUTCE ve PARALEL IS IZOLASYONU ═══
+# ⚠ KAPATILAN ACIK (§23 sinir 2 ve 5): pipeline `defter=None` geciriyordu
+# (para tavani YOKTU) ve sayaclar MODUL DUZEYINDE globaldi (ayni surecte iki
+# is sayaclari karisiyordu). ⚠ BAYRAK HALA VARSAYILAN KAPALI.
+blok("21. I-7 — is butcesi: bes tavan birlikte, varsayilan USD 0.0")
+
+kontrol("bayrak HALA varsayilan KAPALI", mkp.ACIK is False
+        and mkp.acik_mi()[0] is False)
+kontrol("VARSAYILAN USD tavani 0.0 (ucretli cagriya yer YOK)",
+        mkp.VARSAYILAN_MAKS_USD == 0.0)
+kontrol("USD tavani env/config ile ayarlanabilir",
+        'os.environ.get("MEDYA_AVCI_MAKS_USD"' in oku(KOK, "medya_kopru.py"))
+
+_b1 = mkp.is_butcesi_kur("is-1")
+kontrol("butce nesnesi IS ADI tasiyor", _b1.ozet()["is_adi"] == "is-1")
+_gerekli = {"usd", "maks_usd", "istek", "maks_istek", "bayt", "maks_bayt",
+            "kare_cagrisi", "maks_kare", "gecen_sn", "maks_sure_sn",
+            "tavan_doldu", "durma_nedeni", "denenen", "secilen"}
+kontrol("BES TAVAN da BIRLIKTE raporlaniyor", _gerekli <= set(_b1.ozet()),
+        str(sorted(_gerekli - set(_b1.ozet()))))
+kontrol("negatif tavan reddediliyor",
+        _kaldirilan_hata(lambda: mkp.IsButcesi("x", maks_istek=-1), ValueError))
+kontrol("para defteri GERCEKTEN kuruluyor (tavan bagli)",
+        _b1.defter is not None and _b1.defter.tavan == 0.0)
+kontrol("kosu siniri GERCEKTEN kuruluyor", _b1.sinir is not None)
+
+# ── Tavanlar tek tek KAPATIYOR ──
+kontrol("istek tavani 0 -> kapi KAPALI",
+        mkp.IsButcesi("x", maks_istek=0).istek_ayir(1)[0] is False)
+kontrol("kare tavani 0 -> kapi KAPALI",
+        mkp.IsButcesi("x", maks_kare=0).kare_ayir(1)[0] is False)
+kontrol("bayt tavani asilirsa reddediliyor",
+        mkp.IsButcesi("x", maks_bayt=100).bayt_ayir(500)[0] is False)
+kontrol("sure tavani 0 -> bitti",
+        mkp.IsButcesi("x", maks_sure_sn=0).bitti_mi()[0] is True)
+kontrol("USD tavani asilinca bitti_mi True",
+        (lambda b: (b.defter.kaydet("test", "kalem", 0.5), b.bitti_mi()[0])[1])(
+            mkp.IsButcesi("x", maks_usd=0.1)) is True)
+kontrol("durma nedeni GORUNUR (sessiz degil)",
+        "tavani" in mkp.IsButcesi("x", maks_istek=0).bitti_mi()[1])
+
+# ── THREAD GUVENLIGI: kilitsiz sayacla tavan asilirdi ──
+_tb = mkp.IsButcesi("yaris", maks_istek=10, maks_sure_sn=60)
+_verilen2, _kilit2 = [], threading.Lock()
+
+
+def _yaris2():
+    for _ in range(20):
+        ok, _n = _tb.istek_ayir(1)
+        if ok:
+            with _kilit2:
+                _verilen2.append(1)
+
+
+_th2 = [threading.Thread(target=_yaris2) for _ in range(8)]
+[t.start() for t in _th2]
+[t.join() for t in _th2]
+kontrol("THREAD GUVENLI: paralel istekte tavan ASILMIYOR",
+        len(_verilen2) == 10, f"{len(_verilen2)} verildi (tavan 10)")
+kontrol("kare tavani da thread guvenli",
+        _tb.ozet()["istek"] == 10)
+
+# ── PARALEL IS IZOLASYONU: iki isin sayaclari KARISMIYOR ──
+blok("21b. I-7 — paralel iki isin sayaclari KARISMIYOR")
+
+_isA = mkp.is_butcesi_kur("isA", maks_istek=50, maks_kare=50)
+_isB = mkp.is_butcesi_kur("isB", maks_istek=50, maks_kare=50)
+
+
+def _is_kos(b, adet):
+    for _ in range(adet):
+        b.istek_ayir(1)
+        b.denendi()
+        b.dusus("ADAY-YOK", "fixture", "s001")
+
+
+_tA = threading.Thread(target=_is_kos, args=(_isA, 7))
+_tB = threading.Thread(target=_is_kos, args=(_isB, 3))
+_tA.start(); _tB.start(); _tA.join(); _tB.join()
+kontrol("is A sayaci YALNIZCA kendi islerini sayiyor",
+        _isA.ozet()["istek"] == 7 and _isA.ozet()["denenen"] == 7,
+        str(_isA.ozet()["istek"]))
+kontrol("is B sayaci YALNIZCA kendi islerini sayiyor",
+        _isB.ozet()["istek"] == 3 and _isB.ozet()["denenen"] == 3,
+        str(_isB.ozet()["istek"]))
+kontrol("is A dususleri is B'ye SIZMIYOR",
+        len(_isA.dususler()) == 7 and len(_isB.dususler()) == 3)
+kontrol("iki isin butce nesneleri AYRI", _isA is not _isB
+        and _isA.defter is not _isB.defter)
+kontrol("bir isin tavani dolunca DIGERI etkilenmiyor",
+        (lambda: (mkp.IsButcesi("dolu", maks_istek=0),
+                  _isB.istek_ayir(1)[0]))()[1] is True)
+
+# ── FIXTURE: iki paralel is, ayri butce, sayaclar karismiyor ──
+_i7_kok = tempfile.mkdtemp(prefix="i7_")
+_eski_px2 = os.environ.get("PEXELS_KEY")
+_asil_indir2 = _mind.guvenli_indir
+try:
+    os.environ["PEXELS_KEY"] = "test"
+    _mkayit.kosu_sifirla()
+
+    def _indir_fix(url, hedef, **kw):
+        with open(hedef, "wb") as f:
+            f.write(b"\x00" * 9000)
+        return {"ok": True, "sebep": "", "okunan_bayt": 9000, "bilgi": {}}
+
+    _mind.guvenli_indir = _indir_fix
+    _sonuclar = {}
+
+    def _fixture_is(ad, adet, butce):
+        for i in range(adet):
+            _sonuclar.setdefault(ad, []).append(mkp.sahne_medyasi(
+                sorgu="tokyo street night",
+                hedef_yol=os.path.join(_i7_kok, f"{ad}_{i}.mp4"),
+                sahne_amaci="ortam",
+                iddia_metni="Tokyo street at night in 2024.",
+                scene_id=f"{ad}_s{i}", konu="tokyo", is_ayar=_ac,
+                istek=_sahte_istek, kare_dogrula=lambda *a, **k: True,
+                coz=lambda h: ["93.184.216.34"], erisim_tarihi="2026-08-12",
+                butce=butce))
+
+    _bA = mkp.is_butcesi_kur("fixA", maks_istek=50, maks_kare=50)
+    _bB = mkp.is_butcesi_kur("fixB", maks_istek=50, maks_kare=50)
+    _fA = threading.Thread(target=_fixture_is, args=("fixA", 3, _bA))
+    _fB = threading.Thread(target=_fixture_is, args=("fixB", 1, _bB))
+    _fA.start(); _fB.start(); _fA.join(); _fB.join()
+    kontrol("FIXTURE: is A 3 sahne secti", _bA.ozet()["secilen"] == 3,
+            str(_bA.ozet()["secilen"]))
+    kontrol("FIXTURE: is B 1 sahne secti", _bB.ozet()["secilen"] == 1,
+            str(_bB.ozet()["secilen"]))
+    kontrol("FIXTURE: iki isin istek sayaci KARISMIYOR",
+            _bA.ozet()["istek"] != _bB.ozet()["istek"]
+            and _bA.ozet()["istek"] == 6 and _bB.ozet()["istek"] == 2,
+            f"A={_bA.ozet()['istek']} B={_bB.ozet()['istek']}")
+    kontrol("FIXTURE: kare cagrisi sayaci is basina",
+            _bA.ozet()["kare_cagrisi"] == 3 and _bB.ozet()["kare_cagrisi"] == 1)
+    kontrol("FIXTURE: inen bayt is basina sayiliyor",
+            _bA.ozet()["bayt"] == 27000 and _bB.ozet()["bayt"] == 9000,
+            f"A={_bA.ozet()['bayt']} B={_bB.ozet()['bayt']}")
+
+    # ── LIMIT ASILINCA KONTROLLU DUR + ESKI YOLA DUS ──
+    _bK = mkp.is_butcesi_kur("kisitli", maks_istek=1, maks_kare=50)
+    _rK = mkp.sahne_medyasi(
+        sorgu="tokyo street night", hedef_yol=os.path.join(_i7_kok, "k.mp4"),
+        iddia_metni="Tokyo street at night in 2024.", scene_id="k1",
+        konu="tokyo", is_ayar=_ac, istek=_sahte_istek,
+        kare_dogrula=lambda *a, **k: True, coz=lambda h: ["93.184.216.34"],
+        erisim_tarihi="2026-08-12", butce=_bK)
+    kontrol("istek tavani dolunca KONTROLLU DUR", _rK["ok"] is False)
+    kontrol("durma nedeni BUTCE ve GORUNUR",
+            _rK["neden"] == "BUTCE"
+            and any(d["neden"] == "BUTCE" for d in _bK.dususler()),
+            str(_rK["neden"]))
+    kontrol("butce dolunca RASTGELE STOK YOK", _rK["yol"] == "" and not _rK["aday"])
+
+    _bKare = mkp.is_butcesi_kur("karesiz", maks_istek=50, maks_kare=0)
+    _rKare = mkp.sahne_medyasi(
+        sorgu="tokyo street night", hedef_yol=os.path.join(_i7_kok, "k2.mp4"),
+        iddia_metni="Tokyo street at night in 2024.", scene_id="k2",
+        konu="tokyo", is_ayar=_ac, istek=_sahte_istek,
+        kare_dogrula=lambda *a, **k: True, coz=lambda h: ["93.184.216.34"],
+        erisim_tarihi="2026-08-12", butce=_bKare)
+    kontrol("kare tavani 0 -> klip DOGRULANAMAZ, KABUL EDILMEZ (fail-closed)",
+            _rKare["ok"] is False)
+    kontrol("kare tavani dolunca klip DISKTEN SILINIYOR",
+            not os.path.exists(os.path.join(_i7_kok, "k2.mp4")))
+
+    _bBayt = mkp.is_butcesi_kur("baytsiz", maks_istek=50, maks_kare=50,
+                                maks_bayt=100)
+    _rBayt = mkp.sahne_medyasi(
+        sorgu="tokyo street night", hedef_yol=os.path.join(_i7_kok, "k3.mp4"),
+        iddia_metni="Tokyo street at night in 2024.", scene_id="k3",
+        konu="tokyo", is_ayar=_ac, istek=_sahte_istek,
+        kare_dogrula=lambda *a, **k: True, coz=lambda h: ["93.184.216.34"],
+        erisim_tarihi="2026-08-12", butce=_bBayt)
+    kontrol("bayt tavani asilirsa klip KABUL EDILMEZ", _rBayt["ok"] is False)
+
+    # ── MALIYET OZETI GORUNUR ──
+    kontrol("maliyet ozeti bes tavani birlikte gosteriyor",
+            all(k in _bA.ozet() for k in
+                ("usd", "istek", "bayt", "kare_cagrisi", "gecen_sn")))
+    kontrol("tavan dolan iste `tavan_doldu` GORUNUR",
+            _bK.ozet()["tavan_doldu"] is True and _bK.ozet()["durma_nedeni"])
+finally:
+    _mind.guvenli_indir = _asil_indir2
+    if _eski_px2 is None:
+        os.environ.pop("PEXELS_KEY", None)
+    else:
+        os.environ["PEXELS_KEY"] = _eski_px2
+    _sh.rmtree(_i7_kok, ignore_errors=True)
+
+
+blok("21c. I-7 — pipeline baglantisi ve GERIYE UYUMLULUK")
+
+_PP4 = oku(KOK, "pipeline.py")
+kontrol("pipeline IS BASINA butce kuruyor",
+        "medya_kopru.is_butcesi_kur(is_adi)" in _PP4)
+kontrol("pipeline GLOBAL sayac kullanmiyor",
+        "medya_kopru.kayit_sifirla()" not in _PP4
+        and "medya_kopru.ozet()" not in _PP4
+        and "medya_kopru.dususler()" not in _PP4)
+kontrol("butce kopruye GECIRILIYOR", "butce=_avci_butce" in _PP4)
+kontrol("ise yazilan ozet IS BUTCESINDEN geliyor",
+        '_avci_butce.ozet()' in _PP4 and '_avci_butce.dususler()' in _PP4)
+kontrol("butce tavanlari LOGA yaziliyor (gorunur)",
+        "butce=" in _PP4 and "istek /" in _PP4)
+kontrol("kapaliyken `medya_avcisi` anahtari YINE eklenmiyor",
+        'if _avci_acik and _avci_butce is not None:' in _PP4)
+kontrol("kopru avciya defter VE sinir geciriyor (para tavani gercek)",
+        "defter=defter if defter is not None else b.defter" in oku(
+            KOK, "medya_kopru.py")
+        and "sinir=sinir if sinir is not None else b.sinir" in oku(
+            KOK, "medya_kopru.py"))
+
+# GERIYE UYUMLULUK: eski cagri yolu (butce verilmeden) HALA calisiyor
+mkp.kayit_sifirla("eski-yol")
+kontrol("butce VERILMEDEN eski cagri yolu calisiyor",
+        mkp.sahne_medyasi(sorgu="x", hedef_yol="/tmp/z.mp4")["neden"] == "KAPALI")
+kontrol("modul ozet()/dususler() HALA calisiyor (eski imza)",
+        isinstance(mkp.ozet(), dict) and isinstance(mkp.dususler(), list))
+kontrol("modul ozet()'i `acik` bayragini tasimaya devam ediyor",
+        "acik" in mkp.ozet())
+
+# SOZLESMELER — bu adimda hicbiri degismedi
+kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("UI DEGISMEDI",
+        "basitGovde" in oku(KOK, "static/js/wizard.js")
+        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js"))
+kontrol("lisans/SSRF/kare kapisi modulleri DOKUNULMADI",
+        all("IsButcesi" not in oku(KOK, f) for f in
+            ("medya/lisans.py", "medya/guvenlik.py", "medya/indirme.py",
+             "medya/kare_kapisi.py")))
+kontrol("plan fact_id/iddia eksigi BU ADIMDA cozulmedi (bilinen sinir)",
+        "fact_id=str(" in _PP4)
+for _f4 in ("medya_kopru.py", "pipeline.py"):
+    kontrol(f"{_f4} derleniyor", _derlenir(os.path.join(KOK, _f4)))
 
 
 print(f"\n{'=' * 60}")

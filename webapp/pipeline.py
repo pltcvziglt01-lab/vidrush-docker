@@ -4071,17 +4071,24 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # medya yolu BUGUNKUYLE BIREBIR ayni calisir.
     _is_ayar = kanal if isinstance(kanal, dict) else None
     _avci_acik, _avci_gerekce = medya_kopru.acik_mi(_is_ayar)
-    _avci_konsept, _avci_yerler = None, []
+    _avci_konsept, _avci_yerler, _avci_butce = None, [], None
     if _avci_acik:
-        medya_kopru.kayit_sifirla()
+        # ⚠ FAZ I-7: HER IS KENDI butce nesnesini kurar. Modul duzeyinde
+        # paylasilan sayac YOK; ayni surecte iki is kosarsa sayaclar
+        # BIRBIRINE KARISMAZ (test kilitliyor).
+        _avci_butce = medya_kopru.is_butcesi_kur(is_adi)
         try:
             import taksonomi as _tx
             _avci_konsept = _tx.siniflandir(story or "")
         except Exception as e:
             print(f"  avci konsepti cozulemedi: {type(e).__name__}",
                   file=sys.stderr)
+        _bo = _avci_butce.ozet()
         print(f"  MEDYA AVCISI ACIK ({_avci_gerekce}); konsept="
-              f"{(_avci_konsept or {}).get('yol') or 'yok'}", file=sys.stderr)
+              f"{(_avci_konsept or {}).get('yol') or 'yok'}; butce="
+              f"${_bo['maks_usd']:.2f} / {_bo['maks_istek']} istek / "
+              f"{_bo['maks_sure_sn']:.0f} sn / {_bo['maks_kare']} kare",
+              file=sys.stderr)
     if _gorsel_imza:
         _ef_adlari = [e["ad"] for e in _gorsel_imza["efektler"]] or ["yok"]
         _gz = _gorsel_imza["gecis_imza"] or "yok"
@@ -4210,7 +4217,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                     konu=str(story or "")[:120],
                     yer_terim=kaynak._etkin_yer(s["footage_sorgu"].strip()),
                     istek=kaynak.avci_istek, kare_dogrula=kaynak._kare_dogrula,
-                    is_ayar=_is_ayar)
+                    is_ayar=_is_ayar, butce=_avci_butce)
                 if _av["ok"]:
                     if _av.get("atif"):
                         s["kaynakYazi"] = _av["atif"][:80]
@@ -4657,9 +4664,9 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # ⚠ Kapaliyken anahtar HIC eklenmez -> eski islerde `sonuc` bit-bit ayni.
     # Acikken kapinin hic calismadigi durum da GORUNUR (denenen=0), boylece
     # "avci kullandik" gibi kanitsiz iddia uretilmez.
-    if _avci_acik:
-        sonuc["medya_avcisi"] = medya_kopru.ozet()
-        sonuc["dususler"].extend(medya_kopru.dususler())
+    if _avci_acik and _avci_butce is not None:
+        sonuc["medya_avcisi"] = _avci_butce.ozet()
+        sonuc["dususler"].extend(_avci_butce.dususler())
     # ── FAZ I-2c: BILESIK STIL PROFILI KUNYESI (yalnizca VARSA yazilir) ──
     # ⚠ I-2b'nin kapattigi acik: "bir stilin sahne_sn'i degisince dun uretilmis
     # is yeniden uretilemez; hangi ayarla ciktigi kayitli degildi." Kunye o
