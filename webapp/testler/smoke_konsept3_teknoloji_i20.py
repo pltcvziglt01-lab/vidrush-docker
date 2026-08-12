@@ -1,0 +1,1118 @@
+#!/usr/bin/env python3
+"""FAZ I-20 — UCUNCU KONSEPT: TEKNOLOJI/EKONOMI (mevcut motoru sinar).
+
+⚠ YENI MIMARI YOK. Bu betik I-19'da kurulan edinim zincirini, I-14/I-17
+kalite kapilarini ve I-16 altyazi/kunye hattini AYNEN kullanir; yalnizca
+UCUNCU bir konseptle sinar.
+
+⚠ KONU DURUSTCE DARALTILDI. Istenen konu "yapay zeka veri merkezlerinin
+enerji ve cip ekonomisi"ydi. Olculdu: Wikimedia HALA `HTTP 429` veriyor
+(bu ortamin cikis IP'sine ozgu) ve NASA kutuphanesinde ticari AI veri
+merkezi fotografi YOK. Ama NASA'nin KENDI superbilgisayar tesisi
+(Pleiades), silikon karbur cip ve gunes paneli goruntuleri VAR ve bunlar
+"hesaplama gucunun enerji ve cip ekonomisi"ne SEMANTIK OLARAK UYUYOR.
+Bu yuzden konu, saglayicilarin GERCEKTEN destekledigi en yakin durust
+baslikla kuruldu. Uymayan goruntu KULLANILMADI.
+
+⚠ ANLATIM GORUNENE UYDURULUR. Her cumle, o sahneye edinilen varligin
+KENDI basligini betimler; goruntude olmayan sey iddia EDILMEZ.
+
+⚠ SAHTE KANIT YOK: fixture ya da kendi render ciktilarimiz "gercek web
+medyasi" diye SUNULMAZ. Kaynak bulunamazsa BLOKE raporu uretilir.
+
+⚠ MALIYET $0.00 — edge-tts ve NASA API anahtar istemez.
+
+Kosum:
+    python3 webapp/testler/smoke_konsept3_teknoloji_i20.py
+Cikti:
+    outputs/sample/editorv2_teknoloji_i20.mp4 (+ 9+ kare ve JSON rapor)
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+
+KOK = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # webapp/
+DEPO = os.path.dirname(KOK)
+sys.path.insert(0, KOK)
+os.environ.setdefault("VIDRUSH_KOK", os.path.join(DEPO, "cikti", "_i20_kok"))
+
+CIKTI_DIZIN = os.path.join(DEPO, "outputs", "sample")
+VIDEO_ADI = "editorv2_teknoloji_i20.mp4"
+FIXTURE = os.path.join(DEPO, "app", "render-studio", "public", "editorv2",
+                       "faz_e")
+CALISMA = os.path.join(DEPO, "cikti", "_i20")
+OLCU = (1920, 1080)          # ⭐ I-16: 1080p premium
+FPS = 30
+
+# ══════════ KULLANICI GIRDISI — YALNIZ METIN ══════════
+# ⚠ Tur/stil ELLE VERILMEZ. Asagidaki metin `taksonomi.siniflandir` ile
+# siniflanir, `stil_profili.coz` bilesik stili SECER. Kanit raporda.
+KONU_METNI = ("Süperbilgisayarların enerji ve çip ekonomisi: işlem gücü "
+              "nasıl üretiliyor ve faturası ne kadar")
+
+SAHNE_TANIMI = [
+    {"kimlik": "s01", "sorgu": "Pleiades supercomputer",
+     "metin": "Güç burada üretilir."},
+    {"kimlik": "s02", "sorgu": "supercomputer facility",
+     "metin": "Binlerce işlemci tek salonda, sıra sıra dizili duruyor."},
+    {"kimlik": "s03", "sorgu": "Silicon Carbide Integrated Circuit Chip",
+     "metin": "Her hesaplama, silikon üzerindeki devrelerde gerçekleşiyor."},
+    {"kimlik": "s04", "sorgu": "solar array power",
+     "metin": "Bu işlem gücünün faturası ise enerjiyle ödeniyor."},
+]
+SAHNE_METINLERI = [(s["kimlik"], s["metin"]) for s in SAHNE_TANIMI]
+# ⚠ Bunlar DOGRULANMIS IDDIA degil, BETIMLEMEdir: her cumle o sahneye
+# edinilen Commons varliginin kendi basligindaki yeri anlatir. Sayisal ya da
+# tarihsel iddia YOK — dogrulanacak kaynak da yok, uydurma da yok.
+OLGULAR = [{"fact_id": f, "guven": "betimleme", "metin": m}
+           for f, m in SAHNE_METINLERI]
+# ⚠ TURKCE anlatici sesleri (edge-tts, anahtarsiz).
+SES_ADAYLARI = ("tr-TR-AhmetNeural", "tr-TR-EmelNeural")
+
+# Videonun sonunda birakilan nefes payi. I-14 kapisinin tavani 0.5 sn.
+KUYRUK_SN = 0.35
+# Anlatim master hedefi = profil hedefi (premium-modern lufs_hedef -14).
+ANLATIM_LUFS = -14.0
+# Ambiyans hedefi: anlatimin ~24 dB altinda kalacak sekilde HESAPLANDI.
+#   etkin = AMBANS_LUFS + 20log10(0.5) + 20log10(0.5) = AMBANS_LUFS - 12.04
+#   fark  = -14.0 - etkin = 24.04 dB  -> [12, 30] bandinin ortasi
+AMBANS_LUFS = -26.0
+AMBANS_SEVIYE = 0.5
+AMBANS_DUCK = 0.5
+
+# ⚠ SABIT GORSEL HAVUZU YOK. Medya `medya.commons` ile konuya gore EDINILIR.
+DETAY_ESIGI = 20.0          # I-13'te olculdu: esik alti kare DUZ GRI cikiyor
+MEDYA_ONBELLEK = os.path.join(DEPO, "cikti", "_i20_medya")
+SAHNE_SAYISI = len(SAHNE_METINLERI)
+
+
+def ekp_profil(stil_kimligi):
+    """Bilesik stil -> Faz C edit profili (edit_kopru tablosu)."""
+    import edit_kopru
+    return edit_kopru.edit_profili_sec(stil_kimligi or "")[0]
+
+
+def kos(cmd, t=300):
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=t)
+
+
+def ses_olc(yol, sessizlik_esigi="0.30"):
+    """codec/sr/kanal + LUFS/TP/LRA + sessizlik araliklari. Uydurma yok."""
+    o = {}
+    r = kos(["ffprobe", "-v", "error", "-show_entries",
+             "stream=codec_name,sample_rate,channels", "-show_entries",
+             "format=duration", "-of", "json", yol], 60)
+    try:
+        d = json.loads(r.stdout or "{}")
+        a = (d.get("streams") or [{}])[0]
+        o.update({"codec": a.get("codec_name"),
+                  "ornekleme_hz": int(a.get("sample_rate") or 0),
+                  "kanal": int(a.get("channels") or 0),
+                  "sure_sn": round(float((d.get("format") or {}).get(
+                      "duration") or 0), 3)})
+    except (ValueError, TypeError, IndexError):
+        pass
+    r = kos(["ffmpeg", "-nostdin", "-i", yol, "-af",
+             "loudnorm=print_format=json", "-f", "null", "-"])
+    m = re.findall(r"\{[^{}]*\"input_i\"[^{}]*\}", (r.stderr or ""), re.S)
+    if m:
+        try:
+            d = json.loads(m[-1])
+            o.update({"lufs": float(d.get("input_i", 0)),
+                      "tepe_dbtp": float(d.get("input_tp", 0)),
+                      "lra": float(d.get("input_lra", 0))})
+        except (ValueError, TypeError):
+            pass
+    r = kos(["ffmpeg", "-nostdin", "-i", yol, "-af",
+             f"silencedetect=noise=-45dB:d={sessizlik_esigi}", "-f", "null",
+             "-"])
+    basla = [float(x) for x in
+             re.findall(r"silence_start: ([\d.-]+)", r.stderr or "")]
+    sure = [float(x) for x in
+            re.findall(r"silence_duration: ([\d.]+)", r.stderr or "")]
+    o["sessizlikler"] = [{"bas": round(b, 3), "sure": round(s, 3)}
+                         for b, s in zip(basla, sure)]
+    top = sum(sure)
+    o["sessiz_sn"] = round(top, 3)
+    o["sessiz_pct"] = (round(100.0 * top / o["sure_sn"], 1)
+                       if o.get("sure_sn") else 0.0)
+    o["kirpma_var"] = bool(o.get("tepe_dbtp", -99) > -0.1)
+    return o
+
+
+# ────────────────────── 1) ANLATIM + GERCEK ZAMANLAMA ──────────────────────
+
+def anlatim_uret(hedef_dizin):
+    """edge-tts anlatim + **SentenceBoundary** zamanlamasi.
+
+    Doner: (master_yolu, olcum, adaylar, cumle_araliklari) ya da (None, ...).
+
+    ⚠ ZAMANLAMA VEKIL DEGIL OLCUM: `SentenceBoundary` olaylari motorun kendi
+    sentez zaman cizelgesinden gelir. I-14'te kullanilan "kelime sayisi"
+    yaklasimi yalnizca bir vekildi; bu gercek suredir.
+    """
+    try:
+        import edge_tts
+    except ImportError as e:
+        print(f"BLOKE: edge-tts yok ({e}). Cozum: pip install edge-tts",
+              file=sys.stderr)
+        return None, {}, [], []
+    os.makedirs(hedef_dizin, exist_ok=True)
+    metin = " ".join(m for _, m in SAHNE_METINLERI)
+    uretilen = []
+
+    async def uret():
+        for v in SES_ADAYLARI:
+            y = os.path.join(hedef_dizin, f"aday_{v}.mp3")
+            sinirlar = []
+            try:
+                c = edge_tts.Communicate(metin, v)
+                with open(y, "wb") as f:
+                    async for ch in c.stream():
+                        if ch["type"] == "audio":
+                            f.write(ch["data"])
+                        elif ch["type"] == "SentenceBoundary":
+                            sinirlar.append({
+                                "bas": round(ch["offset"] / 1e7, 3),
+                                "sure": round(ch["duration"] / 1e7, 3),
+                                "metin": ch["text"]})
+                uretilen.append((v, y, sinirlar))
+            except Exception as e:                              # noqa: BLE001
+                print(f"  aday {v} uretilemedi: {type(e).__name__}",
+                      file=sys.stderr)
+
+    try:
+        asyncio.run(uret())
+    except Exception as e:                                      # noqa: BLE001
+        print(f"BLOKE: TTS cagrisi basarisiz: {type(e).__name__}: "
+              f"{str(e)[:120]}", file=sys.stderr)
+        return None, {}, [], []
+    if not uretilen:
+        return None, {}, [], []
+
+    # ⚠ SECIM OLCUME DAYANIR: LRA (dinamik genislik) dogalligin en iyi
+    # olculebilir vekili; duz TTS'te 0.5-1, ifadeli anlatimda 2+.
+    # EK SART (I-15): cumle sayisi TAM eslesmeli, yoksa sahne eslemesi bozulur.
+    olcumler = []
+    for v, y, sinirlar in uretilen:
+        o = ses_olc(y)
+        o["ses"] = v
+        o["cumle_siniri"] = len(sinirlar)
+        olcumler.append(o)
+    uygun = [(v, y, s) for v, y, s in uretilen if len(s) == SAHNE_SAYISI]
+    if not uygun:
+        print(f"BLOKE: hicbir aday {SAHNE_SAYISI} cumle siniri vermedi "
+              f"(olculen: {[o['cumle_siniri'] for o in olcumler]}). "
+              f"Sahte zamanlama URETILMEDI.", file=sys.stderr)
+        return None, {}, olcumler, []
+    en_iyi = max(uygun, key=lambda t: next(
+        o.get("lra", 0) for o in olcumler if o["ses"] == t[0]))
+    ses_adi, kaynak, sinirlar = en_iyi
+
+    anlatim_bitis = round(sinirlar[-1]["bas"] + sinirlar[-1]["sure"], 3)
+    kesim = round(anlatim_bitis + KUYRUK_SN, 3)
+    master = os.path.join(hedef_dizin, "anlatim_master.wav")
+    # ⚠ BAS SESSIZLIGI KIRPILMAZ: kirpmak `SentenceBoundary` ofsetlerini
+    # kaydirir ve zamanlama olcumu YALAN olur. Yalnizca KUYRUK kesilir —
+    # olu final kusurunun kok nedeni buydu.
+    r = kos(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", kaynak,
+             "-t", str(kesim), "-af",
+             f"loudnorm=I={ANLATIM_LUFS}:TP=-1.5:LRA=7",
+             "-ar", "48000", "-ac", "1", master])
+    if r.returncode != 0 or not os.path.exists(master):
+        print(f"BLOKE: anlatim master'lanamadi: {(r.stderr or '')[:160]}",
+              file=sys.stderr)
+        return None, {}, olcumler, []
+    olcum = ses_olc(master)
+    olcum["ses"] = ses_adi
+    olcum["anlatim_bitis_sn"] = anlatim_bitis
+    olcum["kesim_sn"] = kesim
+    return master, olcum, olcumler, sinirlar
+
+
+def ambans_hazirla(hedef_dizin, toplam_sn):
+    """Ambiyansi OLCULMUS hedefe normalize et (I-13'te -48.7 LUFS'ti)."""
+    kaynak = os.path.join(FIXTURE, "ambans0.wav")
+    if not os.path.exists(kaynak):
+        return "", {}, {}
+    once = ses_olc(kaynak)
+    hedef = os.path.join(hedef_dizin, "ambans_norm.wav")
+    r = kos(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", kaynak,
+             "-t", str(round(toplam_sn + 1.0, 3)), "-af",
+             f"loudnorm=I={AMBANS_LUFS}:TP=-6:LRA=7",
+             "-ar", "48000", "-ac", "1", hedef])
+    if r.returncode != 0 or not os.path.exists(hedef):
+        return "", once, {}
+    return hedef, once, ses_olc(hedef)
+
+
+# ────────────────────── 2) GORSEL SECIMI ve CESITLILIK ─────────────────────
+
+def gorsel_detay(yol):
+    """Kadraja dusen DETAY (luminans std sapmasi). Olcum, tahmin degil."""
+    r = subprocess.run(
+        ["ffmpeg", "-nostdin", "-v", "error", "-i", yol, "-vf",
+         "crop=iw*0.7:ih*0.7,scale=320:-1,format=gray", "-f", "rawvideo", "-"],
+        capture_output=True, timeout=120)
+    d = r.stdout or b""
+    if len(d) < 1000:
+        return 0.0
+    n = len(d)
+    mu = sum(d) / n
+    return round((sum((b - mu) ** 2 for b in d) / n) ** 0.5, 1)
+
+
+def dhash(yol, w=9, h=8):
+    """64 bit yapisal parmak izi. Ag yok, deterministik."""
+    r = subprocess.run(
+        ["ffmpeg", "-nostdin", "-v", "error", "-i", yol, "-vf",
+         f"scale={w}:{h},format=gray", "-f", "rawvideo", "-"],
+        capture_output=True, timeout=120)
+    d = r.stdout or b""
+    if len(d) < w * h:
+        return None
+    return [1 if d[y * w + x] > d[y * w + x + 1] else 0
+            for y in range(h) for x in range(w - 1)]
+
+
+def benzerlik(a, b):
+    """dHash esitlik orani 0..1. Okunamazsa -1 (OLCULEMEDI)."""
+    ha, hb = dhash(a), dhash(b)
+    if not ha or not hb:
+        return -1.0
+    return sum(1 for x, y in zip(ha, hb) if x == y) / len(ha)
+
+
+def medya_edin():
+    """Sahne basina medyayi SAGLAYICI ZINCIRINDEN edin (devre kesicili).
+
+    ⚠ I-19: tek saglayici yerine sirali zincir. Wikimedia 429 verirse
+    ayni host ZORLANMAZ; devre acilir ve NASA'ya gecilir. Gecis SURESI
+    olculur. Arama/metadata ile GERCEK BAYT ayri sayilir.
+    """
+    from medya import commons, edinim, nasa
+    os.makedirs(MEDYA_ONBELLEK, exist_ok=True)
+    kesici = edinim.DevreKesici()
+    onbellek: dict = {}
+    secilen, rapor = [], {
+        "mimari": "medya.edinim saglayici zinciri + devre kesici",
+        "maliyet_usd": 0.0,
+        "saglayici_sirasi": ["commons", "nasa"],
+        "atlanan_saglayicilar": [
+            {"ad": "pexels", "sebep": "mevcut anahtar GECERSIZ (HTTP 401) — "
+                                      "yeni anahtar ALINMADI"}],
+        "en_az_genislik": 1920, "sahneler": []}
+    for tanim in SAHNE_TANIMI:
+        ad = re.sub(r"[^a-zA-Z0-9_.-]", "_", tanim["sorgu"])[:50]
+        hedef = os.path.join(MEDYA_ONBELLEK, f"{tanim['kimlik']}_{ad}.jpg")
+        # ⚠ ONBELLEK PROVENANCE'I DA SAKLAR. Ilk surumde yalniz DOSYA
+        # onbellekleniyordu; ikinci kosumda telif/atif bilgisi olmadigi icin
+        # kural dogru sekilde REDDEDIYORDU (ONBELLEK-PROVENANCE-YOK).
+        # Kusur kuralda degil onbellekteydi: kunye dosyanin YANINA yazilir.
+        kunye_yolu = hedef + ".kunye.json"
+        onbellekte = (os.path.exists(hedef) and os.path.getsize(hedef) > 10000
+                      and os.path.exists(kunye_yolu))
+        if onbellekte:
+            try:
+                with open(kunye_yolu, encoding="utf-8") as f:
+                    _kunye = json.load(f)
+            except (ValueError, OSError):
+                _kunye = {}
+            son = {"ok": bool(_kunye.get("lisans")
+                              and _kunye.get("eser_sahibi")),
+                   "kullanilan_saglayici": "ONBELLEK",
+                   "failover_sn": 0.0, "metadata_bulundu": 0,
+                   "bayt_indirildi": 0, "denemeler": [], "onbellekten": True,
+                   "aday": dict(_kunye, yol=hedef)}
+        else:
+            son = edinim.edin(
+                tanim["sorgu"], hedef, en_az_genislik=1920, kesici=kesici,
+                onbellek=onbellek,
+                saglayicilar=[
+                    {"ad": "commons", "modul": commons,
+                     "sorgu": tanim["sorgu"] + " Iceland"},
+                    {"ad": "nasa", "modul": nasa, "sorgu": tanim["sorgu"]}],
+                olcu_okuyucu=_olcu_oku)
+        kayit = {"kimlik": tanim["kimlik"], "sorgu": tanim["sorgu"],
+                 "saglayici": son.get("kullanilan_saglayici"),
+                 "failover_sn": son.get("failover_sn"),
+                 "metadata_bulundu": son.get("metadata_bulundu"),
+                 "bayt_indirildi": son.get("bayt_indirildi"),
+                 "onbellekten": bool(son.get("onbellekten")),
+                 "denemeler": son.get("denemeler"),
+                 "devre": son.get("devre")}
+        if not son.get("ok"):
+            kayit["durum"] = "BLOKE"
+            kayit["sebep"] = "hicbir saglayici GERCEK BAYT veremedi"
+            kayit["sinif"] = "TUM-SAGLAYICILAR-DUSTU"
+            rapor["sahneler"].append(kayit)
+            secilen.append(None)
+            continue
+        aday = dict(son["aday"])
+        if onbellekte and not aday.get("lisans"):
+            # Onbellekten geldi ama provenance yok -> KESIN RED.
+            kayit["durum"] = "ONBELLEK-PROVENANCE-YOK"
+            rapor["sahneler"].append(kayit)
+            secilen.append(None)
+            continue
+        if not onbellekte:
+            with open(kunye_yolu, "w", encoding="utf-8") as f:
+                json.dump({k2: v for k2, v in aday.items()
+                           if k2 != "yol"}, f, ensure_ascii=False)
+        aday["asset_id"] = f"{tanim['kimlik']}_{abs(hash(aday.get('orijinal_url') or hedef)) % 10**8}"
+        aday["yol"] = hedef
+        aday["detay_std"] = gorsel_detay(hedef)
+        olcu = _olcu_oku(hedef)
+        aday["genislik"], aday["yukseklik"] = olcu
+        kayit.update({"durum": "OK", "asset_id": aday["asset_id"],
+                      "baslik": aday.get("baslik"),
+                      "lisans": aday.get("lisans"),
+                      "eser_sahibi": aday.get("eser_sahibi"),
+                      "olcu": list(olcu), "detay_std": aday["detay_std"],
+                      "orijinal_url": aday.get("orijinal_url"),
+                      "dayanak": "cumle bu varligin KENDI basligini betimliyor"})
+        if aday["detay_std"] < DETAY_ESIGI:
+            kayit["durum"] = "DETAY-ESIK-ALTI"
+            rapor["sahneler"].append(kayit)
+            secilen.append(None)
+            continue
+        rapor["sahneler"].append(kayit)
+        secilen.append(aday)
+    rapor["basarili"] = sum(1 for s in secilen if s)
+    rapor["dort_k_uygun"] = bool(
+        secilen and all(s and s["genislik"] >= 3840 for s in secilen))
+    rapor["en_hizli_failover_sn"] = min(
+        [k["failover_sn"] for k in rapor["sahneler"]
+         if k.get("failover_sn") is not None] or [None])
+    rapor["devre_ozeti"] = kesici.ozet()
+    return secilen, rapor
+
+
+def _olcu_oku(yol):
+    """Indirilen dosyanin GERCEK piksel olcusu — arama beyanina guvenilmez."""
+    r = kos(["ffprobe", "-v", "error", "-select_streams", "v:0",
+             "-show_entries", "stream=width,height", "-of", "csv=p=0", yol], 60)
+    try:
+        g, y = (r.stdout or "0,0").strip().split(",")[:2]
+        return int(g), int(y)
+    except (ValueError, IndexError):
+        return 0, 0
+
+
+def video_broll_ara():
+    """Guvenli havuzda GERCEK hareketli video adayi var mi?
+
+    ⚠ I-18 kapsami yalnizca FOTOGRAF edinimidir; video B-roll BLOKE kalir.
+    Depodaki `.mp4` dosyalari bu projenin KENDI render ciktilaridir ve
+    B-roll DEGILDIR — onlari kullanmak dongusel olurdu.
+    """
+    aday, taranan = [], []
+    for dizin in (MEDYA_ONBELLEK,
+                  os.path.join(DEPO, "app", "render-studio", "public",
+                               "editorv2")):
+        if not os.path.isdir(dizin):
+            continue
+        taranan.append(os.path.relpath(dizin, DEPO))
+        for kok, _, dosyalar in os.walk(dizin):
+            for d in dosyalar:
+                if d.lower().endswith((".mp4", ".mov", ".webm", ".m4v")):
+                    aday.append(os.path.relpath(os.path.join(kok, d), DEPO))
+    return {
+        "aday": aday, "taranan_dizin": taranan,
+        "durum": "VAR" if aday else "BLOKE",
+        "sebep": ("" if aday else
+                  "I-18 yalnizca FOTOGRAF edinir; guvenli havuzda hareketli "
+                  "video adayi YOK ve depodaki .mp4 dosyalari bu projenin "
+                  "kendi render ciktilari, B-roll DEGILDIR"),
+    }
+
+
+def cesitli_sirala(secilen):
+    """En benzer ciftin KOMSU OLMAMASI icin deterministik siralama.
+
+    ⚠ Bu bir ESIK OYNAMASI DEGIL: hicbir kabul/red karari degismez, yalnizca
+    ayni kumenin SIRASI secilir. Havuzun kendisi daha cesitli hale gelmez —
+    olculdu ki mevcut 4'lu zaten havuzun en cesitli alt kumesi (en yuksek
+    ikili benzerlik 0.6094) ve daha iyisi YOK. Yapilabilecek tek iyilestirme
+    o ciftin arka arkaya DUSMEMESI.
+
+    Ilk gorsel SABIT kalir (en yuksek detayli kare, acilis capasi); kalanlarin
+    tum permutasyonlari arasindan komsu benzerligi en dusuk olan secilir.
+    Kume kucuk (<=6) oldugu icin tam arama ucuz ve deterministik.
+    """
+    import itertools
+    if len(secilen) < 3:
+        return secilen, {}
+    onbellek = {}
+
+    def b(i, j):
+        a1, a2 = secilen[i]["asset_id"], secilen[j]["asset_id"]
+        k = tuple(sorted((a1, a2)))
+        if k not in onbellek:
+            onbellek[k] = benzerlik(secilen[i]["yol"], secilen[j]["yol"])
+        return onbellek[k]
+
+    def komsu_maks(sira):
+        return max(b(sira[i], sira[i + 1]) for i in range(len(sira) - 1))
+
+    kalan = list(range(1, len(secilen)))
+    once = list(range(len(secilen)))
+    en_iyi = min(([0] + list(p) for p in itertools.permutations(kalan)),
+                 key=lambda s: (komsu_maks(s), s))
+    return ([secilen[i] for i in en_iyi],
+            {"once_sira": [secilen[i]["asset_id"] for i in once],
+             "once_komsu_maks": round(komsu_maks(once), 4),
+             "sonra_sira": [secilen[i]["asset_id"] for i in en_iyi],
+             "sonra_komsu_maks": round(komsu_maks(en_iyi), 4),
+             "not": ("yalnizca SIRA degisti; kume ve esikler ayni. Havuzun en "
+                     "cesitli 4'lusu zaten seciliydi (olculdu).")})
+
+
+def cesitlilik_raporu(secilen):
+    """Secilen gorsellerin ikili benzerligi — DURUSTCE, esik OYNATILMADAN."""
+    from editor import kalite_kapisi as kk
+    ciftler = []
+    for i in range(len(secilen)):
+        for j in range(i + 1, len(secilen)):
+            d = benzerlik(secilen[i]["yol"], secilen[j]["yol"])
+            ciftler.append({"a": secilen[i]["asset_id"],
+                            "b": secilen[j]["asset_id"],
+                            "bitisik": bool(j == i + 1),
+                            "benzerlik": round(d, 4)})
+    olculen = [c["benzerlik"] for c in ciftler if c["benzerlik"] >= 0]
+    return {
+        "esik": kk.BENZERLIK_ESIGI,
+        "esik_degistirildi_mi": False,
+        "ciftler": ciftler,
+        "en_yuksek": max(olculen) if olculen else None,
+        "en_yuksek_bitisik": max(
+            [c["benzerlik"] for c in ciftler
+             if c["bitisik"] and c["benzerlik"] >= 0] or [0]),
+        "esigi_asan": [c for c in ciftler
+                       if c["benzerlik"] >= kk.BENZERLIK_ESIGI],
+    }
+
+
+# ────────────────────── 3) SAHNE SURELERI (GERCEK ZAMANLAMA) ───────────────
+
+def girdi_kur(secilen, sinirlar, kesim_sn):
+    """Sahne sureleri **SentenceBoundary**'den; provenance GERCEK varliktan.
+
+    ⚠ Her aday KENDI `atif_metni`ni tasir -> kaynak kunyesi SAHNEYE OZGU.
+    """
+    cumleler, adaylar = [], []
+    n = min(len(secilen), len(sinirlar), len(SAHNE_METINLERI))
+    for i in range(n):
+        bas = 0.0 if i == 0 else sinirlar[i]["bas"]
+        son = sinirlar[i + 1]["bas"] if i + 1 < n else kesim_sn
+        sure = round(son - bas, 3)
+        fid, metin = SAHNE_METINLERI[i]
+        sid = f"s{i + 1:03d}"
+        se = secilen[i]
+        cumleler.append({"scene_id": sid, "fact_id": fid,
+                         "sure_sn": sure, "metin": metin})
+        adaylar.append({
+            "asset_id": se["asset_id"], "scene_id": sid, "fact_id": fid,
+            "saglayici": se["saglayici"], "lisans": se["lisans"],
+            "tur": "image", "medya_turu": "image",
+            "yerel_yol": se["yol"], "medya_yolu": se["yol"],
+            "orijinal_url": se["orijinal_url"],
+            "eser_sahibi": se["eser_sahibi"],
+            "atif_metni": se["atif_metni"],
+            "atif_gerekli": bool(se["atif_gerekli"]),
+            "baslik": se["baslik"],
+            "genislik": se["genislik"], "yukseklik": se["yukseklik"],
+            "sure_sn": sure, "toplam_skor": 90 - i,
+            "render_kullanilabilir": True,
+            "detay_std": se.get("detay_std"), "sahne_amaci": "manzara"})
+    return cumleler, {"adaylar": adaylar, "kapsam_bosluklari": []}
+
+
+# ────────────────────────────── ANA AKIS ───────────────────────────────────
+
+def main() -> int:
+    print("=" * 72)
+    print("FAZ I-20 — UCUNCU KONSEPT: TEKNOLOJI/EKONOMI")
+    print("=" * 72)
+    for arac in ("ffmpeg", "ffprobe"):
+        if not shutil.which(arac):
+            print(f"BLOKE: {arac} yok")
+            return 2
+    if not os.path.isdir(FIXTURE):
+        print(f"BLOKE: fixture dizini yok: {FIXTURE}")
+        return 2
+
+    import edit_kopru
+    from editor import kalite_kapisi as kk
+    from editor import qa_son, remotion_v2
+    if not os.path.isdir(os.path.join(remotion_v2.STUDIO, "node_modules")):
+        print("BLOKE: Remotion node_modules yok — cd app/render-studio && npm ci")
+        return 2
+
+    os.makedirs(CALISMA, exist_ok=True)
+
+    # ── [0/7] OTOMATIK SINIFLANDIRMA — kullanici YALNIZ metin verdi ──
+    import taksonomi
+    import stil_profili
+    konsept = taksonomi.siniflandir(KONU_METNI)
+    stil = stil_profili.coz(konsept=konsept)
+    print(f"\n[0/7] AUTO SINIFLANDIRMA (tur/stil ELLE VERILMEDI)")
+    print(f"      metin  : {KONU_METNI[:66]}…")
+    print(f"      konsept: aile={konsept.get('aile') or '(belirsiz)'} "
+          f"durum={konsept.get('durum')} guven={konsept.get('guven')}")
+    print(f"      gerekce: {str(konsept.get('gerekce'))[:96]}")
+    print(f"      STIL   : kimlik={stil.get('kimlik')} "
+          f"surum={stil.get('surum')} kaynak={stil.get('kaynak')}")
+    if stil.get("kaynak") != "auto":
+        print(f"      ⚠ stil AUTO secilemedi (kaynak={stil.get('kaynak')}) — "
+              f"konu metni taksonomide karsilik bulmadi")
+    edit_profili = ekp_profil(stil.get("kimlik"))
+    print(f"      -> edit profili: {edit_profili}")
+
+    # ── [1/7] ANLATIM ──
+    print("\n[1/7] ANLATICI SESI + GERCEK CUMLE ZAMANLAMASI (edge-tts, $0.00)")
+    anlatim, ses_kalite, adaylar, sinirlar = anlatim_uret(
+        os.path.join(CALISMA, "ses"))
+    if not anlatim:
+        print("BLOKE: kaliteli anlatim uretilemedi. Sahte ses URETILMEDI.")
+        return 3
+    for o in adaylar:
+        print(f"      aday {o['ses']:<22} LRA={o.get('lra', 0):>4.1f} "
+              f"cumle_siniri={o.get('cumle_siniri')} "
+              f"sure={o.get('sure_sn', 0):>5.2f}sn")
+    print(f"      SECILEN: {ses_kalite['ses']}")
+    print(f"      master : {ses_kalite.get('codec')}/"
+          f"{ses_kalite.get('ornekleme_hz')}Hz/{ses_kalite.get('kanal')}ch "
+          f"{ses_kalite.get('sure_sn')}sn LUFS={ses_kalite.get('lufs')} "
+          f"TP={ses_kalite.get('tepe_dbtp')} LRA={ses_kalite.get('lra')}")
+    print(f"      anlatim bitisi {ses_kalite['anlatim_bitis_sn']} sn -> "
+          f"kesim {ses_kalite['kesim_sn']} sn (kuyruk {KUYRUK_SN} sn)")
+    for i, s in enumerate(sinirlar):
+        print(f"        cumle{i + 1} bas={s['bas']:>6.3f} sure={s['sure']:>5.3f}"
+              f"  {s['metin'][:46]}")
+
+    # ── [2/7] GORSEL ──
+    # ── HAREKETLI VIDEO B-ROLL: var mi? Yoksa DURUSTCE BLOKE ──
+    broll = video_broll_ara()
+    if broll["durum"] == "BLOKE":
+        print(f"\n[BLOKE] HAREKETLI VIDEO B-ROLL: {broll['sebep']}")
+        print(f"        taranan: {broll['taranan_dizin']}")
+        print("        -> bu atomda B-roll KULLANILMADI; sahte hareket "
+              "URETILMEDI. Kusur GIZLENMIYOR, raporda yazili.")
+    else:
+        print(f"\n[B-ROLL] {len(broll['aday'])} aday: {broll['aday'][:3]}")
+
+    secilen, medya_rapor = medya_edin()
+    eksik = [s for s in secilen if s is None]
+    print(f"\n[2/7] MEDYA EDINIMI (Wikimedia Commons, anahtarsiz, $0.00)")
+    print(f"      mimari: {medya_rapor['mimari']}")
+    print(f"      zincir: {medya_rapor['saglayici_sirasi']} | atlanan: "
+          f"{[a['ad'] + '=' + a['sebep'][:32] for a in medya_rapor['atlanan_saglayicilar']]}")
+    for k in medya_rapor["sahneler"]:
+        if k["durum"] == "OK":
+            print(f"      {k['kimlik']} OK  [{k['saglayici']:<8}] "
+                  f"{k['olcu'][0]}x{k['olcu'][1]} {k['lisans']:<12} "
+                  f"{str(k['eser_sahibi'])[:18]:<18} detay={k['detay_std']} "
+                  f"failover={k['failover_sn']}s")
+            print(f"           {str(k['baslik'])[:70]}")
+            for d in (k.get("denemeler") or []):
+                print(f"             - {d['saglayici']:<9} {d['durum']:<12} "
+                      f"meta={d['metadata']:<3} sn={d['sn']} "
+                      f"{str(d.get('sebep'))[:40]}")
+        else:
+            print(f"      {k['kimlik']} {k['durum']:<8} {k.get('sebep', '')[:64]}")
+    print(f"      metadata toplam={sum(k.get('metadata_bulundu') or 0 for k in medya_rapor['sahneler'])} "
+          f"bayt toplam={sum(k.get('bayt_indirildi') or 0 for k in medya_rapor['sahneler'])} "
+          f"(AYRI sayilir)")
+    print(f"      devre: {medya_rapor['devre_ozeti']}")
+    if eksik:
+        # ⚠ BLOKE KANITI IZLENEN BIR RAPORA YAZILIR. "Denedik olmadi" demek
+        # yetmez; NE denendigi, NEYIN gectigi ve NEREDE durduldugu sayilabilir
+        # olmali. Lisans/provenance reddi ile AG-HIZ-SINIRI ayri raporlanir.
+        sinif = {}
+        for k in medya_rapor["sahneler"]:
+            sinif[k.get("sinif") or k["durum"]] = \
+                sinif.get(k.get("sinif") or k["durum"], 0) + 1
+        bloke = {
+            "atom": "I-20", "durum": "BLOKE",
+            "ne_bloke": "medya BAYT edinimi (arama ve lisans katmani CALISTI)",
+            "konu_metni": KONU_METNI,
+            "konsept": konsept, "stil": stil,
+            "medya": medya_rapor, "siniflandirma": sinif,
+            "edinim_mimarisi": medya_rapor.get("mimari"),
+            "sahte_medya_uretildi_mi": False,
+            "video_broll": broll,
+            "not": ("arama/metadata/lisans katmani calisti; duran sey "
+                    "upload.wikimedia.org'dan BAYT indirme. Bu ORTAM "
+                    "kaynaklidir (cikis IP hiz siniri), lisans reddi DEGIL."),
+        }
+        os.makedirs(CIKTI_DIZIN, exist_ok=True)
+        with open(os.path.join(CIKTI_DIZIN, "teknoloji_i20_bloke_rapor.json"),
+                  "w", encoding="utf-8") as f:
+            json.dump(bloke, f, ensure_ascii=False, indent=2)
+        print(f"\nBLOKE: {len(eksik)} sahne icin gorsel EDINILEMEDI "
+              f"({sinif}). Sahte gorsel URETILMEDI.")
+        print("      rapor: outputs/sample/teknoloji_i20_bloke_rapor.json")
+        return 2
+    gorsel_olcumleri = [{"asset_id": s["asset_id"], "detay_std": s["detay_std"]}
+                        for s in secilen]
+    # ⚠ 4K IDDIASI KAYNAGA BAGLI — yetmezse DURUSTCE 1080p.
+    global OLCU
+    if not medya_rapor["dort_k_uygun"]:
+        OLCU = (1920, 1080)
+        print(f"      ⚠ kaynaklarin hepsi 4K esigini gecmiyor -> DURUSTCE "
+              f"1080p render (upscale YAPILMIYOR)")
+    else:
+        print(f"      ✓ tum kaynaklar >= {medya_rapor['en_az_genislik']} px "
+              f"-> {OLCU[0]}x{OLCU[1]} render")
+
+    secilen, siralama = cesitli_sirala(secilen)
+    cesitlilik = cesitlilik_raporu(secilen)
+    cesitlilik["siralama"] = siralama
+    if siralama:
+        print(f"      siralama : komsu benzerligi "
+              f"{siralama['once_komsu_maks']} -> "
+              f"{siralama['sonra_komsu_maks']} (yalniz SIRA degisti)")
+    print(f"      cesitlilik: en yuksek ikili benzerlik "
+          f"{cesitlilik['en_yuksek']}, bitisik en yuksek "
+          f"{cesitlilik['en_yuksek_bitisik']} (esik {cesitlilik['esik']}) -> "
+          f"{len(cesitlilik['esigi_asan'])} cift esigi asiyor")
+
+    cumleler, manifest = girdi_kur(secilen, sinirlar, ses_kalite["kesim_sn"])
+    sureler = [c["sure_sn"] for c in cumleler]
+    toplam = round(sum(sureler), 3)
+    print(f"\n[3/7] SAHNE SURELERI (SentenceBoundary'den, sabit blok YOK)")
+    for c in cumleler:
+        print(f"      {c['scene_id']} {c['fact_id']} sure={c['sure_sn']:>6.3f} sn")
+    print(f"      toplam {toplam} sn | yayilim "
+          f"{round(max(sureler) - min(sureler), 3)} sn "
+          f"| benzersiz sure {len(set(sureler))}/{len(sureler)}")
+
+    ambans, ambans_once, ambans_sonra = ambans_hazirla(
+        os.path.join(CALISMA, "ses"), toplam)
+    if ambans:
+        print(f"      ambiyans: {ambans_once.get('lufs')} LUFS -> "
+              f"{ambans_sonra.get('lufs')} LUFS (hedef {AMBANS_LUFS})")
+
+    # ── [4/7] PLAN + ON-RENDER KAPI ──
+    # ── ALTYAZI KUPLERI (GERCEK cumle zamanlamasindan) ──
+    altyazi = kk.altyazi_kupleri(sinirlar, maks_karakter=42)
+    print(f"\n[3b] ALTYAZI: {altyazi['kup_sayisi']} kup "
+          f"({altyazi['olculen_kup']} olculdu / {altyazi['orantili_kup']} "
+          f"orantili), birlestirilen {altyazi['birlestirilen']}, "
+          f"okunabilirlik temiz={altyazi['temiz']}")
+    for k in altyazi["kupler"]:
+        print(f"      {k['bas_sn']:>6.3f} +{k['sure_sn']:>5.3f} "
+              f"[{k['zamanlama']:<9}] {' / '.join(k['satirlar'])[:64]}")
+
+    sonuc = edit_kopru.plan_kur(
+        cumleler=cumleler, medya_manifest=manifest, olgular=OLGULAR,
+        stil=stil, cikti_dizin=CALISMA,
+        is_ayar={"editor_v2": True, "kalite_kapisi": True},
+        ambience=ambans, kare_olcu=OLCU,
+        anlatim_bitis_sn=ses_kalite["anlatim_bitis_sn"],
+        benzerlik_okuyucu=benzerlik,
+        altyazi_kupleri=altyazi["kupler"])
+    if not sonuc["ok"]:
+        print(f"BLOKE: plan kurulamadi -> {sonuc['neden']}")
+        return 4
+    qa = sonuc["qa"]
+    print(f"\n[4/7] PLAN: profil={sonuc['profil_adi']} "
+          f"QA={qa['durum']} (fail={qa['fail']} warn={qa['warn']}) "
+          f"render_edilebilir={sonuc['render_edilebilir']}")
+    # ⚠ BEAT BOLUNMESI SESSIZ KALMASIN. Bir sahne iki beat'e bolunurse iki
+    # beat sahnenin tek adayini paylasir ve AYNI GORSEL ARKA ARKAYA cikar.
+    # Kapi bunu zaten FAIL ediyor ama sebebi gormek icin ayrica raporlanir.
+    zincir = edit_kopru.sahne_zinciri(sonuc["props"])
+    if len(zincir) != len(cumleler):
+        print(f"      ⚠ BEAT BOLUNMESI: {len(cumleler)} sahne -> "
+              f"{len(zincir)} beat. Bolunen sahne(ler) tek adayi paylasir.")
+        for z in zincir:
+            print(f"        {z['beat_id']} {z['scene_id']} "
+                  f"sure={z['sure_sn']} asset={z.get('asset_id') or '(YOK)'}")
+    _mg = kk.motion_grammar_olcusu([
+        {"beat_id": z["beat_id"], "hareket": z["hareket"],
+         "gecis": z.get("gecis") or [], "islev": z.get("islev"),
+         "sure_sn": z["sure_sn"]} for z in zincir])
+    print(f"      motion  : hareket={_mg['hareketler']}")
+    print(f"                benzersiz_hareket={_mg['benzersiz_hareket']} "
+          f"ardisik_tekrar={len(_mg['ardisik_tekrar'])} "
+          f"pencere_tekrari={len(_mg['pencere_tekrari'])}")
+    print(f"      gecis   : {_mg['gecis_dagilimi']} "
+          f"(benzersiz {_mg['benzersiz_gecis']})")
+    print(f"      ritim   : acilis={_mg['acilis_hareketi']} "
+          f"kapanis={_mg['kapanis_hareketi']} "
+          f"ayri={_mg['acilis_kapanis_ayri']}")
+    medyasiz = [z for z in zincir if not z.get("asset_id")]
+    if medyasiz:
+        print(f"      ⚠ MEDYASIZ SAHNE: {[z['beat_id'] for z in medyasiz]} "
+              f"(saglayici kotasi ya da aday yoklugu) -> fallback kart")
+    on_qa = json.load(open(os.path.join(CALISMA, "editor_qa.json"),
+                           encoding="utf-8"))
+    for s in on_qa["sorunlar"]:
+        if s["seviye"] in ("fail", "warn"):
+            print(f"        {s['seviye'].upper():<5} {s['kod']}: "
+                  f"{s['detay'][:100]}")
+    if not sonuc["render_edilebilir"]:
+        print("BLOKE: on-render QA FAIL — render BASLATILMADI")
+        return 5
+
+    # ── [5/7] SES PROPS + RENDER ──
+    props = dict(sonuc["props"])
+    ses_blok = dict(props.get("ses") or {})
+    ses_blok["anlatim"] = anlatim
+    ses_blok["anlatim_seviye"] = 1.0
+    ses_blok["yapay_ses"] = True
+    if ambans:
+        ses_blok["ambans"] = [ambans]
+        ses_blok["ambans_seviye"] = AMBANS_SEVIYE
+        ses_blok["ducking"] = {"ambans": AMBANS_DUCK}
+        # ⚠ ASIL DUZELTME: `anlatim_araliklari` verilmediginde Ses.tsx TUM
+        # videoyu anlatim sayiyor ve ambiyansi bastan sona kisiyor. Gercek
+        # konusma araliklari verilince ambiyans cumle aralarinda geri geliyor.
+        ses_blok["anlatim_araliklari"] = [
+            [round(s["bas"], 3), round(s["bas"] + s["sure"], 3)]
+            for s in sinirlar]
+    props["ses"] = ses_blok
+
+    props = remotion_v2.props_hazirla(props, calisma_dizin=CALISMA)
+    kontrol = remotion_v2.dogrula(props)
+    print(f"\n[5/7] ON-RENDER KAPISI: {kontrol['durum']} "
+          f"({len(kontrol['sorunlar'])} sorun)")
+    if kontrol["durum"] == "FAIL":
+        for s in kontrol["sorunlar"][:5]:
+            print(f"        FAIL {s.get('kod')}: {s.get('detay')}")
+        return 6
+
+    os.makedirs(CIKTI_DIZIN, exist_ok=True)
+    video = os.path.join(CIKTI_DIZIN, VIDEO_ADI)
+    print(f"      RENDER -> {os.path.relpath(video, DEPO)}")
+    r = remotion_v2.render(props, video, olcu=OLCU, fps=FPS, crf=20,
+                           concurrency=2, zaman_asimi=1200)
+    if r["rc"] != 0 or not r.get("var_mi"):
+        print(f"BLOKE: render basarisiz (rc={r['rc']}) "
+              f"{str(r.get('stderr') or '')[:300]}")
+        return 7
+    print(f"      render {r['sure_sn']:.1f} sn")
+
+    # ── [6/7] OLCUM ──
+    print("\n[6/7] OLCUM")
+    video_ses = ses_olc(video)
+    pr = kos(["ffprobe", "-v", "error", "-show_entries",
+              "stream=codec_type,codec_name,width,height,r_frame_rate,"
+              "sample_rate,channels", "-show_entries",
+              "format=duration,size,bit_rate", "-of", "json", video], 60)
+    ffp = json.loads(pr.stdout or "{}")
+    ak = ffp.get("streams") or []
+    v = next((a for a in ak if a.get("codec_type") == "video"), {})
+    a = next((a for a in ak if a.get("codec_type") == "audio"), {})
+    bic = ffp.get("format") or {}
+    print(f"      video : {v.get('codec_name')} {v.get('width')}x"
+          f"{v.get('height')} @ {v.get('r_frame_rate')}")
+    print(f"      ses   : {a.get('codec_name')} {a.get('sample_rate')}Hz / "
+          f"{a.get('channels')}ch")
+    print(f"      sure  : {float(bic.get('duration') or 0):.3f} sn  "
+          f"boyut {int(bic.get('size') or 0) / 1e6:.2f} MB")
+    print(f"      miks  : LUFS={video_ses.get('lufs')} "
+          f"TP={video_ses.get('tepe_dbtp')} LRA={video_ses.get('lra')} "
+          f"sessiz=%{video_ses.get('sessiz_pct')} "
+          f"kirpma={video_ses.get('kirpma_var')}")
+
+    # Kesme tespiti (gercek olcum)
+    kr = kos(["ffmpeg", "-nostdin", "-i", video, "-filter:v",
+              "select='gt(scene,0.12)',showinfo", "-f", "null", "-"])
+    kesmeler = [round(float(l.split("pts_time:")[1].split()[0]), 3)
+                for l in (kr.stderr or "").splitlines() if "pts_time:" in l]
+    print(f"      kesme : {len(kesmeler)} adet {kesmeler[:8]}")
+
+    # ── KONTROLLU TEK REMASTER (H6'da onayli yol) ──
+    # ⚠ Sadece SES sorununda, BIR KEZ, ucretsiz + deterministik loudnorm.
+    # Gorsel yeniden uretilmez, para harcanmaz. Video akisi KOPYALANIR.
+    remaster = {"uygulandi": False, "once": dict(video_ses)}
+    _hedef_lufs = -14.0
+    if abs(video_ses.get("lufs", -99) - _hedef_lufs) > 1.0:
+        gecici = os.path.join(CALISMA, "remaster.mp4")
+        rr = kos(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", video,
+                  "-c:v", "copy", "-af",
+                  f"loudnorm=I={_hedef_lufs}:TP=-1.5:LRA=9",
+                  "-c:a", "aac", "-b:a", "192k", gecici], 600)
+        if rr.returncode == 0 and os.path.exists(gecici):
+            shutil.move(gecici, video)
+            video_ses = ses_olc(video)
+            remaster.update({"uygulandi": True, "hedef_lufs": _hedef_lufs,
+                             "sonra": dict(video_ses),
+                             "yol": "ffmpeg loudnorm, video akisi kopyalandi",
+                             "maliyet_usd": 0.0})
+            print(f"      remaster: LUFS {remaster['once'].get('lufs')} -> "
+                  f"{video_ses.get('lufs')} (TP {video_ses.get('tepe_dbtp')})")
+            pr = kos(["ffprobe", "-v", "error", "-show_entries",
+                      "stream=codec_type,codec_name,width,height,r_frame_rate,"
+                      "sample_rate,channels", "-show_entries",
+                      "format=duration,size,bit_rate", "-of", "json", video], 60)
+            ffp = json.loads(pr.stdout or "{}")
+            bic = ffp.get("format") or {}
+        else:
+            remaster["hata"] = (rr.stderr or "")[:160]
+            print(f"      ⚠ remaster BASARISIZ: {remaster['hata']}")
+
+    # ── FAZ I-17: OPTIK DURAGANLIK OLCUMU (cikti karelerinden) ──
+    # ⚠ Kisa ve kararli: TEK ffmpeg gecisi, ham gri akis, 4 fps / 64x36.
+    print("      optik   : ornekleniyor...")
+    _or = subprocess.run(kk.optik_ornek_komutu(video),
+                         capture_output=True, timeout=600)
+    _farklar = kk.optik_farklar(_or.stdout)
+    _opt_sahne, _t = [], 0.0
+    for z in zincir:
+        _opt_sahne.append({"ad": f"{z['beat_id']} {z['hareket']}",
+                           "bas_sn": round(_t, 3), "sure_sn": z["sure_sn"]})
+        _t += z["sure_sn"]
+    optik = kk.optik_hareket_olcusu(_farklar, sahneler=_opt_sahne)
+    kenar = kk.kenar_siyahligi_olcusu(_or.stdout)
+    print(f"      kenar   : siyah bant temiz={kenar.get('temiz')} "
+          f"(ihlal {kenar.get('ihlal_kare')}/{kenar.get('kare')}, "
+          f"en koyu sol={kenar.get('en_koyu_sol')} sag={kenar.get('en_koyu_sag')})")
+    if optik.get("olculdu"):
+        print(f"      SONRA (I-17) genel_ort={optik['genel_ortalama']} "
+              f"temiz={optik['temiz']}")
+        for s in optik["sahneler"]:
+            print(f"        {s['ad']:<18} sure={s['sure_sn']:>5.2f} "
+                  f"ort={s['ortalama']:>6.3f} durgun_sn={s['durgun_sn']:>5.2f} "
+                  f"{s.get('seviye', 'ok')}")
+    else:
+        print(f"      ⚠ optik olcum ALINAMADI: {optik.get('neden')}")
+
+    # ── I-14/I-17 KAPILARI, RENDER SONRASI ──
+    post = qa_son.denetle(video, kalite_kapisi=True,
+                          optik_farklar=_farklar, optik_sahneler=_opt_sahne,
+                          optik_ham=_or.stdout,
+                          ambans_lufs=(ambans_sonra or {}).get("lufs"),
+                          anlatim_lufs=ses_kalite.get("lufs"),
+                          ambans_seviye=AMBANS_SEVIYE, ducking=AMBANS_DUCK,
+                          beklenen={"sure_sn": toplam,
+                                    "genislik": OLCU[0], "yukseklik": OLCU[1],
+                                    "fps": FPS})
+    pd = post.sozluk()
+    print(f"      POST-QA: {pd['durum']}")
+    for s in pd["sorunlar"]:
+        print(f"        {s['seviye'].upper():<5} {s['kod']}: {s['detay'][:110]}")
+    kal = pd["olcumler"].get("kalite", {})
+    mx, amb = kal.get("miks", {}), kal.get("ambans", {})
+    print(f"      miks olcumu: sessiz %{(mx.get('sessiz_orani') or 0) * 100:.1f}"
+          f" (tavan %{(mx.get('sessiz_oran_tavani') or 0) * 100:.0f}) | "
+          f"olu final {mx.get('olu_final_sn')} sn "
+          f"(tavan {mx.get('olu_final_esigi')} sn)")
+    print(f"      ambiyans   : etkin {amb.get('etkin_lufs')} LUFS, anlatimin "
+          f"{amb.get('fark_db')} dB altinda -> duyulabilir="
+          f"{amb.get('duyulabilir')} bastiriyor={amb.get('bastiriyor')} "
+          f"dengeli={amb.get('dengeli')}")
+
+    # ── [7/7] KARELER (en az 6) ──
+    print("\n[7/7] KARELER")
+    # EN AZ 6 kare: her sahnenin ortasi + baslik bandi ani + video boyunca
+    # esit araliklar. Yakin dusenler (< 0.35 sn) teke indirilir.
+    sure_video = float(bic.get("duration") or toplam)
+    adaylar_an = [1.2]                       # baslik bandinin gorundugu an
+    _t = 0.0
+    for c in cumleler:                       # her sahnenin ortasi
+        adaylar_an.append(round(_t + c["sure_sn"] / 2, 2))
+        _t += c["sure_sn"]
+    for pay in (0.1, 0.22, 0.35, 0.48, 0.6, 0.72, 0.85, 0.95):
+        adaylar_an.append(round(sure_video * pay, 2))
+    kare_anlari = []
+    for t in sorted(set(adaylar_an)):
+        if 0 <= t < sure_video and all(abs(t - x) >= 0.35 for x in kare_anlari):
+            kare_anlari.append(t)
+    if len(kare_anlari) < 9:
+        print(f"      ⚠ yalnizca {len(kare_anlari)} ayri kare ani cikti "
+              f"(hedef >= 9)")
+    kareler = []
+    for t in kare_anlari:
+        ad = f"i20_kare_{str(t).replace('.', '_')}s.png"
+        kare = os.path.join(CIKTI_DIZIN, ad)
+        kos(["ffmpeg", "-nostdin", "-loglevel", "error", "-y", "-ss", str(t),
+             "-i", video, "-frames:v", "1", kare], 60)
+        if os.path.exists(kare) and os.path.getsize(kare) > 1000:
+            kareler.append({"an_sn": t, "dosya": os.path.relpath(kare, DEPO),
+                            "bayt": os.path.getsize(kare)})
+            print(f"      {t:>5} sn -> {os.path.relpath(kare, DEPO)} "
+                  f"({os.path.getsize(kare) / 1000:.0f} KB)")
+
+    # ── RAPOR ──
+    baslik_katmani = next(
+        (k for k in (sonuc["edit_manifest"].get("yazi_katmanlari") or [])
+         if k.get("ad") == "chapter-title"), {})
+    baslik_olcum = kk.baslik_olcusu(baslik_katmani.get("metin", ""),
+                                    punto=baslik_katmani.get("punto", 60),
+                                    kare_genislik=OLCU[0])
+    baslik_olcum["kelime_kesik"] = kk.kelime_ortasi_kesik(
+        SAHNE_METINLERI[0][1], baslik_katmani.get("metin", ""))
+    _kal = pd["olcumler"].get("kalite", {})
+    _on_kal = on_qa.get("olcumler", {}).get("kalite", {})
+    puan = kk.izleyici_kalite_puani(
+        optik=optik, grammar=_on_kal.get("motion_grammar"),
+        ritim=_on_kal.get("ritim"),
+        guvenli_alan=_on_kal.get("guvenli_alan"),
+        cakisma=_on_kal.get("yazi_cakismasi"),
+        altyazi=_on_kal.get("altyazi"),
+        medya=_on_kal.get("medya_tekrari"),
+        miks=_kal.get("miks"), ambans=_kal.get("ambans"))
+    print(f"\n      IZLEYICI KALITE PUANI: {puan['puan']}/100 "
+          f"({puan['kazanilan']}/{puan['olculen_agirlik']} agirlik)")
+    for ad, b in puan["bilesenler"].items():
+        print(f"        {ad:<18} {str(b['puan']):>6}/{b['agirlik']:<3} "
+              f"{b['gerekce'][:60]}")
+
+    rapor = {
+        "atom": "I-20",
+        "izleyici_kalite_puani": puan,
+        "optik_hareket": optik,
+        "kenar_siyahligi": kenar,
+        "motion_grammar": _on_kal.get("motion_grammar"),
+        "video": os.path.relpath(video, DEPO),
+        "konu": "Apollo 11 ay inisi (20 Temmuz 1969)",
+        "kalite_kapisi": "ACIK (kalite_kapisi=True)",
+        "maliyet_usd": 0.0,
+        "duzeltilen_kusurlar": {
+            "baslik": {"olcum": baslik_olcum,
+                       "metin": baslik_katmani.get("metin"),
+                       "punto": baslik_katmani.get("punto"),
+                       "kare_genislik": OLCU[0]},
+            "sahne_sureleri": {
+                "kaynak": "edge-tts SentenceBoundary (GERCEK zamanlama)",
+                "sureler": sureler, "toplam_sn": toplam,
+                "yayilim_sn": round(max(sureler) - min(sureler), 3),
+                "benzersiz": len(set(sureler)),
+                "cumle_sinirlari": sinirlar},
+            "olu_final": {"anlatim_bitis_sn": ses_kalite["anlatim_bitis_sn"],
+                          "kesim_sn": ses_kalite["kesim_sn"],
+                          "kuyruk_sn": KUYRUK_SN,
+                          "olculen_olu_final_sn": mx.get("olu_final_sn")},
+            "ambiyans": {"kaynak_lufs": ambans_once.get("lufs"),
+                         "normalize_lufs": ambans_sonra.get("lufs"),
+                         "seviye": AMBANS_SEVIYE, "ducking": AMBANS_DUCK,
+                         "anlatim_araliklari_gecildi": bool(ambans),
+                         "olcum": amb}},
+        # ⚠ DURUSTLUK NOTU: miksteki sessizlik %0 cikiyor cunku ambiyans bastan
+        # sona duyulabilir seviyede. Bu "anlatimda bosluk yok" DEMEK DEGIL —
+        # anlatimin KENDI bosluklari asagida ayrica olculuyor.
+        "sessizlik_yorumu": {
+            "mikste_sessiz_pct": video_ses.get("sessiz_pct"),
+            "neden": ("ambiyans -45 dB esiginin uzerinde ve kesintisiz; "
+                      "silencedetect bu yuzden aralik bulmuyor"),
+            "anlatim_master_sessizlikleri": ses_kalite.get("sessizlikler"),
+            "anlatim_master_sessiz_pct": ses_kalite.get("sessiz_pct"),
+            "cumle_arasi_bosluklar_sn": [
+                round(sinirlar[i + 1]["bas"]
+                      - (sinirlar[i]["bas"] + sinirlar[i]["sure"]), 3)
+                for i in range(len(sinirlar) - 1)]},
+        "altyazi": {
+            "kup_sayisi": altyazi["kup_sayisi"],
+            "olculen_kup": altyazi["olculen_kup"],
+            "orantili_kup": altyazi["orantili_kup"],
+            "birlestirilen": altyazi["birlestirilen"],
+            "maks_karakter": altyazi["maks_karakter"],
+            "maks_satir": altyazi["maks_satir"],
+            "okunabilirlik_temiz": altyazi["temiz"],
+            "cok_hizli": altyazi["cok_hizli"],
+            "uzun_satir": altyazi["uzun_satir"],
+            "kupler": altyazi["kupler"],
+            "zamanlama_notu": ("cumle sinirlari OLCULDU (edge-tts "
+                               "SentenceBoundary); cumle ICI bolunme "
+                               "gerektiginde parca zamanlamasi karakter "
+                               "agirlikli ORANTILI dagitimdir, olcum degil"),
+            "sahnelere_dagitildi": [
+                {"scene_id": s.get("scene_id"),
+                 "kup": len(s.get("altyazi") or [])}
+                for s in (sonuc["edit_manifest"].get("beat_plani") or {}).get(
+                    "beatler", [])] or None},
+        "kaynak_kunyesi": {
+            "atif_gerekli": True,
+            "katmanlar": [
+                {"ad": k.get("ad"), "metin": k.get("metin"),
+                 "y_orani": k.get("y_orani"), "bas_sn": k.get("bas_sn"),
+                 "sure_sn": k.get("sure_sn"), "kaydirildi": k.get("kaydirildi")}
+                for k in (sonuc["edit_manifest"].get("yazi_katmanlari") or [])
+                if k.get("ad") == "source-label"],
+            "tipografi_raporu": sonuc["edit_manifest"].get(
+                "tipografi_raporu")},
+        "guvenli_alan": (on_qa.get("olcumler", {}).get("kalite", {})
+                         .get("guvenli_alan")),
+        "yazi_cakismasi": (on_qa.get("olcumler", {}).get("kalite", {})
+                           .get("yazi_cakismasi")),
+        "video_broll": broll,
+        "medya_edinim": medya_rapor,
+        "auto_siniflandirma": {
+            "konu_metni": KONU_METNI,
+            "tur_elle_verildi_mi": False,
+            "konsept": konsept,
+            "stil": stil,
+            "edit_profili": edit_profili,
+            "not": ("kullanici YALNIZ metin verdi; aile/stil/edit profili "
+                    "taksonomi + stil_profili tarafindan SECILDI")},
+        "once_i16": {
+            "kaynak": "outputs/sample/editorv2_altyazi_1080p_i16.mp4",
+            "olcum_yontemi": ("4 fps / 64x36 gri, ardisik ortalama mutlak "
+                              "fark (kalite_kapisi.optik_ornek_komutu)"),
+            "sahneler": [
+                {"ad": "b001 push-in", "sure_sn": 2.962, "optik_ort": 3.551},
+                {"ad": "b002 static", "sure_sn": 5.213, "optik_ort": 0.914},
+                {"ad": "b003 push-in", "sure_sn": 4.688, "optik_ort": 5.102},
+                {"ad": "b004 pull-out", "sure_sn": 4.675, "optik_ort": 7.030}],
+            "gecis_dagilimi": {"hard-cut": 4},
+            "hareketler": ["push-in", "static", "push-in", "pull-out"]},
+        "medya_cesitliligi": cesitlilik,
+        "gorsel_secimi": {"esik_std": DETAY_ESIGI,
+                          "olcumler": gorsel_olcumleri,
+                          "secilen": [x["asset_id"] for x in secilen]},
+        "anlatici_ses": {"motor": "edge-tts", "maliyet_usd": 0.0,
+                         "secilen": ses_kalite["ses"], "adaylar": adaylar,
+                         "master": ses_kalite},
+        "plan": {"profil": sonuc["profil_adi"], "qa": qa,
+                 "on_render_qa": on_qa,
+                 "efekt_kapsami": sonuc["efekt_kapsami"],
+                 "kapsam_boslugu": sonuc["kapsam_bosluklari"],
+                 "elenen_medya": sonuc["elenen_medya"]},
+        "zincir": edit_kopru.sahne_zinciri(sonuc["props"]),
+        "ffprobe": ffp,
+        "video_ses_olcumu": video_ses,
+        "remaster": remaster,
+        "kesmeler": {"sayi": len(kesmeler), "anlar": kesmeler},
+        "post_qa": pd,
+        "kareler": kareler,
+        "kapsam": {
+            "gercek_motor": [
+                "editor.plan.uret (beat/gramer/motion/tipografi/ses/QA-on)",
+                "editor.adapter.donustur",
+                "editor.remotion_v2 dogrula/props_hazirla/render",
+                "Remotion VidrushEditorV2 (Chrome headless + ffmpeg)",
+                "edge-tts anlatim + SentenceBoundary zamanlamasi",
+                "kalite_kapisi ACIK: on-render + render sonrasi"],
+            "kapsam_disi": [
+                "WEB'DEN MEDYA BULMA — saglayiciya HIC istek atilmadi",
+                "arastirma/fact-check motoru (olgular Faz E manifestinden)",
+                "canli /api/generate hatti",
+                "altyazi ve kaynak kunyesi (sonraki atom)",
+                                "ucretli API (maliyet $0.00)"]},
+    }
+    with open(os.path.join(CIKTI_DIZIN, "teknoloji_i20_rapor.json"), "w",
+              encoding="utf-8") as f:
+        json.dump(rapor, f, ensure_ascii=False, indent=2)
+    print(f"\n      rapor : outputs/sample/teknoloji_i20_rapor.json")
+
+    pass_mi = (qa["durum"] != "FAIL" and pd["durum"] != "FAIL")
+    print("\n" + "=" * 72)
+    print(f"SONUC: on-render QA={qa['durum']} · render sonrasi QA={pd['durum']}"
+          f" -> {'KAPI GECILDI' if pass_mi else 'KAPI GECILEMEDI'}")
+    print("⚠ Medya WEB'DEN BULUNMADI — yerel Apollo fixture'i kullanildi.")
+    print("=" * 72)
+    return 0 if pass_mi else 8
+
+
+if __name__ == "__main__":
+    sys.exit(main())

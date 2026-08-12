@@ -295,7 +295,23 @@ AGAC = {
         "anahtar": ("teknoloji", "technology", "yapay zeka", "artificial "
                     "intelligence", "yazilim", "yazılım", "software",
                     "algoritma", "algorithm", "kod", "coding", "internet",
-                    "siber", "cyber", "veri merkezi", "data center", "cip",
+                    "siber", "cyber", "veri merkezi", "data center",
+                    # ⚠ FAZ I-20'DE OLCULEN KAPSAM BOSLUGU: teknoloji dali
+                    # YAZILIM agirlikliydi; DONANIM/CIP/ISLEM GUCU sozlugu
+                    # yoktu. Olculdu: "Superbilgisayarlarin enerji ve cip
+                    # ekonomisi" metni `egitim.teknoloji` (2.0/2) ile
+                    # `egitim.aciklayici` (2.0/1) arasinda BERABERE kalip
+                    # guven 0.40'in altina dustu ve `belirsiz` dondu.
+                    # §16'nin sozu geregi yalnizca AGAC'a satir eklendi.
+                    "superbilgisayar", "süperbilgisayar", "supercomputer",
+                    "islemci", "işlemci", "processor", "cpu", "gpu",
+                    "cip", "çip", "chip", "yonga", "yonga seti",
+                    "yari iletken", "yarı iletken", "semiconductor",
+                    "silikon", "silicon", "transistor", "transistör",
+                    "donanim", "donanım", "hardware", "sunucu", "server",
+                    "islem gucu", "işlem gücü", "computing power",
+                    "hesaplama", "computation", "sogutma", "soğutma",
+                    "enerji tuketimi", "enerji tüketimi", "power usage", "cip",
                     "çip", "chip", "islemci", "işlemci", "processor",
                     "blockchain", "robotik", "robotics", "makine ogrenmesi",
                     "makine öğrenmesi", "machine learning"),

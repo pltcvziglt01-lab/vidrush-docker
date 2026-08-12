@@ -5759,6 +5759,95 @@ kontrol("odemeli API cagrisi YOK",
                       re.I))
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# §38  FAZ I-20 — UCUNCU KONSEPT (TEKNOLOJI/EKONOMI)
+# ⚠ Render PLAN seviyesinde BLOKE oldu (asagida); bu bolum yalnizca
+# GERCEKTEN kanitlananı kilitler.
+# ═══════════════════════════════════════════════════════════════════════
+
+blok("§38a UCUNCU KONSEPT — auto siniflandirma ve UCUNCU stil")
+
+_TEK = ("Süperbilgisayarların enerji ve çip ekonomisi: işlem gücü nasıl "
+        "üretiliyor ve faturası ne kadar")
+_kt = _tk.siniflandir(_TEK)
+_st = _sp.coz(konsept=_kt)
+kontrol("⭐ teknoloji metni AUTO siniflandi",
+        _kt["aile"] == "egitim" and _kt["durum"] in ("kesin", "melez"),
+        (_kt["aile"], _kt["durum"], _kt["guven"]))
+kontrol("⭐ UCUNCU ayri stil secildi (auto)",
+        _st.get("kimlik") == "explainer-hizli"
+        and _st.get("kaynak") == "auto", _st.get("kimlik"))
+kontrol("uc konsept UC AYRI stil veriyor",
+        len({_sp.coz(konsept=_tk.siniflandir(m)).get("kimlik") for m in (
+            "Apollo 11 ay inisi tarih belgeseli",
+            "İzlanda buzul lagünleri ve siyah kum plajları",
+            _TEK)}) == 3)
+kontrol("donanim/cip sozlugu EKLENDI (kapsam buyudu)",
+        _tk.kapsam_ozeti()["anahtar"] >= 845,
+        _tk.kapsam_ozeti()["anahtar"])
+_tek_anahtar = set(_tk.AGAC["egitim.teknoloji"]["anahtar"])
+for _k20 in ("superbilgisayar", "cip", "islemci", "yari iletken", "silikon",
+             "islem gucu", "sunucu"):
+    kontrol(f"'{_k20}' teknoloji sozlugunde", _k20 in _tek_anahtar)
+kontrol("⚠ eski teknoloji kelimeleri SILINMEDI",
+        {"teknoloji", "yapay zeka", "yazilim", "veri merkezi"}
+        <= _tek_anahtar)
+kontrol("motor kodu DEGISMEDI (aile 7 / dal 33)",
+        _tk.kapsam_ozeti()["aile"] == 7 and _tk.kapsam_ozeti()["dal"] == 33)
+for _m20, _b20 in (("Kapadokya gezi rehberi", "seyahat"),
+                   ("iPhone 15 vs Galaxy S24 fiyat karsilastirmasi", "urun"),
+                   ("Findik tarifi: 20 dakikada kolay kek", "yasam"),
+                   ("İzlanda buzul lagünleri ve siyah kum plajları",
+                    "seyahat")):
+    kontrol(f"gerileme yok: {_b20}",
+            _tk.siniflandir(_m20)["aile"] == _b20)
+
+blok("§38b I-20 PILOT BETIGI — konu daraltmasi DURUST, sahte kanit YOK")
+
+_SM20 = oku(KOK, "testler/smoke_konsept3_teknoloji_i20.py")
+kontrol("betik mevcut edinim zincirini KULLANIYOR (yeni mimari YOK)",
+        "medya_edin()" in _sikistir(_SM20)
+        and "edinim.edin(" in _sikistir(_SM20))
+kontrol("konu daraltmasi ve SEBEBI kodda yazili",
+        "KONU DURUSTCE DARALTILDI" in _SM20
+        and "HTTP 429" in _SM20)
+kontrol("fixture/kendi render ciktisi GERCEK WEB KANITI diye sunulmuyor",
+        "SAHTE KANIT YOK" in _SM20
+        and "pilot_master" not in _sikistir(_SM20))
+kontrol("ffmpeg test kaynagi KULLANILMIYOR",
+        not re.search(r"lavfi|testsrc|color=c=", _kod_yalniz(_SM20)))
+kontrol("esikler DEGISTIRILMIYOR",
+        "BENZERLIK_ESIGI =" not in _SM20
+        and "OPTIK_DURGUN_ESIGI =" not in _SM20
+        and "saglayici_tavani=" not in _SM20)
+kontrol("QA FAIL'de render BASLATILMIYOR",
+        'if not sonuc["render_edilebilir"]:' in _SM20)
+
+blok("§38c I-20 KORUMALARI")
+
+kontrol("pipeline.py I-20'de de DEGISMEDI",
+        "edinim" not in oku(KOK, "pipeline.py"))
+kontrol("server.py I-20'de de DEGISMEDI",
+        "edinim" not in oku(KOK, "server.py"))
+kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("UI DEGISMEDI", "basitGovde" in oku(KOK, "static/js/wizard.js"))
+kontrol("deploy.sh ezme korumasi KORUNDU",
+        "GERIDE" in open(os.path.join(KOK, "..", "deploy.sh"),
+                         encoding="utf-8").read())
+kontrol("bayraklar HALA varsayilan kapali",
+        mkp.ACIK is False and ekp.ACIK is False)
+
+_R20_YOL = os.path.join(KOK, "..", "outputs", "sample",
+                        "teknoloji_i20_rapor.json")
+if not os.path.exists(_R20_YOL):
+    bloke_yaz("I-20 teknoloji pilotu render raporu",
+              "medya EDINILDI (4/4 NASA) ama PLAN seviyesinde BLOKE: acilis "
+              "beat'i bolunup tek adayi paylasiyor, KALITE-MEDYA-TEKRAR FAIL "
+              "— kapi dogru calisti, esik gevsetilmedi, render BASLATILMADI")
+
+
 print(f"\n{'=' * 60}")
 print(f"GECEN: {gecen}   BASARISIZ: {len(basarisiz)}   BLOKE: {len(bloke)}")
 for b in basarisiz:

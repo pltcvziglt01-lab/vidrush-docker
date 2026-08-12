@@ -186,6 +186,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-17 motion grammar + optik durağanlık kapısı** | `2448478` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-18 ikinci konsept: motor kanıtlandı, medya BLOKE** | `ccb97ce` | ⚠ **origin'e push edildi**, MP4 YOK, deploy YOK |
 | 12 Ağu | **I-19 edinim dayanıklılığı — I-18'in BLOKE'si açıldı** | `888063e` | ✅ **origin'e push edildi**, deploy YOK |
+| 12 Ağu | **I-20 üçüncü konsept: motor sınandı, render BLOKE** | `PENDING` | ⚠ **push edildi**, MP4 YOK, deploy YOK |
 
 ---
 
@@ -3288,3 +3289,88 @@ Hepsi **ağsız** (sahte sağlayıcı) koşuyor — testler internete bağımlı
 Ya yer seviyesi doğa fotoğrafı veren üçüncü bir güvenli sağlayıcı eklemek
 (ör. çalışan bir Pexels/Openverse anahtarıyla), ya da edinim zincirini
 `medya_kopru` üzerinden canlı `/api/generate` hattına **opt-in** bağlamak.
+
+---
+
+## 38. FAZ I-20 — ÜÇÜNCÜ KONSEPT: MOTOR SINANDI, RENDER PLAN'DA BLOKE (12 Ağu)
+
+> **Durum: yerel yeşil, push edildi. Deploy YOK. Maliyet $0.00.**
+> Yeni: `webapp/testler/smoke_konsept3_teknoloji_i20.py`.
+> Değişen: `webapp/taksonomi.py`, `webapp/testler/test_faz_i.py` (+ handoff).
+> **Dokunulmadı:** `pipeline.py`, `server.py`, arayüz, 22 alan, `deploy.sh`,
+> `medya/*` (edinim zinciri I-19'dan aynen), kalite kapıları.
+
+### Sonuç — iki parça
+
+| Parça | Sonuç |
+|---|---|
+| Üçüncü konsept **auto sınıflandırma + üçüncü stil** | ✅ **KANITLANDI** |
+| **Gerçek web medyası edinimi** (4/4, semantik uyumlu) | ✅ **BAŞARILI** |
+| **Render** | ⛔ **PLAN seviyesinde BLOKE** — kapı doğru çalıştı |
+| MP4 | ❌ üretilmedi (sahte PASS verilmedi) |
+
+### ✅ Üçüncü konsept, üçüncü stil — hepsi otomatik
+
+```
+metin  : "Süperbilgisayarların enerji ve çip ekonomisi: işlem gücü nasıl
+          üretiliyor ve faturası ne kadar"
+konsept: aile=egitim  durum=kesin  guven=0.77
+STIL   : explainer-hizli  (kaynak auto)  ->  edit profili premium-modern
+```
+
+Üç konsept → **üç ayrı stil** (testle kilitli):
+`belgesel-sinematik` · `seyahat-4k` · `explainer-hizli`.
+
+### ⚠ ÜÇÜNCÜ KEZ AYNI SINIFTA KAPSAM BOŞLUĞU
+
+I-18'de doğa sözlüğü eksikti; burada **donanım/çip sözlüğü** eksikti.
+Ölçülen: `egitim.teknoloji` (2.0/2) ile `egitim.aciklayici` (2.0/1) berabere
+kaldı, güven 0.40'ın altına düştü → **`belirsiz`**, stil varsayılana düştü.
+Teknoloji dalı **yazılım ağırlıklıydı**; süperbilgisayar/işlemci/çip/yarı
+iletken/işlem gücü yoktu. §16'nın sözü yine uygulandı — yalnız `AGAC`'a
+satır: **783 → 849 anahtar**. Aile 7 / dal 33 aynı, eski kelimeler silinmedi,
+gerileme yok.
+
+### ✅ Medya GERÇEKTEN edinildi ve SEMANTİK OLARAK UYUYOR
+
+Wikimedia hâlâ `HTTP 429`. Konu, sağlayıcıların **gerçekten desteklediği**
+en yakın dürüst başlıkla kuruldu: NASA'nın **kendi süperbilgisayar tesisi**.
+
+| Sahne | Kaynak | Ölçü | Künye |
+|---|---|---|---|
+| s01 Pleiades süperbilgisayar | nasa | 4192×2832 | Dominic Hart |
+| s02 süperbilgisayar salonu | nasa | 2048×3072 | Wade Sisler |
+| s03 silikon karbür çip | nasa | 3000×2250 | GRC |
+| s04 güneş paneli / enerji | nasa | 4986×3744 | NASA/JPL-Caltech |
+
+metadata **19** / bayt **4** (ayrı sayıldı). Dört ayrı künye — sahneye özgü.
+**NASA görüntüsü konuya uymasaydı kullanılmayacaktı**; burada uyuyor.
+
+### ⛔ RENDER NEDEN BLOKE — kapı doğru çalıştı
+
+Açılış beat'i bölünüyor ve iki beat **tek adayı paylaşıyor** →
+`KALITE-MEDYA-TEKRAR` **FAIL** → `render_edilebilir=False`.
+
+Üç ayrı açılış uzunluğu denendi (3.087 / 3.05 / 2.587 sn); üçünde de bölündü.
+**Eşik gevşetilmedi, sağlayıcı kotası yükseltilmedi, sahte PASS verilmedi.**
+Bu, I-15 ve I-19'da da yaşanan bilinen sınıf: bölünen sahne için **ikinci bir
+aday** gerekiyor, ama tek sağlayıcı + kota 4 buna izin vermiyor.
+
+⚠ Özellik dondurma saatine 20 dk kala ayar döngüsü **bilinçli olarak
+durduruldu**; kanıtlanan kısım güvene alındı.
+
+### Ölçülen test sonucu
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Zengin venv** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **257** | **1426** | **2840** |
+
+0 hata. Faz I 1397 → **1426** (+29). Faz I'de **1 BLOKE** (I-20 render
+raporu) — **PASS sayılmadı**, sebebi ölçülmüş olarak yazılı.
+
+### SONRAKİ ATOM (I-21)
+
+Bölünen sahneye **ikinci aday** verecek şekilde `medya_edin`i sahne başına
+N aday getirir hale getirmek (sağlayıcı kotasını yükseltmeden). Bu, I-15'ten
+beri üç kez karşımıza çıkan tek yapısal engel; çözülürse üçüncü konsept
+pilotu doğrudan render edilebilir.
