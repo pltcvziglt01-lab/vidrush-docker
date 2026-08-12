@@ -3675,6 +3675,110 @@ kontrol("deploy.sh ezme korumasi KORUNDU",
                          encoding="utf-8").read())
 
 
+# ═══ 26. FAZ I-12 — QA WARN RAPORU + CHAPTER-CARD KALITESI ═══
+# ⚠ I-11'in 20 sn render'i BES QA WARN uretmisti ve 19. saniyedeki
+# motion-graphic fallback ekranda ANLAMSIZ bir "1" + tek sari cubuk
+# gosteriyordu; ustelik baslik harf ortasindan KIRPILIYORDU.
+blok("26. I-12 — sayi uydurma yasagi ve bolum karti")
+
+from editor import plan as _ep2                        # noqa: E402
+from editor import profil as _eprofil                  # noqa: E402
+
+# ── (a) SAYI UYDURMA YASAK ──
+kontrol("YIL veri sayilmiyor (cubuk grafigi yaniltici olurdu)",
+        _ep2._beat_sayilari("The Endurance became trapped in 1915.") == [],
+        str(_ep2._beat_sayilari("The Endurance became trapped in 1915.")))
+kontrol("GERCEK sayilar okunuyor",
+        _ep2._beat_sayilari("hauled 800 miles in 16 days") == [800.0, 16.0])
+kontrol("sayi yoksa BOS liste (uydurma yok)",
+        _ep2._beat_sayilari("Every member survived the ordeal.") == [])
+kontrol("bozuk girdide cokmuyor",
+        all(isinstance(_ep2._beat_sayilari(x), list)
+            for x in (None, "", 5, "abc")))
+_PLAN_KAYNAK = oku(KOK, "editor/plan.py")
+kontrol("plan.py ARTIK sabit [1] gecmiyor",
+        "veri_grafigi_spec(b.metin[:28], [1]" not in _PLAN_KAYNAK)
+kontrol("veri sahnesi YALNIZCA gercek sayi varsa ciziliyor",
+        "if _degerler:" in _PLAN_KAYNAK
+        and "motion.veri_grafigi_spec(b.metin[:28], _degerler" in _PLAN_KAYNAK)
+kontrol("sayi yoksa BOLUM KARTINA dusuluyor",
+        "motion.bolum_basligi_spec(" in _PLAN_KAYNAK
+        and "_kart_basligi(b.metin" in _PLAN_KAYNAK)
+_GRAF = oku(KOK, "../app/render-studio/src/editorv2/Grafikler.tsx")
+kontrol("TSX de bos veride `[1]` VARMIYOR (derinlemesine savunma)",
+        "degerler.length ? degerler : [1]" not in _GRAF
+        and "if (!degerler.length) return null;" in _GRAF)
+
+# ── (b) BOLUM KARTI: KIRPILMA YOK, SARKAN KELIME YOK ──
+_pp = _eprofil.profil("premium-modern")
+_sinir = _ep2.kart_basligi_siniri(_pp)
+kontrol("kart basligi siniri HESAPLANIYOR (sabit degil)",
+        12 <= _sinir <= 60 and "kart_basligi_siniri" in _PLAN_KAYNAK,
+        str(_sinir))
+kontrol("sinir puntoya BAGLI (buyuk punto -> az karakter)",
+        _ep2.kart_basligi_siniri(_eprofil.profil("premium-modern")) > 0)
+_uzun = "They reached Elephant Island in April 1916, the first solid ground."
+_kart = _ep2._kart_basligi(_uzun, _sinir)
+kontrol("uzun cumle kart basligina KISALTILIYOR", len(_kart) <= _sinir,
+        f"{len(_kart)}/{_sinir}: {_kart!r}")
+kontrol("SARKAN edat/baglac atiliyor",
+        not _kart.lower().split()[-1] in _ep2._SARKAN, _kart)
+kontrol("baslik noktalama ile bitmiyor",
+        not _kart.endswith((",", ";", ":", "-", "—", ".")), _kart)
+kontrol("bos metinde kontrollu varsayilan", _ep2._kart_basligi("") == "BÖLÜM")
+kontrol("kisa cumle OLDUGU GIBI kaliyor",
+        _ep2._kart_basligi("Every member survived", _sinir)
+        == "Every member survived")
+kontrol("TSX kirpma yerine KUCULTUYOR (harf kesilmez)",
+        "KIRPMA YERINE KUCULT" in _GRAF and "const olcek =" in _GRAF
+        and "punto * olcek" in _GRAF.replace("puntoTaban * olcek",
+                                             "punto * olcek"))
+kontrol("kuculme tabani var (okunurluk korunur)", "Math.max(0.7," in _GRAF)
+
+# ── (c) TIPO-GUVENLI-ALT KUSURU KAPANDI ──
+from editor import tipografi as _etipo                 # noqa: E402
+kontrol("source-label konumu 0.90'dan DUSURULDU",
+        _etipo.KONUM["source-label"] == 0.895,
+        str(_etipo.KONUM["source-label"]))
+_alt = (_etipo.KONUM["source-label"] + _etipo.YUKSEKLIK["source-label"]) * 1080
+kontrol("source-label alt kenari guvenli alan ICINDE",
+        _alt <= 1080 - _pp.tipografi.guvenli_kenar,
+        f"alt={_alt:.1f}px > {1080 - _pp.tipografi.guvenli_kenar}")
+kontrol("tum yazi turleri guvenli alanda",
+        all((_etipo.KONUM[a] + _etipo.YUKSEKLIK[a]) * 1080
+            <= 1080 - _pp.tipografi.guvenli_kenar
+            for a in _etipo.KONUM if a in _etipo.YUKSEKLIK),
+        str({a: round((_etipo.KONUM[a] + _etipo.YUKSEKLIK.get(a, 0)) * 1080)
+             for a in _etipo.KONUM}))
+
+# ── (d) 5 QA WARN'IN RAPORU (I-11 olcumu, handoff §29'da ayrintili) ──
+_OUT2 = os.path.join(KOK, "..", "outputs", "sample", "README.md")
+if os.path.exists(_OUT2):
+    _RM2 = open(_OUT2, encoding="utf-8").read()
+    for _w in ("PACING-KISA-ORAN", "SAGLAYICI-TEKEL", "TIPO-GUVENLI-ALT"):
+        kontrol(f"README QA WARN'i raporluyor: {_w}", _w in _RM2)
+    kontrol("README once/sonra kalite karsilastirmasi iceriyor",
+            "ÖNCE" in _RM2 and "SONRA" in _RM2)
+    kontrol("README fixture kaynakli WARN'lari AYIRIYOR",
+            "fixture" in _RM2.lower())
+
+# ── (e) KAPSAM BOSLUGU HALA RASTGELE STOKLA KAPANMIYOR ──
+kontrol("bolum karti bir MEDYA DEGIL (bosluk kapatmaz)",
+        "Bosluk rastgele stokla da kapanmaz" in _PLAN_KAYNAK)
+kontrol("lisans duvari KORUNDU",
+        'getattr(a, "render_kullanilabilir", False)' in oku(KOK, "medya_kopru.py"))
+kontrol("bayraklar HALA varsayilan kapali",
+        mkp.ACIK is False and ekp.ACIK is False)
+kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("UI DEGISMEDI",
+        "basitGovde" in oku(KOK, "static/js/wizard.js")
+        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js"))
+for _f7 in ("editor/plan.py", "editor/tipografi.py"):
+    kontrol(f"{_f7} derleniyor", _derlenir(os.path.join(KOK, _f7)))
+
+
 print(f"\n{'=' * 60}")
 print(f"GECEN: {gecen}   BASARISIZ: {len(basarisiz)}   BLOKE: {len(bloke)}")
 for b in basarisiz:

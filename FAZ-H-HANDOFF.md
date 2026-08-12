@@ -177,7 +177,8 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-8 doğrulanmış olgu → sahne/medya bağı** | `e450aa0` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-9 uçtan uca edit planı orkestrasyonu** | `a0294d0` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-10 edit köprüsü pipeline'a bağlı + manifest dönüşümü** | `477b168` | ✅ **origin'e push edildi**, deploy YOK |
-| 12 Ağu | **I-11 20 sn GERÇEK render smoke** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
+| 12 Ağu | **I-11 20 sn GERÇEK render smoke** | `f4e3a5e` | ✅ **origin'e push edildi**, deploy YOK |
+| 12 Ağu | **I-12 QA WARN raporu + chapter-card kalitesi** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
 
 ---
 
@@ -1950,8 +1951,8 @@ opt-in olmalı) aynı kaldı, ölçüm ona göre yeniden yazıldı.
 
 ## 28. FAZ I-11 — 20 SANİYELİK **GERÇEK** RENDER SMOKE (12 Ağu, ölçüldü)
 
-> **Durum: yazıldı + testlendi + GERÇEK MP4 üretildi, dosyalar staged.**
-> **Commit YOK, deploy YOK. Bayraklar varsayılan KAPALI.**
+> **Durum: commit `f4e3a5e`, `origin/arastirma-motoru`'na PUSH EDİLDİ. Deploy YOK.**
+> **Bayraklar varsayılan KAPALI.**
 > Yeni: `webapp/testler/smoke_editorv2_20sn.py`, `outputs/sample/README.md`.
 > Değişen: `webapp/medya_kopru.py`, `webapp/testler/test_faz_i.py`,
 > `.gitignore` (+ bu handoff).
@@ -2049,11 +2050,103 @@ dürüstlük etiketlerini ve `yerel_yol` düzeltmesini kilitler.
 
 1. **Fixture içeriği anlatımla örtüşmüyor** (Apollo görsel / Endurance metin).
 2. **Web medya hattı hâlâ hiç koşulmadı** — bayraklar kapalı, ağ yok.
-3. **QA WARN'ın 5 uyarısı incelenmedi**; render'a izin verildi ama uyarıların
-   ne olduğu bu adımda analiz edilmedi.
+3. ~~**QA WARN'ın 5 uyarısı incelenmedi.**~~ → ✅ **§29'da (I-12) tek tek
+   raporlandı; 3'ü motor kusuruydu ve kapatıldı.**
 4. **Altyazı yok** — TTS zamanlaması olmadığı için altyazı dizisi boş; ekranda
    yalnızca başlık/etiket katmanları var.
 5. **Sadece 1280×720** render edildi (hız için); 1080p ölçülmedi.
 6. **Tek makinede, tek koşu.** Farklı donanımda süre/başarı ölçülmedi.
+
+---
+
+## 29. FAZ I-12 — 5 QA WARN RAPORU + CHAPTER-CARD KALİTESİ (12 Ağu, ölçüldü)
+
+> **Durum: yazıldı + testlendi + YENİDEN RENDER EDİLDİ, dosyalar staged.**
+> **Commit YOK, deploy YOK. Bayraklar varsayılan KAPALI.**
+> Değişen: `webapp/editor/plan.py`, `webapp/editor/tipografi.py`,
+> `app/render-studio/src/editorv2/Grafikler.tsx`,
+> `webapp/testler/test_faz_i.py`, `outputs/sample/README.md` (+ bu handoff).
+> **Dokunulmadı:** `pipeline.py`, `server.py`, arayüz, 22 alan, `deploy.sh`.
+
+### 5 QA WARN — tek tek raporlandı
+
+| Kod | Detay | Kaynak | Durum |
+|---|---|---|---|
+| `TIPO-GUVENLI-ALT` ×3 | `source-label: alt=1020px > 1016` | **motor kusuru** | ✅ kapatıldı |
+| `PACING-KISA-ORAN` | 4 sn altı oran %83, referans %32 | **fixture** | açık |
+| `SAGLAYICI-TEKEL` | tek sağlayıcı %100 (tavan %40): wikimedia | **fixture** | açık |
+
+Ayrıca 3 `uyari` seviyesinde `SUREKLILIK-AYNI-SAGLAYICI` — aynı fixture sınırı.
+
+⚠ Kalan 2 WARN **motor kusuru değil**: QA, test verisinin gerçekçi olmadığını
+doğru tespit ediyor. Gerçek bir işte farklı sağlayıcı adaylarıyla ikisi de düşer.
+
+### Düzeltilen üç gerçek kusur
+
+**1. Sayı uyduruluyordu.** `plan.py:88` medyasız beat'e **sabit `[1]`** ile veri
+grafiği veriyordu → ekranda anlamsız dev **"1"** + tek sarı bar. Artık
+`_beat_sayilari()` metinden **gerçek** sayı çıkarır (yıllar elenir: 1915/2024
+veri değildir); sayı yoksa veri sahnesi **çizilmez**, profesyonel **bölüm
+kartına** düşülür. `Grafikler.tsx` de boş veride `null` döner (derinlemesine
+savunma).
+
+**2. Başlık harf ortasından kırpılıyordu.** Bant `overflow:hidden` + `nowrap`
+idi. Python tarafında karakter sınırını **hesaplasam bile** font metriği tahmin
+olduğu için kırpma sürdü (iki render'da da görüldü). Kalıcı çözüm tahmine
+güvenmemek: TSX metni sığdıramazsa **puntoyu oranla küçültür** (en fazla %30) —
+harf **asla** kesilmez. Python ayrıca sarkan edat/bağlaçları atar
+("…Elephant Island **in**" → "…Elephant Island").
+
+**3. Güvenli alan aritmetiği yanlıştı.** `source-label` 0.90 + 0.045 = 0.945 →
+**1020.6px > 1016**. Kod yorumunda **üç ayrı deneme** görünüyor (0.94 → 0.91 →
+0.90) ama hiçbirinde hesap yapılmamış, "yeterince aşağı" varsayılmış.
+0.895 → 1015.2px ✅.
+
+⚠ **Aynı sınıftan ikinci bir kusur**, I-12'de eklenen *"tüm yazı türleri
+güvenli alanda"* testiyle bulundu: `subtitle` 0.86 + 0.085 = 0.945 →
+**1020.6px**. Altyazı katmanı henüz üretilmediği için QA'da hiç görünmemişti.
+0.855 → 1015.2px ✅. Test artık **tüm türleri** birden kilitliyor.
+
+### Kalite: ÖNCE / SONRA (ölçülen)
+
+| | ÖNCE (I-11) | SONRA (I-12) |
+|---|---|---|
+| Ön-render QA | **5 WARN** | **2 WARN** |
+| 19. sn karesi | anlamsız "1" + bar, başlık kırpık | temiz bölüm kartı, başlık tam |
+| `source-label` alt | 1020.6 px (taşıyor) | 1015.2 px |
+| 19 s kare boyutu | 78 KB | 104 KB |
+
+Kare **gözle doğrulandı**: "THEY REACHED ELEPHANT ISLAND" tam görünüyor,
+kırpma yok, bant alt-üçlü güvenli alanda dengeli.
+
+### Bağımsız ffprobe (yeniden render sonrası)
+
+```
+h264 / 1280x720 / 30 fps · aac / 48000 Hz / 2 kanal
+duration=20.096000 · size=10647774 bayt
+```
+
+### Ölçülen test sonucu (12 Ağu) — İKİ ORTAM AYRI
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Zengin venv** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **257** | **951** | **2365** |
+| **Sistem Python** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **203** | **951** | **2311** |
+
+0 hata. Faz I 919 → **951** (+32). **Faz C 148/0** — editor paketinde
+gerileme yok.
+
+### BİLİNEN SINIRLAR (dürüstçe)
+
+1. **Kalan 2 WARN fixture kaynaklı, giderilmedi** — gerçek çok-sağlayıcılı
+   veriyle düşmesi *beklenir* ama **ölçülmedi**.
+2. **Punto küçültme oranı tahmine dayanıyor** (0.72 em). Gerçek font
+   metriğiyle ölçülmedi; %30 taban güvenlik payıdır, kesin çözüm değil.
+3. **Bölüm kartı tek satır.** Uzun başlık kısaltılır; iki satıra bölme yok.
+4. **Altyazı hâlâ yok** — `subtitle` düzeltmesi *latent* bir kusurun önlemi,
+   ekranda doğrulanmadı.
+5. **Motion-graphic fallback tek tip.** Her medyasız beat aynı bölüm kartını
+   alır; çeşitlilik (harita/belge/alıntı kartı) seçilmiyor.
+6. **İçerik uyuşmazlığı sürüyor** (Apollo görsel / Endurance metin).
 6. ~~`medya_kopru` çıktısı `medya_manifest` biçiminde değil.~~ →
    ✅ **§27'de (I-10) `manifest_kur()` ile çözüldü.**

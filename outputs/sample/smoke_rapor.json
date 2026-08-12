@@ -5,8 +5,8 @@
   "qa": {
     "durum": "WARN",
     "fail": 0,
-    "warn": 5,
-    "sorun_sayisi": 8
+    "warn": 2,
+    "sorun_sayisi": 5
   },
   "profil": "premium-modern",
   "efekt_kapsami": {
@@ -25,12 +25,11 @@
         "grade": 6,
         "light-sweep": 1,
         "hard-cut": 5,
-        "chapter-title": 1,
+        "chapter-title": 3,
         "source-label": 3,
         "pull-out": 2,
         "flash": 1,
         "static": 3,
-        "data-chart": 2,
         "film-burn": 1
       }
     }
@@ -178,7 +177,7 @@
         "grain",
         "vignette",
         "grade",
-        "data-chart",
+        "chapter-title",
         "hard-cut"
       ],
       "gecis": [
@@ -186,7 +185,7 @@
       ],
       "altyazi_adet": 0,
       "tipografi": [
-        "data-chart"
+        "chapter-title"
       ],
       "ses": "",
       "j_cut": false,
@@ -210,7 +209,7 @@
         "grain",
         "vignette",
         "grade",
-        "data-chart",
+        "chapter-title",
         "film-burn",
         "hard-cut"
       ],
@@ -219,7 +218,7 @@
       ],
       "altyazi_adet": 0,
       "tipografi": [
-        "data-chart"
+        "chapter-title"
       ],
       "ses": "",
       "j_cut": false,
@@ -251,8 +250,8 @@
     ],
     "format": {
       "duration": "20.096000",
-      "size": "10494600",
-      "bit_rate": "4177786"
+      "size": "10647774",
+      "bit_rate": "4238763"
     }
   },
   "kareler": [

@@ -24,8 +24,17 @@ KONUM = {
     "callout": 0.45,          # x/y spec'ten gelir
     # 0.94 iken alt kenar 1063px oluyordu ve guvenli alani (1016px) tasiyordu
     # (onizleme QA'sinda goruldu). 0.91 -> alt kenar 1031... hala tasar; 0.90.
-    "source-label": 0.90,
-    "subtitle": 0.86,
+    # ⚠ 0.90 DA TASIYORDU: 0.90+0.045=0.945 -> 1020.6px > 1016. Uc denemede de
+    # deger "yeterince asagi" sanildi ama HESAPLANMADI; 20 sn render smoke'unda
+    # QA bunu UC KEZ WARN olarak bildirdi (TIPO-GUVENLI-ALT). Dogru ust sinir:
+    #   y_orani <= (1080-64)/1080 - 0.045 = 0.8957
+    # 0.895 -> alt 1015.2px, guvenli alanin ICINDE.
+    "source-label": 0.895,
+    # ⚠ 0.86 DA TASIYORDU: 0.86+0.085=0.945 -> 1020.6px > 1016. Ayni kusur
+    # sinifi (source-label ile birebir ayni aritmetik hata). Altyazi katmani
+    # henuz uretilmedigi icin QA'da hic gorunmemisti — I-12'de eklenen
+    # "tum yazi turleri guvenli alanda" testi yakaladi. 0.855 -> 1015.2px.
+    "subtitle": 0.855,
     "data-chart": 0.30,
 }
 # Katmanin kapladigi dikey yer (oran)

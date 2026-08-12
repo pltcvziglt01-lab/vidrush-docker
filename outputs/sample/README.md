@@ -6,6 +6,43 @@
 python3 webapp/testler/smoke_editorv2_20sn.py
 ```
 
+## Kalite: ÖNCE / SONRA (I-11 → I-12)
+
+| | ÖNCE (I-11) | SONRA (I-12) |
+|---|---|---|
+| Ön-render QA | **5 WARN** | **2 WARN** |
+| 19. sn karesi | anlamsız dev **"1"** + tek sarı bar, başlık kırpık | temiz **bölüm kartı**, başlık tam |
+| `source-label` alt kenarı | 1020.6 px (güvenli alan **1016** — taşıyor) | 1015.2 px ✅ |
+| Kare boyutu (19 s) | 78 KB | 104 KB |
+
+### 5 QA WARN — tek tek
+
+| Kod | Detay | Kaynak | Durum |
+|---|---|---|---|
+| `TIPO-GUVENLI-ALT` ×3 | `source-label: alt=1020px > 1016` | **motor kusuru** | ✅ kapatıldı (`KONUM` 0.90 → 0.895) |
+| `PACING-KISA-ORAN` | 4 sn altı oran %83, referans %32 | **fixture** | açık — test verisinin beat'leri kısa |
+| `SAGLAYICI-TEKEL` | tek sağlayıcı %100 (tavan %40): wikimedia | **fixture** | açık — fixture yalnız Wikimedia içeriyor |
+
+Ayrıca 3 adet `uyari` seviyesinde `SUREKLILIK-AYNI-SAGLAYICI` var; aynı
+fixture sınırından geliyor.
+
+⚠ Kalan 2 WARN **motor kusuru değil**: QA, test verisinin gerçekçi
+olmadığını doğru tespit ediyor. Gerçek bir işte farklı sağlayıcılardan
+gelen adaylarla ikisi de düşer.
+
+### Düzeltilen iki gerçek kusur
+
+1. **Sayı uyduruluyordu.** `plan.py` medyasız beat'e sabit `[1]` değeriyle
+   veri grafiği veriyordu → ekranda anlamsız dev "1" + tek bar. Artık
+   `_beat_sayilari()` metinden **gerçek** sayı çıkarır (yıllar elenir);
+   sayı yoksa veri sahnesi **çizilmez**, profesyonel bölüm kartına düşülür.
+   `Grafikler.tsx` de boş veride `null` döner (derinlemesine savunma).
+2. **Başlık harf ortasından kırpılıyordu.** Bant `overflow:hidden` +
+   `nowrap` idi; hesaplanan karakter sınırı font metriği **tahmin** olduğu
+   için yetmedi. Artık TSX metni sığdıramazsa **puntoyu küçültür** (en fazla
+   %30), yani harf asla kesilmez. Python tarafı ayrıca sarkan edat/bağlaçları
+   atar ("…Elephant Island **in**" → "…Elephant Island").
+
 ## Ölçülen çıktı (12 Ağu 2026)
 
 | Ölçüm | Değer |

@@ -28,16 +28,29 @@ const bantGenislik = (t: number): string => `${Math.max(0, Math.min(1, t)) * 100
 
 export const BolumBasligi: React.FC<{spec: MotionSpec; fps: number}> = ({spec, fps}) => {
   const frame = useCurrentFrame();
-  const {height} = useVideoConfig();
+  const {height, width} = useVideoConfig();
   const bas = sayi(spec.bas_sn, 0.2);
   const sure = sayi(spec.sure_sn, 5);
   const op = zarf(frame, fps, bas, sure, 0.24, 0.3);
   if (op <= 0) return null;
   const t = ilerleme(frame, bas * fps, 0.28 * fps, spec);
-  const punto = sayi(spec.parametre.punto, 60);
+  const puntoTaban = sayi(spec.parametre.punto, 60);
   const yOrani = sayi(spec.parametre.y_orani, 0.7);
-  const dolgu = Math.round(punto * 0.42);
+  const dolgu = Math.round(puntoTaban * 0.42);
   const yaziT = ilerleme(frame, (bas + 0.12) * fps, 0.28 * fps, spec);
+
+  // ⚠ KIRPMA YERINE KUCULT. Bant `overflow: hidden` + `nowrap` oldugu icin
+  // sigmayan baslik HARF ORTASINDAN KESILIYORDU ("...ELEPHANT ISLAN"). Python
+  // tarafinda karakter siniri hesaplanmasina ragmen font metrigi TAHMIN oldugu
+  // icin kesme yine olabiliyordu (20 sn render'da iki kez goruldu).
+  // Cozum tahmine guvenmemek: metin sigmiyorsa punto ORANLA kucultulur, boylece
+  // harf ASLA kesilmez. En fazla %30 kuculur; altina inmek okunurlugu bozar.
+  const yaziMetni = metin(spec.parametre.metin).toUpperCase();
+  const kullanilabilir = width * 0.84 - dolgu * 2.4;
+  // BUYUK HARF Montserrat Bold ~0.72em (muhafazakar; azimsamak kirpar).
+  const tahminiGenislik = Math.max(1, yaziMetni.length * puntoTaban * 0.72);
+  const olcek = Math.max(0.7, Math.min(1, kullanilabilir / tahminiGenislik));
+  const punto = Math.round(puntoTaban * olcek);
   return (
     <AbsoluteFill style={{pointerEvents: 'none', opacity: op}}>
       <div
@@ -444,7 +457,12 @@ export const VeriGrafigi: React.FC<{spec: MotionSpec; fps: number}> = ({spec, fp
   const op = zarf(frame, fps, bas, sure, 0.35, 0.35);
   if (op <= 0) return null;
   const degerler = dizi(spec.parametre.degerler);
-  const veri = degerler.length ? degerler : [1];
+  // ⚠ SAYI UYDURMA YASAK. Onceki surum bos veride `[1]` variyordu; ekranda
+  // kocaman anlamsiz bir "1" ve tek sari cubuk cikiyordu (20 sn render
+  // smoke'unun 19. saniyesinde goruldu). Veri yoksa BU KATMAN CIZILMEZ —
+  // plan tarafi zaten bolum kartina duser (plan.py `_beat_sayilari`).
+  if (!degerler.length) return null;
+  const veri = degerler;
   const enBuyuk = Math.max(...veri, 1);
   const cizimSn = sayi(spec.parametre.cizim_sn, Math.max(0.8, sure * 0.5));
   const t = ilerleme(frame, bas * fps, cizimSn * fps, spec);

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from typing import Optional
 
 from . import adapter, beat, gramer, motion, profil, qa_on, ses, tipografi
@@ -70,6 +71,90 @@ def _yazi_katmanlari_kur(cekimler: list, beatler: list, adaylar_index: dict,
     return tipografi.cakisma_coz(katmanlar, p=p)
 
 
+_SAYI_KALIP = re.compile(r"\b(\d[\d.,]*)\b")
+# Yil gibi gorunen sayilar VERI DEGILDIR (1915, 2024...) — cubuk grafigi
+# olarak cizmek yaniltici olur.
+_YIL_KALIP = re.compile(r"^(1[5-9]\d{2}|20\d{2})$")
+
+
+def _beat_sayilari(metin: str, sinir: int = 6) -> list:
+    """Beat metnindeki GERCEK sayilar. Yil ve sirasal ifadeler elenir.
+
+    ⚠ Bos liste donerse veri sahnesi CIZILMEZ — sayi uydurulmaz.
+    """
+    cikti = []
+    for ham in _SAYI_KALIP.findall(str(metin or "")):
+        temiz = ham.replace(",", "").rstrip(".")
+        if not temiz or _YIL_KALIP.match(temiz):
+            continue
+        try:
+            d = float(temiz)
+        except ValueError:
+            continue
+        if d <= 0:
+            continue
+        cikti.append(d)
+        if len(cikti) >= sinir:
+            break
+    return cikti
+
+
+# BUYUK HARF Montserrat Bold ortalama karakter genisligi (em cinsinden).
+# ⚠ `tipografi.guvenli_alan_kontrol` 0.60 kullaniyor ama o KUCUK-BUYUK karisik
+# metin icin; bolum karti metni TAMAMEN BUYUK HARF cizilir ve daha genistir.
+# 0.60 ile hesaplanan baslik ekranda TASIP KIRPILDI (20 sn render, 19. sn).
+BUYUK_HARF_EM = 0.68
+# Bant `maxWidth: 84%` + iki yanda `dolgu*1.2` ic bosluk (Grafikler.tsx).
+BANT_MAKS_ORAN = 0.84
+
+
+def kart_basligi_siniri(p: EditProfili) -> int:
+    """Bolum kartina KAC KARAKTER sigar? Kirpilma olmasin diye HESAPLANIR.
+
+    ⚠ Onceki surum sabit 42 karakter kullaniyordu; punto 60'ta bant
+    `overflow: hidden` ile metni KIRPIYORDU ("...ELEPHANT ISLAN"). Sinir artik
+    puntodan ve kare genisliginden turetilir, guvenlik payi birakilir.
+    """
+    punto = max(1, int(p.tipografi.bolum_basligi))
+    dolgu = round(punto * 0.42)
+    kullanilabilir = p.genislik * BANT_MAKS_ORAN - 2 * dolgu * 1.2
+    tahmin = int(kullanilabilir / (punto * BUYUK_HARF_EM))
+    # %10 guvenlik payi: font metrikleri tahminidir, kirpmaktansa kisalt.
+    return max(12, int(tahmin * 0.90))
+
+
+# Baslik sonunda yalniz kalmamasi gereken edat/baglac/artikel.
+_SARKAN = frozenset((
+    "in", "on", "at", "of", "to", "for", "with", "from", "by", "and",
+    "or", "the", "a", "an", "as", "into", "over", "after", "before",
+    "ve", "ile", "icin", "gibi", "kadar", "de", "da", "ki", "bir"))
+
+
+def _kart_basligi(metin: str, sinir: int = 42) -> str:
+    """Bolum karti basligi: ilk anlamli ibare, cumle noktalamasi olmadan."""
+    ham = " ".join(str(metin or "").split())
+    if not ham:
+        return "BÖLÜM"
+    # Ilk yan cumleye kadar al (virgul/noktali virgul/tire)
+    for ayrac in (",", ";", " — ", " - "):
+        if ayrac in ham:
+            ham = ham.split(ayrac)[0]
+            break
+    ham = ham.rstrip(".!?")
+    if len(ham) > sinir:
+        kelimeler, birikim = ham.split(), []
+        for k in kelimeler:
+            if len(" ".join(birikim + [k])) > sinir:
+                break
+            birikim.append(k)
+        # ⚠ SARKAN EDAT/BAGLAC ATILIR: "…Elephant Island in" gibi yarim kalan
+        # baslik profesyonel gorunmuyor (20 sn render, 19. sn'de goruldu).
+        while birikim and birikim[-1].lower().strip(",;:") in _SARKAN:
+            birikim.pop()
+        ham = " ".join(birikim) or ham[:sinir]
+    return ham.rstrip(" ,;:-—")
+
+
 def _motion_kur(cekimler: list, beatler: list, p: EditProfili) -> list:
     """Her beat icin motion spec listesi (beat_id ile etiketli)."""
     specler = []
@@ -85,7 +170,20 @@ def _motion_kur(cekimler: list, beatler: list, p: EditProfili) -> list:
         if c.cekim_turu == "map":
             yerel.append(motion.harita_spec(c.ulke or "", None, b.sure_sn))
         if c.cekim_turu == "data":
-            yerel.append(motion.veri_grafigi_spec(b.metin[:28], [1], b.sure_sn))
+            # ⚠ SAYI UYDURMA YASAK. Onceki surum burada SABIT `[1]` geciyordu;
+            # sonuc ekranda kocaman anlamsiz bir "1" ve tek sari cubuktu
+            # (20 sn render smoke'unun 19. saniyesinde goruldu). Veri sahnesi
+            # ancak GERCEK sayi varsa cizilir.
+            _degerler = _beat_sayilari(b.metin)
+            if _degerler:
+                yerel.append(motion.veri_grafigi_spec(b.metin[:28], _degerler,
+                                                      b.sure_sn))
+            else:
+                # Sayi yoksa PROFESYONEL BOLUM KARTI: baslik guvenli izgarada,
+                # uydurma gosterge YOK. Bosluk rastgele stokla da kapanmaz.
+                yerel.append(motion.bolum_basligi_spec(
+                    _kart_basligi(b.metin, kart_basligi_siniri(p)),
+                    b.sure_sn, p=p))
         if b.islev == "hook" and i == 0:
             yerel.append(motion.light_sweep_spec(min(0.9, b.sure_sn * 0.4)))
         if b.perde == "kapanis" and b.islev == "sonuc":
