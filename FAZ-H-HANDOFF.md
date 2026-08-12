@@ -164,7 +164,8 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | H5 medya doğruluk kapısı (biyom/dönem) | `da44489` | ✅ |
 | 12 Ağu | H6 render sonrası QA kapısı | `171737c` | ✅ |
 | 12 Ağu | H4 otomatik girdi analizi | `d40936f` | ✅ **CANLI** |
-| 12 Ağu | **I-1 kare kapısı** — medya seçim akışına bağlandı | bu commit | ✅ yerel yeşil, **deploy YOK** |
+| 12 Ağu | **I-1 kare kapısı** — medya seçim akışına bağlandı | `7dd6322` | ✅ yerel yeşil, **deploy YOK** |
+| 12 Ağu | **I-2a hiyerarşik konsept taksonomisi** | bu commit | ✅ yerel yeşil, **deploy YOK** |
 
 ---
 
@@ -528,3 +529,148 @@ derleniyor) ile kapsanıyor.
 - Bölge tablosu 17 satır — dünya haritası değil. Tablo dışı yerde kapı biyoma düşer.
 - `medya/vision.py` (Faz B enjekte edilebilir puanlayıcı) hâlâ sıralama tarafında
   bağlı değil; I-1 yalnızca **kapı** yolunu bağladı.
+
+---
+
+## 16. FAZ I-2a — HİYERARŞİK KONSEPT / NİYET TAKSONOMİSİ (12 Ağu, ölçüldü)
+
+### Kapatılan açık
+
+`girdi_analizi.TUR_SINYALI` **sabit beş etiket** tutuyordu
+(belgesel/seyahat/açıklayıcı/ürün/hikâye) ve kararı **tek bir anahtar-kelime
+sayımına** dayandırıyordu. Ölçülen sonuçlar:
+
+| Girdi | Eski sonuç |
+|---|---|
+| `"3-1'lik maçın 90. dakikasındaki golle biten derbi özeti"` | **belirsiz** |
+| `"iPhone 15 vs Galaxy S24 fiyat karşılaştırması"` | ürün (alt tür **yok**) |
+| `"kabus gibi bir gece: kapının ardındaki gölge"` | **belirsiz** |
+
+### Yeni: `webapp/taksonomi.py` — **ayrı modül, eski sözleşmeye dokunmadı**
+
+- **7 aile · 33 dal · 690 anahtar · 18 yapısal sinyal · 50 sinyal bağı ·
+  94 karşıt terim** — hepsi `kapsam_ozeti()` ile **sayılabilir**
+  (ölçüm: `python3 -c "import taksonomi; print(taksonomi.kapsam_ozeti())"`).
+  Aileler: `belgesel · seyahat · egitim · hikaye · urun · yasam · kultur`
+- **Yeni konsept eklemek = `AGAC`a bir satır.** Motor kodu değişmez.
+
+### Sadece kelime listesi DEĞİL — ölçülebilir yapısal sinyaller
+
+Karar iki bacaklı: (a) sözlük isabeti, (b) metnin **biçiminden** sayılan kanıt.
+18 sinyal: `yil · eski_yil · para · yuzde · skor · dakika · olcu · adim · soru ·
+cozunurluk · emlak_olcu · model_no · karsilastirma · diyalog · emir · borsa ·
+suc · kisi_adi`.
+
+Bunlar konu kelimesinden bağımsız çalışır — testte kilitli: `"2-0, 45. dakika"`
+metninde hiçbir spor kelimesi yokken `skor` ve `dakika` sinyalleri ölçülüyor.
+
+### Dürüst güven ve fallback
+
+`guven = min(0.95, 0.30 + 0.45·marj + 0.20·min(kanıt,5)/5)` — formül açık,
+uydurma metrik yok. Tavan **0.95**: hiçbir deterministik sınıflandırma
+"kesin doğru" değildir.
+
+| Durum | Koşul | Davranış |
+|---|---|---|
+| `belirsiz` | kanıt < 2 **veya** güven < 0.40 | **Zorla etiket YOK.** `yol="belirsiz"`, gerekçe sebebi yazar |
+| `melez` | 1. ve 2. aday marjı < 0.25 | Tek etikete ezilmez; **ikincil dal raporlanır** |
+| `zayif` | 0.40 ≤ güven < 0.60 | Etiket verilir ama güven düşük olarak işaretlenir |
+| `kesin` | güven ≥ 0.60 | — |
+
+Adaylar **her zaman** raporlanır (kara kutu yok).
+
+### Sınırlı model analizi — klamplı, varsayılan KAPALI
+
+`siniflandir(metin, model_coz=None)`. **Bu modülde hiçbir ağ çağrısı yok**
+(testte kilitli: `requests`/`openai.com`/`http` dizeleri dosyada geçmiyor).
+
+- Model **yalnızca** `durum ∈ {belirsiz, melez, zayif}` iken çağrılır —
+  kesin kararda çağrılmaz (boşa para yok, testli).
+- Model **yalnızca motorun ürettiği aday listesinden** seçebilir. Liste dışı
+  cevap → **YOK SAYILIR**, deterministik karar korunur, `model_notu` ile görünür.
+- Model istisna fırlatırsa deterministik karar korunur.
+- Model güveni **0.90'ı aşamaz** (deterministik tavan 0.95'in altında).
+
+### Geriye uyumluluk — BOZULMADI
+
+| Kilit | Durum |
+|---|---|
+| `girdi_analizi.TUR_SINYALI` hâlâ 5 etiket | ✅ testli |
+| `girdi_analizi.tur_tespit()` davranışı | ✅ değişmedi, testli |
+| `GORSEL_STRATEJISI` | ✅ dokunulmadı |
+| `/api/analiz` sözleşmesi | ✅ dokunulmadı |
+| `taksonomi.ESKI_ETIKET` | her aile → eski 5 etiketten biri; beş değerin dışına çıkmıyor (testli) |
+
+`taksonomi.py` **hiçbir yerden import edilmiyor** — bu adımda motor yalnızca
+yazıldı ve testlendi. Akışa bağlanması I-2c'ye ait.
+
+### Bu adımda düzelttiğim gerçek tasarım açığı
+
+Katı kelime sınırı Türkçe eklerde sözlüğün yarısını körleştiriyordu:
+`"kara delik"` → `"kara delikler"`e, `"teori"` → `"teorisi"`ne,
+`"arastirmacilar"` → `"arastirmacilarinin"`e **uymuyordu**. `bilim` konsepti bu
+yüzden `belirsiz` çıkıyordu (4 test kırmızı).
+
+Çözüm: **sol sınır katı** (kelime ortasında eşleşme yok), sağda **sınırlı** ek
+toleransı — en fazla 6 harf ve yalnızca ≥5 harfli terimlerde. Kısa terimlerde
+tolerans yok, çünkü `"gol"` → `"gölge"`, `"kek"` → `"kekik"` gibi yanlış
+pozitifler gelirdi. Yedi ayrı test bu sınırı kilitliyor.
+
+⚠ Bu değişiklik **yalnızca `taksonomi.py`** içinde; `medya_kapisi` ve
+`kare_kapisi` İngilizce yer adlarıyla çalıştığı için dokunulmadı.
+
+### Ölçülen test sonucu (12 Ağu)
+
+| Paket | Geçen | Başarısız |
+|---|---|---|
+| A | 125 | 0 |
+| B | 200 | 0 |
+| C | 148 | 0 |
+| D | 95 | 0 |
+| E | 127 | 0 |
+| F | 242 | 0 |
+| G | 217 | 0 |
+| H | 203 | 0 (**2 BLOKE**) |
+| I (I-1 + I-2a) | **234** | 0 |
+| **TOPLAM** | **1591** | **0** |
+
+I paketi I-1'de 81'di → I-2a ile **+153** test (12+ konsept matrisi, yapısal
+sinyaller, belirsizlik/melez, klamplı model yolu, Türkçe ek sınırı).
+
+**BLOKE (PASS sayılmadı):** Faz H'de 2 blok — `QA_TEST_VIDEO` ayarlanmadı
+(opsiyonel) ve gerçek uç testi için `fastapi` yerelde kurulu değil
+(`.venv-test` bu oturumda yok). I-2a `server.py`'ye dokunmuyor.
+
+### Test edilen 19 konsept
+
+Rockefeller tarih belgeseli · biyografi (Curie) · İsviçre 4K gezi · bilim
+(kara delik) · teknoloji (yapay zekâ) · finans (enflasyon/borsa) · spor (derbi
+özeti) · true crime · yemek tarifi · eğitim/ders · ürün tanıtımı · müzik/kültür ·
+korku hikâyesi · çocuk hikâyesi · emlak turu · otomotiv sinematik · haber
+analizi · meditasyon ambient · ürün karşılaştırma.
+
+Her konsept için 5 ayrı iddia doğrulanıyor: aile, alt tür, `durum ∈ {kesin,
+melez}`, gerekçenin ölçülen sayı içermesi, eski etikete indirgenmesi.
+
+### BİLİNEN LİMİTLER (dürüstçe)
+
+1. **Ağaç dünyayı kapsamıyor.** 33 dal; kapsam dışı girdi `belirsiz` döner —
+   bu tasarım gereği, eksiklik gizlenmiyor.
+2. **Kapsam dışı iddia yok.** "Tüm stilleri biliyoruz" denmiyor; kapsam
+   `kapsam_ozeti()` ile sayılıyor.
+3. **Gerçek kullanıcı girdisiyle isabet oranı ölçülmedi.** Kanıt 19 kürasyonlu
+   test metni; canlı dağılımda başarım **bilinmiyor**.
+4. **Model yolu hiç gerçek modelle koşulmadı** — sahte çağrılabilirle test
+   edildi. Ücretli çağrı yapılmadı.
+5. **Ek toleransı Türkçeye özel** ve sezgisel (6 harf / ≥5 karakter). İngilizce
+   çoğullarda da çalışır ama diğer eklemeli dillerde test edilmedi.
+6. **Motor henüz akışa bağlı değil** — `girdi_analizi`/`pipeline` bu adımda
+   `taksonomi`yi import etmiyor.
+
+### SONRAKİ ADIM (I-2b/I-2c)
+
+- I-2b: sürümlü **stil profili** kaydı (anlatım yapısı, tempo, geçiş, kamera,
+  tipografi, palet, müzik, medya stratejisi, oran/kanal/süre, kanıt-lisans
+  kuralları, QA eşikleri) — **bu adımda yazılmadı.**
+- I-2c: `girdi_analizi.analiz()` içine `konsept` alanı olarak **ek** bağlama
+  (eski alanlar korunarak) + Auto ↔ kullanıcı seçimi önceliği.
