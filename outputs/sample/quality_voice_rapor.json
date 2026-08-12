@@ -1,0 +1,306 @@
+{
+  "video": "outputs/sample/editorv2_quality_voice_10sn.mp4",
+  "konu": "Apollo 11 ay inisi (20 Temmuz 1969)",
+  "konu_tutarliligi": {
+    "gorsel": "Faz E Wikimedia/NASA Apollo arsivi",
+    "metin": "Faz E arastirma manifesti dogrulanmis iddialari (f001, f004, f005)",
+    "anlatim": "ayni metnin seslendirmesi",
+    "uyusmazlik": false
+  },
+  "anlatici_ses": {
+    "motor": "edge-tts (projenin varsayilan TTS'i, app/uret.py)",
+    "maliyet_usd": 0.0,
+    "secilen": "en-GB-RyanNeural",
+    "secim_gerekcesi": "en yuksek LRA (dinamik genislik) = en az duz okuma; yereldeki macOS say -v Yelda LRA 0.3-1.9",
+    "adaylar": [
+      {
+        "codec": "mp3",
+        "ornekleme_hz": 24000,
+        "kanal": 1,
+        "sure_sn": 9.744,
+        "lufs": -21.44,
+        "tepe_dbtp": -3.83,
+        "lra": 1.6,
+        "sessiz_sn": 1.872,
+        "sessiz_pct": 19.2,
+        "kirpma_var": false,
+        "ses": "en-GB-RyanNeural"
+      },
+      {
+        "codec": "mp3",
+        "ornekleme_hz": 24000,
+        "kanal": 1,
+        "sure_sn": 9.144,
+        "lufs": -20.3,
+        "tepe_dbtp": -3.56,
+        "lra": 1.5,
+        "sessiz_sn": 1.157,
+        "sessiz_pct": 12.7,
+        "kirpma_var": false,
+        "ses": "en-US-AndrewNeural"
+      },
+      {
+        "codec": "mp3",
+        "ornekleme_hz": 24000,
+        "kanal": 1,
+        "sure_sn": 8.952,
+        "lufs": -20.2,
+        "tepe_dbtp": -4.42,
+        "lra": 0.5,
+        "sessiz_sn": 1.252,
+        "sessiz_pct": 14.0,
+        "kirpma_var": false,
+        "ses": "en-US-BrianNeural"
+      }
+    ],
+    "master": {
+      "codec": "pcm_s16le",
+      "ornekleme_hz": 48000,
+      "kanal": 1,
+      "sure_sn": 8.789,
+      "lufs": -16.43,
+      "tepe_dbtp": -1.5,
+      "lra": 2.0,
+      "sessiz_sn": 0.979,
+      "sessiz_pct": 11.1,
+      "kirpma_var": false
+    },
+    "yerel_alternatif": {
+      "motor": "macOS say -v Yelda (Faz E pilot_rapor.json)",
+      "lra_araligi": "0.3 - 1.9",
+      "karar": "KULLANILMADI — duz/makine benzeri, belgesel anlatimi kalitesinde degil"
+    }
+  },
+  "gorsel_secimi": {
+    "esik_std": 20.0,
+    "olcumler": [
+      {
+        "asset_id": "a082_wiki_4ba3ccdace",
+        "yol": "/Users/polatcan/vidrush-docker/app/render-studio/public/editorv2/faz_e/a082_wiki_4ba3ccdace.jpg",
+        "detay_std": 63.1
+      },
+      {
+        "asset_id": "a086_wiki_effc9e462f",
+        "yol": "/Users/polatcan/vidrush-docker/app/render-studio/public/editorv2/faz_e/a086_wiki_effc9e462f.jpg",
+        "detay_std": 53.8
+      },
+      {
+        "asset_id": "a281_wiki_e42b89a1f6",
+        "yol": "/Users/polatcan/vidrush-docker/app/render-studio/public/editorv2/faz_e/a281_wiki_e42b89a1f6.jpg",
+        "detay_std": 6.1
+      },
+      {
+        "asset_id": "a282_wiki_56a60bf31b",
+        "yol": "/Users/polatcan/vidrush-docker/app/render-studio/public/editorv2/faz_e/a282_wiki_56a60bf31b.jpg",
+        "detay_std": 4.7
+      },
+      {
+        "asset_id": "a283_wiki_58de9c1ba3",
+        "yol": "/Users/polatcan/vidrush-docker/app/render-studio/public/editorv2/faz_e/a283_wiki_58de9c1ba3.jpg",
+        "detay_std": 53.0
+      },
+      {
+        "asset_id": "a313_wiki_8ba105ee68",
+        "yol": "/Users/polatcan/vidrush-docker/app/render-studio/public/editorv2/faz_e/a313_wiki_8ba105ee68.jpg",
+        "detay_std": 63.6
+      },
+      {
+        "asset_id": "a314_wiki_6cff017be6",
+        "yol": "/Users/polatcan/vidrush-docker/app/render-studio/public/editorv2/faz_e/a314_wiki_6cff017be6.jpg",
+        "detay_std": 55.1
+      }
+    ],
+    "secilen": [
+      "a313_wiki_8ba105ee68",
+      "a082_wiki_4ba3ccdace",
+      "a314_wiki_6cff017be6"
+    ],
+    "gerekce": "kadraj icindeki luminans std sapmasi; esik alti kare DUZ GRI cikiyordu (olculdu)"
+  },
+  "plan": {
+    "profil": "premium-modern",
+    "qa": {
+      "durum": "WARN",
+      "fail": 0,
+      "warn": 2,
+      "sorun_sayisi": 4
+    },
+    "efekt_kapsami": {
+      "sayim": {
+        "gercek": 17,
+        "pseudo": 0,
+        "ffmpeg-yolu": 0,
+        "bilinmeyen": 0,
+        "toplam": 17
+      },
+      "detay": {
+        "gercek": {
+          "push-in": 1,
+          "grain": 3,
+          "vignette": 3,
+          "grade": 3,
+          "light-sweep": 1,
+          "hard-cut": 3,
+          "chapter-title": 1,
+          "static": 1,
+          "pan-right": 1
+        }
+      }
+    },
+    "kapsam_boslugu": [],
+    "elenen_medya": []
+  },
+  "zincir": [
+    {
+      "beat_id": "b001",
+      "scene_id": "s001",
+      "fact_id": "f001",
+      "asset_id": "a313_wiki_8ba105ee68",
+      "saglayici": "wikimedia",
+      "lisans": "public-domain",
+      "sure_sn": 3.2,
+      "bas_sn": 0.0,
+      "cekim_turu": "close-detail",
+      "hareket": "push-in",
+      "kadraj": "tam",
+      "motion": [
+        "push-in",
+        "grain",
+        "vignette",
+        "grade",
+        "light-sweep",
+        "hard-cut",
+        "chapter-title"
+      ],
+      "gecis": [
+        "hard-cut"
+      ],
+      "altyazi_adet": 0,
+      "tipografi": [
+        "chapter-title"
+      ],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "hook"
+    },
+    {
+      "beat_id": "b002",
+      "scene_id": "s002",
+      "fact_id": "f004",
+      "asset_id": "a082_wiki_4ba3ccdace",
+      "saglayici": "wikimedia",
+      "lisans": "public-domain",
+      "sure_sn": 3.2,
+      "bas_sn": 3.2,
+      "cekim_turu": "medium",
+      "hareket": "static",
+      "kadraj": "punch-1.35",
+      "motion": [
+        "static",
+        "grain",
+        "vignette",
+        "grade",
+        "hard-cut"
+      ],
+      "gecis": [
+        "hard-cut"
+      ],
+      "altyazi_adet": 0,
+      "tipografi": [],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "aciklama"
+    },
+    {
+      "beat_id": "b003",
+      "scene_id": "s003",
+      "fact_id": "f005",
+      "asset_id": "a314_wiki_6cff017be6",
+      "saglayici": "wikimedia",
+      "lisans": "public-domain",
+      "sure_sn": 3.2,
+      "bas_sn": 6.4,
+      "cekim_turu": "establishing",
+      "hareket": "pan-right",
+      "kadraj": "ust",
+      "motion": [
+        "pan-right",
+        "grain",
+        "vignette",
+        "grade",
+        "hard-cut"
+      ],
+      "gecis": [
+        "hard-cut"
+      ],
+      "altyazi_adet": 0,
+      "tipografi": [],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "sonuc"
+    }
+  ],
+  "ffprobe": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "codec_type": "video",
+        "width": 1280,
+        "height": 720,
+        "r_frame_rate": "30/1",
+        "side_data_list": [
+          {}
+        ]
+      },
+      {
+        "codec_name": "aac",
+        "codec_type": "audio",
+        "sample_rate": "48000",
+        "channels": 2,
+        "r_frame_rate": "0/0"
+      }
+    ],
+    "format": {
+      "duration": "9.642667",
+      "size": "8222479",
+      "bit_rate": "6821746"
+    }
+  },
+  "video_ses_olcumu": {
+    "codec": "h264",
+    "ornekleme_hz": 0,
+    "kanal": 0,
+    "sure_sn": 9.643,
+    "lufs": -16.56,
+    "tepe_dbtp": -4.47,
+    "lra": 2.7,
+    "sessiz_sn": 1.887,
+    "sessiz_pct": 19.6,
+    "kirpma_var": false
+  },
+  "kareler": [
+    "outputs/sample/vkare_00s.png",
+    "outputs/sample/vkare_05s.png",
+    "outputs/sample/vkare_09s.png"
+  ],
+  "kapsam": {
+    "gercek_motor": [
+      "editor.plan.uret (beat/gramer/motion/tipografi/ses/QA-on)",
+      "editor.adapter.donustur",
+      "editor.remotion_v2 dogrula/props_hazirla/render",
+      "Remotion VidrushEditorV2 (Chrome headless + ffmpeg)",
+      "edge-tts anlatim uretimi (projenin varsayilan TTS'i)"
+    ],
+    "kapsam_disi": [
+      "WEB'DEN MEDYA BULMA — saglayiciya HIC istek atilmadi",
+      "arastirma/fact-check motoru (olgular Faz E manifestinden)",
+      "canli /api/generate hatti",
+      "ucretli API (maliyet $0.00)"
+    ]
+  }
+}

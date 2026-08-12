@@ -178,7 +178,8 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-9 uçtan uca edit planı orkestrasyonu** | `a0294d0` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-10 edit köprüsü pipeline'a bağlı + manifest dönüşümü** | `477b168` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-11 20 sn GERÇEK render smoke** | `f4e3a5e` | ✅ **origin'e push edildi**, deploy YOK |
-| 12 Ağu | **I-12 QA WARN raporu + chapter-card kalitesi** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
+| 12 Ağu | **I-12 QA WARN raporu + chapter-card kalitesi** | `9be6375` | ✅ **origin'e push edildi**, deploy YOK |
+| 12 Ağu | **I-13 10 sn kaliteli sesli Apollo mini-belgeseli** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
 
 ---
 
@@ -2061,8 +2062,8 @@ dürüstlük etiketlerini ve `yerel_yol` düzeltmesini kilitler.
 
 ## 29. FAZ I-12 — 5 QA WARN RAPORU + CHAPTER-CARD KALİTESİ (12 Ağu, ölçüldü)
 
-> **Durum: yazıldı + testlendi + YENİDEN RENDER EDİLDİ, dosyalar staged.**
-> **Commit YOK, deploy YOK. Bayraklar varsayılan KAPALI.**
+> **Durum: commit `9be6375`, `origin/arastirma-motoru`'na PUSH EDİLDİ. Deploy YOK.**
+> **Bayraklar varsayılan KAPALI.**
 > Değişen: `webapp/editor/plan.py`, `webapp/editor/tipografi.py`,
 > `app/render-studio/src/editorv2/Grafikler.tsx`,
 > `webapp/testler/test_faz_i.py`, `outputs/sample/README.md` (+ bu handoff).
@@ -2150,3 +2151,93 @@ gerileme yok.
 6. **İçerik uyuşmazlığı sürüyor** (Apollo görsel / Endurance metin).
 6. ~~`medya_kopru` çıktısı `medya_manifest` biçiminde değil.~~ →
    ✅ **§27'de (I-10) `manifest_kur()` ile çözüldü.**
+
+---
+
+## 30. FAZ I-13 — 10 SN KALİTELİ SESLİ APOLLO MİNİ-BELGESELİ (12 Ağu, ölçüldü)
+
+> **Durum: yazıldı + testlendi + GERÇEK MP4 üretildi, dosyalar staged.**
+> **Commit YOK, deploy YOK. Bayraklar varsayılan KAPALI. Maliyet $0.00.**
+> Yeni: `webapp/testler/smoke_kaliteli_ses_10sn.py`.
+> Değişen: `webapp/testler/test_faz_i.py`, `outputs/sample/README.md`
+> (+ bu handoff). **Kod tarafında pipeline/UI/editor değişmedi.**
+
+### Konu tutarlılığı — §28'in en ağır sınırı kapatıldı
+
+Önceki smoke'ta **Apollo görsel + Endurance metni** uyuşmazlığı vardı.
+Şimdi üçü de aynı konudan: görsel (Faz E NASA/Wikimedia Apollo arşivi),
+metin (Faz E manifestindeki **doğrulanmış** f001/f004/f005 iddiaları) ve
+anlatım (aynı metnin seslendirmesi).
+
+### Anlatıcı sesi — ölçülen seçim
+
+Yereldeki hazır anlatım **`macOS say -v Yelda`** ile üretilmiş
+(Faz E `pilot_rapor.json`), ölçümü **LRA 0.3–1.9** — düz, makine benzeri;
+belgesel anlatımı kalitesinde **değil**. Bu yüzden projenin **kendi varsayılan
+TTS motoru** (`app/uret.py` → edge-tts) kullanıldı.
+
+| Aday | LRA | LUFS | Süre |
+|---|---|---|---|
+| **en-GB-RyanNeural** ✅ | **1.6** | −21.4 | 9.74 sn |
+| en-US-AndrewNeural | 1.5 | −20.3 | 9.14 sn |
+| en-US-BrianNeural | 0.5 | −20.2 | 8.95 sn |
+
+Master: `pcm_s16le / 48 kHz / mono · 8.789 sn · LUFS −16.43 · TP −1.5 dBTP ·
+LRA 2.0 · sessizlik %11.1 · kırpma yok`.
+
+⚠ **Maliyet $0.00** — edge-tts anahtar istemez. Kredi yüklenmedi, anahtar
+değiştirilmedi. $0.25 tavanı **hiç kullanılmadı**.
+⚠ **Dürüst sınır:** LRA 2.0 iyi bir nöral TTS'tir, **insan anlatıcı değildir**
+(gerçek spiker LRA 4–8).
+
+### Görsel seçimi — ölçülen kapı (bu adımda bulunan kusur)
+
+İlk render'da 0. ve 9. sn kareleri **düz gri** çıktı. Ölçüm nedeni gösterdi:
+`a281` (detay std **6.1**) ve `a282` (**4.7**) havuzun en boş kareleriydi.
+Artık kadraja düşen detay ölçülüyor, eşik altı (< 20) görsel **kullanılmıyor**.
+Kare boyutları 647/543/578 KB → **865/925/1121 KB**; üç kare de gözle
+doğrulandı (Eagle + astronot · ayak izi · bot izi yakın plan).
+
+### Ölçülen çıktı
+
+`outputs/sample/editorv2_quality_voice_10sn.mp4`
+
+| Ölçüm | Değer |
+|---|---|
+| Video | **h264** 1280×720 @ 30 fps |
+| Ses | **aac** 48 000 Hz / 2 kanal |
+| Süre | **9.643 sn** · 8.22 MB |
+| Miks | LUFS −16.56 · TP −4.47 dBTP · kırpma yok · sessizlik %19.6 |
+| Ön-render QA | WARN (fail=0 warn=2) · on-render kapısı **PASS** |
+
+### Ölçülen test sonucu (12 Ağu) — İKİ ORTAM AYRI
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Zengin venv** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **257** | **989** | **2403** |
+| **Sistem Python** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **203** | **989** | **2349** |
+
+0 hata. Faz I 951 → **989** (+38). §27 testleri render/TTS **çalıştırmaz**.
+
+### BU VİDEO NEYİ KANITLAR / KANITLAMAZ
+
+**Kanıtlar:** `editor.plan.uret` tam Faz C zinciri (beat → gramer → motion →
+tipografi → ses → ön-render QA) · `adapter.donustur` · `remotion_v2`
+doğrula/props_hazirla/render · **Remotion `VidrushEditorV2`** (Chrome headless
++ ffmpeg) · lisans duvarı + `fact_id` zincirinin props'a kadar gelmesi ·
+edge-tts anlatım üretimi + ambiyans ducking.
+
+**KANITLAMAZ:** web'den medya bulma (sağlayıcıya **hiç** istek yok) ·
+araştırma/fact-check motoru (olgular hazır manifestten) · canlı
+`/api/generate` hattı · ücretli API.
+
+### BİLİNEN SINIRLAR (dürüstçe)
+
+1. **Web araştırma/medya hattı hâlâ hiç koşulmadı** — bayraklar kapalı.
+2. **LRA 2.0 insan anlatıcı değil**; nöral TTS sınırında.
+3. **Bölüm kartı bu 10 sn'de görünmüyor** — üç sahnenin üçünde de medya var,
+   fallback tetiklenmedi.
+4. **Altyazı yok** (TTS kelime zamanlaması props'a bağlanmadı).
+5. **Anlatım ile sahne sınırları hizalanmadı** — tek master ses; sahne başına
+   segment eşlemesi yapılmadı.
+6. Kalan 2 QA WARN fixture kaynaklı (tek sağlayıcı, kısa beat).

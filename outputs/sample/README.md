@@ -1,4 +1,88 @@
-# EditorV2 20 saniyelik render smoke
+# EditorV2 render örnekleri
+
+Bu dizinde **iki** örnek var:
+
+| Dosya | Ne | Betik |
+|---|---|---|
+| `editorv2_quality_voice_10sn.mp4` | **10 sn Apollo 11 mini-belgeseli, kaliteli anlatıcı sesli** | `webapp/testler/smoke_kaliteli_ses_10sn.py` |
+| `editorv2_smoke_20sn.mp4` | 20 sn motor smoke (sessiz anlatım, konu uyuşmazlıklı) | `webapp/testler/smoke_editorv2_20sn.py` |
+
+---
+
+# 1) 10 sn — kaliteli anlatıcı sesli Apollo 11 mini-belgeseli
+
+```bash
+python3 webapp/testler/smoke_kaliteli_ses_10sn.py
+```
+
+**Konu tutarlı:** görsel + metin + anlatım üçü de **Apollo 11 ay inişi**.
+Görseller Faz E koşusundan kalan gerçek NASA/Wikimedia arşiv fotoğrafları,
+metin Faz E araştırma manifestindeki **doğrulanmış** iddialar (f001/f004/f005),
+anlatım aynı metnin seslendirmesi. Önceki örnekteki *Apollo görsel + Endurance
+metni* uyuşmazlığı **giderildi**.
+
+## Ölçülen çıktı
+
+| Ölçüm | Değer |
+|---|---|
+| Video | **h264** 1280×720 @ 30 fps |
+| Ses | **aac** 48 000 Hz / 2 kanal |
+| Süre | **9.643 sn** |
+| Boyut | 8.22 MB |
+| Miks | LUFS −16.56 · TP −4.47 dBTP · **kırpma yok** · sessizlik %19.6 |
+| Ön-render QA | WARN (fail=0, warn=2) → render'a izin verildi |
+
+Kareler: `vkare_00s.png` (Eagle + astronot) · `vkare_05s.png` (ayak izi) ·
+`vkare_09s.png` (bot izi yakın plan) — üçü de gözle doğrulandı.
+
+## Anlatıcı sesi — seçim gerekçesi (ölçüldü)
+
+| Aday | LRA | LUFS | Süre |
+|---|---|---|---|
+| **en-GB-RyanNeural** ✅ | **1.6** | −21.4 | 9.74 sn |
+| en-US-AndrewNeural | 1.5 | −20.3 | 9.14 sn |
+| en-US-BrianNeural | 0.5 | −20.2 | 8.95 sn |
+
+Seçim ölçüte dayanıyor: **en yüksek LRA** (dinamik genişlik) = en az düz okuma.
+Master'lanmış hâli: `pcm_s16le / 48 kHz / mono · 8.789 sn · LUFS −16.43 ·
+TP −1.5 dBTP · LRA 2.0 · sessizlik %11.1 · kırpma yok`.
+
+⚠ **Yereldeki hazır anlatım kullanılmadı.** Faz E `pilot_rapor.json`'a göre o
+ses **`macOS say -v Yelda`** ile üretilmiş; ölçümü LRA **0.3–1.9**, yani düz ve
+makine benzeri — belgesel anlatımı kalitesinde değil. Onun yerine projenin
+**kendi varsayılan TTS motoru** (`app/uret.py` → edge-tts) kullanıldı.
+
+⚠ **Maliyet $0.00.** edge-tts anahtar istemez, kredi harcamaz. Kredi
+yüklenmedi, anahtar değiştirilmedi.
+
+⚠ **Dürüst sınır:** LRA 2.0 iyi bir *nöral TTS*'tir, **insan anlatıcı değildir**.
+Gerçek belgesel spikeri LRA 4–8 aralığındadır.
+
+## Görsel seçimi — ölçülen kapı
+
+İlk render'da 0. ve 9. saniye kareleri **düz gri** çıktı. Ölçüm nedeni
+gösterdi: kullanılan `a281` (detay std **6.1**) ve `a282` (**4.7**) havuzun en
+boş kareleriydi. Artık kadraja düşen detay **ölçülüyor** ve eşik altı
+(< 20) görsel **kullanılmıyor**:
+
+```
+a313  63.6 SEÇİLDİ   a082  63.1 SEÇİLDİ   a314  55.1 SEÇİLDİ
+a086  53.8 -         a283  53.0 -
+a281   6.1 eşik altı a282   4.7 eşik altı
+```
+
+Kare boyutları 647/543/578 KB → **865/925/1121 KB**.
+
+## ⚠ Bu video neyi KANITLAMAZ
+
+- **Web'den medya bulma** — hiçbir sağlayıcıya istek atılmadı
+- **Araştırma/fact-check motoru** — olgular Faz E manifestinden hazır geldi
+- **Canlı `/api/generate` hattı** — pipeline çağrılmadı
+- **Ücretli API** — maliyet $0.00
+
+---
+
+# 2) EditorV2 20 saniyelik render smoke
 
 `webapp/testler/smoke_editorv2_20sn.py` bu dizine gerçek bir MP4 üretir.
 

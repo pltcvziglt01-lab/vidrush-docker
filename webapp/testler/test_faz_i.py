@@ -3779,6 +3779,115 @@ for _f7 in ("editor/plan.py", "editor/tipografi.py"):
     kontrol(f"{_f7} derleniyor", _derlenir(os.path.join(KOK, _f7)))
 
 
+# ═══ 27. FAZ I-13 — KALITELI ANLATICI SESI + KONU TUTARLILIGI ═══
+# ⚠ BU BOLUM RENDER/TTS CALISTIRMAZ. Betigin sozlesmesini, konu tutarliligi
+# kuralini, ses secim gerekcesini ve gorsel detay kapisini kilitler.
+blok("27. I-13 — 10 sn kaliteli sesli mini-belgesel sozlesmesi")
+
+_SES_YOL = os.path.join(KOK, "testler", "smoke_kaliteli_ses_10sn.py")
+kontrol("10 sn ses smoke betigi var", os.path.exists(_SES_YOL))
+_SS = oku(KOK, "testler/smoke_kaliteli_ses_10sn.py")
+kontrol("betik derleniyor", _derlenir(_SES_YOL))
+
+# ── (a) KONU TUTARLILIGI ──
+kontrol("konu ACIKCA beyan ediliyor (Apollo 11)", "Apollo 11" in _SS)
+kontrol("gorsel/metin/anlatim AYNI konudan",
+        "KONU TUTARLILIGI SART" in _SS
+        and "uyusmazligi GIDERILDI" in _SS)
+kontrol("metin DOGRULANMIS iddialardan turetiliyor",
+        "DOGRULANMIS iddialardan turetildi" in _SS
+        and '"guven": "dogrulandi"' in _SS)
+# ⚠ Dokumantasyon KOD DEGILDIR: betigin basligi zaten "Apollo gorsel +
+# Endurance metni uyusmazligi GIDERILDI" diyor. Bu yuzden yalnizca
+# CALISAN KOD (docstring/yorum ayiklanmis) taranir.
+_SS_AGAC = ast.parse(_SS)
+# ⚠ Modul docstring'i de bir dugumdur; `ast.unparse` onu KORUR. Kod
+# taramasi icin TUM docstring'ler (modul + fonksiyon) ayiklanir.
+for _d in [_SS_AGAC] + [n for n in ast.walk(_SS_AGAC)
+                        if isinstance(n, (ast.FunctionDef,
+                                          ast.AsyncFunctionDef,
+                                          ast.ClassDef))]:
+    _g = getattr(_d, "body", [])
+    if (_g and isinstance(_g[0], ast.Expr)
+            and isinstance(getattr(_g[0], "value", None), ast.Constant)
+            and isinstance(_g[0].value.value, str)):
+        _d.body = _g[1:] or [ast.Pass()]
+_SS_KOD = ast.unparse(ast.fix_missing_locations(_SS_AGAC))
+kontrol("Endurance metni KODDA kullanilmiyor",
+        "Endurance" not in _SS_KOD)
+kontrol("olgular sahne metinleriyle AYNI kaynaktan",
+        "for f, m in SAHNE_METINLERI" in _SS)
+
+# ── (b) ANLATICI SESI: OLCUM + GEREKCE ──
+kontrol("ses kalitesi codec/sr/kanal ile olculuyor",
+        '"ornekleme_hz"' in _SS and '"kanal"' in _SS and '"codec"' in _SS)
+kontrol("LUFS / tepe / LRA olculuyor",
+        '"lufs"' in _SS and '"tepe_dbtp"' in _SS and '"lra"' in _SS)
+kontrol("KIRPMA kontrolu var", '"kirpma_var"' in _SS)
+kontrol("sessizlik orani olculuyor", '"sessiz_pct"' in _SS)
+kontrol("ses secimi OLCUME dayaniyor (LRA), keyfi degil",
+        "SECIM OLCUME DAYANIR" in _SS and 'key=lambda o: (o.get("lra"' in _SS)
+kontrol("yerel macOS say alternatifi DURUSTCE degerlendiriliyor",
+        "macOS say" in _SS and "kaliteli bir belgesel anlatimi DEGIL" in _SS)
+kontrol("TTS maliyeti ACIKCA $0.00 yaziliyor",
+        '"maliyet_usd": 0.0' in _SS and "UCRETSIZ" in _SS)
+kontrol("kredi yukleme/anahtar degisimi YOK",
+        "kredi yuklenmedi, anahtar degistirilmedi" in _SS)
+kontrol("TTS yoksa SAHTE ses uretilmiyor, BLOKE raporlaniyor",
+        "Sahte ses URETILMEDI" in _SS and "BLOKE:" in _SS)
+
+# ── (c) GORSEL DETAY KAPISI (olculen kusurdan dogdu) ──
+kontrol("gorsel detay OLCULUYOR (kadraj ici std sapma)",
+        "def gorsel_detay(" in _SS and "crop=iw*0.7:ih*0.7" in _SS)
+kontrol("esik alti gorsel KULLANILMIYOR",
+        "DETAY_ESIGI" in _SS and 'o["detay_std"] >= DETAY_ESIGI' in _SS)
+kontrol("esigin GEREKCESI olculen kusura dayaniyor",
+        "DUZ GRI cikti" in _SS and "std 6.1" in _SS and "std 4.7" in _SS)
+kontrol("uygun gorsel yoksa SAHTE gorsel uretilmiyor",
+        "Sahte gorsel URETILMEDI" in _SS)
+kontrol("gorsel secimi rapora yaziliyor", '"gorsel_secimi"' in _SS)
+
+# ── (d) GERCEK MOTOR + SAHTE VIDEO YASAGI ──
+for _c in ("edit_kopru.plan_kur(", "remotion_v2.props_hazirla(",
+           "remotion_v2.dogrula(", "remotion_v2.render("):
+    kontrol(f"gercek motor cagrisi: {_c[:26]}", _c in _SS)
+kontrol("SAHTE ffmpeg renk/test kaynagi KODDA YOK",
+        not re.search(r"lavfi|testsrc|color=c=|anullsrc", _SS_KOD))
+kontrol("QA FAIL'de render BASLATILMIYOR",
+        'if not sonuc["render_edilebilir"]:' in _SS
+        and "render BASLATILMADI" in _SS)
+kontrol("ambans DUCKING ile bagli",
+        '"ducking"' in _SS and "ambans_seviye" in _SS)
+
+# ── (e) CIKTI SOZLESMESI ──
+kontrol("cikti adi sozlesmeye uygun",
+        'VIDEO_ADI = "editorv2_quality_voice_10sn.mp4"' in _SS)
+kontrol("0s/5s/9s kareleri cikariliyor", "for t in (0, 5, 9)" in _SS)
+kontrol("ffprobe + ses olcumu JSON'a yaziliyor",
+        '"quality_voice_rapor.json"' in _SS and '"video_ses_olcumu"' in _SS)
+kontrol("rapor kapsam etiketini tasiyor",
+        '"kapsam_disi"' in _SS and "WEB'DEN MEDYA BULMA" in _SS)
+_GI2 = open(os.path.join(KOK, "..", ".gitignore"), encoding="utf-8").read()
+kontrol("video ve kareler git'e EKLENMIYOR",
+        "outputs/sample/*.mp4" in _GI2 and "outputs/sample/*.png" in _GI2)
+
+# ── (f) KORUMALAR ──
+kontrol("bayraklar HALA varsayilan kapali",
+        mkp.ACIK is False and ekp.ACIK is False)
+kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("UI DEGISMEDI",
+        "basitGovde" in oku(KOK, "static/js/wizard.js")
+        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js")
+        and "d.unlu = t.unlu ? '1' : '0'" in oku(KOK, "static/js/wizard.js"))
+kontrol("deploy.sh ezme korumasi KORUNDU",
+        "GERIDE" in open(os.path.join(KOK, "..", "deploy.sh"),
+                         encoding="utf-8").read())
+kontrol("pipeline bu adimda DEGISMEDI",
+        "smoke_kaliteli_ses" not in oku(KOK, "pipeline.py"))
+
+
 print(f"\n{'=' * 60}")
 print(f"GECEN: {gecen}   BASARISIZ: {len(basarisiz)}   BLOKE: {len(bloke)}")
 for b in basarisiz:
