@@ -1,0 +1,284 @@
+{
+  "video": "outputs/sample/editorv2_smoke_20sn.mp4",
+  "plan_sure_sn": 20.0,
+  "sahne": 4,
+  "qa": {
+    "durum": "WARN",
+    "fail": 0,
+    "warn": 5,
+    "sorun_sayisi": 8
+  },
+  "profil": "premium-modern",
+  "efekt_kapsami": {
+    "sayim": {
+      "gercek": 38,
+      "pseudo": 0,
+      "ffmpeg-yolu": 0,
+      "bilinmeyen": 0,
+      "toplam": 38
+    },
+    "detay": {
+      "gercek": {
+        "slow-drift": 1,
+        "grain": 6,
+        "vignette": 6,
+        "grade": 6,
+        "light-sweep": 1,
+        "hard-cut": 5,
+        "chapter-title": 1,
+        "source-label": 3,
+        "pull-out": 2,
+        "flash": 1,
+        "static": 3,
+        "data-chart": 2,
+        "film-burn": 1
+      }
+    }
+  },
+  "kapsam_boslugu": [],
+  "elenen_medya": [],
+  "zincir": [
+    {
+      "beat_id": "b001",
+      "scene_id": "s001",
+      "fact_id": "f001",
+      "asset_id": "a082_wiki_4ba3ccdace",
+      "saglayici": "wikimedia",
+      "lisans": "cc-by-sa",
+      "sure_sn": 2.523,
+      "bas_sn": 0.0,
+      "cekim_turu": "atmospheric",
+      "hareket": "slow-drift",
+      "kadraj": "tam",
+      "motion": [
+        "slow-drift",
+        "grain",
+        "vignette",
+        "grade",
+        "light-sweep",
+        "hard-cut",
+        "chapter-title",
+        "source-label"
+      ],
+      "gecis": [
+        "hard-cut"
+      ],
+      "altyazi_adet": 0,
+      "tipografi": [
+        "chapter-title"
+      ],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "hook"
+    },
+    {
+      "beat_id": "b002",
+      "scene_id": "s001",
+      "fact_id": "f001",
+      "asset_id": "a082_wiki_4ba3ccdace",
+      "saglayici": "wikimedia",
+      "lisans": "cc-by-sa",
+      "sure_sn": 2.524,
+      "bas_sn": 2.523,
+      "cekim_turu": "atmospheric",
+      "hareket": "pull-out",
+      "kadraj": "punch-1.35",
+      "motion": [
+        "pull-out",
+        "grain",
+        "vignette",
+        "grade",
+        "flash",
+        "source-label"
+      ],
+      "gecis": [
+        "flash"
+      ],
+      "altyazi_adet": 0,
+      "tipografi": [],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "hook"
+    },
+    {
+      "beat_id": "b003",
+      "scene_id": "s002",
+      "fact_id": "f002",
+      "asset_id": "a086_wiki_effc9e462f",
+      "saglayici": "wikimedia",
+      "lisans": "cc-by",
+      "sure_sn": 5.907,
+      "bas_sn": 5.047,
+      "cekim_turu": "medium",
+      "hareket": "static",
+      "kadraj": "ust",
+      "motion": [
+        "static",
+        "grain",
+        "vignette",
+        "grade",
+        "hard-cut",
+        "source-label"
+      ],
+      "gecis": [
+        "hard-cut"
+      ],
+      "altyazi_adet": 0,
+      "tipografi": [],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "aciklama"
+    },
+    {
+      "beat_id": "b004",
+      "scene_id": "s003",
+      "fact_id": "f003",
+      "asset_id": "a281_wiki_e42b89a1f6",
+      "saglayici": "wikimedia",
+      "lisans": "public-domain",
+      "sure_sn": 2.79,
+      "bas_sn": 10.954,
+      "cekim_turu": "atmospheric",
+      "hareket": "pull-out",
+      "kadraj": "punch-1.6",
+      "motion": [
+        "pull-out",
+        "grain",
+        "vignette",
+        "grade",
+        "hard-cut"
+      ],
+      "gecis": [
+        "hard-cut"
+      ],
+      "altyazi_adet": 0,
+      "tipografi": [],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "aciklama"
+    },
+    {
+      "beat_id": "b005",
+      "scene_id": "s003",
+      "fact_id": "f003",
+      "asset_id": "",
+      "saglayici": "",
+      "lisans": "",
+      "sure_sn": 3.487,
+      "bas_sn": 13.744,
+      "cekim_turu": "data",
+      "hareket": "data-reveal",
+      "kadraj": "tam",
+      "motion": [
+        "static",
+        "grain",
+        "vignette",
+        "grade",
+        "data-chart",
+        "hard-cut"
+      ],
+      "gecis": [
+        "hard-cut"
+      ],
+      "altyazi_adet": 0,
+      "tipografi": [
+        "data-chart"
+      ],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "aciklama"
+    },
+    {
+      "beat_id": "b006",
+      "scene_id": "s004",
+      "fact_id": "f004",
+      "asset_id": "",
+      "saglayici": "",
+      "lisans": "",
+      "sure_sn": 2.769,
+      "bas_sn": 17.231,
+      "cekim_turu": "data",
+      "hareket": "static",
+      "kadraj": "tam",
+      "motion": [
+        "static",
+        "grain",
+        "vignette",
+        "grade",
+        "data-chart",
+        "film-burn",
+        "hard-cut"
+      ],
+      "gecis": [
+        "hard-cut"
+      ],
+      "altyazi_adet": 0,
+      "tipografi": [
+        "data-chart"
+      ],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "sonuc"
+    }
+  ],
+  "ffprobe": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "codec_type": "video",
+        "width": 1280,
+        "height": 720,
+        "r_frame_rate": "30/1",
+        "side_data_list": [
+          {}
+        ]
+      },
+      {
+        "codec_name": "aac",
+        "codec_type": "audio",
+        "sample_rate": "48000",
+        "channels": 2,
+        "r_frame_rate": "0/0"
+      }
+    ],
+    "format": {
+      "duration": "20.096000",
+      "size": "10494600",
+      "bit_rate": "4177786"
+    }
+  },
+  "kareler": [
+    "outputs/sample/kare_00s.png",
+    "outputs/sample/kare_10s.png",
+    "outputs/sample/kare_19s.png"
+  ],
+  "kapsam": {
+    "gercek_motor": [
+      "editor.plan.uret (beat/gramer/motion/tipografi/ses)",
+      "editor.qa_on on-render QA",
+      "editor.adapter.donustur",
+      "editor.remotion_v2.dogrula + props_hazirla + render",
+      "Remotion VidrushEditorV2 kompozisyonu"
+    ],
+    "fixture": [
+      "yerel Wikimedia gorselleri (Faz E kosusundan)",
+      "yerel TTS .wav dosyalari",
+      "yerel ambiyans .wav"
+    ],
+    "kapsam_disi": [
+      "web'den medya bulma (saglayici istegi YOK)",
+      "arastirma/fact-check motoru",
+      "TTS uretimi",
+      "canli /api/generate hatti",
+      "ucretli API"
+    ]
+  }
+}

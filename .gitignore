@@ -25,3 +25,10 @@ __pycache__/
 webapp/veri/durumlar/
 webapp/veri/gecici/
 webapp/ciktilar/
+
+# Faz I-11 render smoke ciktisi — IKILI dosyalar depoya girmez (~13 MB).
+# `outputs/sample/README.md` ve `smoke_rapor.json` IZLENIR; video/kareler
+# betik yerelde kosturularak yeniden uretilir.
+outputs/sample/*.mp4
+outputs/sample/*.png
+cikti/_smoke_editorv2/

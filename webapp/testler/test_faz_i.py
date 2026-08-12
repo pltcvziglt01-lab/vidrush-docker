@@ -3565,6 +3565,116 @@ for _f6 in ("medya_kopru.py", "edit_kopru.py", "pipeline.py"):
     kontrol(f"{_f6} derleniyor", _derlenir(os.path.join(KOK, _f6)))
 
 
+# ═══ 25. FAZ I-11 — 20 SN RENDER SMOKE SOZLESMESI ═══
+# ⚠ BU BOLUM RENDER CALISTIRMAZ (yavas + agir). Smoke BETIGININ sozlesmesini,
+# durustluk etiketlerini ve `yerel_yol` kusurunun duzeltildigini kilitler.
+# Gercek render kaniti: `outputs/sample/` (betik elle kosulur).
+blok("25. I-11 — render smoke betigi ve durustluk etiketleri")
+
+_SMOKE_YOL = os.path.join(KOK, "testler", "smoke_editorv2_20sn.py")
+kontrol("smoke betigi var", os.path.exists(_SMOKE_YOL))
+_SM = oku(KOK, "testler/smoke_editorv2_20sn.py")
+kontrol("smoke betigi derleniyor", _derlenir(_SMOKE_YOL))
+
+# ── (a) DURUSTLUK ETIKETI: neyi kanitlar / neyi kanitlamaz ──
+kontrol("betik NEYI KANITLAR bolumu tasiyor", "KANITLAR" in _SM)
+kontrol("betik NEYI KANITLAMAZ bolumu tasiyor", "KANITLAMAZ" in _SM)
+for _iz in ("WEB'DEN MEDYA BULMA", "Arastirma/fact-check", "TTS uretimi",
+            "canli /api/generate", "Ucretli"):
+    kontrol(f"kapsam disi acikca yaziyor: {_iz[:24]}", _iz in _SM)
+kontrol("yerel fixture kullandigini SOYLUYOR",
+        "YEREL fixture" in _SM and "faz_e" in _SM)
+kontrol("cikti raporu kapsam etiketini TASIYOR",
+        '"kapsam_disi"' in _SM and '"gercek_motor"' in _SM)
+
+# ── (b) GERCEK MOTOR ZINCIRI CAGRILIYOR ──
+for _c in ("edit_kopru.plan_kur(", "remotion_v2.props_hazirla(",
+           "remotion_v2.dogrula(", "remotion_v2.render("):
+    kontrol(f"gercek motor cagrisi: {_c[:28]}", _c in _SM)
+kontrol("QA FAIL'de RENDER BASLATILMIYOR",
+        'if not sonuc["render_edilebilir"]:' in _SM
+        and "render BASLATILMADI" in _SM)
+kontrol("on-render kapisi FAIL'de duruyor",
+        'if kontrol["durum"] == "FAIL":' in _SM)
+
+# ── (c) BLOKER RAPORLAMA — SAHTE CIKTI URETMEZ ──
+kontrol("bagimlilik yoksa BLOKE raporlaniyor, sahte cikti YOK",
+        _SM.count("BLOKE:") >= 5)
+kontrol("node_modules yoksa cozum yolu yaziliyor",
+        "npm ci" in _SM and "node_modules yok" in _SM)
+kontrol("ffmpeg/ffprobe yoksa BLOKE",
+        'for arac in ("ffmpeg", "ffprobe")' in _SM)
+kontrol("betik SAHTE video URETMIYOR (ffmpeg ile bos dosya yazmiyor)",
+        "lavfi" not in _SM and "color=c=" not in _SM
+        and "testsrc" not in _SM)
+
+# ── (d) DOGRULAMA: ffprobe + kareler ──
+kontrol("ffprobe ile codec/sure/cozunurluk/ses dogrulaniyor",
+        "codec_type,codec_name,width,height" in _SM
+        and "sample_rate,channels" in _SM
+        and "format=duration,size,bit_rate" in _SM)
+kontrol("0s/10s/19s kareleri cikariliyor", "for t in (0, 10, 19)" in _SM)
+kontrol("cikti belirgin outputs/sample yoluna yaziliyor",
+        '"outputs", "sample"' in _SM)
+
+# ── (e) `yerel_yol` KUSURU DUZELTILDI (smoke'un ORTAYA CIKARDIGI) ──
+# ⚠ `editor.plan` medya yolunu `yerel_yol` alanindan okur (plan.py:203).
+# `manifest_kur` yalnizca `medya_yolu` yaziyordu -> plan aday buluyor ama
+# MEDYASI BOS kaliyordu; 20 sn render'da gorseller HIC gorunmedi.
+kontrol("plan medya yolunu `yerel_yol` alanindan okuyor (sozlesme)",
+        'aday.get("yerel_yol")' in oku(KOK, "editor/plan.py"))
+kontrol("manifest_kur ARTIK `yerel_yol` yaziyor",
+        '"yerel_yol": hedef_yol,' in oku(KOK, "medya_kopru.py"))
+_mb11 = mkp.is_butcesi_kur("i11")
+_mb11.secildi({**_SECIM, "yerel_yol": "/tmp/a1.mp4"})
+kontrol("uretilen manifest adayi `yerel_yol` TASIYOR",
+        bool(mkp.manifest_kur(_mb11)["adaylar"][0].get("yerel_yol")),
+        str(sorted(mkp.manifest_kur(_mb11)["adaylar"][0])))
+kontrol("geriye uyumluluk: `medya_yolu` da HALA yaziliyor",
+        bool(mkp.manifest_kur(_mb11)["adaylar"][0].get("medya_yolu")))
+
+# ── (f) CIKTI DIZINI SOZLESMESI ──
+_OUT = os.path.join(KOK, "..", "outputs", "sample")
+kontrol("outputs/sample README'si var", os.path.exists(
+    os.path.join(_OUT, "README.md")))
+if os.path.exists(os.path.join(_OUT, "README.md")):
+    _RM = open(os.path.join(_OUT, "README.md"), encoding="utf-8").read()
+    kontrol("README neyi KANITLAMAZ diyor", "KANITLAMAZ" in _RM)
+    kontrol("README icerik uyusmazligini DURUSTCE yaziyor",
+            "uyuşmaz" in _RM and "Apollo" in _RM and "Endurance" in _RM)
+    kontrol("README web'den medya bulunmadigini yaziyor",
+            "Web'den medya bulma" in _RM)
+    kontrol("README olculen ffprobe degerlerini tasiyor",
+            "h264 / aac" in _RM and "20.096" in _RM)
+_GI = open(os.path.join(KOK, "..", ".gitignore"), encoding="utf-8").read()
+kontrol("ikili ciktilar gitignore'da (depo sismesin)",
+        "outputs/sample/*.mp4" in _GI and "outputs/sample/*.png" in _GI)
+# ⚠ Yorum satirlari KURAL DEGILDIR: gitignore aciklamasi zaten
+# "outputs/sample/README.md ... IZLENIR" diyor. Bu yuzden yalnizca
+# GERCEK KURAL satirlari taranir.
+_GI_KURAL = [x.strip() for x in _GI.splitlines()
+             if x.strip() and not x.strip().startswith("#")]
+kontrol("README ve rapor IZLENIYOR (gitignore KURALI yok)",
+        not [k for k in _GI_KURAL
+             if "README" in k or "smoke_rapor" in k], str(_GI_KURAL[-4:]))
+
+# ── (g) MEVCUT YOL ve BAYRAKLAR ──
+kontrol("smoke pipeline'i CAGIRMIYOR",
+        "import pipeline" not in _SM and "pipeline.uret" not in _SM)
+kontrol("bayraklar HALA varsayilan kapali",
+        mkp.ACIK is False and ekp.ACIK is False)
+kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("UI DEGISMEDI",
+        "basitGovde" in oku(KOK, "static/js/wizard.js")
+        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js")
+        and "d.unlu = t.unlu ? '1' : '0'" in oku(KOK, "static/js/wizard.js"))
+kontrol("deploy.sh ezme korumasi KORUNDU",
+        "GERIDE" in open(os.path.join(KOK, "..", "deploy.sh"),
+                         encoding="utf-8").read())
+
+
 print(f"\n{'=' * 60}")
 print(f"GECEN: {gecen}   BASARISIZ: {len(basarisiz)}   BLOKE: {len(bloke)}")
 for b in basarisiz:

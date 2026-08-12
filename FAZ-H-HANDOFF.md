@@ -176,7 +176,8 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-7 iş başına bütçe + paralel izolasyon** | `6294369` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-8 doğrulanmış olgu → sahne/medya bağı** | `e450aa0` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-9 uçtan uca edit planı orkestrasyonu** | `a0294d0` | ✅ **origin'e push edildi**, deploy YOK |
-| 12 Ağu | **I-10 edit köprüsü pipeline'a bağlı + manifest dönüşümü** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
+| 12 Ağu | **I-10 edit köprüsü pipeline'a bağlı + manifest dönüşümü** | `477b168` | ✅ **origin'e push edildi**, deploy YOK |
+| 12 Ağu | **I-11 20 sn GERÇEK render smoke** | (staged, commit YOK) | ✅ A–I yeşil, **deploy YOK** |
 
 ---
 
@@ -1863,7 +1864,7 @@ gerileme yok. pyflakes temiz.
 
 ## 27. FAZ I-10 — EDİT KÖPRÜSÜ PIPELINE'A BAĞLI + MANİFEST DÖNÜŞÜMÜ (12 Ağu)
 
-> **Durum: yazıldı + testlendi, dosyalar staged. Commit YOK, deploy YOK.**
+> **Durum: commit `477b168`, `origin/arastirma-motoru`'na PUSH EDİLDİ. Deploy YOK.**
 > **Her iki bayrak da varsayılan KAPALI.**
 > Değişen: `webapp/medya_kopru.py`, `webapp/pipeline.py`,
 > `webapp/testler/test_faz_i.py` (+ bu handoff).
@@ -1944,5 +1945,115 @@ opt-in olmalı) aynı kaldı, ölçüm ona göre yeniden yazıldı.
    klipler manifeste **girmez**; yani avcı kapalıyken plan hiç kurulamaz.
 6. `edit_plani` özeti iş sözleşmesine değil yalnızca `sonuc` sözlüğüne yazılır;
    `server.py` bu alanı okumadığı için arayüzde **görünmez**.
+
+---
+
+## 28. FAZ I-11 — 20 SANİYELİK **GERÇEK** RENDER SMOKE (12 Ağu, ölçüldü)
+
+> **Durum: yazıldı + testlendi + GERÇEK MP4 üretildi, dosyalar staged.**
+> **Commit YOK, deploy YOK. Bayraklar varsayılan KAPALI.**
+> Yeni: `webapp/testler/smoke_editorv2_20sn.py`, `outputs/sample/README.md`.
+> Değişen: `webapp/medya_kopru.py`, `webapp/testler/test_faz_i.py`,
+> `.gitignore` (+ bu handoff).
+> **Dokunulmadı:** `pipeline.py`, `server.py`, arayüz, 22 alan, `editor/`
+> paketi, `edit_kopru.py`, `deploy.sh`.
+
+### Keşif: bağımlılıklar GERÇEKTEN var
+
+| Bağımlılık | Durum |
+|---|---|
+| ffmpeg / ffprobe | ✅ 8.1.1, `/opt/homebrew/bin` |
+| node / npx | ✅ v24.14.1 / 11.11.0 |
+| `app/render-studio/node_modules` | ✅ **var** (Remotion 4.0.410) |
+| `VidrushEditorV2` kompozisyonu | ✅ `src/Root.tsx`'te tanımlı |
+| Chrome headless shell | ✅ `~/.cache/puppeteer` — **çevrimdışı render mümkün** |
+
+⚠ Handoff §10 madde 4 *"yerelde node_modules yok → render edilemiyor"*
+diyordu. **Bu artık doğru değil** — 30 karelik deneme render'ı ~1 sn'de,
+ağ olmadan tamamlandı.
+
+### Ölçülen çıktı — `outputs/sample/editorv2_smoke_20sn.mp4`
+
+| Ölçüm | Değer |
+|---|---|
+| Codec | **h264 / aac** |
+| Çözünürlük | 1280×720 @ 30 fps |
+| Süre | **20.096 sn** |
+| Boyut | 10.49 MB |
+| Ses | 48 000 Hz / **2 kanal** |
+| Render süresi | ~25 sn |
+| Ön-render QA | **WARN** (fail=0, warn=5) → render'a izin verildi |
+| Efekt kapsamı | 38 spec, **hepsi `gercek`** (0 bilinmeyen) |
+
+Kareler çıkarıldı ve **gözle doğrulandı**: `kare_00s.png` ·
+`kare_10s.png` (gerçek Wikimedia Apollo arşiv fotoğrafı + grain/vinyet/
+nişangâh katmanları) · `kare_19s.png` (motion-graphic fallback + tipografi).
+
+### GERÇEK motorun çalışan kısmı
+
+`edit_kopru.plan_kur()` → `editor.plan.uret()` (beat → gramer → motion →
+tipografi → ses → **ön-render QA**) → `adapter.donustur()` →
+`remotion_v2.dogrula()` → `props_hazirla()` → `render()` →
+**Remotion `VidrushEditorV2`** (Chrome headless + ffmpeg).
+
+Sahne zinciri raporda birebir duruyor: 4 beat gerçek medya + `fact_id` +
+lisans (`cc-by-sa`, `cc-by`, `public-domain`) taşıyor; 2 beat'te medya yok →
+**motion-graphic fallback** (rastgele stok **değil**).
+
+### ⚠ Bu videonun KANITLAMADIĞI
+
+- **Web'den medya bulma** — hiçbir sağlayıcıya istek atılmadı; görsel/ses
+  daha önce indirilmiş yerel fixture (`public/editorv2/faz_e/`).
+- Araştırma/fact-check motoru, TTS üretimi, canlı `/api/generate` hattı,
+  ücretli API — hiçbiri koşmadı.
+- **İçerik tutarlılığı:** fixture görselleri **Apollo/Ay**, fixture anlatımı
+  **Endurance/Antarktika**. Görsel ile anlatım konu olarak **örtüşmüyor**.
+  Bu kasıtlı: ölçülen şey motorun video üretip üretmediği.
+
+Bu etiketler hem betiğin başlığında hem `outputs/sample/README.md`'de hem de
+`smoke_rapor.json` içindeki `kapsam` bloğunda yazılı; testler üçünü de kilitliyor.
+
+### Smoke'un ORTAYA ÇIKARDIĞI GERÇEK KUSUR
+
+İlk render'da **görseller hiç görünmedi** (kareler 62–69 KB, düz koyu zemin).
+Kök neden: `editor.plan` medya yolunu **`yerel_yol`** alanından okuyor
+(`plan.py:203`), ama I-10'un `manifest_kur()`'u yalnızca `medya_yolu`
+yazıyordu. Plan aday buluyor, **medyası boş** kalıyordu — sessiz kayıp.
+
+Düzeltildi: `manifest_kur()` artık **iki adı da** yazıyor (geriye uyumlu).
+İkinci render'da kareler 885 KB / 1149 KB'ye çıktı ve görseller göründü.
+Test bunu kilitliyor.
+
+⚠ Bu kusur yalnızca **gerçekten render edildiği için** görüldü; fixture
+testleri props üretimini doğruluyordu ama *ekranda ne göründüğünü* değil.
+
+### İkili dosyalar neden git'te değil?
+
+MP4 + PNG ≈ **13 MB**. Git geçmişine giren ikili dosya geri alınamaz; bu
+yüzden `.gitignore`'a alındı. **İzlenen:** `outputs/sample/README.md` ve
+`smoke_rapor.json`. Video betik yerelde koşturularak yeniden üretilir.
+Aksini istersen `.gitignore` satırları kaldırılabilir.
+
+### Ölçülen test sonucu (12 Ağu) — İKİ ORTAM AYRI
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **Zengin venv** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **257** | **919** | **2333** |
+| **Sistem Python** | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **203** | **919** | **2279** |
+
+0 hata. Faz I 879 → **919** (+40). pyflakes temiz.
+⚠ §25 testleri **render çalıştırmaz** (yavaş/ağır); betiğin sözleşmesini,
+dürüstlük etiketlerini ve `yerel_yol` düzeltmesini kilitler.
+
+### BİLİNEN SINIRLAR (dürüstçe)
+
+1. **Fixture içeriği anlatımla örtüşmüyor** (Apollo görsel / Endurance metin).
+2. **Web medya hattı hâlâ hiç koşulmadı** — bayraklar kapalı, ağ yok.
+3. **QA WARN'ın 5 uyarısı incelenmedi**; render'a izin verildi ama uyarıların
+   ne olduğu bu adımda analiz edilmedi.
+4. **Altyazı yok** — TTS zamanlaması olmadığı için altyazı dizisi boş; ekranda
+   yalnızca başlık/etiket katmanları var.
+5. **Sadece 1280×720** render edildi (hız için); 1080p ölçülmedi.
+6. **Tek makinede, tek koşu.** Farklı donanımda süre/başarı ölçülmedi.
 6. ~~`medya_kopru` çıktısı `medya_manifest` biçiminde değil.~~ →
    ✅ **§27'de (I-10) `manifest_kur()` ile çözüldü.**

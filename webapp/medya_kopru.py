@@ -486,6 +486,12 @@ def sahne_medyasi(*, sorgu: str, hedef_yol: str, sahne_amaci: str = "",
             "atif_gerekli": bool(getattr(aday, "atif_gerekli", True)),
             "sorgu": str(getattr(aday, "sorgu", "") or ""),
             "medya_yolu": hedef_yol,
+            # ⚠ `editor.plan` medya yolunu `yerel_yol` alanindan OKUR
+            # (plan.py:203). Yalnizca `medya_yolu` yazmak sessiz bir
+            # kayipti: plan aday buluyor ama MEDYASI BOS kaliyordu —
+            # 20 sn smoke render'inda GORSELLERIN HIC GORUNMEMESIYLE
+            # olculdu. Iki ad da yazilir (geriye uyumlu).
+            "yerel_yol": hedef_yol,
             "medya_turu": medya_turu,
             "tur": medya_turu,
             "sahne_amaci": str(sahne_amaci or ""),
