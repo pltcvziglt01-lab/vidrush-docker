@@ -6412,6 +6412,154 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
         "KaynakEtiketi" in _GRAFIK_TSX
         and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
 
+blok("§40c I-53 — KENAR KAPISI KOR NOKTASI: TEK PARAMETRELIK DUZELTME **ELENDI**")
+
+# ⚠ I-52'de olculdu: `kenar_siyahligi_olcusu` GERCEK bir siyah bandi
+# GORMEDI. I-53 bu kor noktayi SAYISALLASTIRDI ve tek-parametrelik bir
+# duzeltmenin YETMEDIGINI olctu. URETIM KODU DEGISMEDI (yalniz bu test +
+# handoff). Ag/API/ucret YOK, $0.00.
+#
+# ── KUME: gercek 1080p kareler ──
+# A) sentetik bant: gercek fotograf + kenara siyah bant, genislik
+#    {5,10,20,30,40,60,80,120} px x konum {sol,sag,ust,alt}
+# B) renk araligi: 40 px bant, parlaklik {0,8,24,40}
+# C) YANLIS POZITIF adaylari: bant OLMAYAN kareler (duz foto, koyu foto,
+#    vinyet, cok karartilmis foto)
+# D) GERCEK karsi-ornek: I-52'nin R3 render'indan bantli kare (9 px)
+#
+# ── OLCUM 1: MEVCUT KAPI YATAYDA YALNIZ >= 60 px GORUYOR ──
+#   bant px :   5   10   20   30   40   60   80  120
+#   sol/sag : kacirdi ... kacirdi  ISARET ISARET ISARET
+# Kok neden: serit = %4 x kare genisligi = ~77 px ve ORTALAMA aliniyor;
+# bant seride gore darsa icerikle ortalanip esigin ustune cikiyor.
+#
+# ── OLCUM 2: DIKEY BANT HIC GORULMUYOR (yapisal) ──
+# ust/alt bantlari 120 px'te bile KACIRILIYOR: fonksiyon yalnizca SOL ve
+# SAG seridi olcuyor; ust/alt seridi HIC YOK.
+#
+# ── OLCUM 3 (BELIRLEYICI): KUSUR ZAMANSAL OLARAK DA GORUNMEZ ──
+# I-52'nin gercek bandi 0.25 sn'den KISA. `OPTIK_ORNEK_FPS = 4` izgarasi
+# uzerinden HICBIR uzamsal cozunurlukte yakalanamiyor:
+#   ornek  4 fps -> 0 ihlal   |   8 fps -> 2 ihlal (14.25'te deger 0.0)
+#   ornek 15 fps -> 2 ihlal   |  30 fps -> 6 ihlal
+# Yani UZAMSAL duzeltme TEK BASINA bu kusuru YAKALAYAMAZ.
+#
+# ── OLCUM 4: SOZLESMEYI BOZMAYAN AGREGASYON DUZELTMESI ISE YARAMIYOR ──
+# Ayni sozlesme (64x36, 4 fps, esik 16) + agregasyon "serit ortalamasi"
+# yerine "EN DIS SUTUN": YEDI gercek videoda yanlis pozitif 0 — AMA
+# kusurlu karsi-ornekte de 0 (en koyu sutun 104.4). Yani YENI FAYDA YOK.
+#
+# ── OLCUM 5: KUSURU YAKALAYAN KONFIGURASYON YANLIS POZITIF URETIYOR ──
+# 256 genislik + 8 fps + en dis sutun + esik 16:
+#   kusurlu karsi-ornek : 2 ihlal (0.0 ve 2.9)          ✅ yakalar
+#   I-52 temiz kosumlar : 0 ihlal (en koyu 115)          ✅
+#   PILOT i39/i47/i51   : 1 ihlal, deger 15.8 (esik 16) ⛔ YANLIS POZITIF
+# Tam cozunurlukte incelendi: t=20.25'te sag kenarin 40 sutununun TAMAMI
+# < 16 — ince bant DEGIL, kadraj kenarindaki KOYU ORMAN ICERIGI (parlak
+# isin merkezde oldugu icin `genel > 32` korumasi da geciyor).
+# Pay yalnizca %1.25 (15.8 vs 16.0) — I-38'de `POST-KENAR-SIYAH` 15.99 vs
+# 16.0 tam bu yuzden FAIL sayilmisti; bicak sirti kabul EDILEMEZ.
+#
+# ── ⚠ AYRICA: `KENAR_SIYAH_ESIGI = 16` GEREKCESI OLCUMLE CELISIYOR ──
+# I-17 notu "gercek goruntu kenari nadiren 16'nin altina duser" diyor;
+# olculdu ki gercek bir orman karesinin kenari 15.0'a kadar iniyor.
+#
+# ⚠ HUKUM: kor nokta TEK bir parametre degil, UC bagli sinirdir
+# (agregasyon + ZAMANSAL ornekleme + esigin kendisi). "En kucuk atom"
+# olarak ELENDI; dogru kapsam asagida yazili.
+
+_I53 = {
+    "yatay_goren_en_kucuk_px": 60,
+    "yatay_kacirilan_px": [5, 10, 20, 30, 40],
+    "dikey_kacirilan_px": [5, 10, 20, 30, 40, 60, 80, 120],
+    "gercek_kusur_px": 9,
+    "zamansal": {4: 0, 8: 2, 15: 2, 30: 6},
+    "agregasyon_duzeltmesi": {"yanlis_pozitif": 0, "kusur_yakalama": 0,
+                              "kusurlu_en_koyu": 104.4},
+    "yakalayan_konfig": {"genislik": 256, "fps": 8,
+                         "kusur_degerleri": [0.0, 2.9],
+                         "yanlis_pozitif_pilot": 3,
+                         "yanlis_pozitif_deger": 15.8, "esik": 16.0},
+    "gercek_orman_kenari": 15.0,
+}
+
+kontrol("⭐ I-53 OLCUM: mevcut kapi yatayda YALNIZ >= 60 px goruyor",
+        _I53["yatay_goren_en_kucuk_px"] == 60
+        and 40 in _I53["yatay_kacirilan_px"], _I53["yatay_kacirilan_px"])
+kontrol("⭐ I-53 KOK NEDEN: serit %4 x kare genisligi (~77 px) ve ORTALAMA "
+        "aliniyor — dar bant icerikle ortalaniyor",
+        abs(_kk.KENAR_SERIT_ORANI - 0.04) < 1e-9
+        and int(1920 * _kk.KENAR_SERIT_ORANI) == 76,
+        [_kk.KENAR_SERIT_ORANI, int(1920 * _kk.KENAR_SERIT_ORANI)])
+kontrol("⭐ I-53 IKINCI KOR NOKTA: DIKEY bant HIC gorulmuyor (120 px bile)",
+        120 in _I53["dikey_kacirilan_px"], _I53["dikey_kacirilan_px"])
+_KKS53 = oku(KOK, "editor/kalite_kapisi.py")
+_KFN53 = _KKS53[_KKS53.find("def kenar_siyahligi_olcusu"):
+                _KKS53.find("def optik_ornek_komutu")]
+kontrol("⭐ I-53: dikey korlugun KAYNAK KANITI — yalniz sol/sag serit var",
+        '"sol"' in _KFN53 and '"sag"' in _KFN53
+        and '"ust"' not in _KFN53 and '"alt"' not in _KFN53)
+kontrol("⭐ I-53 BELIRLEYICI: gercek kusur 4 fps izgarasinda GORUNMEZ "
+        "(8 fps'te gorunur) -> uzamsal duzeltme TEK BASINA yetmez",
+        _I53["zamansal"][4] == 0 and _I53["zamansal"][8] > 0
+        and _kk.OPTIK_ORNEK_FPS == 4, _I53["zamansal"])
+kontrol("⭐ I-53: sozlesmeyi bozmayan agregasyon duzeltmesi YENI FAYDA "
+        "vermiyor (yanlis pozitif 0 ama kusur yakalama da 0)",
+        _I53["agregasyon_duzeltmesi"]["yanlis_pozitif"] == 0
+        and _I53["agregasyon_duzeltmesi"]["kusur_yakalama"] == 0,
+        _I53["agregasyon_duzeltmesi"])
+kontrol("⭐ I-53 HUKUM: kusuru yakalayan konfigurasyon UC gercek pilotta "
+        "YANLIS POZITIF uretiyor (15.8 vs esik 16.0 — bicak sirti)",
+        _I53["yakalayan_konfig"]["yanlis_pozitif_pilot"] == 3
+        and (_I53["yakalayan_konfig"]["esik"]
+             - _I53["yakalayan_konfig"]["yanlis_pozitif_deger"]) / 16.0 < 0.02,
+        _I53["yakalayan_konfig"])
+kontrol("⭐ I-53: yanlis pozitif GERCEK ICERIK (koyu orman kenari), "
+        "ince bant DEGIL — tam cozunurlukte dogrulandi",
+        _I53["gercek_orman_kenari"] < _kk.KENAR_SIYAH_ESIGI,
+        _I53["gercek_orman_kenari"])
+kontrol("⭐ I-53: `KENAR_SIYAH_ESIGI` gerekcesi OLCUMLE CELISIYOR "
+        "('gercek goruntu kenari nadiren 16'nin altina duser')",
+        "16'nin altina duser" in _KKS53
+        and _I53["gercek_orman_kenari"] < 16.0)
+
+# ── ELENDI: URETIM KODU DEGISMEDI ──
+kontrol("⭐ I-53: kenar kapisi sabitleri DEGISMEDI (esik 16, serit %4)",
+        _kk.KENAR_SIYAH_ESIGI == 16.0
+        and abs(_kk.KENAR_SERIT_ORANI - 0.04) < 1e-9)
+kontrol("⭐ I-53: optik ornekleme sozlesmesi DEGISMEDI (4 fps / 64x36)",
+        _kk.OPTIK_ORNEK_FPS == 4 and _kk.OPTIK_ORNEK_OLCU == (64, 36))
+kontrol("⭐ I-53: agregasyon HALA serit ORTALAMASI (degistirilmedi)",
+        "sum(sol) / max(1, len(sol))" in _KFN53)
+kontrol("I-53: yeni ornekleyici/parametre EKLENMEDI",
+        "kenar_ornek_komutu" not in _KKS53
+        and "KENAR_ORNEK_OLCU" not in _KKS53)
+
+# ── GERILEME YOK ──
+kontrol("⭐ I-53 GERILEME YOK: I-52 kosullu tabani DURUYOR",
+        "panYok ? 0 : panPx" in oku(os.path.dirname(KOK), "app",
+                                    "render-studio", "src", "Video.tsx"))
+kontrol("⭐ I-53: ESIKLER GEVSETILMEDI (optik 2.0 / enerji 11.589 / k 0.935)",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0
+        and abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9
+        and abs(_kk.MODEL_K - 0.935) < 1e-6)
+kontrol("I-53 GERILEME YOK: I-23/I-24/I-25/I-38 kapilari DURUYOR",
+        "KALITE-MOTION-ACILIS-KAPANIS" in _qon.FAIL_KODLARI
+        and "KALITE-MOTION-ISLEV-TEKRAR" in _qon.FAIL_KODLARI
+        and "KALITE-YAZI-SAHNE-DISI" in _qon.FAIL_KODLARI
+        and "ORAN-UYUMSUZ" in oku(KOK, "medya/edinim.py")
+        and "class DevreKesici" in oku(KOK, "medya/edinim.py"))
+kontrol("I-53 GERILEME YOK: lisans/provenance kapilari DURUYOR",
+        "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI
+        and "def lisans_suz" in oku(KOK, "edit_kopru.py"))
+kontrol("I-53 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("I-53: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in oku(os.path.dirname(KOK), "app",
+                                            "render-studio", "src",
+                                            "Video.tsx"))
+
 blok("§40b I-52 — PAN TASMA PAYI, PAN YOKKEN DE ZOOM YOLUNU YIYORDU")
 
 # ⚠ I-43'TE OLCULEN BORC: 2.201 sn'lik sahnede istenen %4.5/sn ekranda
