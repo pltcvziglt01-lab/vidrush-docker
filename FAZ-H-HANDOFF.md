@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 14 Ağu | **I-54 kenar kapısı korpusu genişletildi, ayrım payı ölçüldü** | `PENDING` | ✅ **push edildi**, korpus **gerçek render**la genişletildi (4 yön kusurlu + 15 gerçek temiz pilot), train/held-out **ölçümden önce** sabitlendi; dört eksen **ayrı** raporlandı: tek yön **hiç** ayırmıyor (dört yön zorunlu), mevcut `şerit_ort` agregasyonu **negatif**, 64/128 çözünürlük **hiç**, **4 fps hiçbir çözünürlükte** ayırmıyor; ayrım iki eksene birden bağlı (256 ≥15 fps, **384 ≥8 fps**); ölçülen band **kusur ≤0.02 / temiz ≥9.96** — **örtüşme yok**; ⚠ I-53'ün "kusur ≤2.9" iddiası **doğrulandı**, "temiz ≥15.0" **yanlış** (gerçek taban **10.01**, `onizleme_lawn_i40`); **eşik seçilmedi**, üretim kodu **değişmedi**, geçici varlıklar (345 MB) temizlendi, deploy YOK |
 | 14 Ağu | **I-53 kenar kapısı kör noktası: tek parametrelik düzeltme ELENDİ** | `f00ae2f` | ✅ **push edildi**, kör nokta sayısallaştırıldı: yatayda **yalnız ≥60 px** görülüyor, **dikey bant 120 px'te bile hiç** görülmüyor (yapısal — sadece sol/sağ şerit var); ⚠ **belirleyici**: I-52'nin gerçek 9 px bandı **4 fps ızgarasında hiç yok** (8 fps'te 0.0) → uzamsal düzeltme **tek başına yetmiyor**; sözleşmeyi bozmayan agregasyon düzeltmesi yanlış pozitif 0 ama **yeni fayda da 0**; kusuru yakalayan konfigürasyon (256/8 fps) **üç gerçek pilotta yanlış pozitif** üretiyor (15.8 vs eşik 16.0 — bıçak sırtı, gerçek koyu orman kenarı) → **üretim kodu DEĞİŞMEDİ**, geçici varlıklar temizlendi, deploy YOK |
 | 14 Ağu | **I-52 pan taşma payı, pan yokken de zoom yolunu yiyordu** | `145986c` | ✅ **push edildi**, I-43 borcunun kök nedeni kodda gösterildi: `kbHesap` pan payını **koşulsuz** ödüyordu ama kayma yalnız `pan` bir yönken uygulanıyor → `pan: 'yok'` sahnelerde %3.49 boşa gidiyordu; **koşullu** düzeltme (taban 1.0349→1.012 yalnız pan yokken) gerçek render'da ölçüldü: pan'sız sahneler **+%9…+%35** optik, pan yapan sahneler **bit-bit aynı**; ⚠ payın pan yapan sahnede **gerekli** olduğu karşı-örnekle kanıtlandı (payı herkesten kaldırınca tam çözünürlükte **9 koyu sütun**), koşullu halde **0**; 25.2 sn 1080p pilot POST-QA **WARN** (tek kalan s1'in kök nedeni bu atom değil — görsel enerjisi), kenar **0/101 + tam çözünürlükte 0**, **kabul edilmiş MP4 DEĞİL**, deploy YOK |
 | 14 Ağu | **I-51 eksik veri üretildi, doygunluk ölçülerek kabul edildi** | `ce6be80` | ✅ **push edildi**, gerçek editorv2 1080p'de **18 yeni kontrollü nokta** (2 enerji × {pan, zoom} × hedef d 0.5–1.3; parametreler üretimin kendi saf fonksiyonlarıyla **sayısal çözüldü**, ölçek tavanı yetmeyen 6 zoom noktası **düşürüldü**); **train/held-out ayrımı render'dan ÖNCE** diske sabitlendi; model TRAIN'de seçilip HELD-OUT'ta **tek kez** ölçüldü: doygunluk **HELD MAE 15.7%→7.6%**, **en kötü 38.7%→14.4%**, **fail bandı 1.442→1.748**, **yanlış fail 0** korundu → I-50'nin oracle beklentisi **doğrulandı**; `MODEL_K` 0.935 / `MODEL_D0` 3.012 / marj 0.144; eşikler gevşetilmedi; 25.2 sn pilot POST-QA **PASS**, **11/11 kare SHA-256 aynı**, **kabul edilmiş MP4 DEĞİL** (b001/b002 semantik), deploy YOK |
@@ -5666,6 +5667,104 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 72. FAZ I-54 — KENAR KAPISI: KORPUS GENİŞLETİLDİ, AYRIM PAYI ÖLÇÜLDÜ (yalnız tanısal, 14 Ağu)
+
+> **Durum: I-53'ün bıraktığı soru ÖLÇÜLDÜ. Ayrım **var** ve **geniş**
+> (kusur ≤ 0.02 / temiz ≥ 9.96, örtüşme yok) — ama yalnızca **dört yön +
+> en dış sütun + ≥384 genişlik + ≥8 fps** birlikte sağlandığında.
+> ⚠ I-53'ün "temiz ≥ 15.0" iddiası **yanlış çıktı** (gerçek taban 10.01).
+> **Eşik SEÇİLMEDİ**, üretim kodu **DEĞİŞMEDİ**. A–I yeşil (3495, 0 hata,
+> 1 BLOKE — I-33). Rerender YOK. Geçici varlıklar (345 MB) temizlendi.
+> Deploy YOK, kabul edilmiş MP4 YOK. Maliyet $0.00.**
+> Değişen: **yalnızca** `webapp/testler/test_faz_i.py` (+140 satır) ve
+> handoff. `kalite_kapisi.py`, `Video.tsx`, `qa_on.py`, `medya/*`,
+> `deploy.sh`, **eşikler**, **22 alan sözleşmesi** **dokunulmadı**.
+> I-23…I-53 **korundu**.
+
+### Korpus — hepsi GERÇEK render (sentetik kare yok)
+
+- **Kusurlu**: `Video.tsx`te taşma payı kaldırılarak (I-52 R3 yöntemi)
+  üretilen gerçek 1080p render — **dört yön** (sağ/sol/üst/alt), parlak+koyu
+  görsel, kısa+uzun süre — artı I-52'nin kendi karşı-örneği.
+- **Temiz**: **15 gerçek geçmiş pilot** (i15, i16, i17, i18, i20, i37, i39,
+  i42, i43, i41-vid, i52-vid, önizleme, smoke20, ses10 + I-54'ün temiz eşi).
+- ⚠ **Train/held-out ayrımı ölçümden ÖNCE** sabitlendi ve diske yazıldı
+  (`cikti/_i54_ayrim/i54_bolunme.json`).
+
+### Eksen 1 — YÖN (dış sütun, 384, 8 fps)
+
+| yön | TRAIN ayrım | HELD ayrım |
+|---|---|---|
+| yalnız yatay | **−103.79** | **−104.19** |
+| yalnız dikey | **−91.15** | **−61.26** |
+| **dört yön** | **+11.75** | **+9.94** |
+
+Tek yön **hiçbir zaman** ayırmıyor → **dört yön zorunlu** (I-53'ün dikey
+körlük bulgusu doğrulandı).
+
+### Eksen 2 — AGREGASYON (dört yön, 384, 8 fps)
+
+| agregasyon | kusur (T/H) | temiz (T/H) | ayrım (T/H) |
+|---|---|---|---|
+| **`serit_ort` (MEVCUT)** | 107.5 / 105.98 | 13.11 / 11.9 | **−94.39 / −94.08** |
+| **`dis1` (en dış sütun/satır)** | **0.0 / 0.02** | **11.75 / 9.96** | **+11.75 / +9.94** |
+| `dis2` | 35.65 / 9.49 | 12.99 / 9.99 | −22.66 / +0.5 |
+| `serit_min` | 0.0 / 0.02 | 8.04 / 9.76 | +8.04 / +9.74 |
+
+**Mevcut agregasyon ayırmıyor**; `dis1` en iyisi.
+
+### Eksen 3+4 — ÇÖZÜNÜRLÜK × ZAMAN (dört yön, `dis1`)
+
+| genişlik | 4 fps | 8 fps | 15 fps | 30 fps |
+|---|---|---|---|---|
+| 64 | −78 / −93 | −82 / −76 | −78 / −81 | −74 / −77 |
+| 128 | −51 / −76 | −54 / −36 | −47 / −45 | −38 / −36 |
+| 256 | −2.9 / −32.5 | −9.0 / +9.9 | **+2.1 / +6.8** | **+6.9 / +9.8** |
+| **384** | +12.9 / **−1.1** | **+11.8 / +9.9** | **+11.7 / +9.6** | **+11.8 / +9.6** |
+
+- **64 ve 128 hiçbir fps'te** ayırmıyor.
+- **4 fps hiçbir çözünürlükte** ayırmıyor (384'te held **−1.1**).
+- Ayrım **iki eksene birden** bağlı: 256 ancak **≥15 fps**, 384 ise **≥8 fps**.
+
+### Ölçülen ayrım bandı (dört yön + `dis1` + 384 + 8 fps)
+
+| taraf | değer |
+|---|---|
+| kusur tarafı **en yüksek** | **0.02** (train 0.0) |
+| temiz tarafı **en düşük** | **9.96** (train 11.75) |
+| tüm temiz korpus tabanı | **10.01** — `onizleme_lawn_i40` @ 22.25 sn |
+
+Sonraki en düşükler: `ses10` 12.47, `i39` 15.86, `i37` 15.89.
+**Örtüşme yok**; band genişliği ≈ **10 birim**.
+
+### ⚠ I-53'ün iddiası kısmen düzeltildi
+
+- *"kusur ≤ 2.9"* → **doğrulandı** (0.02'ye indi).
+- *"temiz ≥ 15.0"* → **YANLIŞ**: gerçek temiz taban **10.01**. Eşik 15
+  seçilseydi `onizleme_lawn_i40` ve `ses10` **yanlış pozitif** olurdu.
+
+⚠ **Eşik SEÇİLMEDİ** — bu atom yalnızca bandı ölçer.
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **2081** | **3495** |
+
+0 hata. Faz I 2063 → **2081** (+18). **1 BLOKE** — I-33 kaydı sürüyor.
+
+### SONRAKİ ATOM — artık uygulanabilir
+
+Ölçüm, I-53'ün istediği dört parçayı da sabitledi:
+**dört yön** + **en dış sütun/satır** + **≥384 genişlik** + **≥8 fps**, ve
+eşiğin konacağı **band (0.02, 9.96)**. Sonraki atom bu konfigürasyonu
+bağımsız bir kenar ölçüm hattı olarak **uygulayabilir** (⚠ `OPTIK_ORNEK_FPS`
+4'te kalmalı — I-17 durağanlık eşikleri ona bağlı) ve eşiği bandın içinden
+**gerekçeli** seçebilir; yanlış pozitif 0 korunmalı.
+
+⚠ Diğer açık borçlar: semantik kabul engeli (b002/b005 — **kullanıcı
+kararı**), önizlemede altyazı çizilmemesi (I-40), model d > 1.31 ölçülmemiş.
 
 ---
 

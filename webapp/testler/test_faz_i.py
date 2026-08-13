@@ -6412,6 +6412,146 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
         "KaynakEtiketi" in _GRAFIK_TSX
         and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
 
+blok("§40d I-54 — KENAR KAPISI: KORPUS GENISLETILDI, AYRIM PAYI OLCULDU")
+
+# ⚠ YALNIZ TANISAL. Uretim kodu DEGISMEDI, esik SECILMEDI/UYDURULMADI.
+# I-53'un "kusur <= 2.9, temiz >= 15.0" IDDIASI daha genis korpusla SINANDI;
+# 256/dis-sutun/8fps VARSAYIMI KABUL EDILMEDI — dort eksen AYRI olculdu.
+# Ag/API/ucret YOK, $0.00.
+#
+# ── KORPUS (hepsi GERCEK render, sentetik kare YOK) ──
+# KUSURLU: `Video.tsx`te tasma payi kaldirilarak (I-52 R3 yontemi) uretilen
+#   gercek 1080p render — DORT YON (sag/sol/ust/alt), parlak+koyu gorsel,
+#   kisa+uzun sure — arti I-52'nin kendi karsi-ornegi.
+# TEMIZ: 15 GERCEK gecmis pilot (i15/i16/i17/i18/i20/i37/i39/i42/i43/
+#   i41vid/i52vid/onizleme/smoke20/ses10 + I-54'un kendi temiz esi).
+# ⚠ TRAIN/HELD-OUT ayrimi OLCUMDEN ONCE sabitlendi ve diske yazildi
+#   (`cikti/_i54_ayrim/i54_bolunme.json`).
+#
+# ── EKSEN 1: YON (dis1, 384, 8 fps) ──
+#   yalniz YATAY  : TRAIN ayrim -103.79 | HELD -104.19   ⛔
+#   yalniz DIKEY  : TRAIN  -91.15 | HELD  -61.26          ⛔
+#   DORT YON      : TRAIN  +11.75 | HELD   +9.94          ✅
+# -> Tek yon HICBIR zaman ayirmiyor; DORT YON ZORUNLU (I-53'un dikey
+#    korlugu bulgusu dogrulandi).
+#
+# ── EKSEN 2: AGREGASYON (dort yon, 384, 8 fps) ──
+#   serit_ort (MEVCUT): kusur 107.5/105.98, temiz 13.11/11.9 -> ayrim NEGATIF
+#   dis1  (en dis sutun/satir): kusur 0.0/0.02, temiz 11.75/9.96 -> +11.75/+9.94
+#   dis2  (en dis iki)        : ayrim -22.66 / +0.5   (kararsiz)
+#   serit_min                 : +8.04 / +9.74        (dis1'den zayif)
+# -> MEVCUT agregasyon ayirmiyor; `dis1` en iyisi.
+#
+# ── EKSEN 3+4: COZUNURLUK x ZAMAN (dort yon, dis1) ──
+#   64  : dort fps'te de NEGATIF
+#   128 : dort fps'te de NEGATIF
+#   256 : 4 fps -2.88/-32.5 | 8 fps -9.01/+9.88 | 15 fps +2.08/+6.78 |
+#         30 fps +6.85/+9.78     -> ancak >= 15 fps'te IKISI de pozitif
+#   384 : 4 fps +12.94/-1.1 | 8 fps +11.75/+9.94 | 15 fps +11.74/+9.61 |
+#         30 fps +11.75/+9.61    -> >= 8 fps'te IKISI de pozitif
+# -> Ayrim IKI eksene birden bagli; 4 fps HICBIR cozunurlukte yetmiyor.
+#
+# ── OLCULEN AYRIM BANDI (dort yon + dis1 + 384 + 8 fps) ──
+#   kusur tarafi EN YUKSEK : 0.02   (train 0.0)
+#   temiz tarafi EN DUSUK  : 9.96   (train 11.75)
+# Tum temiz korpusta taban 10.01 (`onizleme_lawn_i40` @22.25 sn); sonraki
+# en dusukler ses10 12.47, i39 15.86, i37 15.89.
+#
+# ⚠ I-53'UN IDDIASI KISMEN DUZELTILDI: "kusur <= 2.9" DOGRULANDI (0.02'ye
+# indi) ama "temiz >= 15.0" YANLIS — gercek temiz taban 10.01. Ayrim yine de
+# GENIS (yaklasik 10 birim) ve ORTUSME YOK.
+# ⚠ ESIK SECILMEDI: bu atom yalnizca bandi olcer. Esik, bant icinden
+# gerekceli olarak SONRAKI atomda turetilecek.
+
+_I54 = {
+    "yon": {"yatay": (-103.79, -104.19), "dikey": (-91.15, -61.26),
+            "dort_yon": (11.75, 9.94)},
+    "agregasyon": {"serit_ort": (-94.39, -94.08), "dis1": (11.75, 9.94),
+                   "dis2": (-22.66, 0.5), "serit_min": (8.04, 9.74)},
+    "cozunurluk_zaman": {
+        (64, 4): (-78.28, -93.42), (64, 30): (-73.56, -76.56),
+        (128, 8): (-53.76, -35.99), (128, 30): (-37.78, -36.12),
+        (256, 4): (-2.88, -32.5), (256, 8): (-9.01, 9.88),
+        (256, 15): (2.08, 6.78), (256, 30): (6.85, 9.78),
+        (384, 4): (12.94, -1.1), (384, 8): (11.75, 9.94),
+        (384, 15): (11.74, 9.61), (384, 30): (11.75, 9.61)},
+    "band": {"kusur_en_yuksek": 0.02, "temiz_en_dusuk": 9.96,
+             "temiz_taban_korpus": 10.01, "taban_video": "onizleme_lawn_i40"},
+    "i53_iddiasi": {"kusur_ust": 2.9, "temiz_alt": 15.0},
+}
+
+kontrol("⭐ I-54 EKSEN-YON: tek yon HICBIR zaman ayirmiyor, DORT YON zorunlu",
+        _I54["yon"]["yatay"][0] < 0 and _I54["yon"]["yatay"][1] < 0
+        and _I54["yon"]["dikey"][0] < 0 and _I54["yon"]["dikey"][1] < 0
+        and min(_I54["yon"]["dort_yon"]) > 0, _I54["yon"])
+kontrol("⭐ I-54 EKSEN-AGREGASYON: MEVCUT `serit_ort` ayirmiyor (negatif)",
+        max(_I54["agregasyon"]["serit_ort"]) < 0,
+        _I54["agregasyon"]["serit_ort"])
+kontrol("⭐ I-54 EKSEN-AGREGASYON: en iyi `dis1` (en dis sutun/satir)",
+        min(_I54["agregasyon"]["dis1"])
+        > max(min(v) for a, v in _I54["agregasyon"].items() if a != "dis1"),
+        _I54["agregasyon"])
+kontrol("⭐ I-54 EKSEN-COZUNURLUK: 64 ve 128 HICBIR fps'te ayirmiyor",
+        all(max(v) < 0 for (g, _f), v in _I54["cozunurluk_zaman"].items()
+            if g in (64, 128)))
+kontrol("⭐ I-54 EKSEN-ZAMAN: 4 fps HICBIR cozunurlukte ayirmiyor",
+        all(min(v) < 0 for (_g, f), v in _I54["cozunurluk_zaman"].items()
+            if f == 4))
+kontrol("⭐ I-54: ayrim IKI eksene birden bagli — 256 ancak >=15 fps'te, "
+        "384 ise >=8 fps'te ikisini de pozitif yapiyor",
+        min(_I54["cozunurluk_zaman"][(256, 8)]) < 0
+        and min(_I54["cozunurluk_zaman"][(256, 15)]) > 0
+        and min(_I54["cozunurluk_zaman"][(384, 8)]) > 0)
+kontrol("⭐ I-54 BAND: kusur tarafi <= 0.02, temiz tarafi >= 9.96 — "
+        "ORTUSME YOK",
+        _I54["band"]["kusur_en_yuksek"] < _I54["band"]["temiz_en_dusuk"]
+        and (_I54["band"]["temiz_en_dusuk"]
+             - _I54["band"]["kusur_en_yuksek"]) > 9.0, _I54["band"])
+kontrol("⭐ I-54: I-53'un 'kusur <= 2.9' iddiasi DOGRULANDI",
+        _I54["band"]["kusur_en_yuksek"] <= _I54["i53_iddiasi"]["kusur_ust"])
+kontrol("⭐ I-54: I-53'un 'temiz >= 15.0' iddiasi YANLIS — gercek taban "
+        "10.01 (onizleme_lawn_i40)",
+        _I54["band"]["temiz_taban_korpus"] < _I54["i53_iddiasi"]["temiz_alt"],
+        _I54["band"])
+
+# ── TANISAL: URETIM DEGISMEDI, ESIK SECILMEDI ──
+_KKS54 = oku(KOK, "editor/kalite_kapisi.py")
+kontrol("⭐ I-54: kenar kapisi sabitleri DEGISMEDI (esik 16, serit %4)",
+        _kk.KENAR_SIYAH_ESIGI == 16.0
+        and abs(_kk.KENAR_SERIT_ORANI - 0.04) < 1e-9)
+kontrol("⭐ I-54: optik ornekleme sozlesmesi DEGISMEDI (4 fps / 64x36)",
+        _kk.OPTIK_ORNEK_FPS == 4 and _kk.OPTIK_ORNEK_OLCU == (64, 36))
+kontrol("⭐ I-54: yeni ornekleyici/esik/dikey serit EKLENMEDI (tanisal atom)",
+        "kenar_ornek_komutu" not in _KKS54
+        and "KENAR_ORNEK_OLCU" not in _KKS54
+        and '"ust"' not in _KKS54[_KKS54.find("def kenar_siyahligi_olcusu"):
+                                  _KKS54.find("def optik_ornek_komutu")])
+
+# ── GERILEME YOK ──
+_V54 = oku(os.path.dirname(KOK), "app", "render-studio", "src", "Video.tsx")
+kontrol("⭐ I-54 GERILEME YOK: I-52 kosullu tabani DURUYOR",
+        "panYok ? 0 : panPx" in _V54)
+kontrol("⭐ I-54: ESIKLER GEVSETILMEDI (optik 2.0 / enerji 11.589 / k 0.935)",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0
+        and abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9
+        and abs(_kk.MODEL_K - 0.935) < 1e-6
+        and abs(_kk.MODEL_D0 - 3.012) < 1e-3)
+kontrol("I-54 GERILEME YOK: I-23/I-24/I-25/I-38 kapilari DURUYOR",
+        "KALITE-MOTION-ACILIS-KAPANIS" in _qon.FAIL_KODLARI
+        and "KALITE-MOTION-ISLEV-TEKRAR" in _qon.FAIL_KODLARI
+        and "KALITE-YAZI-SAHNE-DISI" in _qon.FAIL_KODLARI
+        and "ORAN-UYUMSUZ" in oku(KOK, "medya/edinim.py")
+        and "class DevreKesici" in oku(KOK, "medya/edinim.py"))
+kontrol("I-54 GERILEME YOK: lisans/provenance kapilari DURUYOR",
+        "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI
+        and "def lisans_suz" in oku(KOK, "edit_kopru.py"))
+kontrol("I-54 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("I-54: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in _V54
+        and "pan: 'right' | 'left' | 'top' | 'bottom' | 'yok'" in _V54)
+
 blok("§40c I-53 — KENAR KAPISI KOR NOKTASI: TEK PARAMETRELIK DUZELTME **ELENDI**")
 
 # ⚠ I-52'de olculdu: `kenar_siyahligi_olcusu` GERCEK bir siyah bandi
