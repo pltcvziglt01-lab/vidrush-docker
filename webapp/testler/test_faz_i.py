@@ -6281,6 +6281,74 @@ kontrol("elenen kaydi SEBEBIYLE birlikte duruyor",
             "x", adet=6, en_az_genislik=1920, acan=_sahte_acan([
                 _sahte_sayfa(1, 1, 800, 600, "kucuk.jpg")]))["elenen"]))
 
+blok("§39m I-37 — BEAT->SCENE->FACT->ASSET BAGI KOPAMAZ")
+
+# ⚠ I-37'DE OLCULEN KUSUR (lawn pilotu, gercek render):
+# `cesitli_sirala` varliklari SAHNELER ARASINDA yeniden diziyordu; varliklar
+# sahnelere INDEKS ile eslendigi icin anlatim ile gorsel KAYDI. Olculen:
+#   b003 anlatim s02 "thin, patchy lawn" <- s03 FISKIYE gorseli
+#   b004 anlatim s03 "water lightly"     <- s04 RICINUS fidesi
+#   b005 anlatim s04 "seedling"          <- s02 patchy lawn
+# 6 beat'in 3'u kaymisti ve HICBIR otomatik kapi gormuyordu.
+
+class _C37:
+    def __init__(self, sid, aid):
+        self.scene_id = sid
+        self.asset_id = aid
+
+
+class _B37:
+    def __init__(self, bid, sid, fid):
+        self.beat_id = bid
+        self.scene_id = sid
+        self.fact_id = fid
+
+
+def _bag37(esleme):
+    """esleme: [(beat, scene, asset_scene)] -> qa_on bag olcumu."""
+    cek = [_C37(s, f"{a}_x") for _, s, a in esleme]
+    bea = [_B37(b, s, s) for b, s, _ in esleme]
+    idx = {f"{a}_x": {"scene_id": a} for _, _, a in esleme}
+    q = _qon.QaSonucu()
+    _qon._kalite_denetle(q, beatler=bea, cekimler=cek, yazi_katmanlari=[],
+                         adaylar_index=idx, p=_qon.VARSAYILAN,
+                         kare_olcu=(1920, 1080), anlatim_bitis_sn=None,
+                         toplam=10.0, benzerlik_okuyucu=None, acik=True)
+    return q
+
+# ── KIRMIZI: gercek lawn kaymasi ──
+_q37 = _bag37([("b001", "s001", "s001"), ("b002", "s001", "s001"),
+               ("b003", "s002", "s003"), ("b004", "s003", "s004"),
+               ("b005", "s004", "s002"), ("b006", "s005", "s005")])
+_bag = _q37.olcumler["kalite"]["beat_bagi"]
+kontrol("⭐ I-37 KIRMIZI: capraz sahne kaymasi YAKALANIYOR (3 beat)",
+        len(_bag["kopuk"]) == 3 and _bag["temiz"] is False,
+        [k["beat_id"] for k in _bag["kopuk"]])
+kontrol("⭐ I-37: kopuk bag PRE-QA'da FAIL uretiyor",
+        any(x.kod == "KALITE-BAG-KOPUK" and x.seviye == "fail"
+            for x in _q37.sorunlar))
+kontrol("I-37: kopuk kayit beat/scene/varlik-scene GOSTERIYOR",
+        _bag["kopuk"][0]["beat_id"] == "b003"
+        and _bag["kopuk"][0]["scene_id"] == "s002"
+        and _bag["kopuk"][0]["varlik_scene_id"] == "s003", _bag["kopuk"][0])
+# ── YESIL: dogru baglama ──
+_q37b = _bag37([("b001", "s001", "s001"), ("b002", "s001", "s001"),
+                ("b003", "s002", "s002"), ("b004", "s003", "s003"),
+                ("b005", "s004", "s004"), ("b006", "s005", "s005")])
+_bag_b = _q37b.olcumler["kalite"]["beat_bagi"]
+kontrol("⭐ I-37 YESIL: dogru baglamada kopuk YOK",
+        _bag_b["temiz"] is True and not _bag_b["kopuk"])
+kontrol("I-37: bag RAPORDA gorunur (her beat icin kayit)",
+        len(_bag_b["kayitlar"]) == 6
+        and all({"beat_id", "scene_id", "fact_id", "asset_id"} <= set(k)
+                for k in _bag_b["kayitlar"]))
+kontrol("⭐ I-37: kapi FAIL ve KALITE kodlarinda (bayraga bagli)",
+        "KALITE-BAG-KOPUK" in _qon.FAIL_KODLARI
+        and "KALITE-BAG-KOPUK" in _qon.KALITE_KODLARI)
+kontrol("⭐ I-37: siralayici artik SAHNELER ARASI permutasyon YAPMIYOR",
+        "itertools.permutations" not in _sikistir(
+            oku(KOK, "testler/smoke_konsept3_teknoloji_i20.py")))
+
 blok("§39l I-36 — SAGLAYICI TUTARSIZLIGI DUZELTILDI")
 
 # ⚠ I-35'TE OLCULEN KUSUR: I-33 raporunda s01 icin Commons denemesi

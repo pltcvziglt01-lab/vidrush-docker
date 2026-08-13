@@ -5098,3 +5098,81 @@ Kalan ikisi **kullanıcı kararı**: (a) s01 için sağlayıcı sırası,
 (b) operatör onayı. Bu atom teşhis güvenilirliğini onardığı için artık
 "hangi sağlayıcı neyi verdi" sorusu **rapordan doğrudan** okunabiliyor —
 (a) seçeneği ölçülerek değerlendirilebilir hale geldi.
+
+---
+
+## 55. FAZ I-37 — BEAT→SCENE→FACT→ASSET BAĞI KOPAMAZ (dar kalite atomu, 13 Ağu)
+
+> **Durum: kök neden ÇÖZÜLDÜ, kapı eklendi, A–I yeşil (0 hata).
+> Lawn pilotu HÂLÂ kabul edilmedi (ayrı, ölçülen sebep). Deploy YOK.
+> Maliyet $0.00.**
+> Değişen: `webapp/editor/qa_on.py`,
+> `webapp/testler/smoke_konsept3_teknoloji_i20.py`,
+> `webapp/testler/test_faz_i.py` (+ handoff).
+> `medya/*`, `editor/plan.py`, `motion.py`, `gramer.py`, `kalite_kapisi.py`,
+> `pipeline.py`, `server.py`, `deploy.sh` ve 22 alan sözleşmesi
+> **dokunulmadı**. I-22…I-36 **korundu**. Rastgelelik/yeni sağlayıcı yok.
+
+### ⛔ Ölçülen kök neden
+
+`cesitli_sirala` varlıkları **sahneler arasında** `itertools.permutations`
+ile yeniden diziyor ve *"yalnızca SIRA değişti"* diyordu. Ama varlıklar
+sahnelere **indeks** ile eşleşiyor (`manifest_yap`) — dolayısıyla permütasyon
+**anlatım ile görseli koparıyordu**. Gerçek render'da ölçüldü (lawn pilotu,
+6 beat'in **3**'ü):
+
+| beat | anlatım | ekrandaki görsel |
+|---|---|---|
+| b003 | *"…thin, **patchy lawn** he started with."* | **fıskiye** (yemyeşil çim) |
+| b004 | *"Then **water lightly** two or three times a day…"* | **Ricinus** fidesi |
+| b005 | *"Warm soil to germinate… **seedling**"* | **patchy lawn** |
+
+Hiçbir otomatik kapı bunu görmüyordu; kusur ancak kareye bakınca çıktı.
+
+### Düzeltme (en küçük güvenli)
+
+1. **Sıralayıcı sahne bağını korur.** Sahneler arası permütasyon **kaldırıldı**.
+   ⚠ Ölçülen kayıp **yok**: komşu benzerliği zaten eşiğin çok altındaydı
+   (0.5625 < 0.86). Çeşitlilik hükmünü I-22 `KALITE-MEDYA-TEKRAR`, sahne içi
+   seçimi `_varlik_sec` + I-23b ayırt-etme kapısı veriyor — ikisi de **sahne
+   bağını zaten korur**.
+2. **Yeni PRE-QA kapısı `KALITE-BAG-KOPUK` (fail).** Her beat için
+   beat→scene→fact→asset bağı doğrulanır: varlığın `scene_id`'si çekimin
+   `scene_id`'sinden farklıysa **render durur**. Bağ `olcum["beat_bagi"]`
+   ile **raporda görünür** (her beat için kayıt + kopuk listesi).
+
+### Testler
+
+Kırmızı önce: gerçek lawn kayması fixture'ıyla kapı **3 kopuk beat** yakaladı
+ve `KALITE-BAG-KOPUK` **fail** üretti; doğru bağlamada temiz. Ayrıca
+sıralayıcıda `itertools.permutations` kalmadığı kilitlendi.
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1734** | **3148** |
+
+0 hata. Faz I 1727 → **1734**. 1 BLOKE (I-33 görsel inceleme kaydı).
+
+### ✅ Rerender: sahne bağı DÜZELDİ, ama pilot yine kabul edilmedi
+
+Mevcut cache ile yeniden üretildi. Zincir artık **doğru**:
+`b003→s02`, `b004→s03`, `b005→s04`, `b006→s05` — kayma **gitti**,
+`siralama: SAHNE BAGI KORUNDU (yeniden_dizildi=False)`.
+
+⛔ Ama PRE-QA **`KALITE-MEDYA-TEKRAR`** ile durdurdu: `s01` önbellekten
+**tek** varlık dönüyor (bölünen b001/b002 aynı görseli paylaşıyor).
+Cache'te `s01_..._1.jpg` var ama **künyesi yok** — provenance'ı olmayan
+varlık kullanılamaz ve künye **uydurulmaz**. İkinci adayı indirmek Commons'ın
+`Retry-After: 600` penceresini beklemeyi gerektiriyor.
+
+**MP4 kabul edilmiş değil, mutlak yol verilmedi, deploy yok.**
+
+### SONRAKİ ATOM (I-38)
+
+1. **Lawn pilotunu tamamla**: taze pencerede s01 için 2 aday indir
+   (`cikti/_i37_medya/s01_*` silinip sürücü tek kez koşulur) → PRE-QA geçer.
+   Sürücü: `scratchpad/i37_surucu.py` (repo dışı, motoru DEĞİŞTİRMEZ).
+2. Sonra da **Ricinus semantik kusuru** kalırsa tam PASS **denmez**:
+   `grass seedling` sorgusunun 0. adayı (*Grass seedlings near Dreenhill*,
+   4032×3024) tüm kapılardan geçiyor ama indirmesi 429'a takılmıştı;
+   `cikti/_i37_medya/s04_*` silinip yeniden alınmalı.

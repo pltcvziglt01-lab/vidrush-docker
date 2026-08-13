@@ -652,44 +652,31 @@ def video_broll_ara():
 
 
 def cesitli_sirala(secilen):
-    """En benzer ciftin KOMSU OLMAMASI icin deterministik siralama.
+    """SAHNE BAGINI KORUR — sahneler arasi yeniden dizme YOK (I-37).
 
-    ⚠ Bu bir ESIK OYNAMASI DEGIL: hicbir kabul/red karari degismez, yalnizca
-    ayni kumenin SIRASI secilir. Havuzun kendisi daha cesitli hale gelmez —
-    olculdu ki mevcut 4'lu zaten havuzun en cesitli alt kumesi (en yuksek
-    ikili benzerlik 0.6094) ve daha iyisi YOK. Yapilabilecek tek iyilestirme
-    o ciftin arka arkaya DUSMEMESI.
+    ⚠ I-37'DE OLCULEN KUSUR: bu fonksiyon eskiden `itertools.permutations`
+    ile TUM sahneleri yeniden diziyor ve "yalnizca SIRA degisti" diyordu.
+    Ama varliklar sahnelere INDEKS ile eslesiyor (`manifest_yap`), dolayisiyla
+    permutasyon ANLATIM ile GORSELI birbirinden KOPARIYORDU. Gercek render'da
+    olculdu (lawn pilotu, 6 beat'in 3'u):
+        b003 anlatim "thin, patchy lawn"  <- FISKIYE gorseli
+        b004 anlatim "water lightly"      <- RICINUS fidesi
+        b005 anlatim "seedling"           <- patchy lawn
+    Hicbir otomatik kapi bunu gormuyordu; kusur ancak kareye bakinca cikti.
 
-    Ilk gorsel SABIT kalir (en yuksek detayli kare, acilis capasi); kalanlarin
-    tum permutasyonlari arasindan komsu benzerligi en dusuk olan secilir.
-    Kume kucuk (<=6) oldugu icin tam arama ucuz ve deterministik.
+    ⚠ KAYIP YOK: komsu benzerligi zaten esigin cok altindaydi (olculen
+    0.5625 < esik 0.86), yani permutasyonun kazandirdigi olculebilir bir sey
+    YOKTU. Cesitlilik hukmunu I-22 `KALITE-MEDYA-TEKRAR` kapisi veriyor.
+    Sahne ici aday secimi `_varlik_sec` + I-23b ayirt-etme kapisinin isidir;
+    orasi SAHNE BAGINI ZATEN korur.
     """
-    import itertools
-    if len(secilen) < 3:
-        return secilen, {}
-    onbellek = {}
-
-    def b(i, j):
-        a1, a2 = secilen[i]["asset_id"], secilen[j]["asset_id"]
-        k = tuple(sorted((a1, a2)))
-        if k not in onbellek:
-            onbellek[k] = benzerlik(secilen[i]["yol"], secilen[j]["yol"])
-        return onbellek[k]
-
-    def komsu_maks(sira):
-        return max(b(sira[i], sira[i + 1]) for i in range(len(sira) - 1))
-
-    kalan = list(range(1, len(secilen)))
-    once = list(range(len(secilen)))
-    en_iyi = min(([0] + list(p) for p in itertools.permutations(kalan)),
-                 key=lambda s: (komsu_maks(s), s))
-    return ([secilen[i] for i in en_iyi],
-            {"once_sira": [secilen[i]["asset_id"] for i in once],
-             "once_komsu_maks": round(komsu_maks(once), 4),
-             "sonra_sira": [secilen[i]["asset_id"] for i in en_iyi],
-             "sonra_komsu_maks": round(komsu_maks(en_iyi), 4),
-             "not": ("yalnizca SIRA degisti; kume ve esikler ayni. Havuzun en "
-                     "cesitli 4'lusu zaten seciliydi (olculdu).")})
+    return secilen, {
+        "yeniden_dizildi": False,
+        "sira": [s.get("asset_id") for s in (secilen or []) if s],
+        "not": ("SAHNE BAGI KORUNDU: sahneler arasi permutasyon YOK (I-37). "
+                "Cesitlilik I-22 tekrar kapisi + I-23b ayirt-etme kapisiyla "
+                "SAHNE ICINDE saglanir."),
+    }
 
 
 def cesitlilik_raporu(secilen):
@@ -945,9 +932,8 @@ def main() -> int:
     cesitlilik = cesitlilik_raporu(secilen)
     cesitlilik["siralama"] = siralama
     if siralama:
-        print(f"      siralama : komsu benzerligi "
-              f"{siralama['once_komsu_maks']} -> "
-              f"{siralama['sonra_komsu_maks']} (yalniz SIRA degisti)")
+        print(f"      siralama : SAHNE BAGI KORUNDU "
+              f"(yeniden_dizildi={siralama.get('yeniden_dizildi')})")
     print(f"      cesitlilik: en yuksek ikili benzerlik "
           f"{cesitlilik['en_yuksek']}, bitisik en yuksek "
           f"{cesitlilik['en_yuksek_bitisik']} (esik {cesitlilik['esik']}) -> "

@@ -39,6 +39,8 @@ FAIL_KODLARI = {
     "KALITE-MOTION-ACILIS-KAPANIS", "KALITE-MOTION-ISLEV-TEKRAR",
     # ── Faz I-31: gorunur kunye eksik olamaz ──
     "KALITE-KUNYE-EKSIK",
+    # ── Faz I-37: beat->scene->fact->asset bagi KOPAMAZ ──
+    "KALITE-BAG-KOPUK",
     # ── Faz I-27: kamera punch'i kaynagi BUYUTEMEZ ──
     "KALITE-PUNCH-BUYUTME",
 }
@@ -55,7 +57,8 @@ KALITE_KODLARI = ("KALITE-BASLIK-KIRPIK", "KALITE-BASLIK-TASMA",
                   "KALITE-MEDYASIZ-BEAT",
                   "KALITE-MOTION-ACILIS-KAPANIS",
                   "KALITE-MOTION-ISLEV-TEKRAR",
-                  "KALITE-PUNCH-BUYUTME", "KALITE-KUNYE-EKSIK")
+                  "KALITE-PUNCH-BUYUTME", "KALITE-KUNYE-EKSIK",
+                  "KALITE-BAG-KOPUK")
 
 
 @dataclass
@@ -381,6 +384,40 @@ def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
     def _ekle(kod, seviye, detay, oneri, scene_id="", beat_id=""):
         if acik:
             q.ekle(Sorun(kod, seviye, scene_id, beat_id, detay, oneri))
+
+    # ── (0) I-37: BEAT -> SCENE -> FACT -> ASSET BAGI ──
+    # ⚠ I-37'DE OLCULEN KUSUR: cesitlilik siralayicisi varliklari SAHNELER
+    # ARASINDA yeniden diziyordu. Varliklar sahnelere INDEKS ile eslendigi
+    # icin anlatim ile gorsel KAYIYORDU: "thin, patchy lawn" cumlesinin
+    # altinda fiskiye, "water lightly" cumlesinin altinda Ricinus fidesi
+    # cikti (6 beat'in 3'u). Otomatik hicbir kapi bunu gormuyordu.
+    # Bag artik DETERMINISTIK dogrulanir ve raporda GORUNUR.
+    bag_kayit, bag_kopuk = [], []
+    for _c0, _b0 in zip(cekimler, beatler):
+        _aid = str(getattr(_c0, "asset_id", "") or "")
+        _sid = str(getattr(_c0, "scene_id", "") or "")
+        _kayit = {"beat_id": getattr(_b0, "beat_id", ""),
+                  "scene_id": _sid, "fact_id": getattr(_b0, "fact_id", ""),
+                  "asset_id": _aid,
+                  "varlik_scene_id": "", "bagli": True}
+        if _aid:
+            _ad0 = (adaylar_index or {}).get(_aid) or {}
+            _vsid = str(_ad0.get("scene_id") or "")
+            _kayit["varlik_scene_id"] = _vsid
+            if _vsid and _sid and _vsid != _sid:
+                _kayit["bagli"] = False
+                bag_kopuk.append(_kayit)
+        bag_kayit.append(_kayit)
+    olcum["beat_bagi"] = {"kayitlar": bag_kayit, "kopuk": bag_kopuk,
+                          "temiz": not bag_kopuk}
+    for _bk in bag_kopuk:
+        _ekle("KALITE-BAG-KOPUK", "fail",
+              f"{_bk['beat_id']} sahnesi {_bk['scene_id']} ama varlik "
+              f"{_bk['asset_id']} sahne {_bk['varlik_scene_id']}'e ait — "
+              f"anlatim ile gorsel KAYIYOR",
+              "medya siralamasi/secimi SAHNE BAGINI korumali; varlik baska "
+              "sahnenin beat'ine TASINAMAZ",
+              scene_id=_bk["scene_id"], beat_id=_bk["beat_id"])
 
     # ── (1) BASLIK: kelime ortasi kesik + bant tasmasi ──
     baslik_olcumleri = []
