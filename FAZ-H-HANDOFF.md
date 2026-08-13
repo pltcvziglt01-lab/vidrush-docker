@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 13 Ağu | **I-49 b005 tür/takson yerel olarak: ELENDİ** | `PENDING` | ✅ **push edildi**, ölçüldü: kurulu taksonomi/ML paketi **yok**, `taksonomi.py` biyolojik değil, `webapp/veri/` altında tür verisi yok, 17 gerçek künyenin **21 alanında** tür/kategori alanı **yok**; tek çıkarılabilir sinyal (Latin ikili adlandırma, salt yapısal) örneklemde ayırıyor gibi görünüyor (negatif 2/3, pozitif 0/3, 17 adayda 1) **ama hüküm taşımıyor**: işaretlenen iki adaydan biri (b002) anlatımla **aynı özne ailesinde** — *Heteropogon contortus* bir **çim türü**; "tür adı var" ile "tür yanlış" ayrımı için yerel kaynak yok ve sinyal en iyi etiketlenmiş adayları cezalandırırdı → **üretim kodu DEĞİŞMEDİ**, b005 kabul engeli **sürüyor**, deploy YOK |
 | 13 Ağu | **I-48 b002 yer/özne biyom sözlüğüyle: ELENDİ** | `7b8492d` | ✅ **push edildi**, ölçüldü: altı gerçek çiftin **hiçbirinde** sahne biyomu çıkmıyor (video bağlamı da boş) → kapı **yapısal olarak atıl**; yer adı eklense bile (Kahoolawe→tropik) **sahne tarafı boş** kaldığı için çelişki üretilemiyor; kök neden: sözlükte **"ılıman" kuşağı yok** ve lawn/grass hiçbir kuşakta değil; eklenecek iddia (**çim ⊥ tropik**) **faktüel olarak yanlış** (hawaii tropik listede, b002'nin öznesi *Heteropogon contortus* — bir çim türü); kelime örtüşmesi **ters** çalışıyor (iki POZİTİF kontrol sıfır kelime, negatif b002 iki kelime) → **üretim kodu DEĞİŞMEDİ**, b002 kabul engeli **sürüyor**, deploy YOK |
 | 13 Ağu | **I-47 dönem kapısı çift yönlü: ilk otomatik semantik işaret** | `0d21107` | ✅ **push edildi**, `donem_kapisi` yalnız **sahne tarihselse** adayı denetliyordu; ters yön (**tarihsel aday, güncel sahne**) hiç görülmüyordu → `donem_uyarisi` (saf metin, **yeni sağlayıcı/ağ/API yok**); pilotun gerçek 6 çiftinde **yalnız b001** işaretlendi (17 gerçek adayda **1** işaret, yanlış alarm **0**), gözle doğrulandı (1900 arşiv fotoğrafı vs "right now"); **seçim değişmedi** (aday elenmez, 11/11 kare SHA-256 aynı), kod **warn** (`EMIN DEGILSEN ENGELLEME`); ⚠ b002/b005 bu sinyalle **ulaşılamaz** — kabul engeli **sürüyor**, deploy YOK |
 | 13 Ağu | **I-46 risk optik birimde ifade ediliyor (enerji × yer değiştirme)** | `9a7438d` | ✅ **push edildi**, I-45 tek gezinme hızında kalibre olduğu için b002/b005'te **hüküm veremiyordu**; model **türetildi** (|ΔI| ≈ |∇I|·d) ve pan (öteleme) ile zoom (ölçek) alanları **ayrıldı**; 12 kontrollü nokta ile **k=0.8877** ölçüldü, **tutulan 6 gerçek çekimde** ort. hata **%10.8** / en kötü **%22.9**; risk artık **optik birimde** (eşik 2.0 aynen) ve fail yalnız `beklenen×1.229 < 2.0` iken → **kapsam dışı 2 → 0**, yanlış alarm **0**, `KALITE-OPTIK-DURGUN-BEKLENEN` **FAIL** seviyesine çıkarıldı (12+6 noktada yanlış fail yok); render **11/11 kare SHA-256 aynı**, POST-QA **PASS**, **kabul edilmiş MP4 DEĞİL** (b001/b002 semantik), deploy YOK |
@@ -5661,6 +5662,122 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 67. FAZ I-49 — b005 TÜR/TAKSON, YEREL OLARAK: **ELENDİ** (yalnız tanısal, 13 Ağu)
+
+> **Durum: yaklaşım ÖLÇÜLDÜ ve ELENDİ. Üretim kodu DEĞİŞMEDİ; ölçüm ve
+> gerekçe teste kilitlendi. A–I yeşil (3396, 0 hata, 1 BLOKE — I-33 kaydı
+> sürüyor). Render/medya davranışı değişmediği için **rerender YOK**.
+> Deploy YOK. Maliyet $0.00.**
+> Değişen: **yalnızca** `webapp/testler/test_faz_i.py` (+190 satır) ve
+> handoff (git ile doğrulandı: tek dosya). `medya_kapisi.py`, `medya/*`,
+> `editor/*`, `deploy.sh`, **22 alan sözleşmesi** **dokunulmadı**.
+> Yeni sağlayıcı / **VLM / embedding / LLM** / ikinci ağ çağrısı / ücretli
+> API / **paket-credential değişikliği** / özel-case kara liste **yok**.
+> I-23…I-48 **korundu**.
+
+### Soru
+
+Üçüncü semantik negatif — **b005**, aday *"Ricinus communis seedling
+NC2.jpg"*, anlatım **çim tohumu/fidesi** bağlamı — **yerel** olarak
+sınanabilir mi?
+
+### Ölçüm 1 — depoda taksonomik kaynak YOK
+
+| kaynak | sonuç |
+|---|---|
+| kurulu taksonomi/ML paketi (nltk, spacy, Bio, sklearn, numpy, gensim, pygbif, ete3) | **YOK** |
+| `taksonomi.py` | **konsept/niyet** taksonomisi — biyolojik **değil** |
+| `webapp/veri/` | `anim`, `durumlar`, `gecici`, `onbellek` — tür verisi **yok** |
+
+### Ölçüm 2 — aday metadata'sında tür/kategori alanı YOK
+
+17 gerçek künyenin **21 alanı** tarandı (`aciklama`, `alaka_sirasi`,
+`asset_id`, `atif_gerekli`, `atif_metni`, `baslik`, `eser_sahibi`,
+`genislik`, `indirme_url`, `kaynak_niteligi`, `kaynak_saglayici`, `lisans`,
+`lisans_url`, `mime`, `olcu_bilinmiyor`, `olculen_olcu`, `oran_karari`,
+`orijinal_url`, `red_nedeni`, `render_kullanilabilir`, `saglayici`,
+`yukseklik`) → **tür/kategori/takson alanı yok**.
+
+### Ölçüm 3/4 — tek çıkarılabilir sinyal: Latin ikili adlandırma
+
+Salt **yapısal** ölçüt (`taksonomi.py`'nin *"sinyal metnin biçiminden gelir"*
+kuralının aynısı): büyük harfli cins + küçük harfli **Latin sonekli** epitet.
+
+| beat | sınıf | sıkı sinyal | gevşek sinyal |
+|---|---|---|---|
+| b001 | NEG | `[]` | `[]` |
+| **b002** | NEG | `['Heteropogon contortus']` | `['Heteropogon contortus']` |
+| b003 | POZ | `[]` | `['Mountainview section']` |
+| b004 | POZ | `[]` | `['Sprinkler head']` |
+| **b005** | **NEG (hedef)** | `['Ricinus communis']` | `['Ricinus communis']` |
+| b006 | POZ | `[]` | `[]` |
+
+**Sıkı**: negatiflerde 2/3, pozitiflerde 0/3 — *ayırıyor gibi görünüyor*.
+**Gevşek** (Latin sonek şartı olmadan): pozitiflerin **2/3'ünü** işaretliyor
+→ kullanılamaz. **Ölçüm 5**: 17 gerçek adayda yanlış alarm **1** (b005'in
+kendisi).
+
+### ⛔ Ölçüm 6 (BELİRLEYİCİ) — sinyalin varlığı "yanlış" demek değil
+
+Sinyal *"başlık bir tür adı taşıyor"* der; ***"tür yanlış"* demez.** Bu, kendi
+verimizde kanıtlandı: işaretlenen iki adaydan biri olan **b002**'nin öznesi
+*Heteropogon contortus* — **bir çim türüdür** (Poaceae), yani anlatımla
+**aynı özne ailesinde**; b002'nin kusuru tür değil **yer/ortam** (I-48).
+Dolayısıyla işaret kümesinin **yarısı** zaten tür uyuşmazlığı değil.
+
+*"Ricinus communis çim değildir"* hükmünü vermek için **hangi türün çim
+olduğunu** bilmek gerekir; bunun yerel karşılığı Ölçüm 1/2'de **arandı ve
+yok**.
+
+⚠ **Ters etki**: sinyal, bilimsel künyeli (tür adı taşıyan) **en iyi
+etiketlenmiş** adayları da işaretlerdi — örneğin bir çim videosunda
+*Lolium perenne* **doğru** adaydır — ve doğruyu yanlıştan **ayıramazdı**.
+
+### ⛔ Hüküm — I-34/I-48 dersi uygulandı
+
+**b005 tür/takson ayrımı mevcut yerel kaynaklarla taşınamaz.** Üretime
+**eklenmedi**: ikili adlandırma sinyali yok, özel-case kara liste yok, yeni
+paket/ağ/credential yok — üçü de teste kilitlendi. Zorlama yok, sahte PASS
+yok, WARN da **eklenmedi** (ayıran güvenilir kanıt bulunamadığı için).
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1982** | **3396** |
+
+0 hata. Faz I 1963 → **1982** (+19). **1 BLOKE** — I-33 kaydı sürüyor.
+
+### ⚠ Ayrıca ölçülen (bu atomda KULLANILMADI)
+
+`aciklama` alanı 17 adayın **11'inde dolu** — ama lawn pilotunun **beş
+adayının hepsinde BOŞ**. Yani bu pilot için daha zengin metin de yok.
+
+### ⛔ Kabul durumu — DEĞİŞMEDİ
+
+Pilot MP4 **kabul edilmiş değildir**, deploy yok. Üç semantik negatiften
+**yalnız b001** otomatik işaretleniyor (I-47); **b002 ve b005 hâlâ gözle
+uyumsuz ve otomatik kapılarla ulaşılamıyor**.
+
+### SONRAKİ ATOM — ölçülen durum ne diyor
+
+Semantik kabul engeli için **yerel yollar tükendi**; dört bağımsız eleme:
+
+| atom | yaklaşım | sonuç |
+|---|---|---|
+| I-34 | kare-bakan görsel sinyaller | **elendi** (precision 0.25) |
+| I-35 | sorgu daraltması | **elendi** (karşılıklı dışlayan kısıtlar) |
+| I-48 | biyom/yer adı sözlüğü | **elendi** (kuşak ifade edilemiyor) |
+| I-49 | tür/takson (yerel) | **elendi** (kaynak yok, sinyal hüküm taşımıyor) |
+
+Geriye ölçülmemiş **iki** yol kalıyor ve **ikisi de kullanıcı kararıdır**:
+**(1) operatör onayı**, **(2) yeni yetenek (VLM/görüntü-metin eşleme)** —
+ikincisi ücret ve yeni bağımlılık doğurur; **kapsam/bütçe kararı
+kullanıcıya aittir**.
+
+⚠ Semantik dışında ölçülmüş açık kusurlar: model doygunluğu (I-46, %22.9),
+kısa sahnede pan taşma payı (I-43), önizlemede altyazı çizilmemesi (I-40).
 
 ---
 

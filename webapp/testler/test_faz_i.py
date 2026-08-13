@@ -6412,6 +6412,196 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
         "KaynakEtiketi" in _GRAFIK_TSX
         and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
 
+blok("§39y I-49 — b005 TUR/TAKSON: YEREL SINANAMAZ, **ELENDI** (olculdu)")
+
+# ⚠ HEDEF: I-47'nin (donem) ve I-48'in (yer/ozne) yakalayamadigi UCUNCU
+# negatif — b005, aday "Ricinus communis seedling NC2.jpg", anlatim cim
+# tohumu/fidesi baglami — YEREL olarak sinanabilir mi?
+# Olculdu -> SINANAMAZ. Yaklasim I-34/I-48 dersiyle ELENDI.
+# URETIM KODU DEGISMEDI (yalniz bu test + handoff).
+# Yeni saglayici / VLM / embedding / LLM / ikinci ag cagrisi / ucretli API /
+# paket-credential degisikligi / ozel-case kara liste YOK.
+#
+# ── OLCUM 1: DEPODA TAKSONOMIK KAYNAK YOK ──
+#   kurulu taksonomi/ML paketi : YOK (nltk/spacy/Bio/sklearn/numpy... hicbiri)
+#   taksonomi.py               : KONSEPT/NIYET taksonomisi, biyolojik DEGIL
+#   webapp/veri/               : ['anim','durumlar','gecici','onbellek'] —
+#                                tur/takson veri kumesi YOK
+#
+# ── OLCUM 2: ADAY METADATA'SINDA TUR/KATEGORI ALANI YOK ──
+# 17 gercek kunye dosyasinin TUM alanlari tarandi (21 alan): aciklama,
+# alaka_sirasi, asset_id, atif_gerekli, atif_metni, baslik, eser_sahibi,
+# genislik, indirme_url, kaynak_niteligi, kaynak_saglayici, lisans,
+# lisans_url, mime, olcu_bilinmiyor, olculen_olcu, oran_karari, orijinal_url,
+# red_nedeni, render_kullanilabilir, saglayici, yukseklik.
+# tur / kategori / takson / etiket alani: **YOK**.
+#
+# ── OLCUM 3/4: TEK CIKARILABILIR SINYAL — LATIN IKILI ADLANDIRMA ──
+# Salt YAPISAL olcut (taksonomi.py'nin "sinyal metnin BICIMINDEN gelir"
+# kuralinin aynisi): buyuk harfli cins + kucuk harfli Latin sonekli epitet.
+#   beat  sinif      siki sinyal                 gevsek sinyal
+#   b001  NEG        []                          []
+#   b002  NEG        ['Heteropogon contortus']   ['Heteropogon contortus']
+#   b003  POZ        []                          ['Mountainview section']
+#   b004  POZ        []                          ['Sprinkler head']
+#   b005  NEG HEDEF  ['Ricinus communis']        ['Ricinus communis']
+#   b006  POZ        []                          []
+# SIKI: negatiflerde 2/3, pozitiflerde 0/3. GEVSEK: pozitiflerde 2/3 —
+# yani Latin sonek sarti OLMADAN sinyal kullanilamaz (I-34'teki yanlis
+# pozitif tablosunun aynisi).
+#
+# ── OLCUM 5: 17 GERCEK ADAYDA YANLIS ALARM = 1 (b005'in kendisi) ──
+#
+# ── OLCUM 6 (BELIRLEYICI): SINYALIN VARLIGI "YANLIS" DEMEK DEGIL ──
+# Sinyal "baslik BIR TUR ADI TASIYOR" der; "TUR YANLIS" DEMEZ. Kendi
+# verimizde KANITLANDI: isaretlenen iki adaydan biri olan b002'nin oznesi
+# *Heteropogon contortus* BIR CIM TURUDUR (Poaceae) — yani anlatimla AYNI
+# ozne ailesinde. b002'nin kusuru tur degil YER/ORTAM (I-48'de olculdu).
+# Dolayisiyla isaret kumesinin YARISI zaten "tur uyusmazligi" DEGIL.
+# "Ricinus communis cim DEGILDIR" hukmunu vermek icin hangi turun cim
+# oldugunu bilmek gerekir; bunun yerel karsiligi OLCUM 1/2'de ARANDI ve YOK.
+#
+# ── TERS ETKI: sinyal EN IYI ETIKETLENMIS adaylari cezalandirirdi ──
+# Bilimsel kunyeli (tur adi tasiyan) bir aday DOGRU da olabilir
+# (or. lawn videosunda *Lolium perenne*). Sinyal onu da isaretlerdi ve
+# dogruyu yanlistan AYIRAMAZDI.
+#
+# ⚠ HUKUM: b005 tur/takson ayrimi MEVCUT YEREL kaynaklarla TASINAMAZ.
+# Uretime eklenmedi; b005 KABUL ENGELI OLARAK SURUYOR.
+#
+# ── AYRICA OLCULEN (sonraki atom icin veri, bu atomda KULLANILMADI) ──
+# `aciklama` alani 17 adayin 11'inde DOLU — ama lawn pilotunun BES adayinin
+# HEPSINDE BOS. Yani bu pilot icin daha zengin metin de YOK.
+
+_MK49 = __import__("medya_kapisi")
+_LATIN_SON49 = ("us", "um", "is", "ii", "ae", "ata", "osa", "ana", "ica",
+                "ensis", "oides", "folia", "flora")
+_IKILI49 = re.compile(r"\b([A-Z][a-z]{3,})[ \-]([a-z]{4,})\b")
+
+
+def _ikili49(metin, latin_sonek=True):
+    """Latin ikili adlandirma — SALT YAPISAL, kelime listesi YOK."""
+    out = []
+    for m in _IKILI49.finditer(str(metin or "")):
+        if latin_sonek and not m.group(2).endswith(_LATIN_SON49):
+            continue
+        out.append(f"{m.group(1)} {m.group(2)}")
+    return out
+
+
+_CIFT49 = [
+    ("b001", "NEG", "Vegetable, grass and flower seeds, 1900 (1900) "
+                    "(20532148836).jpg"),
+    ("b002", "NEG", "Starr-101229-6113-Heteropogon contortus-habitat seed "
+                    "ball paper bag mulch piles-Kanapou-Kahoolawe "
+                    "(25059536945).jpg"),
+    ("b003", "POZ", "2025-04-07 15 59 57 A patchy lawn in spring within Ann "
+                    "M. Banchoff Park in the Mountainview section of Ewing "
+                    "Township, Mercer County, New Jersey.jpg"),
+    ("b004", "POZ", "Sprinkler Irrigation - Sprinkler head.JPG"),
+    ("b005", "NEG", "Ricinus communis seedling NC2.jpg"),
+    ("b006", "POZ", "Dülmen, Mühlenwegfriedhof -- 2012 -- 8083.jpg"),
+]
+
+# ── OLCUM 1: yerel taksonomik kaynak YOK ──
+_paket49 = []
+for _p49 in ("nltk", "spacy", "Bio", "sklearn", "numpy", "gensim", "pygbif",
+             "ete3"):
+    try:
+        __import__(_p49)
+        _paket49.append(_p49)
+    except Exception:                                             # noqa: BLE001
+        pass
+kontrol("⭐ I-49 OLCUM: kurulu taksonomi/ML paketi YOK",
+        _paket49 == [], _paket49)
+_TK49 = __import__("taksonomi")
+kontrol("⭐ I-49 OLCUM: `taksonomi.py` BIYOLOJIK degil (konsept/niyet)",
+        not any(x in (_TK49.__doc__ or "").lower()
+                for x in ("species", "binomial", "botanik", "poaceae")))
+kontrol("⭐ I-49 OLCUM: `webapp/veri/` altinda tur/takson veri kumesi YOK",
+        not [d for d in os.listdir(os.path.join(KOK, "veri"))
+             if any(x in d.lower() for x in ("tur", "takson", "species",
+                                             "plant", "bitki"))],
+        sorted(os.listdir(os.path.join(KOK, "veri"))))
+
+# ── OLCUM 2: metadata'da tur/kategori alani YOK ──
+_ALAN49 = {"aciklama", "alaka_sirasi", "asset_id", "atif_gerekli",
+           "atif_metni", "baslik", "eser_sahibi", "genislik", "indirme_url",
+           "kaynak_niteligi", "kaynak_saglayici", "lisans", "lisans_url",
+           "mime", "olcu_bilinmiyor", "olculen_olcu", "oran_karari",
+           "orijinal_url", "red_nedeni", "render_kullanilabilir",
+           "saglayici", "yukseklik"}
+kontrol("⭐ I-49 OLCUM: aday metadata'sinda tur/kategori/takson alani YOK",
+        not [a for a in _ALAN49
+             if any(x in a for x in ("takson", "kategori", "species",
+                                     "etiket"))], sorted(_ALAN49))
+
+# ── OLCUM 3/4: sinyal ayiriyor GIBI gorunuyor ──
+_S49 = {b: (_ikili49(t, True), _ikili49(t, False)) for b, _c, t in _CIFT49}
+kontrol("⭐ I-49 OLCUM: SIKI sinyal negatiflerde 2/3, pozitiflerde 0/3",
+        sum(1 for b, c, _t in _CIFT49 if c == "NEG" and _S49[b][0]) == 2
+        and sum(1 for b, c, _t in _CIFT49 if c == "POZ" and _S49[b][0]) == 0,
+        {b: _S49[b][0] for b, *_ in _CIFT49})
+kontrol("⭐ I-49 OLCUM: GEVSEK sinyal POZITIFLERIN 2/3'unu isaretliyor "
+        "(Latin sonek sarti olmadan KULLANILAMAZ)",
+        sum(1 for b, c, _t in _CIFT49 if c == "POZ" and _S49[b][1]) == 2,
+        {b: _S49[b][1] for b, *_ in _CIFT49})
+
+# ── OLCUM 6 (BELIRLEYICI): varlik != yanlislik ──
+kontrol("⭐ I-49 BELIRLEYICI: isaretlenen IKI adaydan BIRI (b002) anlatimla "
+        "AYNI ozne ailesinde — *Heteropogon contortus* BIR CIM TURU",
+        _S49["b002"][0] == ["Heteropogon contortus"]
+        and _S49["b005"][0] == ["Ricinus communis"],
+        [_S49["b002"][0], _S49["b005"][0]])
+kontrol("⭐ I-49 HUKUM: 'tur adi VAR' ile 'tur YANLIS' ayrimi icin YEREL "
+        "kaynak YOK -> sinyal hukum TASIYAMAZ",
+        _paket49 == []
+        and not [a for a in _ALAN49 if "takson" in a or "species" in a])
+
+# ── ELENDI: URETIM KODU DEGISMEDI ──
+_MKS49 = oku(KOK, "medya_kapisi.py")
+kontrol("⭐ I-49: ikili adlandirma sinyali URETIME EKLENMEDI",
+        not any(x in _MKS49.lower()
+                for x in ("ricinus", "heteropogon", "binomial", "ikili_ad")),
+        "sinyal uretime sizmis")
+kontrol("I-49: ozel-case kara liste YOK (varliga/dosyaya ozel esleme yok)",
+        "ricinus" not in _MKS49.lower()
+        and "grass_seedling" not in _MKS49.lower())
+kontrol("⭐ I-49: yeni paket/saglayici/ag cagrisi/credential YOK",
+        not any(x in _MKS49 for x in ("requests", "urllib", "http",
+                                      "subprocess", "socket", "api_key",
+                                      "API_KEY", "import nltk", "spacy")))
+
+# ── GERILEME YOK ──
+kontrol("I-49 GERILEME YOK: I-47 donem uyarisi HALA b001'i yakaliyor",
+        _MK49.donem_uyarisi(
+            "There is a bag of grass seed on my garage shelf right now.",
+            _CIFT49[0][2]).get("uyari") is True)
+kontrol("I-49 GERILEME YOK: I-48 hukmu duruyor (yer adlari sozlukte YOK)",
+        not any(x in _MKS49.lower() for x in ("kahoolawe", "kanapou"))
+        and len(_MK49.BIYOM_ISARETI) == 4)
+kontrol("I-49 GERILEME YOK: biyom kapisi GERCEK celiskide HALA REDDEDIYOR",
+        _MK49.kapi("The desert dunes stretch for miles.",
+                   "polar bear on arctic sea ice")[0] is False)
+kontrol("I-49 GERILEME YOK: edinim kapilari ve 429 devre kesici DURUYOR",
+        "class DevreKesici" in oku(KOK, "medya/edinim.py")
+        and "COZUNURLUK-YETERSIZ" in oku(KOK, "medya/edinim.py")
+        and "ORAN-UYUMSUZ" in oku(KOK, "medya/edinim.py"))
+kontrol("I-49 GERILEME YOK: lisans/provenance kapilari DURUYOR",
+        "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI
+        and "def lisans_suz" in oku(KOK, "edit_kopru.py"))
+kontrol("⭐ I-49: ESIKLER GEVSETILMEDI (optik 2.0 / enerji 11.589 / k 0.8877)",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0
+        and abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9
+        and abs(_kk.MODEL_K - 0.8877) < 1e-4)
+kontrol("I-49 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+_V49 = oku(os.path.dirname(KOK), "app", "render-studio", "src", "Video.tsx")
+kontrol("I-49: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in _V49
+        and "pan: 'right' | 'left' | 'top' | 'bottom' | 'yok'" in _V49)
+
 blok("§39x I-48 — b002 YER/OZNE: BIYOM SOZLUGU YOLUYLA **ELENDI** (olculdu)")
 
 # ⚠ HEDEF: I-47'nin yakalayamadigi b002 negatifi ("Kanapou-Kahoolawe" yer
