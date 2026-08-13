@@ -7238,6 +7238,36 @@ else:
                   f"GORMUYOR; kusur ancak ELLE kare cikararak yakalanir.")
     else:
         kontrol("⭐ I-31: her beat en az bir kareyle ornekleniyor", True)
+    # ── I-33: BAGIMSIZ GORSEL INCELEME KAYDI ──
+    # ⚠ Bu bir SINIFLANDIRICI DEGIL, OLCULEN TEK VARLIGA OZGU BIR KAYITTIR.
+    # I-29'da olculdu: metadata anahtar kelimesi genel bir kapi olamaz
+    # (gercek kusurda recall %0, 7 isaretten 5'i yanlis pozitif). Burada
+    # yalnizca I-33'te GOZLE dogrulanan varlik, kendi basligiyla kayitlidir;
+    # medya degisince bu kayit KENDILIGINDEN dusar ve yeni varlik yeniden
+    # incelenmek zorunda kalir.
+    _I33_GORULEN = "node on display at NASA Ames visitor center"
+    _b001_31 = next((z for z in (_R20.get("zincir") or [])
+                     if z.get("beat_id") == "b001"), {})
+    _s01_31 = next((s for s in (_R20["medya_edinim"].get("sahneler") or [])
+                    if s.get("kimlik") == "s01"), {})
+    _kare_b001 = ((_R20.get("kare_ornekleme") or {}).get("beat_kare")
+                  or {}).get("b001") or []
+    if _I33_GORULEN in str(_s01_31.get("baslik") or ""):
+        bloke_yaz(
+            "I-33 pilot GORSEL INCELEME — b001 VITRIN/PANO",
+            f"kare {_kare_b001} sn · beat b001 · varlik "
+            f"{_b001_31.get('asset_id')} · saglayici "
+            f"{_b001_31.get('saglayici')} · lisans {_b001_31.get('lisans')} · "
+            f"baslik {str(_s01_31.get('baslik'))[:70]!r}. GOZLE DOGRULANDI: "
+            f"cam arkasi MUZE VITRINI, Ingilizce bilgi panolari "
+            f"('The Pleiades Supercomputer', 'Anatomy of a Pleiades Node'), "
+            f"cam yansimalari. Turkce anlatim 'Guc burada uretilir.' ile "
+            f"UYUMSUZ. Otomatik kapilarin HEPSI PASS; kusur yalnizca gorsel "
+            f"incelemede gorunuyor. MP4 KABUL EDILMIS SAYILMAZ.")
+    else:
+        kontrol("I-33: b001 varligi I-33'te gorulen vitrin degil — "
+                "YENIDEN GORSEL INCELEME GEREKIR", True,
+                str(_s01_31.get("baslik"))[:60])
     # ⚠ OLCULEN KUSUR SESSIZCE GECILMEZ.
     if (_pb26.get("buyuten_beat") or 0) > 0:
         bloke_yaz(

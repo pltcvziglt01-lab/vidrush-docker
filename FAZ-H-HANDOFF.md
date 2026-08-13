@@ -199,6 +199,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-30 yatay güvenli alan kapısı eklendi** | `527cd28` | ✅ **push edildi**, sağ/sol taşma ölçülür oldu, pilotta ateşlemiyor, MP4 korundu, deploy YOK |
 | 13 Ağu | **I-31 ekran künyesi politikası** | `73d91e1` | ⚠ **push edildi**, taşma çözüldü + tam atıf korundu, MP4 **KABUL EDİLMEDİ** (açılış vitrin planı), deploy YOK |
 | 13 Ağu | **I-32 kare örnekleme her beat'i kapsıyor** | `7098f4b` | ✅ **push edildi**, b001 kör noktası çözüldü, rerender YOK (talimat), BLOKE kanıt olarak duruyor, deploy YOK |
+| 13 Ağu | **I-33 gerçek koşum doğrulaması** | `PENDING` | ⚠ **push edildi**, kare planı KANITLANDI (b001 kapsandı), otomatik kapılar PASS ama MP4 **KABUL EDİLMEDİ** (b001 vitrin/pano), deploy YOK |
 
 ---
 
@@ -4706,3 +4707,103 @@ ancak yeni kareler üretilince kapanır. Beklenen sonuç ikiden biri:
 İkinci durumda sıra, I-29'da metadata ile çözülemeyeceği ölçülen
 **vitrin/pano tespitine** gelir; o **kare-bakan** bir sinyal gerektirir ve
 `medya.edinim`'de açıkça kapsam dışıdır — **kullanıcı kararı**.
+
+---
+
+## 51. FAZ I-33 — GERÇEK KOŞUM DOĞRULAMASI: KARE PLANI KANITLANDI, MP4 ⛔ BLOKE (13 Ağu)
+
+> **Durum: I-32'nin kare planı GERÇEK koşumda kanıtlandı. Otomatik kapıların
+> HEPSİ PASS, ama bağımsız görsel inceleme kusuru buldu → MP4 KABUL
+> EDİLMİŞ SAYILMAZ. Deploy YOK. Maliyet $0.00.**
+> Değişen: `webapp/testler/test_faz_i.py`,
+> `outputs/sample/teknoloji_i20_rapor.json` (+ handoff).
+> **Medya/algoritma kodu DEĞİŞMEDİ** (talimat gereği): `kalite_kapisi.py`,
+> `plan.py`, `qa_on.py`, `medya/*` ve smoke betiği git ile doğrulandı.
+> Sağlayıcı/ağ bütçesi artmadı, ücretli API **$0**, anahtar/kredi değişikliği
+> yok.
+
+### ✅ I-32 kare planı GERÇEK koşumda çalıştı
+
+| beat | aralık | **temsil karesi** | taşma |
+|---|---|---|---|
+| **b001** | 0.000–0.862 | ✅ **0.4333** | yok |
+| b002 | 0.862–2.587 | 1.3, 1.7333, 2.4333 | yok |
+| b003 | 2.587–7.325 | 3.7667, 4.9667, 6.1333 | yok |
+| b004 | 7.325–12.225 | 8.5333, 9.7667, 11.0 | yok |
+| b005 | 12.225–17.050 | 14.6333 | yok |
+
+`kare=11`, `beat=5`, `hedef=11`, **`kapsanmayan=[]`**, `yeterli=True`.
+I-31'de kör noktada kalan **b001 artık zorunlu incelemenin içinde** —
+kusur elle kare çıkarmaya gerek kalmadan görüldü.
+
+### ✅ Otomatik ölçümlerin hepsi PASS
+
+**ffprobe:** h264 **1920×1080** @30 + aac 48 kHz/2ch, **17.109 sn**, 39.62 MB.
+**Ses:** LUFS **−14.36**, TP **−4.09**, LRA 3.6, sessizlik **%0** (ince tarama
+da boş). **Kesmeler:** 6. **Siyah/donmuş aralık:** yok. **Kenar:** 0/68;
+11 karenin tam çözünürlükte dört kenarı ayrı ölçüldü, en koyu **24.96**
+(eşik 16). **Optik:** genel 14.41, durgun ihlal 0.
+**Tipografi:** güvenli alan ✅ · yatay güvenli alan ✅ · çakışma ✅ · altyazı ✅.
+**Künye:** 5 karar, hepsi `TAM`, politika temiz; künye→varlık eşlemesi doğru.
+**Motion:** 5 benzersiz hareket, işlev tekrarı 0, açılış≠kapanış, punch temiz.
+**Medya tekrarı:** eşiği aşan çift yok. **POST-QA: PASS**, puan **100/100**.
+
+### ⛔ BAĞIMSIZ GÖRSEL İNCELEME — kusur bulundu
+
+| alan | değer |
+|---|---|
+| kare zamanı | **0.4333 sn** |
+| beat | **b001** |
+| varlık | `s01_11066148` |
+| sağlayıcı / lisans | `wikimedia` / `cc-by-sa` |
+| başlık | `Pleiades supercomputer node on display at NASA Ames visitor center…` |
+| ölçü | 3410×2634 |
+
+Kare **cam arkası bir müze vitrini**: *"The Pleiades Supercomputer"* ve
+*"Anatomy of a Pleiades Node"* İngilizce bilgi panoları, cam yansımaları.
+Türkçe anlatım *"Güç burada üretilir."* ve Türkçe **GÜÇ** başlığı, İngilizce
+açıklama panosunun üstünde duruyor — **anlatıyla uyumsuz**.
+
+⚠ **Otomatik kapıların hepsi PASS verdi**; kusur yalnızca görsel incelemede
+görünüyor. Bu, I-29'da ölçülen boşluğun aynısı: metadata anahtar kelimesi
+genel bir kapı olamaz (gerçek kusurda recall **%0**, 7 işaretten 5'i yanlış
+pozitif). Bu yüzden **sınıflandırıcı eklenmedi**; teste yalnızca **bu ölçülen
+varlığa özgü, izlenebilir bir kayıt** kondu — medya değişince kayıt
+kendiliğinden düşer ve yeni varlık **yeniden incelenmek zorunda kalır**.
+
+**MP4 KABUL EDİLMİŞ SAYILMAZ. Deploy YOK. Kabul edilmiş mutlak MP4 yolu
+raporlanmıyor.**
+
+### Ölçülen test sonucu
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1685** | **3099** |
+
+0 hata. Faz I 1684 → **1685**. **1 BLOKE** — I-33 görsel inceleme kaydı.
+
+### ⚠ Ölçülen yan bulgu: sağlayıcı tekeli %100 değil %80
+
+Commons bu koşumda **b001'i** verdi (`meta=5`, bayt geldi), gerisi 429 →
+NASA. Yani karışım `wikimedia 1 / nasa 4` = **%80** (tavan %40, WARN sürüyor).
+Commons'ın verdiği tek varlık **vitrin fotoğrafı** çıktı.
+
+### SONRAKİ ATOM (I-34) — yalnız ölçülen kusurdan
+
+**Vitrin/pano/dolaylı-medya tespiti artık tek gerçek açık kusur.** İki kez
+üst üste (I-31, I-33) **aynı Commons varlığı** b001'e düştü ve her ikisinde
+de tüm otomatik kapıları geçti. Ölçülen kısıtlar:
+
+- **Metadata ile çözülemez** (I-29: recall %0, hassasiyet %6).
+- **Çözünürlük/oran/punch kapıları görmüyor** (3410×2634, oran 1.294 — hepsi
+  temiz).
+- Gerçek çözüm **kare-bakan** bir sinyal: cam yansıması / yüksek yoğunluklu
+  düz metin bloğu / dikdörtgen pano sayımı. Bu, `medya.edinim`'in
+  `kapsam_disi` listesinde **açıkça kapsam dışı** yazan "kare-bakan içerik
+  doğrulaması"dır — yeni bir yetenek ve **kullanıcı kararı**.
+
+En küçük ölçülebilir ilk adım önerisi: **indirilen görselde metin yoğunluğu
+ölçümü** (ffmpeg kenar/gradyan istatistiği ile, OCR'sız, ağsız) ve bunun
+kusurlu varlık ile kabul edilen NASA varlıkları üzerinde **recall/hassasiyet
+ölçümü** — I-29'daki disiplinin aynısı. Güvenilir çıkarsa kapı, çıkmazsa
+dürüstçe elenir.
