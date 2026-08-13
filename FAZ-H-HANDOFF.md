@@ -205,6 +205,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-36 sağlayıcı tutarsızlığı düzeltildi** | `6bab9f9` | ✅ **push edildi**, başarılı geçmiş 429 ile ezilmiyor, sağlayıcı seçilen varlıktan türüyor, rerender/deploy YOK |
 | 13 Ağu | **I-37 beat→scene→asset bağı kopamaz** | `3ccc73c` | ✅ **push edildi**, çapraz sahne kayması ÇÖZÜLDÜ + PRE-QA kapısı; lawn MP4 **KABUL EDİLMEDİ** (s01 tek varlık), deploy YOK |
 | 13 Ağu | **I-38 yazı spec'i sahneye göreli** | `bf1b0c8` | ✅ **push edildi**, ekran künyesi artık ÇİZİLİYOR (4 CC sahne) + PRE-QA kapısı; lawn MP4 **KABUL EDİLMEDİ** (POST-KENAR-SIYAH + semantik), deploy YOK |
+| 13 Ağu | **I-39 altyazı nefes boşluğu zorunlu** | `391d527` | ✅ **push edildi**, künye SAĞ ÜSTE (32.1→766.5 px) + başlık 0.60 + PRE-QA `KALITE-YAZI-NEFES-YOK`; 1080p pilot POST-QA **PASS**, kenar 1/101→0/101; lawn MP4 **KABUL EDİLMEDİ** (b001/b002/b005 semantik), deploy YOK |
 
 ---
 
