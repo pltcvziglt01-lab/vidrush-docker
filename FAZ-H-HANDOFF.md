@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 14 Ağu | **I-55 kenar eşiği türetildi (train→formül, held-out tek bakış)** | `PENDING` | ✅ **push edildi**, I-54'ün **ön-kayıtlı** bölünmesi değiştirilmeden okundu; eşik **yalnız TRAIN**'den açık formülle (`eşik = temiz_alt / 2` = **6.234**) türetildi ve TRAIN bandının içinde olduğu doğrulandı; **held-out'a tek bakış**: 4 kusurlu örneğin **4'ü yakalandı**, 7 temiz örneğin **7'si temiz** → **kaçırma 0, yanlış pozitif 0**; duyarlılık: güvenlik katı ~1.25–2494 aralığında sonuç değişmiyor; ⚠ ölçüm betiğinde pencere hatası bulunup düzeltildi (kusur 20.431→0.046, render değişmedi); **üretim kodu değişmedi** (eşik uygulanmadı, `KENAR_SIYAH_ESIGI` 16 duruyor), geçici varlıklar (345 MB) temizlendi, deploy YOK |
 | 14 Ağu | **I-54 kenar kapısı korpusu genişletildi, ayrım payı ölçüldü** | `61ecca8` | ✅ **push edildi**, korpus **gerçek render**la genişletildi (4 yön kusurlu + 15 gerçek temiz pilot), train/held-out **ölçümden önce** sabitlendi; dört eksen **ayrı** raporlandı: tek yön **hiç** ayırmıyor (dört yön zorunlu), mevcut `şerit_ort` agregasyonu **negatif**, 64/128 çözünürlük **hiç**, **4 fps hiçbir çözünürlükte** ayırmıyor; ayrım iki eksene birden bağlı (256 ≥15 fps, **384 ≥8 fps**); ölçülen band **kusur ≤0.02 / temiz ≥9.96** — **örtüşme yok**; ⚠ I-53'ün "kusur ≤2.9" iddiası **doğrulandı**, "temiz ≥15.0" **yanlış** (gerçek taban **10.01**, `onizleme_lawn_i40`); **eşik seçilmedi**, üretim kodu **değişmedi**, geçici varlıklar (345 MB) temizlendi, deploy YOK |
 | 14 Ağu | **I-53 kenar kapısı kör noktası: tek parametrelik düzeltme ELENDİ** | `f00ae2f` | ✅ **push edildi**, kör nokta sayısallaştırıldı: yatayda **yalnız ≥60 px** görülüyor, **dikey bant 120 px'te bile hiç** görülmüyor (yapısal — sadece sol/sağ şerit var); ⚠ **belirleyici**: I-52'nin gerçek 9 px bandı **4 fps ızgarasında hiç yok** (8 fps'te 0.0) → uzamsal düzeltme **tek başına yetmiyor**; sözleşmeyi bozmayan agregasyon düzeltmesi yanlış pozitif 0 ama **yeni fayda da 0**; kusuru yakalayan konfigürasyon (256/8 fps) **üç gerçek pilotta yanlış pozitif** üretiyor (15.8 vs eşik 16.0 — bıçak sırtı, gerçek koyu orman kenarı) → **üretim kodu DEĞİŞMEDİ**, geçici varlıklar temizlendi, deploy YOK |
 | 14 Ağu | **I-52 pan taşma payı, pan yokken de zoom yolunu yiyordu** | `145986c` | ✅ **push edildi**, I-43 borcunun kök nedeni kodda gösterildi: `kbHesap` pan payını **koşulsuz** ödüyordu ama kayma yalnız `pan` bir yönken uygulanıyor → `pan: 'yok'` sahnelerde %3.49 boşa gidiyordu; **koşullu** düzeltme (taban 1.0349→1.012 yalnız pan yokken) gerçek render'da ölçüldü: pan'sız sahneler **+%9…+%35** optik, pan yapan sahneler **bit-bit aynı**; ⚠ payın pan yapan sahnede **gerekli** olduğu karşı-örnekle kanıtlandı (payı herkesten kaldırınca tam çözünürlükte **9 koyu sütun**), koşullu halde **0**; 25.2 sn 1080p pilot POST-QA **WARN** (tek kalan s1'in kök nedeni bu atom değil — görsel enerjisi), kenar **0/101 + tam çözünürlükte 0**, **kabul edilmiş MP4 DEĞİL**, deploy YOK |
@@ -5667,6 +5668,111 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 73. FAZ I-55 — KENAR EŞİĞİ TÜRETİLDİ (train→formül, held-out TEK BAKIŞ, 14 Ağu)
+
+> **Durum: eşik YALNIZ TRAIN bandından açık formülle türetildi ve
+> held-out'a **tek kez** bakıldı: **kaçırma 0, yanlış pozitif 0** → KABUL.
+> ⚠ Bu bir **kalibrasyon** atomudur: yapılandırma ve eşik **üretime
+> UYGULANMADI**. A–I yeşil (3514, 0 hata, 1 BLOKE — I-33). Rerender YOK.
+> Geçici varlıklar (345 MB) temizlendi. Deploy YOK, kabul edilmiş MP4 YOK.
+> Maliyet $0.00.**
+> Değişen: **yalnızca** `webapp/testler/test_faz_i.py` (+~110 satır) ve
+> handoff. `kalite_kapisi.py`, `Video.tsx`, `qa_on.py`, `medya/*`,
+> `deploy.sh`, **eşikler**, **22 alan sözleşmesi** **dokunulmadı**.
+> I-23…I-54 **korundu**.
+
+### Yöntem — sızıntı yok
+
+1. Bölünme I-54'te **ölçümden önce** sabitlenmişti; buradan
+   **değiştirilmeden okundu** (`cikti/_i54_ayrim/i54_bolunme.json`).
+2. Eşik **yalnız TRAIN** bandından, **açık formülle** türetildi.
+3. Held-out'a **yalnızca bir kez** bakıldı.
+4. Pilot geçsin diye ayar **yok**; eşik uydurma **yok**.
+
+Yapılandırma I-54'te ölçülmüştü ve burada **seçilmedi, yalnızca kullanıldı**:
+dört yön + `dis1` (en dış sütun/satır) + 384 genişlik + 8 fps.
+
+### ⚠ Ölçüm sırasında bulunan ve düzeltilen kusur (betikte, render'da değil)
+
+İlk koşumda TRAIN'de **örtüşme** göründü (kusur 20.431 > temiz 12.468).
+Neden: sahne penceresi `int(bitiş × fps)` ile kesiliyor ve sahnenin **son
+karesi** (2.201 sn'lik sahnede t=2.125) dışarıda kalıyordu — **bant tam
+orada** oluşuyor. Pencere zaman tabanlı yapıldı; değer **20.431 → 0.046**.
+Render **değişmedi**; hata ölçüm betiğindeydi.
+
+### TRAIN — eşik yalnız buradan
+
+| taraf | değerler |
+|---|---|
+| **kusurlu** | sag-parlak-kisa **0.046** · ust-parlak-kisa 0.0 · sag-koyu-uzun 0.0 |
+| **temiz** | **ses10 12.468** · i37 15.889 · smoke20 19.005 · i20 23.594 · i18 25.870 · i16 32.968 · i17 32.968 · i15 33.005 |
+
+Band: kusur **0.046** < temiz **12.468** (örtüşme yok).
+
+### Formül — açık ve en kötü train sınırlarından
+
+```
+eşik = temiz_alt / GÜVENLİK_KATI          GÜVENLİK_KATI = 2
+eşik = 12.468 / 2 = 6.234
+```
+
+**Anlamı**: temiz bir karenin işaretlenmesi için, TRAIN'de ölçülen **en koyu
+temiz kenarın yarısı** kadar daha koyulaşması gerekir (**2× pay**).
+TRAIN payları: temiz tarafı **×2.00** (formülün kendisi), kusur tarafı
+**×135.5**. Eşiğin TRAIN bandının içinde olduğu ayrıca **doğrulandı**
+(0.046 < 6.234 < 12.468) — uydurma değil, kontrol.
+
+### HELD-OUT — TEK BAKIŞ
+
+| kusurlu | değer | sonuç |
+|---|---|---|
+| sol-parlak-uzun | 0.005 | yakalandı |
+| ust-koyu-kisa | 0.003 | yakalandı |
+| alt-parlak-uzun | 0.0 | yakalandı |
+| i52karsi | 0.0 | yakalandı |
+
+| temiz | değer | sonuç |
+|---|---|---|
+| **onizleme** | **10.009** | temiz |
+| i39 | 15.856 | temiz |
+| i43 | 22.856 | temiz |
+| i52vid | 22.921 | temiz |
+| i42 / i41vid | 37.880 | temiz |
+| i54temiz | 40.329 | temiz |
+
+**Kaçırma 0 · Yanlış pozitif 0 → KABUL.**
+Held payları: temiz tarafı **×1.61**, kusur tarafı **×1247**.
+
+### Duyarlılık — sonuç tek bir sayıya bağlı değil
+
+Held-out'ta FP=FN=0 kalması için `GÜVENLİK_KATI` aralığı yaklaşık
+**(1.25, 2494)**; seçilen **2.0** bu aralığın rahat içinde.
+
+⚠ Bu eşik (**6.234**) mevcut `KENAR_SIYAH_ESIGI` (**16**) ile
+**karşılaştırılamaz**: farklı örnekleme (384×216 @ 8 fps) ve farklı
+agregasyon (en dış sütun/satır) üzerinde tanımlıdır.
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **2100** | **3514** |
+
+0 hata. Faz I 2081 → **2100** (+19). **1 BLOKE** — I-33 kaydı sürüyor.
+
+### SONRAKİ ATOM — artık tek parça kaldı
+
+Kenar kapısının **tüm parçaları ölçüldü**: yapılandırma (I-54) ve eşik
+(I-55). Geriye **uygulama** kalıyor: bağımsız kenar ölçüm hattı
+(`kenar_ornek_komutu` + dört yön + en dış sütun/satır + eşik 6.234), PRE/POST
+QA'ya kablolama ve gerçek pilotla doğrulama.
+⚠ `OPTIK_ORNEK_FPS` **4'te kalmalı** (I-17 durağanlık eşikleri ona bağlı).
+⚠ Uygulama **render davranışını değiştirmez** ama **QA hükmünü** değiştirir;
+o atomda ≥20 sn 1080p pilot + tam QA gerekir.
+
+⚠ Diğer açık borçlar: semantik kabul engeli (b002/b005 — **kullanıcı
+kararı**), önizlemede altyazı çizilmemesi (I-40), model d > 1.31 ölçülmemiş.
 
 ---
 

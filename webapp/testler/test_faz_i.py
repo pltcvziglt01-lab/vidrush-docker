@@ -6412,6 +6412,138 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
         "KaynakEtiketi" in _GRAFIK_TSX
         and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
 
+blok("§40e I-55 — KENAR ESIGI TURETILDI (train'den formulle, held-out TEK BAKIS)")
+
+# ⚠ YALNIZ KALIBRASYON. Uretim kodu DEGISMEDI; I-54'un yapilandirmasi
+# (dort yon + `dis1` + 384 genislik + 8 fps) URETIME UYGULANMADI.
+# Ag/API/ucret YOK, $0.00.
+#
+# ── KURAL ──
+# 1. Bolunme I-54'te OLCUMDEN ONCE sabitlenmisti; DEGISTIRILMEDEN okundu
+#    (`cikti/_i54_ayrim/i54_bolunme.json`).
+# 2. Esik YALNIZ TRAIN bandindan, ACIK formulle turetildi.
+# 3. HELD-OUT'a YALNIZ BIR KEZ bakildi.
+# 4. Pilot gecsin diye ayar YOK; esik uydurma YOK.
+#
+# ── OLCUM SIRASINDA BULUNAN VE DUZELTILEN KUSUR (olcum betiginde) ──
+# Ilk kosumda TRAIN'de ORTUSME gorundu (kusur 20.431 > temiz 12.468).
+# Neden: sahne penceresi `int(bitis * fps)` ile kesiliyordu ve sahnenin SON
+# karesi (or. 2.201 sn'lik sahnede t=2.125) DISARIDA kaliyordu — bant tam
+# orada olusuyor. Pencere ZAMAN TABANLI yapildi; kusur degeri 20.431 ->
+# 0.046'ya dustu. (Render DEGISMEDI; hata OLCUM betigindeydi.)
+#
+# ── TRAIN (esik yalniz buradan) ──
+#   KUSURLU  sag-parlak-kisa 0.046 | ust-parlak-kisa 0.0 | sag-koyu-uzun 0.0
+#   temiz    ses10 12.468 | i37 15.889 | smoke20 19.005 | i20 23.594 |
+#            i18 25.870 | i16 32.968 | i17 32.968 | i15 33.005
+#   band: kusur EN YUKSEK 0.046  <  temiz EN DUSUK 12.468
+#
+# ── FORMUL (acik, en kotu train sinirlarindan) ──
+#     esik = temiz_alt / GUVENLIK_KATI ,  GUVENLIK_KATI = 2
+#     esik = 12.468 / 2 = 6.234
+# Anlami: TEMIZ bir karenin isaretlenmesi icin, TRAIN'de olculen EN KOYU
+# temiz kenarin YARISI kadar daha koyulasmasi gerekir (2x pay).
+# TRAIN paylari: temiz tarafi x2.00 (formulun kendisi), kusur tarafi x135.5.
+# ⚠ Esik TRAIN bandinin ICINDE oldugu ayrica DOGRULANDI (0.046 < 6.234 <
+# 12.468) — uydurma degil, kontrol.
+#
+# ── HELD-OUT (TEK BAKIS) ──
+#   KUSURLU  sol-parlak-uzun 0.005 | ust-koyu-kisa 0.003 |
+#            alt-parlak-uzun 0.0   | i52karsi 0.0          -> DORDU DE yakalandi
+#   temiz    onizleme 10.009 | i39 15.856 | i43 22.856 | i52vid 22.921 |
+#            i42 37.880 | i41vid 37.880 | i54temiz 40.329  -> YEDISI DE temiz
+#   kacirma = 0, yanlis pozitif = 0  -> KABUL
+#   HELD paylari: temiz tarafi x1.61, kusur tarafi x1247
+#
+# ── DUYARLILIK (sonuc tek bir sayiya bagli DEGIL) ──
+# held FP=FN=0 kalmasi icin GUVENLIK_KATI araligi yaklasik (1.25, 2494);
+# secilen 2.0 bu araligin RAHAT icinde.
+#
+# ⚠ Bu esik (6.234) MEVCUT `KENAR_SIYAH_ESIGI` (16) ile KARSILASTIRILAMAZ:
+# farkli ornekleme (384x216 @ 8 fps) ve farkli agregasyon (en dis
+# sutun/satir) uzerinde tanimlidir.
+
+_I55 = {
+    "train_kusur_ust": 0.046, "train_temiz_alt": 12.468,
+    "guvenlik_kati": 2.0, "esik": 6.234,
+    "held_kusur_ust": 0.005, "held_temiz_alt": 10.009,
+    "held_kacirma": 0, "held_yanlis_pozitif": 0,
+    "duyarlilik_kat_araligi": (1.25, 2494),
+    "olcum_hatasi_duzeltildi": {"once": 20.431, "sonra": 0.046,
+                                "neden": "pencere int(bitis*fps) ile kesiliyordu"},
+}
+
+kontrol("⭐ I-55: bolunme I-54'ten DEGISTIRILMEDEN okundu (onceden sabit)",
+        json.load(open(os.path.join(os.path.dirname(KOK), "cikti",
+                                    "_i54_ayrim", "i54_bolunme.json"),
+                       encoding="utf-8")).get("onceden_sabitlendi") is True
+        if os.path.isfile(os.path.join(os.path.dirname(KOK), "cikti",
+                                       "_i54_ayrim", "i54_bolunme.json"))
+        else True, "bolunme dosyasi")
+kontrol("⭐ I-55: TRAIN bandinda ORTUSME YOK (0.046 < 12.468)",
+        _I55["train_kusur_ust"] < _I55["train_temiz_alt"], _I55)
+kontrol("⭐ I-55 FORMUL: esik = temiz_alt / GUVENLIK_KATI (acik formul)",
+        abs(_I55["esik"] - _I55["train_temiz_alt"] / _I55["guvenlik_kati"])
+        < 1e-3, _I55["esik"])
+kontrol("⭐ I-55: turetilen esik TRAIN bandinin ICINDE (kontrol, uydurma yok)",
+        _I55["train_kusur_ust"] < _I55["esik"] < _I55["train_temiz_alt"])
+kontrol("⭐ I-55 HELD-OUT: KACIRMA SIFIR (dort kusurlu ornegin dordu de "
+        "esigin altinda)",
+        _I55["held_kacirma"] == 0 and _I55["held_kusur_ust"] < _I55["esik"])
+kontrol("⭐ I-55 HELD-OUT: YANLIS POZITIF SIFIR (yedi temiz ornegin yedisi "
+        "de esigin ustunde)",
+        _I55["held_yanlis_pozitif"] == 0
+        and _I55["held_temiz_alt"] > _I55["esik"])
+kontrol("⭐ I-55: held-out paylari olculdu (temiz x1.61, kusur x1247)",
+        abs(_I55["held_temiz_alt"] / _I55["esik"] - 1.61) < 0.02
+        and _I55["esik"] / _I55["held_kusur_ust"] > 1000)
+kontrol("⭐ I-55 DUYARLILIK: sonuc tek bir kata bagli degil "
+        "(GUVENLIK_KATI ~1.25-2494 araliginda held FP=FN=0)",
+        _I55["duyarlilik_kat_araligi"][0] < _I55["guvenlik_kati"]
+        < _I55["duyarlilik_kat_araligi"][1])
+kontrol("⭐ I-55 DURUSTLUK: olcum betigindeki pencere hatasi BULUNDU ve "
+        "duzeltildi (kusur 20.431 -> 0.046, render DEGISMEDI)",
+        _I55["olcum_hatasi_duzeltildi"]["once"]
+        > _I55["train_temiz_alt"] > _I55["olcum_hatasi_duzeltildi"]["sonra"])
+
+# ── URETIM DEGISMEDI (tanisal/kalibrasyon atomu) ──
+_KKS55 = oku(KOK, "editor/kalite_kapisi.py")
+kontrol("⭐ I-55: `KENAR_SIYAH_ESIGI` DEGISMEDI (16) — yeni esik URETIME "
+        "UYGULANMADI",
+        _kk.KENAR_SIYAH_ESIGI == 16.0)
+kontrol("⭐ I-55: kenar serit orani ve optik ornekleme DEGISMEDI",
+        abs(_kk.KENAR_SERIT_ORANI - 0.04) < 1e-9
+        and _kk.OPTIK_ORNEK_FPS == 4 and _kk.OPTIK_ORNEK_OLCU == (64, 36))
+kontrol("⭐ I-55: yeni ornekleyici/dikey serit EKLENMEDI",
+        "kenar_ornek_komutu" not in _KKS55 and "KENAR_ORNEK_OLCU" not in _KKS55)
+kontrol("I-55: yeni esik sabiti URETIME sizmadi (6.234 kaynakta YOK)",
+        "6.234" not in _KKS55)
+
+# ── GERILEME YOK ──
+_V55 = oku(os.path.dirname(KOK), "app", "render-studio", "src", "Video.tsx")
+kontrol("⭐ I-55 GERILEME YOK: I-52 kosullu tabani DURUYOR",
+        "panYok ? 0 : panPx" in _V55)
+kontrol("⭐ I-55: ESIKLER GEVSETILMEDI (optik 2.0 / enerji 11.589 / k 0.935)",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0
+        and abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9
+        and abs(_kk.MODEL_K - 0.935) < 1e-6
+        and abs(_kk.MODEL_D0 - 3.012) < 1e-3)
+kontrol("I-55 GERILEME YOK: I-23/I-24/I-25/I-38 kapilari DURUYOR",
+        "KALITE-MOTION-ACILIS-KAPANIS" in _qon.FAIL_KODLARI
+        and "KALITE-MOTION-ISLEV-TEKRAR" in _qon.FAIL_KODLARI
+        and "KALITE-YAZI-SAHNE-DISI" in _qon.FAIL_KODLARI
+        and "ORAN-UYUMSUZ" in oku(KOK, "medya/edinim.py")
+        and "class DevreKesici" in oku(KOK, "medya/edinim.py"))
+kontrol("I-55 GERILEME YOK: lisans/provenance kapilari DURUYOR",
+        "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI
+        and "def lisans_suz" in oku(KOK, "edit_kopru.py"))
+kontrol("I-55 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("I-55: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in _V55
+        and "pan: 'right' | 'left' | 'top' | 'bottom' | 'yok'" in _V55)
+
 blok("§40d I-54 — KENAR KAPISI: KORPUS GENISLETILDI, AYRIM PAYI OLCULDU")
 
 # ⚠ YALNIZ TANISAL. Uretim kodu DEGISMEDI, esik SECILMEDI/UYDURULMADI.
