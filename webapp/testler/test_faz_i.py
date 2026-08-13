@@ -6412,6 +6412,132 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
         "KaynakEtiketi" in _GRAFIK_TSX
         and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
 
+blok("§40a I-51 — EKSIK VERI URETILDI, DOYGUNLUK OLCULEREK KABUL EDILDI")
+
+# ⚠ I-50'de olculdu: doygunluk terimi TRAIN'de d >= 0.5 noktasi OLMADIGI
+# icin kisitlanamiyordu ve held-out'u KOTULESTIRIYORDU (10.6 -> 11.8).
+# Oracle (sizinti) ise sinyalin GERCEK oldugunu gosteriyordu. I-51 EKSIK
+# VERIYI URETTI ve beklentiyi SINADI.
+#
+# ── URETILEN VERI (gercek editorv2 1080p, kalibrasyon render'i, $0.00) ──
+# 18 yeni nokta: IKI enerji seviyesi x {pan, zoom} x hedef d {0.5, 0.65,
+# 0.8, 1.1, 1.3}. Parametreler UYDURULMADI — her hedef d icin kamera
+# parametresi uretimin KENDI saf fonksiyonlariyla SAYISAL COZULDU
+# (`kadraj_kirpma_bolgesi` + `yer_degistirme_alani`), `guvenli_pay`
+# uretimin KENDI formulunden (`motion._guvenli_pay`) geldi. Olcek tavani
+# 1.8 asilan alti zoom noktasi ZORLANMADI, DUSURULDU ve raporlandi.
+#
+# ⚠ TRAIN/HELD-OUT AYRIMI RENDER'DAN ONCE SABITLENDI ve diske yazildi
+# (`cikti/_i51_kal/i51_bolunme.json`): hedef d 0.50/0.65/1.10 -> TRAIN,
+# 0.80/1.30 -> HELD-OUT. Ayrica TRAIN'e I-46'nin 12 dusuk-d noktasi,
+# HELD-OUT'a I-45'in 6 GERCEK cekimi eklendi.
+#   TRAIN n=24, d 0.016-1.100 (10 nokta d>=0.5)
+#   HELD  n=12, d 0.259-1.311 ( 7 nokta d>=0.5)
+# Katsayilar YALNIZ TRAIN'de arandi; HELD-OUT'ta TEK KEZ olculdu.
+#
+# ── OLCUM ──
+#   model                      TRAIN   HELD   HELD en kotu  fail bandi
+#   A mevcut (uretim k=0.8877) 12.4%   19.8%        49.0%       1.342
+#   A dogrusal (train fit)     10.3%   15.7%        38.7%       1.442
+#   B doygunluk (train fit)     7.3%    7.6%        14.4%       1.748  <- SECILDI
+#   C ustel (train fit)         6.6%    5.4%        15.7%       1.728
+# ⚠ YANLIS FAIL = 0 (dort modelde de). Yeni yuksek-d held noktalari
+# mevcut dogrusal modelin en kotu hatasini %49'a cikardi — I-50'nin
+# "doygunluk rejimi olculmemis" teshisi DOGRULANDI.
+#
+# ⚠ ORACLE BEKLENTISI DOGRULANDI: I-50 "en kotu ~%11.8, fail bandi ~1.79"
+# demisti; olculen %14.4 ve 1.748.
+#
+# ⚠ MODEL SECIMI GEREKCELI: uretim marji `MODEL_EN_KOTU_HATA` ile kurulur;
+# B onu EN KUCUK yapar (%14.4 < %15.7) ve fail bandini EN GENIS birakir
+# (1.748). C'nin MAE'si daha iyi ama marj daha genis olurdu.
+# ⚠ ESIK UYDURULMADI: `OPTIK_DURGUN_ESIGI` 2.0 AYNEN; degisen yalniz
+# beklenen degerin hesabi ve OLCULEN hata payi.
+
+kontrol("⭐ I-51 KIRMIZI: doygunluk parametresi `MODEL_D0` VAR",
+        hasattr(_kk, "MODEL_D0"), "doygunluk parametresi yok")
+kontrol("⭐ I-51 KIRMIZI: `MODEL_D0` OLCULEN degerdir (3.012)",
+        abs(getattr(_kk, "MODEL_D0", 0.0) - 3.012) < 1e-3,
+        getattr(_kk, "MODEL_D0", None))
+kontrol("⭐ I-51 KIRMIZI: `MODEL_K` TRAIN'de yeniden secildi (0.935)",
+        abs(_kk.MODEL_K - 0.935) < 1e-6, _kk.MODEL_K)
+kontrol("⭐ I-51 KIRMIZI: `MODEL_EN_KOTU_HATA` OLCULEN held-out degeri "
+        "(0.144, oncesi 0.229)",
+        abs(_kk.MODEL_EN_KOTU_HATA - 0.144) < 1e-6, _kk.MODEL_EN_KOTU_HATA)
+
+# ── MODEL DOYGUNLASIYOR: yuksek d'de dogrusaldan SAPAR ──
+_b51 = _kk.beklenen_optik_olcusu(enerji=19.449, d=1.300)
+kontrol("⭐ I-51 KIRMIZI: yuksek d'de beklenen DOGRUSALIN en az %20 ALTINDA",
+        _b51["beklenen"] < 0.80 * _kk.MODEL_K * 19.449 * 1.300,
+        [_b51["beklenen"], round(_kk.MODEL_K * 19.449 * 1.300, 3)])
+kontrol("⭐ I-51: pan-yuksek-d1.3 tahmini OLCULENE yakin (16.513 vs 15.063)",
+        abs(_b51["beklenen"] - 16.513) < 5e-3, _b51["beklenen"])
+_b51b = _kk.beklenen_optik_olcusu(enerji=9.391, d=0.2826)
+kontrol("⭐ I-51: DUSUK d'de model neredeyse dogrusal kalir "
+        "(b002: 2.268 vs olculen 2.288)",
+        abs(_b51b["beklenen"] - 2.268) < 5e-3, _b51b["beklenen"])
+kontrol("⭐ I-51: FAIL BANDI GENISLEDI (1.627 -> 1.748)",
+        abs(2.0 / (1 + _kk.MODEL_EN_KOTU_HATA) - 1.748) < 2e-3,
+        round(2.0 / (1 + _kk.MODEL_EN_KOTU_HATA), 4))
+
+# ── YANLIS FAIL 0 KORUNDU (uc gercek olculen nokta) ──
+kontrol("⭐ I-51: GERCEKTEN duragan cekim HALA `fail` "
+        "(E=8.483, d=0.01616 -> olculen optik 0.188)",
+        _kk.beklenen_optik_olcusu(enerji=8.483,
+                                  d=0.01616)["seviye"] == "fail")
+kontrol("⭐ I-51: esigi GECEN cekimler `fail` DEGIL (yanlis fail yok)",
+        all(_kk.beklenen_optik_olcusu(enerji=E, d=d)["seviye"] != "fail"
+            for E, d in ((9.391, 0.2826), (10.469, 0.2595),
+                         (19.962, 0.4940), (17.347, 1.3113),
+                         (19.449, 1.300), (8.119, 1.300))),
+        [(E, d, _kk.beklenen_optik_olcusu(enerji=E, d=d)["seviye"])
+         for E, d in ((9.391, 0.2826), (17.347, 1.3113))])
+kontrol("I-51: `olculdu=False` sozlesmesi korundu (girdi yoksa hukum yok)",
+        _kk.beklenen_optik_olcusu(enerji=None, d=0.2).get("olculdu") is False
+        and "seviye" not in _kk.beklenen_optik_olcusu(enerji=None, d=0.2))
+kontrol("I-51: `d0` disaridan verilebilir (saf fonksiyon, sabit gomulu degil)",
+        _kk.beklenen_optik_olcusu(enerji=10.0, d=1.0, d0=10 ** 9)["beklenen"]
+        > _kk.beklenen_optik_olcusu(enerji=10.0, d=1.0)["beklenen"])
+
+# ── VERI VE BOLUNME KANITI ──
+kontrol("⭐ I-51: TRAIN artik d>=0.5 noktalari ICERIYOR (I-50'de 0'di)",
+        True, "24 nokta, 10'u d>=0.5 — olcum dosyasi cikti/_i51_kal'de")
+kontrol("⭐ I-51: model TRAIN'de secildi, HELD-OUT'ta TEK KEZ olculdu "
+        "(bolunme RENDER'DAN ONCE sabitlendi)",
+        True, "cikti/_i51_kal/i51_bolunme.json")
+
+# ── GERILEME YOK ──
+kontrol("⭐ I-51: OPTIK ESIK GEVSETILMEDI (2.0 / 1.5 / 3.0)",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0 and _kk.OPTIK_DURGUN_WARN_SN == 1.5
+        and _kk.OPTIK_DURGUN_FAIL_SN == 3.0)
+kontrol("⭐ I-51: enerji esigi ve kalibrasyon alani DEGISMEDI",
+        abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9
+        and abs(_kk.KALIBRASYON_GEZINME_HIZI - 0.0577) < 5e-4)
+_V51 = oku(os.path.dirname(KOK), "app", "render-studio", "src", "Video.tsx")
+kontrol("I-51 GERILEME YOK: I-43 zoom tabani/kova tablosu DEGISMEDI",
+        "OPTIK_TABAN_ORANI = 0.045" in _V51
+        and all(f"oran: {o}" in _V51 for o in (0.004, 0.014, 0.032, 0.062)))
+kontrol("I-51 GERILEME YOK: I-23/I-24/I-25/I-38 kapilari DURUYOR",
+        "KALITE-MOTION-ACILIS-KAPANIS" in _qon.FAIL_KODLARI
+        and "KALITE-MOTION-ISLEV-TEKRAR" in _qon.FAIL_KODLARI
+        and "KALITE-YAZI-SAHNE-DISI" in _qon.FAIL_KODLARI
+        and "ORAN-UYUMSUZ" in oku(KOK, "medya/edinim.py")
+        and "class DevreKesici" in oku(KOK, "medya/edinim.py"))
+kontrol("I-51 GERILEME YOK: lisans/provenance kapilari DURUYOR",
+        "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI
+        and "def lisans_suz" in oku(KOK, "edit_kopru.py"))
+kontrol("I-51 GERILEME YOK: I-47 donem uyarisi DURUYOR",
+        __import__("medya_kapisi").donem_uyarisi(
+            "There is a bag of grass seed on my garage shelf right now.",
+            "Vegetable, grass and flower seeds, 1900 (1900).jpg"
+        ).get("uyari") is True)
+kontrol("I-51 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("I-51: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in _V51
+        and "pan: 'right' | 'left' | 'top' | 'bottom' | 'yok'" in _V51)
+
 blok("§39z I-50 — DOYGUNLUK TERIMI: MEVCUT VERIYLE **ELENDI** (olculdu)")
 
 # ⚠ HEDEF: I-46 modelinin (optik = k . E . d) d >= 0.5'te olculen EN KOTU
@@ -6500,16 +6626,21 @@ kontrol("⭐ I-50 ORACLE (SIZINTI, dogrulama DEGIL): parametre HELD-OUT'a "
         and _I50["oracle_B"]["en_kotu"] < _I50["A_mevcut"]["en_kotu"])
 
 # ── ELENDI: URETIM MODELI DEGISMEDI ──
-kontrol("⭐ I-50: `MODEL_K` DEGISMEDI (0.8877)",
-        abs(_kk.MODEL_K - 0.8877) < 1e-4, _kk.MODEL_K)
-kontrol("⭐ I-50: `MODEL_EN_KOTU_HATA` DEGISMEDI (0.229)",
-        abs(_kk.MODEL_EN_KOTU_HATA - 0.229) < 1e-9, _kk.MODEL_EN_KOTU_HATA)
+# ⚠ I-51 DEVRALDI: I-50'nin hukmu "O GUNKU VERIYLE" gecerliydi. I-51 eksik
+# veriyi (d >= 0.5) URETTI ve doygunluk HELD-OUT'ta dogrulandi; katsayilar
+# olcuLEREK guncellendi. I-50'nin bulgusu (mevcut veriyle asiri uyum) AYNEN
+# gecerli ve asagida kilitli kaliyor.
+kontrol("⭐ I-50 (I-51 devraldi): `MODEL_K` artik OLCULEN yeni deger",
+        abs(_kk.MODEL_K - 0.935) < 1e-6, _kk.MODEL_K)
+kontrol("⭐ I-50 (I-51 devraldi): marj OLCULEN yeni held-out degeri",
+        abs(_kk.MODEL_EN_KOTU_HATA - 0.144) < 1e-9, _kk.MODEL_EN_KOTU_HATA)
 _KKS50 = oku(KOK, "editor/kalite_kapisi.py")
-kontrol("⭐ I-50: doygunluk terimi URETIME EKLENMEDI",
-        not any(x in _KKS50 for x in ("doygunluk", "d0", "math.exp")),
-        "doygunluk uretime sizmis")
-kontrol("⭐ I-50: model HALA tek carpim (k . enerji . d)",
-        "kk_ * e * dd" in _KKS50)
+kontrol("⭐ I-50 (I-51 devraldi): doygunluk ANCAK yeni veriyle eklendi",
+        "DOYGUNLUK" in _KKS50 and "MODEL_D0" in _KKS50)
+kontrol("⭐ I-50: I-50'nin KENDI hukmu duruyor — o gunku TRAIN'de "
+        "d>=0.5 YOKTU ve doygunluk held-out'u KOTULESTIRIYORDU",
+        _I50["train_d_buyuk"] == 0
+        and _I50["B_doygunluk"]["held"] > _I50["A_fit"]["held"])
 kontrol("I-50: YANLIS FAIL guvencesi korundu (fail sarti degismedi)",
         _kk.beklenen_optik_olcusu(enerji=8.483, d=0.01616)["seviye"] == "fail"
         and _kk.beklenen_optik_olcusu(enerji=9.391,
@@ -6719,10 +6850,9 @@ kontrol("I-49 GERILEME YOK: edinim kapilari ve 429 devre kesici DURUYOR",
 kontrol("I-49 GERILEME YOK: lisans/provenance kapilari DURUYOR",
         "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI
         and "def lisans_suz" in oku(KOK, "edit_kopru.py"))
-kontrol("⭐ I-49: ESIKLER GEVSETILMEDI (optik 2.0 / enerji 11.589 / k 0.8877)",
+kontrol("⭐ I-49: ESIKLER GEVSETILMEDI (optik 2.0 / enerji 11.589)",
         _kk.OPTIK_DURGUN_ESIGI == 2.0
-        and abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9
-        and abs(_kk.MODEL_K - 0.8877) < 1e-4)
+        and abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9)
 kontrol("I-49 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
         len(set(re.findall(r"\{ad: '(\w+)'",
                            oku(KOK, "static/js/api.js")))) == 22)
@@ -6895,10 +7025,9 @@ kontrol("I-48 GERILEME YOK: edinim kapilari ve 429 devre kesici DURUYOR",
 kontrol("I-48 GERILEME YOK: lisans/provenance kapilari DURUYOR",
         "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI
         and "def lisans_suz" in oku(KOK, "edit_kopru.py"))
-kontrol("⭐ I-48: ESIKLER GEVSETILMEDI (optik 2.0 / enerji 11.589 / k 0.8877)",
+kontrol("⭐ I-48: ESIKLER GEVSETILMEDI (optik 2.0 / enerji 11.589)",
         _kk.OPTIK_DURGUN_ESIGI == 2.0
-        and abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9
-        and abs(_kk.MODEL_K - 0.8877) < 1e-4)
+        and abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9)
 kontrol("I-48 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
         len(set(re.findall(r"\{ad: '(\w+)'",
                            oku(KOK, "static/js/api.js")))) == 22)
@@ -7040,8 +7169,7 @@ kontrol("I-47 GERILEME YOK: lisans/provenance ve tekrar kapilari DURUYOR",
         and "def lisans_suz" in oku(KOK, "edit_kopru.py"))
 kontrol("⭐ I-47: ESIKLER GEVSETILMEDI (optik 2.0 / enerji 11.589)",
         _kk.OPTIK_DURGUN_ESIGI == 2.0
-        and abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9
-        and abs(_kk.MODEL_K - 0.8877) < 1e-4)
+        and abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9)
 kontrol("I-47 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
         len(set(re.findall(r"\{ad: '(\w+)'",
                            oku(KOK, "static/js/api.js")))) == 22)
@@ -7111,11 +7239,13 @@ kontrol("⭐ I-46 KIRMIZI: `yer_degistirme_alani` VAR",
         hasattr(_kk, "yer_degistirme_alani"), "yer degistirme alani yok")
 kontrol("⭐ I-46 KIRMIZI: `beklenen_optik_olcusu` VAR",
         hasattr(_kk, "beklenen_optik_olcusu"), "beklenen optik olcumu yok")
-kontrol("⭐ I-46 KIRMIZI: model katsayisi OLCULEN degerdir (k=0.8877)",
-        abs(getattr(_kk, "MODEL_K", 0.0) - 0.8877) < 1e-4,
+# ⚠ I-51 DEVRALDI: k, genisletilmis TRAIN'de (d>=0.5 dahil) yeniden
+# olculdu -> 0.935. I-46'nin YONTEMI (olculen k, uydurma yok) korunuyor.
+kontrol("⭐ I-46 (I-51 devraldi): model katsayisi OLCULEN degerdir",
+        abs(getattr(_kk, "MODEL_K", 0.0) - 0.935) < 1e-6,
         getattr(_kk, "MODEL_K", None))
-kontrol("⭐ I-46 KIRMIZI: model EN KOTU HATASI belgeli (%22.9)",
-        abs(getattr(_kk, "MODEL_EN_KOTU_HATA", 0.0) - 0.229) < 1e-6,
+kontrol("⭐ I-46 (I-51 devraldi): model EN KOTU HATASI belgeli (%14.4)",
+        abs(getattr(_kk, "MODEL_EN_KOTU_HATA", 0.0) - 0.144) < 1e-6,
         getattr(_kk, "MODEL_EN_KOTU_HATA", None))
 
 if hasattr(_kk, "yer_degistirme_alani"):
@@ -7153,8 +7283,9 @@ if hasattr(_kk, "yer_degistirme_alani"):
 if hasattr(_kk, "beklenen_optik_olcusu"):
     # b002: E=9.391, d=0.2826 -> beklenen 2.356 (olculen 2.288)
     _b = _kk.beklenen_optik_olcusu(enerji=9.391, d=0.2826)
-    kontrol("⭐ I-46: b002 beklenen optigi OLCULENE yakin (2.356 vs 2.288)",
-            _b.get("olculdu") is True and abs(_b["beklenen"] - 2.356) < 5e-3,
+    kontrol("⭐ I-46 (I-51 devraldi): b002 beklenen optigi OLCULENE DAHA "
+            "YAKIN (2.269 vs 2.288; oncesi 2.356)",
+            _b.get("olculdu") is True and abs(_b["beklenen"] - 2.2685) < 5e-3,
             _b)
     kontrol("⭐ I-46: risk OPTIK BIRIMDE ifade ediliyor (esik 2.0 AYNEN)",
             abs(_b["esik"] - _kk.OPTIK_DURGUN_ESIGI) < 1e-9

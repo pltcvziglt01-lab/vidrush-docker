@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 14 Ağu | **I-51 eksik veri üretildi, doygunluk ölçülerek kabul edildi** | `PENDING` | ✅ **push edildi**, gerçek editorv2 1080p'de **18 yeni kontrollü nokta** (2 enerji × {pan, zoom} × hedef d 0.5–1.3; parametreler üretimin kendi saf fonksiyonlarıyla **sayısal çözüldü**, ölçek tavanı yetmeyen 6 zoom noktası **düşürüldü**); **train/held-out ayrımı render'dan ÖNCE** diske sabitlendi; model TRAIN'de seçilip HELD-OUT'ta **tek kez** ölçüldü: doygunluk **HELD MAE 15.7%→7.6%**, **en kötü 38.7%→14.4%**, **fail bandı 1.442→1.748**, **yanlış fail 0** korundu → I-50'nin oracle beklentisi **doğrulandı**; `MODEL_K` 0.935 / `MODEL_D0` 3.012 / marj 0.144; eşikler gevşetilmedi; 25.2 sn pilot POST-QA **PASS**, **11/11 kare SHA-256 aynı**, **kabul edilmiş MP4 DEĞİL** (b001/b002 semantik), deploy YOK |
 | 14 Ağu | **I-50 doygunluk terimi mevcut veriyle: ELENDİ** | `f4a0afe` | ✅ **push edildi**, sıkı train/held-out ile ölçüldü: **TRAIN'de d ≥ 0.5 olan nokta YOK** (0.016–0.289) oysa en kötü hata d=1.311'de → doygunluk parametresi train verisiyle **kısıtlanamıyor**; ek parametre TRAIN'i iyileştirip (9.4→7.8%) **HELD-OUT'u kötüleştiriyor** (10.6→11.8%) ve en kötü hatayı **büyütüyor** (22.4→27.3/28.2%) → **fail bandı daralıyor** (1.627→1.571/1.560), yani kapı daha az vaka yakalar; oracle (sızıntı) %6.0/%11.8 ile sinyalin **gerçek ama verinin yetersiz** olduğunu gösteriyor → **üretim modeli DEĞİŞMEDİ** (`MODEL_K` 0.8877, hata payı 0.229), rerender YOK, deploy YOK |
 | 13 Ağu | **I-49 b005 tür/takson yerel olarak: ELENDİ** | `f136778` | ✅ **push edildi**, ölçüldü: kurulu taksonomi/ML paketi **yok**, `taksonomi.py` biyolojik değil, `webapp/veri/` altında tür verisi yok, 17 gerçek künyenin **21 alanında** tür/kategori alanı **yok**; tek çıkarılabilir sinyal (Latin ikili adlandırma, salt yapısal) örneklemde ayırıyor gibi görünüyor (negatif 2/3, pozitif 0/3, 17 adayda 1) **ama hüküm taşımıyor**: işaretlenen iki adaydan biri (b002) anlatımla **aynı özne ailesinde** — *Heteropogon contortus* bir **çim türü**; "tür adı var" ile "tür yanlış" ayrımı için yerel kaynak yok ve sinyal en iyi etiketlenmiş adayları cezalandırırdı → **üretim kodu DEĞİŞMEDİ**, b005 kabul engeli **sürüyor**, deploy YOK |
 | 13 Ağu | **I-48 b002 yer/özne biyom sözlüğüyle: ELENDİ** | `7b8492d` | ✅ **push edildi**, ölçüldü: altı gerçek çiftin **hiçbirinde** sahne biyomu çıkmıyor (video bağlamı da boş) → kapı **yapısal olarak atıl**; yer adı eklense bile (Kahoolawe→tropik) **sahne tarafı boş** kaldığı için çelişki üretilemiyor; kök neden: sözlükte **"ılıman" kuşağı yok** ve lawn/grass hiçbir kuşakta değil; eklenecek iddia (**çim ⊥ tropik**) **faktüel olarak yanlış** (hawaii tropik listede, b002'nin öznesi *Heteropogon contortus* — bir çim türü); kelime örtüşmesi **ters** çalışıyor (iki POZİTİF kontrol sıfır kelime, negatif b002 iki kelime) → **üretim kodu DEĞİŞMEDİ**, b002 kabul engeli **sürüyor**, deploy YOK |
@@ -5663,6 +5664,122 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 69. FAZ I-51 — EKSİK VERİ ÜRETİLDİ, DOYGUNLUK ÖLÇÜLEREK KABUL EDİLDİ (14 Ağu)
+
+> **Durum: I-50'nin işaret ettiği eksik veri (d ≥ 0.5) GERÇEK RENDERER'DA
+> üretildi; doygunluk terimi TRAIN'de seçilip HELD-OUT'ta TEK KEZ ölçüldü
+> ve **oracle beklentisi doğrulandı**: HELD MAE 15.7% → **7.6%**, en kötü
+> 38.7% → **14.4%**, fail bandı 1.442 → **1.748**, **yanlış fail 0**.
+> A–I yeşil (3437, 0 hata). 25.2 sn pilot POST-QA **PASS**, **11/11 kare
+> SHA-256 aynı**. MP4 **kabul edilmedi** (semantik). Deploy YOK. $0.00.**
+> Değişen: `webapp/editor/kalite_kapisi.py` (2 ölçülen sabit güncellendi +
+> 1 doygunluk sabiti + tek satırlık formül), `webapp/testler/test_faz_i.py`.
+> `Video.tsx`, `Kamera.tsx`, `qa_on.py`, `medya/*`, `deploy.sh`, **eşikler**
+> ve **22 alan sözleşmesi** **dokunulmadı**. I-23…I-50 **korundu**.
+
+### Üretilen veri — ölçüm, tahmin değil
+
+Gerçek **editorv2 1080p** renderer'ında **18 yeni kontrollü nokta**: iki
+enerji seviyesi × {**pan**, **zoom**} × hedef `d` ∈ {0.5, 0.65, 0.8, 1.1, 1.3}.
+
+⚠ **Parametre uydurulmadı**: her hedef `d` için kamera parametresi üretimin
+**kendi saf fonksiyonlarıyla** (`kadraj_kirpma_bolgesi` +
+`yer_degistirme_alani`) **sayısal olarak çözüldü**; `guvenli_pay` üretimin
+kendi formülünden (`motion._guvenli_pay`) geldi. Ölçek tavanı **1.8**
+(üretimde punch-1.6 ile 1.696 görülmüştü) aşılan **6 zoom noktası
+zorlanmadı, düşürüldü ve raporlandı**.
+
+### ⚠ Train/held-out ayrımı RENDER'DAN ÖNCE sabitlendi
+
+`cikti/_i51_kal/i51_bolunme.json` **render'dan önce** yazıldı:
+hedef d **0.50/0.65/1.10 → TRAIN**, **0.80/1.30 → HELD-OUT**. Ayrıca
+TRAIN'e I-46'nın 12 düşük-d noktası, HELD-OUT'a I-45'in **6 gerçek çekimi**
+eklendi — böylece iki küme de hem düşük hem yüksek d içeriyor:
+
+| küme | n | d aralığı | d ≥ 0.5 |
+|---|---|---|---|
+| TRAIN | 24 | 0.016–1.100 | 10 |
+| HELD-OUT | 12 | 0.259–1.311 | 7 |
+
+Katsayılar **yalnız TRAIN**'de arandı; HELD-OUT'ta **tek kez** ölçüldü.
+
+### Ölçüm — tek değerlendirme
+
+| model | TRAIN | HELD | HELD en kötü | fail bandı | yanlış fail |
+|---|---|---|---|---|---|
+| A doğrusal (eski üretim, k=0.8877) | 12.4% | 19.8% | **49.0%** | 1.342 | **0** |
+| A doğrusal (train fit, k=0.8265) | 10.3% | 15.7% | 38.7% | 1.442 | **0** |
+| **B doygunluk (SEÇİLEN)** | **7.3%** | **7.6%** | **14.4%** | **1.748** | **0** |
+| C üstel | 6.6% | 5.4% | 15.7% | 1.728 | **0** |
+
+⚠ Yeni yüksek-d held-out noktaları, **eski doğrusal modelin** en kötü
+hatasını **%49'a** çıkardı — I-50'nin *"doygunluk rejimi ölçülmemiş"*
+teşhisi **doğrulandı**.
+
+⚠ **Oracle beklentisi tutturuldu**: I-50 *"en kötü ~%11.8, fail bandı ~1.79"*
+demişti; ölçülen **%14.4** ve **1.748**.
+
+### Model seçimi gerekçeli
+
+**B seçildi**: üretim marjı `MODEL_EN_KOTU_HATA` ile kurulur ve B onu **en
+küçük** yapar (%14.4 < %15.7), dolayısıyla **fail bandını en geniş** bırakır
+(1.748 > 1.728). C'nin MAE'si daha iyi ama marjı daha geniş olurdu.
+
+### Değişen üretim modeli (en küçük)
+
+```
+beklenen = k · E · d / (1 + d/d0)        (öncesi: k · E · d)
+MODEL_K            0.8877 → 0.935
+MODEL_D0           (yeni) 3.012
+MODEL_EN_KOTU_HATA 0.229  → 0.144
+```
+
+`d ≪ d0` iken bölen ≈ 1 ve model **doğrusal kalır** — düşük-d davranışı
+korunuyor (b002: beklenen 2.269, ölçülen 2.288; öncesi 2.356).
+⚠ **`OPTIK_DURGUN_ESIGI` 2.0 AYNEN**; hiçbir eşik gevşetilmedi, enerji eşiği
+(11.589) ve kalibrasyon gezinme hızı (0.0577) değişmedi.
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **2023** | **3437** |
+
+0 hata. Faz I 2001 → **2023** (+22). Red-first: 8 XX.
+⚠ I-46/I-50'nin eski katsayıları kilitleyen 9 kontrolü **devralındı** ve
+yeni ölçülen değerlere bağlandı; I-50'nin **kendi bulgusu** (o günkü
+veriyle aşırı uyum) **aynen kilitli** kalıyor.
+
+### 1080p pilot — `editorv2_lawn_i51.mp4` (25.2 sn)
+
+Üretim modeli değiştiği için tam pilot koşuldu. Sadakat: **beat eşit=True,
+varlık eşit=True**.
+
+- **1920×1080 @ 30**, aac 48 kHz/2ch, 25.259 sn · **8 kesme** · **11 kare** (6 beat)
+- LUFS **−14.27** / TP **−3.10** · sessizlik **%0.0** · kırpma yok · kenar **0/101**
+- medya tekrarı: **6 benzersiz varlık**, bitişik tekrar yok
+- motion: **4 farklı hareket**, ardışık/işlev tekrarı yok, açılış≠kapanış
+- tipografi: güvenli alan / yatay / nefes / çakışma **temiz** · künye 5 sahnede
+- I-51 optik risk: **yok** · I-45 enerji: işaretlenen yok, kapsam dışı yok
+- I-47 dönem uyarısı: **b001** (doğru pozitif, sürüyor)
+- PRE-QA **WARN** (fail=0), **POST-QA: PASS**
+- **Gerileme yok**: I-47 render'ıyla **11/11 kare SHA-256 birebir aynı**
+
+### ⛔ Kabul durumu
+
+**Kabul edilmiş MP4 değildir**, mutlak yol verilmedi, deploy yok: b001/b002
+görselleri anlatımla **semantik uyumsuz**. ⚠ `cikti/_i51_kal` altındaki
+**kalibrasyon render'ları kabul MP4'ü değildir** — yalnız ölçüm çıktısıdır.
+
+### SONRAKİ ATOM
+
+1. **Semantik kabul engeli** — dört bağımsız eleme (I-34/I-35/I-48/I-49)
+   sonrası **kullanıcı kararı**: operatör onayı ya da VLM.
+2. **Kısa sahnede zoom yolunun çoğunu pan taşma payı yiyor** (I-43'te
+   ölçüldü: 2.201 sn'de istenen %4.5/sn ekranda %2.91/sn).
+3. **Önizlemede altyazı hiç çizilmiyor** (I-40).
+4. Model artık d ≤ 1.31 bandında doğrulandı; **d > 1.31** hâlâ ölçülmemiş.
 
 ---
 

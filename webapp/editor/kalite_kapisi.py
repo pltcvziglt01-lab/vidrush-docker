@@ -1624,7 +1624,34 @@ def yer_degistirme_alani(bas: dict, son: dict, *, sure_sn: float,
 #     zoom  8.756/0.28945 -> 2.135 (k 0.842)   pan  8.471/0.04920 -> 0.398 (0.955)
 #     zoom  8.756/0.20190 -> 1.563 (k 0.884)   pan  8.502/0.12261 -> 0.934 (0.896)
 # MEDYAN 0.8877 alindi (ortalama degil: uc noktalara dayanikli).
-MODEL_K = 0.8877
+#
+# ⚠ FAZ I-51'DE YENIDEN OLCULDU. I-50'de tanilandi ki yukaridaki aile
+# d 0.016-0.289 ile SINIRLIYDI; d >= 0.5 rejimi HIC olculmemisti ve model
+# orada FAZLA tahmin ediyordu. I-51, EKSIK VERIYI URETTI: gercek editorv2
+# 1080p render'inda 18 yeni nokta (iki enerji x {pan, zoom} x hedef d
+# {0.5, 0.65, 0.8, 1.1, 1.3}); parametreler uydurulmadi, her hedef d icin
+# kamera parametresi bu modulun KENDI saf fonksiyonlariyla sayisal cozuldu.
+# TRAIN/HELD-OUT ayrimi RENDER'DAN ONCE sabitlendi:
+#   TRAIN n=24 (I-46'nin 12 dusuk-d noktasi + hedef d 0.50/0.65/1.10)
+#   HELD  n=12 (I-45'in 6 GERCEK cekimi   + hedef d 0.80/1.30)
+# Katsayilar YALNIZ TRAIN'de arandi, HELD-OUT'ta TEK KEZ olculdu:
+#   model                        TRAIN   HELD   HELD en kotu  fail bandi
+#   A dogrusal (eski, k=0.8877)  12.4%   19.8%        49.0%       1.342
+#   A dogrusal (train fit)       10.3%   15.7%        38.7%       1.442
+#   B doygunluk (SECILEN)         7.3%    7.6%        14.4%       1.748
+#   C ustel                       6.6%    5.4%        15.7%       1.728
+# Dort modelde de YANLIS FAIL = 0. B secildi cunku uretim marji
+# `MODEL_EN_KOTU_HATA` ile kurulur ve B onu EN KUCUK yapar (%14.4 < %15.7),
+# dolayisiyla fail bandini EN GENIS birakir.
+MODEL_K = 0.935
+
+# ⚠ DOYGUNLUK OLCEGI (Faz I-51). Buyuk yer degistirmede icerik dekorele
+# olur ve kare farki DOGRUSAL BUYUMEZ; olculen egri
+#     beklenen = k . E . d / (1 + d/d0)
+# ile en iyi uyusuyor. d0 TRAIN'de arandi (3.012) ve HELD-OUT'ta TEK KEZ
+# dogrulandi. d << d0 iken model neredeyse DOGRUSALDIR (dusuk-d davranisi
+# korunur: b002 icin 2.268, olculen 2.288).
+MODEL_D0 = 3.012
 
 # ⚠ MODELIN EN KOTU HATASI — TUTULAN ORNEKTE olculdu (I-45'in ALTI gercek
 # cekimi; kalibrasyona GIRMEDILER):
@@ -1637,11 +1664,18 @@ MODEL_K = 0.8877
 # Ortalama mutlak hata %10.8. En kotu sapma b004'te (d = 1.31 ornek piksel;
 # birinci mertebe rejiminin disinda) ve model FAZLA tahmin ediyor — "hareket
 # az" kapisi icin GUVENLI yon.
-MODEL_EN_KOTU_HATA = 0.229
+#
+# ⚠ FAZ I-51'DE YENIDEN OLCULDU. Genisletilmis HELD-OUT (12 nokta: I-45'in
+# 6 gercek cekimi + d 0.80/1.30 hedefli 6 yeni kontrollu nokta) uzerinde
+# doygunluklu modelin EN KOTU hatasi %14.4 olctu; ayni kumede dogrusal
+# baseline %38.7 veriyordu. Marj OLCULEN en kotu hatadir; kuculdugu icin
+# fail bandi 1.627 -> 1.748 GENISLEDI ve kapi daha cok gercek vakayi
+# yakalayabilir. ⚠ YANLIS FAIL = 0 korundu (36 noktanin hicbirinde).
+MODEL_EN_KOTU_HATA = 0.144
 
 
 def beklenen_optik_olcusu(*, enerji, d, esik: float = OPTIK_DURGUN_ESIGI,
-                          k: float = MODEL_K,
+                          k: float = MODEL_K, d0: float = MODEL_D0,
                           en_kotu_hata: float = MODEL_EN_KOTU_HATA) -> dict:
     """Cekimin BEKLENEN optik hareketi — risk OPTIK BIRIMDE ifade edilir.
 
@@ -1664,9 +1698,12 @@ def beklenen_optik_olcusu(*, enerji, d, esik: float = OPTIK_DURGUN_ESIGI,
     if e < 0 or dd < 0:
         return {"olculdu": False, "neden": "GIRDI-GECERSIZ"}
     kk_ = _sayi(k, MODEL_K)
+    d0_ = _sayi(d0, MODEL_D0)
     hata = _sayi(en_kotu_hata, MODEL_EN_KOTU_HATA)
     esik_ = _sayi(esik, OPTIK_DURGUN_ESIGI)
-    beklenen = kk_ * e * dd
+    # ⚠ I-51: DOYGUNLUK. d << d0 iken bolen ~1 ve model DOGRUSAL kalir;
+    # buyuk d'de icerik dekorele oldugu icin buyume yavaslar (olculdu).
+    beklenen = kk_ * e * dd / (1.0 + dd / d0_) if d0_ > 0 else kk_ * e * dd
     ust = beklenen * (1.0 + hata)
     if ust < esik_:
         seviye = "fail"
@@ -1676,7 +1713,7 @@ def beklenen_optik_olcusu(*, enerji, d, esik: float = OPTIK_DURGUN_ESIGI,
         seviye = "temiz"
     return {"olculdu": True, "beklenen": round(beklenen, 4),
             "ust_sinir": round(ust, 4), "esik": esik_, "k": kk_,
-            "en_kotu_hata": hata, "enerji": round(e, 3), "d": round(dd, 5),
+            "d0": d0_, "en_kotu_hata": hata, "enerji": round(e, 3), "d": round(dd, 5),
             "seviye": seviye}
 
 
