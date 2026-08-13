@@ -207,6 +207,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-38 yazı spec'i sahneye göreli** | `bf1b0c8` | ✅ **push edildi**, ekran künyesi artık ÇİZİLİYOR (4 CC sahne) + PRE-QA kapısı; lawn MP4 **KABUL EDİLMEDİ** (POST-KENAR-SIYAH + semantik), deploy YOK |
 | 13 Ağu | **I-39 altyazı nefes boşluğu zorunlu** | `391d527` | ✅ **push edildi**, künye SAĞ ÜSTE (32.1→766.5 px) + başlık 0.60 + PRE-QA `KALITE-YAZI-NEFES-YOK`; 1080p pilot POST-QA **PASS**, kenar 1/101→0/101; lawn MP4 **KABUL EDİLMEDİ** (b001/b002/b005 semantik), deploy YOK |
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
+| 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 
 ---
 
