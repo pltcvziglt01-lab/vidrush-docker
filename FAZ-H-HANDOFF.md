@@ -196,7 +196,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-27 kamera punch büyütmesi ÇÖZÜLDÜ** | `6ccb739` | ✅ **push edildi**, büyüten beat 2→0, POST-QA **TAM PASS**, puan 100/100, Faz I BLOKE 0, deploy YOK |
 | 13 Ağu | **I-28 seçim sırası tanısı: KUSUR YOK** | `b61208d` | ✅ **push edildi**, öncül ölçümle çürüdü, üretim kodu DEĞİŞMEDİ, davranış kilitlendi, MP4 korundu, deploy YOK |
 | 13 Ağu | **I-29 afiş/pano sinyali: metadata GÜVENİLİR DEĞİL** | `015973e` | ✅ **push edildi**, recall %0 / hassasiyet %6 ölçüldü, üretim DEĞİŞMEDİ, MP4 korundu, deploy YOK |
-| 13 Ağu | **I-30 yatay güvenli alan kapısı eklendi** | `PENDING` | ✅ **push edildi**, sağ/sol taşma ölçülür oldu, pilotta ateşlemiyor, MP4 korundu, deploy YOK |
+| 13 Ağu | **I-30 yatay güvenli alan kapısı eklendi** | `527cd28` | ✅ **push edildi**, sağ/sol taşma ölçülür oldu, pilotta ateşlemiyor, MP4 korundu, deploy YOK |
 
 ---
 
