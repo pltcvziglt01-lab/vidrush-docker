@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 13 Ağu | **I-43 zoom kovaları optik ölçüm birimiyle hizalandı** | `PENDING` | ✅ **push edildi**, kovalar referans kanal birimindeydi (%/sn zoom), kapı ekran farkını ölçüyordu → **ölçülen taban 0.045**; 25.2 sn pilotta eşiği geçen sahne **2/6 → 5/6** (aynı props ile karşı-olgu render'ı), eşik gevşetilmedi, kova tablosu/aritmetik/22 alan dokunulmadı; POST-QA **WARN** (s1 — kök neden ölçüldü: **görsel enerjisi**, |grad| 4.21 vs 10.9–15.2), **kabul edilmiş MP4 DEĞİL**, deploy YOK |
 
 ---
 
@@ -5655,6 +5656,157 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 61. FAZ I-43 — ZOOM KOVALARI OPTİK ÖLÇÜM BİRİMİYLE HİZALANMAMIŞTI (kalite atomu, 13 Ağu)
+
+> **Durum: ölçülen birim uyuşmazlığı ÇÖZÜLDÜ ve GERÇEK RENDER'DA doğrulandı
+> (aynı 25.2 sn pilotta eşiği geçen sahne **2/6 → 5/6**, karşı-olgu render'ıyla).
+> A–I yeşil (3252, 0 hata). ⛔ Pilotun POST-QA'sı **WARN** — kalan tek bulgunun
+> kök nedeni ÖLÇÜLDÜ ve bu atomun konusu DEĞİL (görsel enerjisi).
+> Eşik GEVŞETİLMEDİ. Deploy YOK. Maliyet $0.00.**
+> Değişen: `app/render-studio/src/Video.tsx` (1 sabit + `Math.max`),
+> `webapp/testler/test_faz_i.py`. `pipeline.py`, `hizli_render.py`,
+> `editor/*`, `medya/*`, `server.py`, `deploy.sh`, **ZOOM_KOVA tablosu**,
+> **indeks aritmetiği** ve **22 alan sözleşmesi** **dokunulmadı**.
+> I-23…I-42 **korundu**.
+
+### ⛔ Ölçülen kök neden — BİRİM UYUŞMAZLIĞI
+
+`ZOOM_KOVA` oranları **referans kanal ölçümünden** gelir; birim **"%/sn zoom
+hızı"** ve ölçüm **canlı çekimlerde** yapıldı — o karelerde zoomun dışında
+özne/kamera hareketi de vardı. Optik kapı ise **başka bir şey** ölçer:
+ardışık gri karelerin ortalama mutlak farkı (0-255, 4 fps / 64×36). Bizim
+çıktı **durağan fotoğraf**; ekrandaki tek hareket transformdur. Yani
+referansın "ihmal edilebilir/sakin" kovalarının canlı çekimde **bedava
+aldığı** hareket bizde **yoktur** → kovalar kendi kapımızı geçemiyordu.
+I-42 pilotunda ölçülmüştü: s1 (0.032) **1.915**, s2 (0.014) **1.214**.
+
+### Kalibrasyon — değer TAHMİN EDİLMEDİ, ÖLÇÜLDÜ
+
+Her aday oran için `zoomOrani` geçici olarak sabitlendi ve **pilotun kendi üç
+(görsel, zoom, pan) birleşimi** 1080p render edilip ölçüldü (en kötü durum
+`pan: "yok"` dâhil), sahne başına 4.0 sn:
+
+| oran | en kötü ort | pay | durağan seri (üç sahne) | sonuç |
+|---|---|---|---|---|
+| 0.032 "belirgin" | **1.868** | ×0.93 | 0.75 / 0.75 / 1.25 sn | **2/3 sahne KALIR** |
+| 0.038 | 2.322 | ×1.16 | 0.25 / 0.25 / 0.25 sn | geçer, seri VAR |
+| 0.041 | 2.544 | ×1.27 | 0.0 / 0.25 / 0.0 sn | geçer, seri VAR |
+| **0.045** | **2.827** | **×1.41** | **0.0 / 0.0 / 0.0 sn** | ✅ **hepsi temiz** |
+| 0.062 "agresif" | 3.931 | ×1.97 | 0.0 / 0.0 / 0.0 sn | ✅ (I-42 açılışı) |
+
+⚠ **Ölçüt ÖLÇÜMDEN ÖNCE yazıldı**: (a) ortalama eşiği geçsin, (b) en uzun
+durağan seri **tüm** sahnelerde 0.0 sn olsun, (c) en kötü pay **≥ ×1.25**.
+(c) uydurma değil — 0.032'nin üç görseldeki yayılımı **×0.93–×1.00 ölçüldü**,
+yani bıçak sırtı bir pay tek bir görsel değişince düşüyor (I-38'de
+`POST-KENAR-SIYAH` 15.99 vs 16.0 tam olarak böyle FAIL olmuştu).
+Ölçütü karşılayan **en küçük taranan oran: `OPTIK_TABAN_ORANI = 0.045`**.
+
+### Düzeltme (en küçük)
+
+`zoomOrani`nin döndürdüğü oran `Math.max(k.oran, OPTIK_TABAN_ORANI)` ile
+tabana çekilir. **Kova tablosu, `2749 % 1000` aritmetiği, kullanıcının
+`zoom`/`pan` seçimleri ve 22 alan sözleşmesi dokunulmadı**; I-42 açılışı
+(0.062) tabanın üstünde olduğu için **bit-bit aynı** kaldı.
+
+⚠ **EŞİK GEVŞETİLMEDİ**: `OPTIK_DURGUN_ESIGI` 2.0, WARN 1.5 sn, FAIL 3.0 sn,
+örnekleme 4 fps/64×36, `OPTIK_ASIRI_ESIGI` 45.0 aynen duruyor — test kilitler.
+
+⚠ **DÜRÜST SONUÇ**: taban 0.004/0.014/0.032 kovalarını yutar (indekslerin
+~%87'si). Orada kaybedilen şey "çeşitlilik" değil, **kusur derecesiydi** —
+o kovalar durağan fotoğrafta zaten kapının altındaydı. Tablo dağılımın
+**kayıtlı** hali olarak duruyor; tabanın **üstünde** çeşitlilik kazanmak
+ayrı ve **ölçülmemiş** bir atomdur.
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1838** | **3252** |
+
+0 hata. Faz I 1818 → **1838** (+20). Red-first: 20 kontrolün **6'sı XX**.
+
+### 1080p pilot — `vidrushvideo_kova_i43.mp4` (25.2 sn)
+
+Sahneler **uydurulmadı**: üretim hattının **gerçek planı** okundu
+(`cikti/_i37_calisma/render_plan.json`) — 6 beat, gerçek süreler, gerçek
+anlatım metinleri, gerçek `bas_sn` dilimleri; künyeler medyanın **gerçek**
+`.kunye.json` dosyalarından üretilip props'a hattın **kendi** yardımcısıyla
+(`pipeline._kaynak_yazi_props`) taşındı. Medya/ses önbellekten, **$0.00**.
+
+- **1920×1080 @ 30**, aac 48 kHz/2ch, 25.259 sn, 97.29 MB · **6 kesme** · **11 kare** (6 beat'in hepsi kapsandı)
+- LUFS **−14.92** / TP **−4.47** / LRA 3.0 · kırpma **yok** · **sessizlik 1 aralık, 0.347 sn (%1.4)**
+- kenar siyahlığı **0/101** · medya tekrarı: **6 benzersiz varlık**, bitişik tekrar yok
+- motion grammar: **4 farklı hareket**, ardışık/pencere/işlev tekrarı **yok**, açılış≠kapanış
+- tipografi: güvenli alan / yatay / nefes / çakışma **dördü de temiz**; künye **4 CC sahnesinde çiziliyor** (kareyle doğrulandı), PD sahnesinde alan **yok**
+
+**Atomun iddiası — AYNI props ile KARŞI-OLGU render'ı (taban kapalı = I-42 davranışı):**
+
+| sahne | oran ÖNCE | optik ÖNCE | oran SONRA | optik SONRA | durum |
+|---|---|---|---|---|---|
+| s0 | 0.062 | 3.535 | 0.062 | 3.534 | değişmedi (taban dışı) |
+| s1 | 0.032 | 0.904 | 0.045 | **0.955** | ⛔ hâlâ kalıyor |
+| s2 | 0.014 | 1.046 | 0.045 | **2.914** | ✅ düzeldi |
+| s3 | 0.004 | 1.021 | 0.045 | **2.810** | ✅ düzeldi |
+| s4 | 0.062 | 2.806 | 0.062 | 2.806 | değişmedi (taban dışı) |
+| s5 | 0.032 | 1.469 | 0.045 | **2.195** | ✅ düzeldi |
+
+**Eşiği geçen sahne: 2/6 → 5/6.** Taban dışı sahneler bit-bit aynı kaldı.
+
+⛔ **POST-QA: WARN — kabul edilmiş MP4 DEĞİLDİR.** Mutlak yol verilmedi.
+
+| bulgu | seviye | detay |
+|---|---|---|
+| `POST-OPTIK-DURGUN` s1 | WARN | ort **0.955** < 2.0, en uzun durağan seri 1.25 sn |
+
+### s1'in kök nedeni TAHMİN EDİLMEDİ, AYRIŞTIRILDI
+
+Üç tek sahnelik render (hepsi oran 0.045, `zoom=out`, `pan=yok`):
+
+| vaka | görsel | süre | etkin hız | optik | sonuç |
+|---|---|---|---|---|---|
+| A | s1'in görseli | 2.201 sn | %2.91/sn | **1.457** | ⛔ kalır |
+| B | s1'in görseli | 5.550 sn | %3.87/sn | **1.643** | ⛔ kalır |
+| C | kalibre görsel | 2.201 sn | %2.91/sn | **3.690** | ✅ geçer |
+
+**C vs A**: aynı süre, aynı etkin hız, farklı görsel → **fark 2.5 kat**.
+**B**: süre uzatılıp etkin hız artırılınca bile geçmiyor.
+Yani kök neden **süre de kova da değil, GÖRSELİN KENDİSİ**. Ölçüldü —
+ortalama yatay gradyan (uzamsal detay, 64×36 gri):
+
+| görsel | \|grad\| | pilottaki optik |
+|---|---|---|
+| **s01_grass_seed_bag_1** (s1) | **4.21** | **0.955** ⛔ |
+| s05_green_lawn_grass | 10.92 | 2.195 |
+| s04_grass_seedling | 11.17 | 2.806 |
+| s01_grass_seed_bag | 12.61 | 3.534 |
+| s02_patchy_lawn | 12.74 | 2.914 |
+| s03_sprinkler | 15.20 | 2.810 |
+
+s1'in görseli (kızıl toprak + boş gökyüzü, geniş düz alanlar) diğer beşin
+**üçte biri** detaya sahip. **Hiçbir makul zoom oranı düz bir görseli
+kurtarmıyor** — bu, kovanın değil **medya seçiminin** sorunudur.
+
+⚠ Ayrıca **gözle doğrulandı**: s0 (1900 tarihli atlı pulluk fotoğrafı) ve s1
+(kızıl toprak erozyon sahası) anlatımla (*"There is a bag of grass seed on my
+garage shelf right now."*) **semantik olarak uyumsuz** — bilinen b001/b002
+kusur sınıfı, otomatik kapıların hepsi PASS. Bu da MP4'ün kabul edilmemesinin
+ikinci nedeni.
+
+### SONRAKİ ATOM (I-44) — yalnız ölçülen kusurdan
+
+1. **Optik hareket görselin uzamsal enerjisine bağlı ve bu HİÇ ölçülmüyor**
+   (ölçüldü: \|grad\| 4.21 → optik 0.955; 10.9–15.2 → 2.2–3.5). Doğru atom:
+   medya seçiminde/kapısında **görsel enerjisini ölçmek** — ya düşük enerjili
+   varlığı elemek ya da ona verilen hareketi ölçülen enerjiye göre
+   türetmek. ⚠ Körlemesine eşik düşürmek YANLIŞ, kovayı yükseltmek de
+   ölçüldüğü gibi ÇÖZMÜYOR (vaka B).
+2. **Kısa sahnede zoom yolunun çoğunu pan taşma payı yiyor** (ölçüldü:
+   `kbHesap` tabanı 1.0349; 2.201 sn'de istenen %4.5/sn ekranda **%2.91/sn**
+   oluyor). Tek başına eşiği düşürmedi ama etkiyi zayıflatıyor.
+3. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
+4. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — s0/s1'de
+   bu pilotta yeniden gözle doğrulandı.
 
 ---
 

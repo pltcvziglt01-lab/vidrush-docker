@@ -493,6 +493,39 @@ const ZOOM_KOVA: {oran: number; pay: number}[] = [
 // Diger sahneler icin dagitim BIT-BIT aynidir.
 const ACILIS_ZOOM_ORANI = 0.062;
 
+// ── KOVALAR OPTIK OLCUM BIRIMIYLE HIZALANMAMISTI (Faz I-43) ──
+// ⚠ OLCULEN KUSUR (I-42 pilotu): acilis duzeldi ama KUSUR SINIFI durdu —
+// s1 (0.032) ort 1.915 ve s2 (0.014) ort 1.214, ikisi de esik 2.0'in ALTINDA.
+// KOK NEDEN BIRIM UYUSMAZLIGI: yukaridaki kovalar REFERANS KANAL olcumunden
+// gelir ve birim "%/sn ZOOM HIZI"dir; o kareler CANLI cekimdir, yani ekranda
+// zoomun DISINDA ozne/kamera hareketi de vardir. Optik kapi ise BASKA bir sey
+// olcer: ardisik gri karelerin ortalama mutlak farki (0-255, 4 fps / 64x36).
+// Bizim cikti DURAGAN FOTOGRAF; ekrandaki TEK hareket transformdur. Yani
+// referansin "ihmal edilebilir/sakin" kovalarinin canli cekimde BEDAVA aldigi
+// hareket bizde YOKTUR -> kovalar kendi kapimizi gecemiyordu.
+//
+// ⚠ TAHMIN YOK: her aday oran icin `zoomOrani` gecici olarak sabitlenip
+// PILOTUN KENDI uc (gorsel, zoom, pan) birlesimi 1080p render edilip olculdu
+// (en kotu durum `pan: "yok"` dahil), sahne basina 4.0 sn:
+//   oran   en kotu ort   pay     duragan seri (uc sahne)   sonuc
+//   0.032     1.868      x0.93   0.75 / 0.75 / 1.25 sn     2/3 sahne KALIR
+//   0.038     2.322      x1.16   0.25 / 0.25 / 0.25 sn     gecer, seri VAR
+//   0.041     2.544      x1.27   0.0  / 0.25 / 0.0  sn     gecer, seri VAR
+//   0.045     2.827      x1.41   0.0  / 0.0  / 0.0  sn     HEPSI TEMIZ
+//   0.062     3.931      x1.97   0.0  / 0.0  / 0.0  sn     (I-42 acilisi)
+// Olcut OLCUMDEN ONCE yazildi: (a) ortalama esigi gecsin, (b) en uzun duragan
+// seri TUM sahnelerde 0.0 sn olsun, (c) en kotu pay >= x1.25 olsun. (c) sarti
+// uydurma degil — 0.032'nin uc gorseldeki yayilimi x0.93-x1.00 OLCULDU, yani
+// bicak sirti pay tek bir gorsel degisince dusuyor.
+// ⚠ ESIK GEVSETILMEDI (`kalite_kapisi.OPTIK_DURGUN_ESIGI` = 2.0 duruyor);
+// hizalanan taraf KOVALARDIR.
+// ⚠ DURUST SONUC: taban 0.004/0.014/0.032 kovalarini yutar (indekslerin
+// ~%87'si), cunku bu kovalar duragan fotografta ZATEN kapinin altindaydi —
+// yani orada "cesitlilik" degil KUSUR derecesi vardi. Kova tablosu dagilimin
+// KAYITLI hali olarak DURUYOR; tabanin USTUNDE cesitlilik kazanmak ayri ve
+// OLCULMEMIS bir atomdur (bkz. FAZ-H-HANDOFF I-43 sonraki atom).
+const OPTIK_TABAN_ORANI = 0.045;
+
 /** Sahne indeksine gore zoom hizi kovasi (deterministik, her uretimde ayni). */
 const zoomOrani = (indeks: number): number => {
   if (indeks === 0) return ACILIS_ZOOM_ORANI;
@@ -500,9 +533,10 @@ const zoomOrani = (indeks: number): number => {
   let birikim = 0;
   for (const k of ZOOM_KOVA) {
     birikim += k.pay;
-    if (r < birikim) return k.oran;
+    // ⚠ Kova secimi DEGISMEDI; yalniz OLCULEN optik tabana cekilir.
+    if (r < birikim) return Math.max(k.oran, OPTIK_TABAN_ORANI);
   }
-  return ZOOM_KOVA[1].oran;
+  return Math.max(ZOOM_KOVA[1].oran, OPTIK_TABAN_ORANI);
 };
 
 const SURE_ZOOM = (K: number, fps: number, oran = 0.018, tavan = 1.38) =>

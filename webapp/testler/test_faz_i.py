@@ -6412,6 +6412,132 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
         "KaynakEtiketi" in _GRAFIK_TSX
         and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
 
+blok("§39s I-43 — ZOOM KOVALARI OPTIK OLCUM BIRIMIYLE HIZALANMAMISTI")
+
+# ⚠ I-42 PILOTUNDA OLCULEN KUSUR (acilis DUZELDI, sinif DUZELMEDI):
+# `ZOOM_KOVA` oranlari REFERANS KANAL olcumunden gelir — birim "%/sn zoom
+# hizi" ve olcum CANLI cekimlerde yapildi (o karelerde kameranin disinda
+# ozne/kamera hareketi de VARDI). Optik kapi ise BASKA bir birim olcer:
+# ekrandaki ardisik gri karelerin ortalama mutlak farki (0-255, 4 fps /
+# 64x36). Bizim cikti DURAGAN FOTOGRAF oldugu icin ekrandaki TEK hareket
+# transformdur; yani referansin "ihmal edilebilir/sakin" kovalarinin canli
+# cekimde bedava aldigi hareket bizde YOKTUR. Iki taraf ayri birimde
+# oldugundan kovalar kapiyi gecmiyordu.
+#
+# ⚠ I-43 KALIBRASYONU — DEGERLER TAHMIN EDILMEDI, GERCEK 1080p RENDER'DA
+# OLCULDU. Her aday oran icin `zoomOrani` gecici olarak sabitlendi ve
+# PILOTUN KENDI uc (gorsel, zoom, pan) birlesimi olculdu (en kotu durum
+# `pan: "yok"` dahil). Olcum: 4 fps / 64x36, sahne basina 4.0 sn.
+#
+#   oran   en kotu ort   pay    duragan seri (uc sahne)   sonuc
+#   0.032     1.868      x0.93  0.75 / 0.75 / 1.25 sn     2/3 sahne KALIR
+#   0.038     2.322      x1.16  0.25 / 0.25 / 0.25 sn     gecer, seri VAR
+#   0.041     2.544      x1.27  0.0  / 0.25 / 0.0  sn     gecer, seri VAR
+#   0.045     2.827      x1.41  0.0  / 0.0  / 0.0  sn     ✅ HEPSI TEMIZ
+#   0.062     3.931      x1.97  0.0  / 0.0  / 0.0  sn     ✅ (I-42 acilisi)
+#
+# TABAN, OLCUMDEN ONCE yazilan olcutle secildi: (a) ortalama esigi gecsin,
+# (b) en uzun duragan seri TUM sahnelerde 0.0 sn olsun, (c) en kotu pay
+# >= x1.25 olsun. (c) sarti UYDURMA DEGIL: 0.032'nin uc gorseldeki yayilimi
+# x0.93-x1.00 olcuLDU, yani bicak sirti bir pay TEK BIR GORSEL degisince
+# dusuyor (I-38'de `POST-KENAR-SIYAH` 15.99 vs 16.0 tam olarak boyle FAIL
+# olmustu). Olcutu karsilayan EN KUCUK taranan oran: 0.045.
+#
+# ⚠ ESIK GEVSETILMEDI. `OPTIK_DURGUN_ESIGI` 2.0 DURUYOR; hizalanan taraf
+# KOVALAR. Kova tablosu, indeks aritmetigi, kullanici zoom/pan secimleri ve
+# 22 alan sozlesmesi DOKUNULMADI.
+
+_V43 = oku(os.path.dirname(KOK), "app", "render-studio", "src", "Video.tsx")
+_KOVA43 = [(0.004, 0.34), (0.014, 0.39), (0.032, 0.14), (0.062, 0.13)]
+
+kontrol("⭐ I-43 KIRMIZI: olculen OPTIK TABAN orani Video.tsx'te VAR",
+        "OPTIK_TABAN_ORANI" in _V43, "taban orani yok")
+_m43 = re.search(r"OPTIK_TABAN_ORANI\s*=\s*([\d.]+)", _V43)
+_taban43 = float(_m43.group(1)) if _m43 else 0.0
+kontrol("⭐ I-43 KIRMIZI: taban, BICAK SIRTI kovadan (0.032) BUYUK",
+        _taban43 > _KOVA43[2][0], _taban43)
+kontrol("⭐ I-43: taban OLCULEN degerdir (0.045 — olcutu karsilayan en kucuk)",
+        abs(_taban43 - 0.045) < 1e-9, _taban43)
+
+
+def _ham_oran43(indeks):
+    """Kova secimi — TABANSIZ ham hali (dagilim BOZULMADI kaniti)."""
+    r = ((indeks * 2749) % 1000) / 1000
+    b = 0.0
+    for o, p in _KOVA43:
+        b += p
+        if r < b:
+            return o
+    return _KOVA43[1][0]
+
+
+def _zoom_orani43(indeks):
+    """Video.tsx `zoomOrani` aritmetiginin AYNISI (test tarafi ayna)."""
+    if indeks == 0:
+        return _acilis43
+    return max(_ham_oran43(indeks), _taban43)
+
+
+_ma43 = re.search(r"ACILIS_ZOOM_ORANI\s*=\s*([\d.]+)", _V43)
+_acilis43 = float(_ma43.group(1)) if _ma43 else 0.0
+_govde43 = _V43[_V43.find("const zoomOrani"):_V43.find("const SURE_ZOOM")]
+
+kontrol("⭐ I-43 KIRMIZI: `zoomOrani` dondurdugu orani TABANA cekiyor",
+        "Math.max" in _govde43 and "OPTIK_TABAN_ORANI" in _govde43,
+        "zoomOrani govdesinde taban uygulanmiyor")
+kontrol("⭐ I-43 KIRMIZI: HICBIR sahne indeksi OLCULEN tabanin ALTINA dusmuyor",
+        _taban43 >= 0.045
+        and all(_zoom_orani43(i) >= 0.045 for i in range(0, 64)),
+        [i for i in range(0, 64) if _zoom_orani43(i) < 0.045][:5] or _taban43)
+kontrol("⭐ I-43: indeks 1..8 oranlari OLCULEN tabana hizalandi",
+        [_zoom_orani43(i) for i in range(1, 9)]
+        == [0.045, 0.045, 0.045, 0.062, 0.045, 0.045, 0.045, 0.062],
+        [_zoom_orani43(i) for i in range(1, 9)])
+kontrol("⭐ I-43: kalibrasyon KAYNAKTA belgeli (olculen en kotu degerler)",
+        "1.868" in _V43 and "2.827" in _V43,
+        "olcum degerleri kaynakta yok")
+
+# ── HIZALAMA TUM TUKETICILERE ULASIYOR (tek kapi: `zoomOrani`) ──
+kontrol("I-43: bes gorunum hesabi da orani `zoomOrani`den aliyor",
+        len(re.findall(r"zoomOrani\(indeks\)", _V43)) >= 5,
+        len(re.findall(r"zoomOrani\(indeks\)", _V43)))
+
+# ── DAGILIM BOZULMADI: kova tablosu ve aritmetik AYNEN ──
+kontrol("I-43 GERILEME YOK: kova tablosu DEGISMEDI (4 kova, ayni sayilar)",
+        all(f"oran: {o}" in _V43 and f"pay: {p}" in _V43
+            for o, p in _KOVA43), _KOVA43)
+kontrol("I-43 GERILEME YOK: indeks aritmetigi DEGISMEDI (2749 / 1000)",
+        "indeks * 2749" in _V43 and "% 1000" in _V43)
+kontrol("I-43: TABANSIZ ham kova dizisi BIT-BIT eski haliyle ayni",
+        [_ham_oran43(i) for i in range(1, 9)]
+        == [0.032, 0.014, 0.004, 0.062, 0.032, 0.014, 0.004, 0.062],
+        [_ham_oran43(i) for i in range(1, 9)])
+
+# ── ESIK GEVSETILMEDI (hizalanan taraf KOVALAR) ──
+kontrol("⭐ I-43: `OPTIK_DURGUN_ESIGI` GEVSETILMEDI (2.0)",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0, _kk.OPTIK_DURGUN_ESIGI)
+kontrol("I-43: durgun WARN/FAIL sureleri de DEGISMEDI (1.5 / 3.0)",
+        _kk.OPTIK_DURGUN_WARN_SN == 1.5 and _kk.OPTIK_DURGUN_FAIL_SN == 3.0)
+kontrol("I-43: optik ornekleme sozlesmesi DEGISMEDI (4 fps / 64x36)",
+        _kk.OPTIK_ORNEK_FPS == 4 and _kk.OPTIK_ORNEK_OLCU == (64, 36))
+kontrol("I-43: ust sinir (asiri hiz) DEGISMEDI — taban onun COK altinda",
+        _kk.OPTIK_ASIRI_ESIGI == 45.0 and _taban43 < 0.062)
+
+# ── ONCEKI ATOMLAR VE SOZLESMELER ──
+kontrol("I-43 GERILEME YOK: I-42 acilis orani DURUYOR (0.062, tabanin ustunde)",
+        abs(_acilis43 - 0.062) < 1e-9 and _acilis43 >= _taban43, _acilis43)
+kontrol("I-43 GERILEME YOK: I-42 indeks 0 dallanmasi DURUYOR",
+        re.search(r"indeks\s*===\s*0", _govde43) is not None)
+kontrol("I-43 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("I-43: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in _V43
+        and "pan: 'right' | 'left' | 'top' | 'bottom' | 'yok'" in _V43)
+kontrol("I-43 GERILEME YOK: I-41 kunyesi ve I-39 konumu DURUYOR",
+        "const KaynakYazi" in _V43 and "KUNYE_Y_ORANI = 0.075" in _V43
+        and abs(_etipo.KAYNAK_ETIKETI_ALTYAZILI - 0.075) < 1e-9)
+
 blok("§39r I-42 — ACILIS SAHNESI HER VIDEODA EN DURAGAN OLANDI")
 
 # ⚠ I-41 PILOTUNDA OLCULEN KUSUR: `VidrushVideo` zoom hizini sahne
