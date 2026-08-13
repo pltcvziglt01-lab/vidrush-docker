@@ -20,6 +20,10 @@ import subprocess
 import tempfile
 from typing import Callable, Optional
 
+from . import kalite_kapisi as _kk
+from . import tipografi as _tg
+from .profil import EditProfili, VARSAYILAN
+
 # ⚠ drawtext FONTFILE OLMADAN calismaz (macOS/bazi ffmpeg derlemeleri).
 # Onizleme ilk kosusunda "sentetik gorsel uretilemedi" hatasinin sebebi buydu.
 # Repodaki STATIK Montserrat Bold kullanilir (degisken font Thin cizer).
@@ -58,6 +62,85 @@ def drawtext_var_mi() -> bool:
         r = _kos(["ffmpeg", "-hide_banner", "-filters"], 30)
         _DRAWTEXT_ONBELLEK[0] = " drawtext" in (r.get("stdout") or "")
     return bool(_DRAWTEXT_ONBELLEK[0])
+
+
+# ─────────────────── YAZI GEOMETRISI — TEK KAYNAK (Faz I-40) ───────────────
+#
+# ⚠ NEDEN VAR — I-40'TA OLCULEN AYRISMA:
+# Bu modul yazi katmanlarini SABIT sayilarla ciziyordu (`y=h*0.70`,
+# `y=h*0.80`, `y=h-th-14`, punto 34/26/15) ve PLANIN KENDI spec'ini
+# (`parametre.y_orani`, `parametre.punto`) HIC OKUMUYORDU. Sonuc IKI AYRI
+# GEOMETRI: I-39'da bolum basligi 0.60'a, kunye 0.075'e tasindi ama onizleme
+# hala 0.70 / ekran DIBI ciziyordu. Bu, I-14'te olculen kusur sinifinin
+# aynisi (plan bir sey hesaplar, cizim baskasini cizer) ve I-16'da Remotion
+# tarafinda duzeltilen `bottom: 22` kusurunun onizlemedeki ikizi.
+#
+# Kural: KONUM/PUNTO/HIZALAMA **spec'ten** gelir; spec sessizse
+# `tipografi.KONUM` ve profil puntosu kullanilir — bu dosyada UYDURMA SABIT
+# TUTULMAZ. Puntolar profil NOMINAL genisliginde uretildigi icin onizleme
+# olcusune ORANLA kucultulur.
+NOMINAL_GENISLIK = 1920.0
+# Yalniz kunye SAGA yaslanir (Remotion `KaynakEtiketi` ile ayni).
+SAG_HIZALI = ("source-label",)
+# Dikey konumu `y_orani` yerine `y` alaninda tasiyan spec'ler.
+_Y_ALAN = ("y_orani", "y")
+
+
+def _profil_punto(ad: str, p: EditProfili) -> float:
+    t = p.tipografi
+    return {"chapter-title": t.bolum_basligi, "lower-third": t.alt_band_baslik,
+            "source-label": t.kaynak_etiketi, "callout": t.callout,
+            "quote-card": t.alt_band_baslik}.get(ad, t.callout)
+
+
+def yazi_yerlesimi(ad: str, prm, *, gen: float, yuk: float,
+                   p: Optional[EditProfili] = None) -> dict:
+    """Onizleme yazi katmaninin punto/x/y'si. Saf; ISTISNA FIRLATMAZ.
+
+    ⚠ TEK KAYNAK: deger once PLANIN spec'inden, sonra `tipografi.KONUM` ve
+    profil puntosundan gelir. Bu dosyada ikinci bir aritmetik yoktur.
+
+    ⚠ Kunye guvenli kenari ZORLAR — Remotion `KaynakEtiketi` ile birebir ayni
+    hesap: `min(y*yuk, yuk - guvenli_kenar - punto * SATIR_KUTU_ORANI)`.
+    """
+    p = p or VARSAYILAN
+    prm = prm if isinstance(prm, dict) else {}
+    ad = str(ad or "")
+    g = _kk._sayi(gen, NOMINAL_GENISLIK)
+    y_kare = _kk._sayi(yuk, 1080.0)
+    olcek = max(0.05, (g / NOMINAL_GENISLIK) if g > 0 else 1.0)
+
+    punto = max(8, int(round(_kk._sayi(prm.get("punto"),
+                                       _profil_punto(ad, p)) * olcek)))
+    y_orani = None
+    for alan in _Y_ALAN:
+        if alan in prm:
+            d = _kk._sayi(prm.get(alan), -1.0)
+            if 0.0 <= d <= 1.0:
+                y_orani = d
+                break
+    if y_orani is None:
+        y_orani = _kk._sayi(_tg.KONUM.get(ad), 0.78)
+
+    sag = ad in SAG_HIZALI
+    guvenli = p.tipografi.guvenli_kenar * olcek
+    if ad == "callout":
+        # callout `x`i ORAN tasir (0..1), izgara noktasi degil.
+        x_px = int(round(min(max(_kk._sayi(prm.get("x"), 0.6), 0.0), 1.0) * g))
+    else:
+        x_px = int(round(_kk._sayi(prm.get("x"), p.tipografi.izgara_x) * olcek))
+
+    y_px = y_orani * y_kare
+    tavan = y_kare - guvenli - punto * _kk.SATIR_KUTU_ORANI
+    kirpildi = bool(sag and y_px > tavan)
+    if kirpildi:
+        y_px = tavan
+    return {"ad": ad, "punto": punto, "x_px": x_px,
+            "y_orani": round(y_orani, 6), "y_px": round(y_px, 3),
+            "dolgu": max(2, int(round(punto * _kk.DOLGU_ORANI))),
+            "sag_hizali": sag, "guvenli_kenar_px": round(guvenli, 3),
+            "tavan_px": round(tavan, 3), "kirpildi": kirpildi,
+            "olcek": round(olcek, 6)}
 
 
 MAKS_VARLIK = 3
@@ -210,24 +293,34 @@ def _segment_filtresi(sahne: dict, sure: float, fps: int, yuk: int,
                             "sebep": "ffmpeg drawtext filtresi YOK "
                                      "(libfreetype olmadan derlenmis)"})
             continue
-        elif ad == "chapter-title":
-            vf.append(_bant_yazi(prm.get("metin", ""), 34, 0.70, sure))
-        elif ad == "lower-third":
-            vf.append(_bant_yazi(prm.get("baslik", ""), 26, 0.80, sure))
+        elif ad in ("chapter-title", "lower-third"):
+            # ⚠ I-40: punto/x/y artik SPEC'ten geliyor (sabit 34/26/0.70/0.80
+            # DEGIL). Bant dolgusu da Grafikler.tsx'in `DOLGU_ORANI`si.
+            yer = yazi_yerlesimi(ad, prm, gen=gen, yuk=yuk)
+            vf.append(_bant_yazi(
+                prm.get("metin" if ad == "chapter-title" else "baslik", ""),
+                yer, sure))
         elif ad == "source-label":
+            # ⚠ I-40: `y=h-th-14` SABITI KALDIRILDI. O sabit planin hesabini
+            # HIC okumuyordu ve guvenli kenarin DISINDA kaliyordu — I-16'da
+            # Remotion'da duzeltilen `bottom: 22` kusurunun ikizi.
             m = _kacir(str(prm.get("metin", ""))[:40])
             if m:
+                yer = yazi_yerlesimi(ad, prm, gen=gen, yuk=yuk)
                 vf.append(f"drawtext={_fontstr()}text='{m}':"
-                          f"fontcolor=white@0.62:fontsize=15:"
-                          f"x=w-tw-18:y=h-th-14:borderw=2:bordercolor=black@0.5")
+                          f"fontcolor=white@0.62:fontsize={yer['punto']}:"
+                          f"x=w-tw-{int(round(yer['guvenli_kenar_px']))}:"
+                          f"y=h*{yer['y_orani']:.3f}:"
+                          f"borderw=2:bordercolor=black@0.5")
         elif ad == "callout":
             m = _kacir(str(prm.get("metin", ""))[:26])
             if m:
+                yer = yazi_yerlesimi(ad, prm, gen=gen, yuk=yuk)
                 vf.append(f"drawtext={_fontstr()}text='{m}':"
-                          f"fontcolor=white:fontsize=20:"
-                          f"x=w*{float(prm.get('x') or 0.6):.2f}:"
-                          f"y=h*{float(prm.get('y') or 0.4):.2f}:"
-                          f"box=1:boxcolor=black@0.62:boxborderw=8")
+                          f"fontcolor=white:fontsize={yer['punto']}:"
+                          f"x={yer['x_px']}:y=h*{yer['y_orani']:.3f}:"
+                          f"box=1:boxcolor=black@0.62:"
+                          f"boxborderw={yer['dolgu']}")
         elif prm.get("tur") in ("hard-cut", "j-cut", "l-cut", "crossfade",
                                 "karartma", "flash"):
             pass                      # gecisler concat asamasinda
@@ -238,14 +331,21 @@ def _segment_filtresi(sahne: dict, sure: float, fps: int, yuk: int,
     return ",".join(vf), atlanan
 
 
-def _bant_yazi(metin: str, punto: int, y_orani: float, sure: float) -> str:
+def _bant_yazi(metin: str, yer: dict, sure: float) -> str:
     """Kontrast banti + kalin yazi. drawtext'in kendi box'i kullaniliyor —
-    drawbox'un w/h ifadelerinde 't' YOK (11 Agu tuzagi)."""
+    drawbox'un w/h ifadelerinde 't' YOK (11 Agu tuzagi).
+
+    ⚠ I-40: punto/x/y ve bant dolgusu artik ARGUMAN DEGIL, `yazi_yerlesimi`
+    sozlugu — yani PLANIN spec'i. Onceki surumde bu fonksiyona SABIT sayilar
+    (34/26 punto, 0.70/0.80 oran, x=66, dolgu 14) geciriliyordu.
+    """
     m = _kacir(str(metin or "")[:44])
     if not m:
         return "null"
-    return (f"drawtext={_fontstr()}text='{m}':fontcolor=white:fontsize={punto}:"
-            f"x=66:y=h*{y_orani:.2f}:box=1:boxcolor=black@0.62:boxborderw=14:"
+    return (f"drawtext={_fontstr()}text='{m}':fontcolor=white:"
+            f"fontsize={yer['punto']}:x={yer['x_px']}:"
+            f"y=h*{yer['y_orani']:.3f}:box=1:boxcolor=black@0.62:"
+            f"boxborderw={yer['dolgu']}:"
             f"enable='between(t\\,0.15\\,{max(0.6, sure - 0.1):.2f})'")
 
 

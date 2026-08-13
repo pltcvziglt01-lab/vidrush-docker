@@ -6412,6 +6412,143 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
         "KaynakEtiketi" in _GRAFIK_TSX
         and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
 
+blok("§39p I-40 — ONIZLEME YOLU REMOTION GEOMETRISINDEN AYRISIYORDU")
+
+# ⚠ I-39'DA BULUNAN, I-40'TA OLCULEN KUSUR: `editor/onizleme.py` (ffmpeg
+# onizleme yolu) yazi katmanlarini SABIT sayilarla ciziyordu ve planin KENDI
+# spec'ini OKUMUYORDU:
+#     chapter-title -> y=h*0.70 SABIT   (plan 0.60 diyor — I-39)
+#     lower-third   -> y=h*0.80 SABIT   (KONUM 0.78 diyor)
+#     source-label  -> y=h-th-14 SABIT  (y_orani HIC okunmuyor; I-16'da
+#                      Remotion'da duzeltilen `bottom: 22` kusurunun AYNISI,
+#                      ustelik guvenli kenarin -64*olcek- DISINDA)
+# Puntolar da elle secilmisti (34/26/15) ve profil puntosuyla (60/42/21)
+# hicbir aritmetik bagi yoktu. Yani IKI AYRI GEOMETRI vardi — I-14'te olculen
+# kusur sinifinin ta kendisi (plan bir sey hesaplar, cizim baskasini cizer).
+# ⚠ DURUST KAPSAM: bu modulun repoda CAGIRANI YOK (olculdu: hicbir import).
+# Duzeltme uretim ciktisini degistirmez; AYRISMAYI ve testsizligi kapatir.
+
+from editor import onizleme as _onz                               # noqa: E402
+
+_P40 = _eprofil.profil("premium-modern")
+_ONZ_OLCU = (1280, 720)
+_OLCEK40 = _ONZ_OLCU[0] / 1920.0
+
+
+def _spec40(ad, **prm):
+    """render_plan'daki bicimde tek bir ffmpeg yazi spec'i."""
+    return {"ad": ad, "renderer": "ffmpeg", "beat_id": "b001",
+            "sure_sn": 3.0, "parametre": dict(prm)}
+
+
+# I-39 1080p pilotunun GERCEK yazi specleri (render_plan.json'dan OLCULDU)
+_SPEC40 = [
+    _spec40("chapter-title", metin="THERE IS A BAG OF GRASS", y_orani=0.6,
+            punto=60, x=100),
+    _spec40("source-label", metin="Famartin / CC-BY-SA", y_orani=0.075,
+            punto=21),
+]
+
+_yerlesim = getattr(_onz, "yazi_yerlesimi", None)
+kontrol("⭐ I-40 KIRMIZI: onizleme `yazi_yerlesimi` TEK KAYNAK fonksiyonu VAR",
+        callable(_yerlesim), type(_yerlesim).__name__)
+
+
+def _yer40(ad, prm):
+    if not callable(_yerlesim):
+        return {}
+    return _yerlesim(ad, prm, gen=_ONZ_OLCU[0], yuk=_ONZ_OLCU[1], p=_P40)
+
+
+_Y40_BASLIK = _yer40("chapter-title", _SPEC40[0]["parametre"])
+_Y40_KUNYE = _yer40("source-label", _SPEC40[1]["parametre"])
+kontrol("⭐ I-40 KIRMIZI: bolum basligi PLANIN y_orani'ni okuyor (0.60)",
+        abs(_Y40_BASLIK.get("y_orani", -1) - 0.60) < 1e-9, _Y40_BASLIK)
+kontrol("⭐ I-40 KIRMIZI: kunye PLANIN y_orani'ni okuyor (0.075, dip DEGIL)",
+        abs(_Y40_KUNYE.get("y_orani", -1) - 0.075) < 1e-9, _Y40_KUNYE)
+kontrol("⭐ I-40: punto SABIT degil, spec puntosundan OLCEKLENIYOR",
+        _Y40_BASLIK.get("punto") == round(60 * _OLCEK40)
+        and _Y40_KUNYE.get("punto") == round(21 * _OLCEK40),
+        (_Y40_BASLIK.get("punto"), _Y40_KUNYE.get("punto"),
+         round(60 * _OLCEK40), round(21 * _OLCEK40)))
+kontrol("I-40: izgara x'i de OLCEKLENIYOR (66 sabiti degil)",
+        _Y40_BASLIK.get("x_px") == round(100 * _OLCEK40), _Y40_BASLIK.get("x_px"))
+kontrol("I-40: kunye SAGA hizali, bolum basligi SOLA (Remotion ile ayni)",
+        _Y40_KUNYE.get("sag_hizali") is True
+        and _Y40_BASLIK.get("sag_hizali") is False)
+# ⚠ TSX `KaynakEtiketi` guvenli kenari ZORLUYOR; onizleme de zorlamali.
+_Y40_DIP = _yer40("source-label", {"metin": "x", "y_orani": 0.99, "punto": 21})
+_tavan40 = (_ONZ_OLCU[1] - _P40.tipografi.guvenli_kenar * _OLCEK40
+            - round(21 * _OLCEK40) * 1.3)
+kontrol("⭐ I-40: kunye GUVENLI KENARI zorluyor (y_orani 0.99 KIRPILIYOR)",
+        _Y40_DIP.get("y_px", 1e9) <= _tavan40 + 1e-6
+        and _Y40_DIP.get("kirpildi") is True,
+        (_Y40_DIP.get("y_px"), _tavan40))
+# ⚠ y_orani YOKSA uydurma sabit degil, `tipografi.KONUM` (tek kaynak).
+_Y40_VARS = _yer40("chapter-title", {"metin": "x", "punto": 60})
+kontrol("I-40: y_orani yoksa `tipografi.KONUM`a duser (uydurma sabit YOK)",
+        abs(_Y40_VARS.get("y_orani", -1)
+            - _etipo.KONUM["chapter-title"]) < 1e-9, _Y40_VARS.get("y_orani"))
+
+# ── FILTRE DIZGISI: ayrisma dizgide de KALMAMALI ──
+# ⚠ Yerel ffmpeg libfreetype OLMADAN derlenmis (modulun kendi belgeledigi
+# durum). Yetenek yoklamasi TEST ICIN gecici olarak acilir; ffmpeg
+# CALISTIRILMAZ, yalniz filtre dizgisi uretilir (saf, deterministik).
+_DT_ESKI = _onz._DRAWTEXT_ONBELLEK[0]
+_onz._DRAWTEXT_ONBELLEK[0] = True
+try:
+    _VF40, _ATLANAN40 = _onz._segment_filtresi(
+        {"beat_id": "b001", "motion": _SPEC40}, 3.0, 30,
+        _ONZ_OLCU[1], _ONZ_OLCU[0])
+finally:
+    _onz._DRAWTEXT_ONBELLEK[0] = _DT_ESKI
+kontrol("⭐ I-40 KIRMIZI: filtrede SABIT `y=h*0.70` KALMADI",
+        "h*0.70" not in _VF40 and "h*0.80" not in _VF40, _VF40[:200])
+kontrol("⭐ I-40 KIRMIZI: kunyede SABIT `y=h-th-14` KALMADI",
+        "y=h-th-14" not in _VF40 and "fontsize=15" not in _VF40, _VF40[:200])
+kontrol("⭐ I-40: filtre PLANIN y_orani'ni tasiyor (0.60 ve 0.075)",
+        "h*0.600" in _VF40 and "0.075" in _VF40, _VF40[:260])
+kontrol("I-40: yazi specleri ATLANMADI (drawtext varken)",
+        not [a for a in _ATLANAN40
+             if a.get("spec") in ("chapter-title", "source-label")],
+        _ATLANAN40)
+
+# ── PARITE: I-39 pilotunun TUM yazi katmanlari icin onizleme == Remotion ──
+_PARITE40 = [("chapter-title", 0.6, 60), ("source-label", 0.075, 21),
+             ("lower-third", _etipo.KONUM["lower-third"], 42),
+             ("callout", 0.45, 30)]
+_sapan40 = []
+for _ad40, _y40, _pt40 in _PARITE40:
+    _r40 = _yer40(_ad40, {"metin": "x", "y_orani": _y40, "punto": _pt40})
+    if abs(_r40.get("y_orani", -1) - _y40) > 1e-9:
+        _sapan40.append((_ad40, _y40, _r40.get("y_orani")))
+kontrol("⭐ I-40: DORT yazi turunun HEPSINDE onizleme == plan y_orani",
+        not _sapan40, _sapan40)
+kontrol("⭐ I-40: onizleme ile Remotion arasinda IKINCI ARITMETIK YOK "
+        "(sabit y orani kodda kalmadi)",
+        "0.70, sure" not in oku(KOK, "editor/onizleme.py")
+        and "0.80, sure" not in oku(KOK, "editor/onizleme.py"))
+
+# ── GERILEME YOK ──
+kontrol("I-40 GERILEME YOK: KONUM sabitleri DEGISMEDI (I-39)",
+        _etipo.KONUM["chapter-title"] == 0.60
+        and abs(_etipo.KAYNAK_ETIKETI_ALTYAZILI - 0.075) < 1e-9
+        and _etipo.KONUM["lower-third"] == 0.78)
+kontrol("I-40 GERILEME YOK: drawtext YOKKEN yazi SESSIZCE dusmuyor",
+        callable(getattr(_onz, "drawtext_var_mi", None))
+        and "drawtext filtresi YOK" in oku(KOK, "editor/onizleme.py"))
+kontrol("I-40 GERILEME YOK: onizleme hala ffmpeg-disi spec'i ATLIYOR",
+        any(a.get("sebep") == "renderer=remotion" for a in _onz._segment_filtresi(
+            {"beat_id": "b1", "motion": [{"ad": "map-route",
+                                          "renderer": "remotion",
+                                          "parametre": {}}]},
+            2.0, 30, 720, 1280)[1]))
+kontrol("I-40: bozuk/eksik parametre ISTISNA FIRLATMIYOR",
+        callable(_yerlesim)
+        and isinstance(_yer40("source-label", {}), dict)
+        and isinstance(_yer40("bilinmeyen", {"y_orani": "x", "punto": None}),
+                       dict))
+
 blok("§39o I-39 — ALTYAZI NEFES BOSLUGU (olculen kusur)")
 
 # ⚠ I-38'IN 1080p PILOTUNDA OLCULEN KUSUR: ekran kunyesi ARTIK ciziliyor

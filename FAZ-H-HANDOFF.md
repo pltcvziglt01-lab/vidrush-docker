@@ -5411,3 +5411,126 @@ Bunlar I-39'un konusu **değildi** ve talimat gereği **kodla genişletilmedi**:
    hattı artık **ayrışıyor**. Dar, bedava, ağsız bir atom.
 3. **`kaynakYazi` `VidrushVideo` yolunda taşınmıyor** (I-38'den devir,
    `pipeline.py` hattı hâlâ ölçülmedi).
+
+---
+
+## 58. FAZ I-40 — ÖNİZLEME YOLU REMOTION GEOMETRİSİNE BAĞLANDI (dar parite atomu, 13 Ağu)
+
+> **Durum: ölçülen ayrışma ÇÖZÜLDÜ, modüle İLK test kapsamı geldi, A–I yeşil
+> (3201, 0 hata). Değişen yolun GERÇEK çıktısı üretildi. 1080p Remotion pilotu
+> gerileme kanıtı olarak yeniden üretildi: **11/11 kare SHA-256 birebir aynı**,
+> POST-QA **PASS**. Deploy YOK. Maliyet $0.00.**
+> Değişen: `webapp/editor/onizleme.py`, `webapp/testler/test_faz_i.py`.
+> `tipografi.py`, `motion.py`, `kalite_kapisi.py`, `qa_on.py`, `plan.py`,
+> `adapter.py`, `remotion_v2.py`, `medya/*`, TSX'lerin **hiçbiri**,
+> `pipeline.py`, `server.py`, `deploy.sh` ve 22 alan sözleşmesi
+> **dokunulmadı** (git ile doğrulandı). I-23…I-39 **korundu**.
+
+### ⛔ Ölçülen ayrışma
+
+`editor/onizleme.py` yazı katmanlarını **sabit sayılarla** çiziyordu ve planın
+kendi spec'ini (`parametre.y_orani`, `parametre.punto`, `parametre.x`)
+**hiç okumuyordu** — oysa spec'ler `renderer=ffmpeg` ile **zaten o değerleri
+taşıyor**:
+
+| katman | önizleme (eski) | planın dediği (I-39) |
+|---|---|---|
+| `chapter-title` | `y=h*0.70`, punto **34** | y_orani **0.60**, punto 60 |
+| `lower-third` | `y=h*0.80`, punto **26** | `KONUM` **0.78**, punto 42 |
+| `source-label` | `y=h-th-14` (**y_orani hiç okunmuyor**), punto **15** | y_orani **0.075**, punto 21 |
+
+Yani **iki ayrı geometri** vardı: I-14'te ölçülen kusur sınıfının aynısı (plan
+bir şey hesaplar, çizim başkasını çizer) ve I-16'da Remotion'da düzeltilen
+`bottom: 22` kusurunun **önizlemedeki ikizi** — üstelik `h-th-14` güvenli
+kenarın (64×ölçek = 42.7 px) **dışındaydı**.
+
+⚠ **DÜRÜST KAPSAM — ölçüldü:** bu modülün repoda **hiçbir çağıranı yok**
+(tek bir `import` bile). Düzeltme üretim çıktısını **değiştirmez**; ayrışmayı
+ve **sıfır test kapsamını** kapatır. Bu, atomu küçültmez ama iddiasını
+küçültür ve öyle raporlanır.
+
+### Düzeltme (tek kaynak)
+
+- **Yeni saf fonksiyon `onizleme.yazi_yerlesimi(ad, prm, gen, yuk, p)`**:
+  punto/x/y/hizalama **önce planın spec'inden**, spec sessizse
+  `tipografi.KONUM` ve profil puntosundan gelir. Bu dosyada **uydurma sabit
+  tutulmaz**. Puntolar profil nominal genişliğinde (1920) üretildiği için
+  önizleme ölçüsüne **oranla** küçültülür (`NOMINAL_GENISLIK`).
+- **Künye güvenli kenarı ZORLAR** — Remotion `KaynakEtiketi` ile birebir aynı
+  hesap: `min(y*yuk, yuk − güvenli_kenar − punto × SATIR_KUTU_ORANI)`; kırpma
+  olduğunda `kirpildi=True` ile **raporlanır**.
+- `_bant_yazi` artık sabit argüman değil **yerleşim sözlüğü** alıyor; bant
+  dolgusu da `kalite_kapisi.DOLGU_ORANI` (Grafikler.tsx'in kendi sabiti).
+- `callout` yatayda **oran** (`x`), diğerleri **izgara px** (`izgara_x`)
+  taşıdığı için tür bazında ayrı ele alınır — tahmin/heuristik yok.
+
+### Testler (red-first) — modülün İLK kapsamı
+
+Kırmızı önce **çökmeden** koştu: 18 hedefli kontrolün **14'ü XX** verdi ve
+filtre dizgisi kusuru **dizgide** göründü: `fontsize=34:x=66:y=h*0.70`.
+Düzeltmeden sonra **18/18 yeşil**. Yerel ffmpeg libfreetype **olmadan**
+derlendiği için testler ffmpeg **çalıştırmaz**; yetenek yoklaması test
+süresince geçici açılır ve yalnız **saf filtre dizgisi** üretilir.
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1787** | **3201** |
+
+0 hata. Faz I 1769 → **1787** (+18). 2 BLOKE (I-33 kaydı + opsiyonel fixture).
+
+### ✅ Değişen yolun GERÇEK çıktısı: `onizleme_lawn_i40.mp4`
+
+I-39 pilotunun `render_plan.json`i, `editor.onizleme` ile 720p'ye çevrildi.
+Medya **önbellekten**, ağ **yok**, **$0.00**. Ölçümler
+(`outputs/sample/onizleme_i40_rapor.json`):
+
+- **1280×720 @ 30**, 25.30 sn, 4.99 MB · **6/6 sahne gerçek lisanslı medya**
+  (sentetik **kullanılmadı**), hata **yok**
+- LUFS **−14.25** / TP **−5.57** / LRA 0.20 · sessizlik aralığı **0**
+- **6 kesme** · **11 kare** çıkarıldı; kare gözle doğrulandı (b004 fıskiye)
+- **Parite kanıtı**: altı yazı katmanının **hepsi** planın `y_orani`sini
+  birebir taşıyor (0.60 / 0.075 ×5), künye **sağa hizalı**, kırpma yok
+
+⛔ **BLOKE — sahte PASS verilmedi:** bu host'un ffmpeg'i **libfreetype olmadan**
+derlenmiş; `drawtext` **yok**. Yazı katmanları **çizilemedi** ve modül onları
+`atlanan_spec`'te **raporladı** (sessiz kayıp yok: `chapter-title` ×1,
+`source-label` ×5). Yani **yazı geometrisi görsel olarak doğrulanamadı**;
+deterministik filtre-dizgisi testleriyle kilitlendi. Konteynerdeki ffmpeg'de
+filtre **var** — görsel doğrulama orada yapılmalı.
+
+### ✅ 1080p Remotion pilotu — GERİLEME YOK (nesnel kanıt)
+
+`editorv2_lawn_i40.mp4` yeniden üretildi (önbellekten, $0.00). Sadakat kapısı
+yine `beat esit=True / varlık esit=True`. Ölçümler I-39 ile **aynı**:
+1920×1080@30, 25.259 sn, LUFS −14.27 / TP −3.10, 8 kesme, optik ort 9.2,
+kenar siyahlığı **0/101** (en koyu sağ 16.01), 11 kare, **POST-QA PASS**.
+
+**Nesnel gerileme kanıtı:** I-39 ve I-40 render'larının **11 karesinin
+11'i de SHA-256 olarak birebir aynı**. Yani I-40 Remotion hattını
+**bit düzeyinde** değiştirmedi.
+
+### ⛔ Pilot yine KABUL EDİLMEDİ
+
+I-39'da ölçülen **semantik kusurlar aynen duruyor** (b001 1900 sepya hasat,
+b002 Kahoʻolawe kurak saha, b005 Ricinus), statik fotoğraf/Ken Burns yapısı,
+B-roll/video yok, hook/kapanış zayıf, müzik/SFX yok. I-40 bunlara
+**dokunmadı**. **MP4 kabul edilmiş değil, mutlak yol verilmedi, deploy yok.**
+
+### ⚠ Bu atomda ÖLÇÜLEN, kapsam dışı bırakılan kusurlar
+
+1. **Önizleme yolunda ALTYAZI hiç çizilmiyor** — `render_plan`'daki
+   `altyazi` küpleri okunmuyor. I-39 nefes kapısının önizlemede karşılığı
+   **yok** (bant da yok). Dar, bedava, ağsız bir atom.
+2. **Önizleme sesi 96 kHz aac** çıkıyor (yatak 48 kHz üretilmesine rağmen);
+   Remotion hattı 48 kHz. I-40 ses yoluna **dokunmadı**.
+3. **Geçiş efektleri önizlemede uygulanmıyor** (modülün kendi belgelediği
+   sınır) — sert kesme ile concat ediliyor.
+
+### SONRAKİ ATOM (I-41) — yalnız ölçülen kusurdan
+
+1. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005). I-38'den beri
+   açık; **ayrı ve daha büyük** atom. Sorguyu/eşiği zorlamak çözüm değil
+   (I-34/I-35'te ikisi de ölçülüp elendi).
+2. **Önizlemede altyazı yok** (yukarıda ölçüldü) — dar ve bedava.
+3. **`kaynakYazi` `VidrushVideo` yolunda taşınmıyor** (I-38'den devir;
+   `pipeline.py` hattı hâlâ ölçülmedi).

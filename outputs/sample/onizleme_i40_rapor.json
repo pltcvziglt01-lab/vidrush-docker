@@ -1,0 +1,197 @@
+{
+  "video": "/Users/polatcan/vidrush-docker/outputs/sample/onizleme_lawn_i40.mp4",
+  "onizleme_raporu": {
+    "segment": [
+      {
+        "beat_id": "b001",
+        "sure": 1.89,
+        "cekim": "close-detail",
+        "hareket": "push-in",
+        "kaynak": "lisansli",
+        "asset_id": "s01_5156581"
+      },
+      {
+        "beat_id": "b002",
+        "sure": 2.2,
+        "cekim": "close-detail",
+        "hareket": "pull-out",
+        "kaynak": "lisansli",
+        "asset_id": "s01y1_9559294"
+      },
+      {
+        "beat_id": "b003",
+        "sure": 5.55,
+        "cekim": "medium",
+        "hareket": "pan-right",
+        "kaynak": "lisansli",
+        "asset_id": "s02_63708224"
+      },
+      {
+        "beat_id": "b004",
+        "sure": 5.35,
+        "cekim": "medium",
+        "hareket": "pan-left",
+        "kaynak": "lisansli",
+        "asset_id": "s03_745812"
+      },
+      {
+        "beat_id": "b005",
+        "sure": 5.27,
+        "cekim": "establishing",
+        "hareket": "push-in",
+        "kaynak": "lisansli",
+        "asset_id": "s04_86323697"
+      },
+      {
+        "beat_id": "b006",
+        "sure": 4.94,
+        "cekim": "establishing",
+        "hareket": "pull-out",
+        "kaynak": "lisansli",
+        "asset_id": "s05_2732961"
+      }
+    ],
+    "atlanan_spec": [
+      {
+        "beat_id": "b001",
+        "spec": "light-sweep",
+        "sebep": "renderer=remotion",
+        "fallback": "flash"
+      },
+      {
+        "beat_id": "b001",
+        "spec": "chapter-title",
+        "sebep": "ffmpeg drawtext filtresi YOK (libfreetype olmadan derlenmis)"
+      },
+      {
+        "beat_id": "b002",
+        "spec": "source-label",
+        "sebep": "ffmpeg drawtext filtresi YOK (libfreetype olmadan derlenmis)"
+      },
+      {
+        "beat_id": "b003",
+        "spec": "source-label",
+        "sebep": "ffmpeg drawtext filtresi YOK (libfreetype olmadan derlenmis)"
+      },
+      {
+        "beat_id": "b004",
+        "spec": "source-label",
+        "sebep": "ffmpeg drawtext filtresi YOK (libfreetype olmadan derlenmis)"
+      },
+      {
+        "beat_id": "b005",
+        "spec": "source-label",
+        "sebep": "ffmpeg drawtext filtresi YOK (libfreetype olmadan derlenmis)"
+      },
+      {
+        "beat_id": "b006",
+        "spec": "source-label",
+        "sebep": "ffmpeg drawtext filtresi YOK (libfreetype olmadan derlenmis)"
+      }
+    ],
+    "hata": [],
+    "sure_sn": 25.2,
+    "sahne": 6,
+    "sentetik_kullanildi": false,
+    "cikti": "/Users/polatcan/vidrush-docker/outputs/sample/onizleme_lawn_i40.mp4"
+  },
+  "ffprobe": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "codec_type": "video",
+        "width": 1280,
+        "height": 720,
+        "r_frame_rate": "30/1"
+      },
+      {
+        "codec_name": "aac",
+        "codec_type": "audio",
+        "sample_rate": "96000",
+        "channels": 2,
+        "r_frame_rate": "0/0"
+      }
+    ],
+    "format": {
+      "duration": "25.300000",
+      "size": "4985971"
+    }
+  },
+  "ses": {
+    "input_i": "-14.25",
+    "input_tp": "-5.57",
+    "input_lra": "0.20",
+    "input_thresh": "-24.25",
+    "output_i": "-24.03",
+    "output_tp": "-15.34",
+    "output_lra": "0.10",
+    "output_thresh": "-34.03",
+    "normalization_type": "dynamic",
+    "target_offset": "0.03"
+  },
+  "sessizlik_araligi": 0,
+  "kesmeler": {
+    "sayi": 6,
+    "anlar": [
+      0.033,
+      1.867,
+      4.067,
+      9.633,
+      15.0,
+      20.267
+    ]
+  },
+  "kareler": [
+    {
+      "an_sn": 2.108,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i40_onizleme/kareler/i40_kare_2_108s.png"
+    },
+    {
+      "an_sn": 4.217,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i40_onizleme/kareler/i40_kare_4_217s.png"
+    },
+    {
+      "an_sn": 6.325,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i40_onizleme/kareler/i40_kare_6_325s.png"
+    },
+    {
+      "an_sn": 8.433,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i40_onizleme/kareler/i40_kare_8_433s.png"
+    },
+    {
+      "an_sn": 10.542,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i40_onizleme/kareler/i40_kare_10_542s.png"
+    },
+    {
+      "an_sn": 12.65,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i40_onizleme/kareler/i40_kare_12_65s.png"
+    },
+    {
+      "an_sn": 14.758,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i40_onizleme/kareler/i40_kare_14_758s.png"
+    },
+    {
+      "an_sn": 16.867,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i40_onizleme/kareler/i40_kare_16_867s.png"
+    },
+    {
+      "an_sn": 18.975,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i40_onizleme/kareler/i40_kare_18_975s.png"
+    },
+    {
+      "an_sn": 21.083,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i40_onizleme/kareler/i40_kare_21_083s.png"
+    },
+    {
+      "an_sn": 23.192,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i40_onizleme/kareler/i40_kare_23_192s.png"
+    }
+  ],
+  "maliyet_usd": 0.0,
+  "yazi_cizildi_mi": false,
+  "bloke": [
+    "ffmpeg libfreetype OLMADAN derlenmis: drawtext YOK. Yazi katmanlari CIZILEMEDI ve atlanan_spec'te RAPORLANDI. Yazi geometrisi gorsel olarak DOGRULANAMAZ; deterministik filtre-dizgisi testleriyle kilitlendi."
+  ]
+}
