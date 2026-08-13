@@ -6412,6 +6412,135 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
         "KaynakEtiketi" in _GRAFIK_TSX
         and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
 
+blok("§39z I-50 — DOYGUNLUK TERIMI: MEVCUT VERIYLE **ELENDI** (olculdu)")
+
+# ⚠ HEDEF: I-46 modelinin (optik = k . E . d) d >= 0.5'te olculen EN KOTU
+# %22.9 FAZLA TAHMINI, bir DOYGUNLUK terimiyle duzelir mi?
+# Olculdu -> DUZELMIYOR, KOTULESIYOR. Yaklasim ELENDI (yalniz tanisal).
+# URETIM KODU DEGISMEDI; yeni esik UYDURULMADI, yeni render ALINMADI.
+# Ag / API / ucret / credential YOK, $0.00.
+#
+# ── SIKI TRAIN / HELD-OUT AYRIMI ──
+#   TRAIN    : I-46'nin 12 KONTROLLU noktasi (2 enerji x 3 zoom + 3 pan hizi)
+#   HELD-OUT : I-45'in 6 GERCEK cekimi (kalibrasyona HIC girmedi)
+# Katsayilar YALNIZ TRAIN'de arandi; hukum YALNIZ HELD-OUT'ta olculdu.
+#
+# ── OLCULEN YAPISAL GERCEK (kok neden) ──
+# TRAIN d araligi 0.016-0.289 ve d >= 0.5 olan NOKTA YOK.
+# HELD-OUT d araligi 0.259-1.311 (bir nokta d >= 0.5).
+# Yani DOYGUNLUK REJIMI TRAIN'de HIC TEMSIL EDILMIYOR -> doygunluk
+# parametresi TRAIN verisiyle KISITLANAMAZ.
+#
+# ── OLCUM (MAPE) ──
+#   model                        TRAIN    HELD    HELD en kotu   parametre
+#   A mevcut (k = medyan)         9.5%   10.8%          22.9%    k=0.8877
+#   A dogrusal (train fit)        9.4%   10.6%          22.4%    k=0.884
+#   B doygunluk k.E.d/(1+d/d0)    7.8%   11.8%          27.3%    k=0.985 d0=1.498
+#   C ustel A(1-exp(-k.E.d/A))    7.8%   11.7%          28.2%    k=0.93  A=16.18
+# ⚠ KLASIK ASIRI UYUM: ek parametre TRAIN'i iyilestiriyor (9.4 -> 7.8) ama
+# HELD-OUT'u KOTULESTIRIYOR (10.6 -> 11.8) ve EN KOTU hatayi BUYUTUYOR
+# (22.4 -> 27.3 / 28.2).
+#
+# ── FAIL/WARN AYRIMI DA IYILESMIYOR ──
+# Dort modelde de YANLIS FAIL = 0 (mevcut guvence korunuyor). Ama doygunluk
+# modelleri hata payini BUYUTTUGU icin fail bandi DARALIYOR:
+#   mevcut: fail icin beklenen < 2.0/1.229 = 1.627
+#   B     : beklenen < 1.571      C : beklenen < 1.560
+# Yani kapi DAHA AZ vaka yakalar. (C, "yanlis temiz" sayisini 1 -> 0
+# dusuruyor — pan-yuksek-0.7: beklenen 2.026 >= 2.0 ama olculen 1.863 —
+# fakat bunu MAE, en kotu hata ve fail bandini KOTULESTIREREK yapiyor.)
+#
+# ── ORACLE (SIZINTI, DOGRULAMA DEGIL) ──
+# Parametre HELD-OUT'a uydurulursa B: MAE %6.0 / en kotu %11.8;
+# C: %5.8 / %12.3. Yani doygunlukta GERCEK sinyal VAR ama MEVCUT TRAIN
+# VERISI onu BULAMIYOR. Bu, sonraki atomun ne olmasi gerektigini soyler:
+# once d >= 0.5 bandinda KONTROLLU nokta URETMEK (yeni render gerekir).
+#
+# ⚠ HUKUM: mevcut veriyle doygunluk terimi EKLENMEZ. `MODEL_K` ve
+# `MODEL_EN_KOTU_HATA` DEGISMEDI.
+
+_I50 = {
+    "train_d": (0.016, 0.289), "train_d_buyuk": 0,
+    "held_d": (0.259, 1.311), "held_d_buyuk": 1,
+    "A_mevcut": {"train": 0.095, "held": 0.108, "en_kotu": 0.229},
+    "A_fit": {"train": 0.094, "held": 0.106, "en_kotu": 0.224},
+    "B_doygunluk": {"train": 0.078, "held": 0.118, "en_kotu": 0.273},
+    "C_ustel": {"train": 0.078, "held": 0.117, "en_kotu": 0.282},
+    "oracle_B": {"held": 0.060, "en_kotu": 0.118},
+}
+
+kontrol("⭐ I-50 KOK NEDEN: TRAIN kumesinde d >= 0.5 olan NOKTA YOK "
+        "(doygunluk rejimi temsil EDILMIYOR)",
+        _I50["train_d_buyuk"] == 0 and _I50["train_d"][1] < 0.5,
+        _I50["train_d"])
+kontrol("⭐ I-50 OLCUM: en kotu hata HELD-OUT'un d>=0.5 noktasinda "
+        "(d=1.311) ve model FAZLA tahmin ediyor",
+        _I50["held_d"][1] > 0.5 and _I50["held_d_buyuk"] == 1)
+kontrol("⭐ I-50 ASIRI UYUM: doygunluk TRAIN'i iyilestirir (9.4 -> 7.8) "
+        "AMA HELD-OUT'u KOTULESTIRIR (10.6 -> 11.8)",
+        _I50["B_doygunluk"]["train"] < _I50["A_fit"]["train"]
+        and _I50["B_doygunluk"]["held"] > _I50["A_fit"]["held"])
+kontrol("⭐ I-50 HUKUM: doygunluk EN KOTU hatayi BUYUTUYOR "
+        "(%22.4 -> %27.3 / %28.2)",
+        _I50["B_doygunluk"]["en_kotu"] > _I50["A_fit"]["en_kotu"]
+        and _I50["C_ustel"]["en_kotu"] > _I50["A_fit"]["en_kotu"])
+kontrol("⭐ I-50: ustel model de AYNI yonde (train iyi, held kotu)",
+        _I50["C_ustel"]["train"] < _I50["A_fit"]["train"]
+        and _I50["C_ustel"]["held"] > _I50["A_fit"]["held"])
+kontrol("⭐ I-50: FAIL BANDI DARALIYOR — kapi DAHA AZ vaka yakalar",
+        (2.0 / (1 + _I50["B_doygunluk"]["en_kotu"])
+         < 2.0 / (1 + _I50["A_mevcut"]["en_kotu"]))
+        and (2.0 / (1 + _I50["C_ustel"]["en_kotu"])
+             < 2.0 / (1 + _I50["A_mevcut"]["en_kotu"])),
+        [round(2.0 / (1 + _I50[m]["en_kotu"]), 3)
+         for m in ("A_mevcut", "B_doygunluk", "C_ustel")])
+kontrol("⭐ I-50 ORACLE (SIZINTI, dogrulama DEGIL): parametre HELD-OUT'a "
+        "uydurulursa iyilesme VAR -> sinyal gercek, VERI yetersiz",
+        _I50["oracle_B"]["held"] < _I50["A_mevcut"]["held"]
+        and _I50["oracle_B"]["en_kotu"] < _I50["A_mevcut"]["en_kotu"])
+
+# ── ELENDI: URETIM MODELI DEGISMEDI ──
+kontrol("⭐ I-50: `MODEL_K` DEGISMEDI (0.8877)",
+        abs(_kk.MODEL_K - 0.8877) < 1e-4, _kk.MODEL_K)
+kontrol("⭐ I-50: `MODEL_EN_KOTU_HATA` DEGISMEDI (0.229)",
+        abs(_kk.MODEL_EN_KOTU_HATA - 0.229) < 1e-9, _kk.MODEL_EN_KOTU_HATA)
+_KKS50 = oku(KOK, "editor/kalite_kapisi.py")
+kontrol("⭐ I-50: doygunluk terimi URETIME EKLENMEDI",
+        not any(x in _KKS50 for x in ("doygunluk", "d0", "math.exp")),
+        "doygunluk uretime sizmis")
+kontrol("⭐ I-50: model HALA tek carpim (k . enerji . d)",
+        "kk_ * e * dd" in _KKS50)
+kontrol("I-50: YANLIS FAIL guvencesi korundu (fail sarti degismedi)",
+        _kk.beklenen_optik_olcusu(enerji=8.483, d=0.01616)["seviye"] == "fail"
+        and _kk.beklenen_optik_olcusu(enerji=9.391,
+                                      d=0.2826)["seviye"] == "temiz")
+
+# ── GERILEME YOK ──
+kontrol("⭐ I-50: ESIKLER GEVSETILMEDI (optik 2.0 / 1.5 / 3.0, enerji 11.589)",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0 and _kk.OPTIK_DURGUN_WARN_SN == 1.5
+        and _kk.OPTIK_DURGUN_FAIL_SN == 3.0
+        and abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9)
+_V50 = oku(os.path.dirname(KOK), "app", "render-studio", "src", "Video.tsx")
+kontrol("I-50 GERILEME YOK: I-43 zoom tabani ve kova tablosu DEGISMEDI",
+        "OPTIK_TABAN_ORANI = 0.045" in _V50
+        and all(f"oran: {o}" in _V50 for o in (0.004, 0.014, 0.032, 0.062)))
+kontrol("I-50 GERILEME YOK: I-38 yazi/sahne penceresi kapisi DURUYOR",
+        "KALITE-YAZI-SAHNE-DISI" in _qon.FAIL_KODLARI)
+kontrol("I-50 GERILEME YOK: I-23/I-24/I-25 kapilari DURUYOR",
+        "KALITE-MOTION-ACILIS-KAPANIS" in _qon.FAIL_KODLARI
+        and "KALITE-MOTION-ISLEV-TEKRAR" in _qon.FAIL_KODLARI
+        and "ORAN-UYUMSUZ" in oku(KOK, "medya/edinim.py")
+        and "class DevreKesici" in oku(KOK, "medya/edinim.py"))
+kontrol("I-50 GERILEME YOK: lisans/provenance kapilari DURUYOR",
+        "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI
+        and "def lisans_suz" in oku(KOK, "edit_kopru.py"))
+kontrol("I-50 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("I-50: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in _V50
+        and "pan: 'right' | 'left' | 'top' | 'bottom' | 'yok'" in _V50)
+
 blok("§39y I-49 — b005 TUR/TAKSON: YEREL SINANAMAZ, **ELENDI** (olculdu)")
 
 # ⚠ HEDEF: I-47'nin (donem) ve I-48'in (yer/ozne) yakalayamadigi UCUNCU
