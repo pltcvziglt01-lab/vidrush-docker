@@ -194,6 +194,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-25 sağlayıcı-tekel tanısı: kök neden bizdeydi** | `4acf133` | ✅ **push edildi**, 2 gerçek hata düzeltildi, WARN **dürüst** (Commons 429), medya kümesi değişmedi, deploy YOK |
 | 13 Ağu | **I-26 s03 aşırı dar sorgu çözüldü; pilot BLOKE** | `2928130` | ⚠ **push edildi**, Commons s03 0→2 aday, tekel %100→%60, MP4 **KABUL EDİLMEDİ** (punch büyütme), deploy YOK |
 | 13 Ağu | **I-27 kamera punch büyütmesi ÇÖZÜLDÜ** | `6ccb739` | ✅ **push edildi**, büyüten beat 2→0, POST-QA **TAM PASS**, puan 100/100, Faz I BLOKE 0, deploy YOK |
+| 13 Ağu | **I-28 seçim sırası tanısı: KUSUR YOK** | `PENDING` | ✅ **push edildi**, öncül ölçümle çürüdü, üretim kodu DEĞİŞMEDİ, davranış kilitlendi, MP4 korundu, deploy YOK |
 
 ---
 
@@ -4194,5 +4195,113 @@ dikey/kare değil"**; kilit ona çevrildi (gevşetme değil, doğru değişmez).
   konuya sadık** aday var (Ohio OSC 5184×3456, alaka 2) — eşik **sonra**
   değil **arama sıralamasıyla birlikte** değerlendirilirse tekel gerçekten
   kırılabilir. Ölçülerek denenmeli.
+  > ⚠ **I-28 DÜZELTMESİ — bu madde YANILTICIYDI.** "İlk adayları eliyor"
+  > doğru ama eksik: **sıradaki** aday (Ohio OSC 5184×3456) eşiği geçiyor ve
+  > **0. sırada seçiliyor**. I-28'de ölçüldü: 429 devre dışı bırakıldığında
+  > zincir 4/4 sahnede Commons'tan konuya sadık aday seçiyor. Seçim/filtre
+  > sırasında **kusur yok**; tekelin tek sebebi indirmedeki HTTP 429.
 - **"Afiş/pano fotoğrafı"** için ölçülebilir eleme sinyali (metin yoğunluğu)
   — I-26'da gözle yakalandı, otomatik ölçümü yok.
+
+---
+
+## 46. FAZ I-28 — SEÇİM SIRASI TANISI: **KUSUR YOK**, DAVRANIŞ KİLİTLENDİ (13 Ağu)
+
+> **Durum: öncül ÖLÇÜMLE ÇÜRÜDÜ. Üretim kodu DEĞİŞMEDİ; doğru davranış
+> teste kilitlendi. Yerel yeşil (0 hata), push edildi. Deploy YOK.
+> Maliyet $0.00.**
+> Değişen: **yalnızca** `webapp/testler/test_faz_i.py` (+ handoff).
+> `plan.py`, `qa_on.py`, `motion.py`, `kalite_kapisi.py`, `gramer.py`,
+> `medya/*`, `pipeline.py`, `server.py`, `deploy.sh`, smoke betiği ve
+> 22 alan sözleşmesi **dokunulmadı** (git ile doğrulandı).
+> **Pilot yeniden üretilmedi**: medya kümesi ve render davranışı
+> değişmediği için I-27'nin kabul edilmiş MP4'ü **korunuyor**.
+
+### ⚠ ARANAN KUSUR YOK — ölçüm öncülü çürüttü
+
+Beklenen kusur: *"2443 eşiği yüzünden konuya sadık yüksek çözünürlüklü
+Ohio OSC (5184×3456) adayı seçilemiyor, tekel NASA %100 oluyor."*
+
+Aynı **tek** `ara()` çağrısıyla ölçüldü (ek ağ/kota yok):
+
+| sorgu | ham | elenen | kalan | **0. sıradaki aday** |
+|---|---|---|---|---|
+| `supercomputer facility` | 18 | 12 | 6 | **OSC's HP Intel Xeon Oakley Cluster 5184×3456** ✅ |
+| `Pleiades supercomputer` | 18 | 13 | 5 | NASA Pleiades Supercomputer 4983×3303 ✅ |
+| `silicon carbide integrated circuit` | 2 | 0 | 2 | Extremely durable silicon carbide semiconductor ✅ |
+| `solar array power` | 18 | 6 | 6 | Solar array-2 ✅ |
+
+Eşik gerçekten düşük çözünürlüklü **alaka-1** adayını (Columbia 2100×1524)
+eliyor — ama **sıradaki** aday (Ohio OSC, alaka 2) eşiği geçiyor ve
+**0. sırada seçiliyor**. Yani "sıradakine deterministik geçiş" **zaten
+çalışıyor**.
+
+### Uçtan uca kanıt — 429 devre dışı bırakılınca zincir Commons'ı seçiyor
+
+Gerçek Commons araması + **sahte indirici** (429 yok) ile koşuldu:
+
+| sahne | istenen | `ara()` | seçilen |
+|---|---|---|---|
+| s01 | 2 | **1** | NASA Pleiades Supercomputer + Pleiades supercomputer |
+| s02 | 1 | **1** | **OSC's HP Intel Xeon Oakley Cluster** |
+| s03 | 1 | **1** | Extremely durable silicon carbide semiconductor |
+| s04 | 1 | **1** | Solar array-2 |
+
+4/4 sahne Commons'tan **konuya sadık** aday seçti, sahne başına **tek**
+arama çağrısı. **Seçim/filtre sırasında kusur yok.**
+
+### Tekelin TEK sebebi — indirmedeki HTTP 429
+
+Son pilot koşumunda Commons `metadata=5` üretti (yani eşikten geçen aday
+**seçildi**), düşüş `BAYT-YOK / HTTP 429` ile oldu. Bu, I-18'den beri
+belgeli **çevresel** koşul; devre kesici doğru davranıyor (600 sn
+beklemiyor, NASA'ya geçiyor). **Sahte sağlayıcı çeşitliliği üretilmedi.**
+
+### Havuz açlığı da yok
+
+Eşik sertleşmesine rağmen kalan aday sayısı istenen adedin **üstünde**:
+5≥2, 6≥1, 2≥1, 6≥1. Ham çekim derinliğini (`gsrlimit`) artırmak **ölçülen
+bir fayda üretmiyordu**, bu yüzden **değiştirilmedi** — kanıtsız değişiklik
+yapılmadı.
+
+### Yapılan tek iş: doğru davranışı KİLİTLEMEK
+
+Sahte API/aday listesiyle (ağ yok) kilitlendi:
+- düşük çözünürlüklü alaka-1 aday **eşikte elenir**,
+- sıradaki konuya sadık yüksek çözünürlüklü aday **0. sırada seçilir**,
+- **semantik alaka birincil** kalır (konu dışı RC Lens futbol fotoğrafları
+  arkada),
+- lisans belirsiz ve eser sahibi eksik adaylar **geçmez**,
+- I-23 oran kapısı dikey adayı **reddetmeye devam eder**,
+- eşik I-27'den **türetilen** değere (2443) eşittir,
+- **ek `ara()` çağrısı yoktur**.
+
+### Bulunan ve düzeltilen kendi hatam
+
+I-27'nin "SONRAKİ ATOM" notu *"yeni eşik Commons'ın alaka sırasındaki ilk
+adaylarını eliyor"* diyordu. Doğru ama **eksik ve yanıltıcı**: sıradaki aday
+eşiği geçiyor ve seçiliyor. Bu ifade I-28'in yanlış öncülle başlamasına yol
+açtı; handoff'ta **düzeltme notu** olarak işaretlendi.
+
+Ayrıca test fikstürümde `LicenseUrl` ezilmiyordu; yalnız kısa adı
+değiştirmek lisans kararını yanıltıyordu (karar URL'den de lisans çıkarıyor).
+Fikstür düzeltildi — **üretim kodunda kusur yoktu**.
+
+### Ölçülen test sonucu
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1616** | **3030** |
+
+0 hata. Faz I 1604 → **1616** (+12). Faz I BLOKE **0**.
+Kalan tek BLOKE Faz H'deki `QA_TEST_VIDEO` (opsiyonel, I-22'den beri aynı).
+
+### SONRAKİ ATOM (I-29 adayları)
+
+- **Sağlayıcı tekeli teknik olarak çözülemez durumda:** Commons'ın 429'u
+  host/IP kaynaklı ve `Retry-After: 600`. Gerçek seçenekler — 429 penceresi
+  dışında edinim ya da farklı bir kamu malı sağlayıcı — **kullanıcı
+  kararıdır**, mühendislik kusuru değil.
+- **"Afiş/pano fotoğrafı"** için ölçülebilir eleme sinyali (metin yoğunluğu)
+  — I-26'da gözle yakalandı, otomatik ölçümü hâlâ yok. Tek gerçek açık kalite
+  kapısı bu.

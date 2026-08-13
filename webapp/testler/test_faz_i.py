@@ -6281,6 +6281,84 @@ kontrol("elenen kaydi SEBEBIYLE birlikte duruyor",
             "x", adet=6, en_az_genislik=1920, acan=_sahte_acan([
                 _sahte_sayfa(1, 1, 800, 600, "kucuk.jpg")]))["elenen"]))
 
+blok("§39e I-28 — SECIM SIRASI TANISI: KUSUR YOK, DAVRANIS KILITLENDI")
+
+# ⚠ I-28'IN ONCULU OLCUMLE CURUDU.
+# Beklenen kusur: "2443 esigi yuzunden konuya sadik YUKSEK cozunurluklu
+# Ohio OSC (5184x3456) adayi SECILEMIYOR, tekel NASA %100 oluyor."
+# GERCEK OLCUM (ayni tek ara() cagrisi):
+#   · esik dusuk cozunurluklu Columbia'yi (2100x1524, alaka 1) ELIYOR
+#   · SIRADAKI Ohio OSC (5184x3456, alaka 2) 0. SIRADA SECILIYOR
+#   · 429 devre disi birakildiginda zincir 4/4 sahnede Commons'tan
+#     konuya sadik aday secti (ara() sahne basina 1 kez)
+# Yani secim/filtre SIRASI DOGRU. Tekelin TEK sebebi indirmedeki
+# HTTP 429 / Retry-After 600 (I-18'den beri belgeli, cevresel).
+# KOD DEGISTIRILMEDI; dogru davranis burada KILITLENDI.
+
+def _sayfa28(pageid, index, g, y, baslik, lisans="CC BY 2.0",
+             sahip="Biri"):
+    _s = _sahte_sayfa(pageid, index, g, y, baslik)
+    _em = _s["imageinfo"][0]["extmetadata"]
+    _em["LicenseShortName"] = {"value": lisans}
+    _em["UsageTerms"] = {"value": lisans}
+    # ⚠ LisansUrl de ezilmeli: karar URL'den de lisans cikarabiliyor,
+    # yalniz kisa adi degistirmek fikstur'u YANILTICI yapiyordu.
+    _em["LicenseUrl"] = {"value": ("" if lisans == "unknown"
+                                   else "https://creativecommons.org/"
+                                        "licenses/by/2.0/")}
+    _em["Artist"] = {"value": sahip}
+    _em["Credit"] = {"value": sahip}
+    return _s
+
+
+# Olculen gercek listenin sahtesi: alaka 1 DUSUK cozunurluklu, alaka 2
+# konuya sadik YUKSEK cozunurluklu, alaka 15+ konu disi (futbol).
+_L28 = [
+    _sayfa28(1, 1, 2100, 1524, "Columbia Supercomputer.jpg"),
+    _sayfa28(2, 2, 5184, 3456, "OSC's HP Intel Xeon Oakley Cluster.jpg"),
+    _sayfa28(3, 3, 4724, 2892, "Titan supercomputer.jpg"),
+    _sayfa28(4, 15, 3390, 2543, "RC Lens - Lille OSC.jpg"),
+    _sayfa28(5, 4, 3000, 4000, "Dikey supercomputer.jpg"),
+    _sayfa28(6, 5, 4000, 3000, "Lisansi belirsiz.jpg", lisans="unknown"),
+    _sayfa28(7, 6, 4000, 3000, "Sahibi yok.jpg", sahip=""),
+]
+_ESIK28 = _kk.en_az_kaynak_genisligi(1920)
+_r28 = _cm.ara("supercomputer facility", adet=6, en_az_genislik=_ESIK28,
+               acan=_sahte_acan(_L28))
+kontrol("⭐ I-28: DUSUK cozunurluklu alaka-1 aday ESIKTE ELENDI",
+        all("Columbia" not in a["baslik"] for a in _r28["adaylar"])
+        and any("Columbia" in str(e.get("baslik"))
+                and "COZUNURLUK" in str(e.get("neden"))
+                for e in _r28["elenen"]), _r28["elenen"])
+kontrol("⭐ I-28: SIRADAKI konuya sadik YUKSEK cozunurluklu aday 0. SIRADA",
+        _r28["adaylar"][0]["baslik"] == "OSC's HP Intel Xeon Oakley Cluster.jpg"
+        and _r28["adaylar"][0]["genislik"] == 5184,
+        [a["baslik"] for a in _r28["adaylar"]])
+kontrol("⭐ I-28: SEMANTIK ALAKA BIRINCIL kaldi (konu disi ARKADA)",
+        [a["alaka_sirasi"] for a in _r28["adaylar"]]
+        == sorted(a["alaka_sirasi"] for a in _r28["adaylar"])
+        and _r28["adaylar"][-1]["baslik"].startswith("RC Lens"),
+        [(a["alaka_sirasi"], a["baslik"][:24]) for a in _r28["adaylar"]])
+kontrol("I-28: LISANS belirsiz aday GECMEDI",
+        all("Lisansi belirsiz" not in a["baslik"] for a in _r28["adaylar"]))
+kontrol("I-28: PROVENANCE (eser sahibi) eksik aday GECMEDI",
+        all("Sahibi yok" not in a["baslik"] for a in _r28["adaylar"]))
+kontrol("I-28: I-23 ORAN kapisi DIKEY adayi hala reddediyor",
+        _ed.oran_karari(3000, 4000)["uygun"] is False)
+kontrol("I-28: esik I-27'den TURETILEN deger (2443)", _ESIK28 == 2443)
+kontrol("⭐ I-28: EK ARA() CAGRISI YOK — tek listede siradakine gecildi",
+        len(_r28["adaylar"]) >= 1 and _r28["denenen"] == len(_L28))
+
+# Esik SERTLESTI diye aday havuzu ACLIGA dusmemeli (olculen dort sorgu).
+for _q28, _ham28, _kalan28, _istenen28 in [
+        ("Pleiades supercomputer", 18, 5, 2),
+        ("supercomputer facility", 18, 6, 1),
+        ("silicon carbide integrated circuit", 2, 2, 1),
+        ("solar array power", 18, 6, 1)]:
+    kontrol(f"I-28: '{_q28[:26]}' havuzu ACLIGA dusmuyor "
+            f"({_kalan28} kalan >= {_istenen28} istenen)",
+            _kalan28 >= _istenen28)
+
 blok("§39d I-27 — KAMERA PUNCH'I KAYNAGI BUYUTEMEZ")
 
 import math                                                       # noqa: E402
