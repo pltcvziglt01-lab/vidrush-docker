@@ -200,6 +200,7 @@ def denetle(video_yolu: str, *, beklenen: Optional[dict] = None,
             optik_farklar: Optional[list] = None,
             optik_sahneler: Optional[list] = None,
             optik_ham: Optional[bytes] = None,
+            kenar_ham: Optional[bytes] = None,
             ambans_lufs: Optional[float] = None,
             anlatim_lufs: Optional[float] = None,
             ambans_seviye: float = 1.0,
@@ -361,6 +362,28 @@ def denetle(video_yolu: str, *, beklenen: Optional[dict] = None,
                    f"esik {ke['siyah_esigi']}) — kamera kadrajdan tasiyor",
                    "motion._guvenli_pay hesabini kontrol et; pan payi "
                    "(S-1)/(2S) sinirini asmamali")
+
+    # ── FAZ I-56: BAGIMSIZ KENAR OLCUM HATTI (dort yon, en dis sutun/satir) ──
+    # ⚠ GERIYE UYUMLU: yukaridaki I-17 olcumu ve `POST-KENAR-SIYAH` AYNEN
+    # duruyor; bu AYRI bir ornek (`kenar_ornek_komutu`, 384x216 @ 8 fps) ve
+    # AYRI bir esik (`KENAR_DIS_ESIGI`) uzerinde calisir. Ornek verilmezse
+    # davranis BIT-BIT eskisi gibidir.
+    # ⚠ I-53'te olculdu: eski olcum yatayda yalnizca >= 60 px bant goruyor,
+    # DIKEY yonde tamamen kor ve 0.25 sn'den kisa bandi 4 fps izgarasinda
+    # HIC yakalayamiyordu.
+    if kenar_ham:
+        kd = kalite_kapisi_mod.kenar_dis_olcusu(kenar_ham)
+        q.olcumler.setdefault("kalite", {})["kenar_dis"] = kd
+        if kalite_kapisi and kd.get("olculdu") and not kd.get("temiz"):
+            _ilk = (kd.get("ornek_ihlal") or [{}])[0]
+            q.ekle("POST-KENAR-DIS", "fail",
+                   f"{kd['ihlal_kare']}/{kd['kare']} karede EN DIS kenarda "
+                   f"siyah bant (ilk: {_ilk.get('yon')} kenari "
+                   f"{_ilk.get('deger')}, esik {kd['esik']}); en koyu "
+                   f"sol {kd['en_koyu_sol']} sag {kd['en_koyu_sag']} "
+                   f"ust {kd['en_koyu_ust']} alt {kd['en_koyu_alt']}",
+                   "kamera kadrajdan tasiyor: pan tasma payini "
+                   "(motion._guvenli_pay / Video.tsx TABAN_OLCEK) kontrol et")
     return q.sonuclandir()
 
 

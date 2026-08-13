@@ -1218,6 +1218,114 @@ def kenar_siyahligi_olcusu(ham: bytes, *, olcu: tuple = OPTIK_ORNEK_OLCU,
     }
 
 
+# ═══════════ 7f) BAGIMSIZ KENAR OLCUM HATTI (Faz I-56) ═════════════════
+#
+# ⚠ NEDEN AYRI BIR HAT — I-52/I-53/I-54'TE OLCULDU:
+# `kenar_siyahligi_olcusu` optik ornegin (64x36 @ 4 fps) uzerine kuruluydu ve
+# UC bagimsiz kor noktasi vardi:
+#   (a) AGREGASYON: serit = %4 x kare genisligi (~77 px) ve ORTALAMA aliniyor
+#       -> yataydan yalnizca >= 60 px bantlar goruluyordu.
+#   (b) YON: yalnizca sol/sag seridi vardi -> DIKEY bant 120 px'te bile
+#       GORULMUYORDU.
+#   (c) ZAMAN: gercek bir kusur bandi 0.25 sn'den kisa oldugu icin 4 fps
+#       izgarasinda HICBIR uzamsal cozunurlukte yakalanamiyordu.
+# ⚠ Bu yuzden esikleri/ornegi DEGISTIRMEK yerine AYRI bir hat kuruldu:
+# `OPTIK_ORNEK_FPS` (4) ve `OPTIK_ORNEK_OLCU` (64x36) I-17 duraganlik
+# esiklerini tasidigi icin OLDUGU GIBI BIRAKILDI; `kenar_siyahligi_olcusu`
+# ve `KENAR_SIYAH_ESIGI` (16) da GERIYE UYUMLULUK icin AYNEN duruyor.
+#
+# ⚠ YAPILANDIRMA UYDURULMADI (I-54 olcumu, train/held-out ayrimi olcumden
+# ONCE sabitlenmis 4 kusurlu + 15 gercek temiz video uzerinde):
+#   yon        : tek yon HICBIR zaman ayirmiyor (yatay -103.8, dikey -91.2);
+#                DORT YON zorunlu (+11.8 train / +9.9 held)
+#   agregasyon : mevcut serit-ortalamasi ayirmiyor (-94.4); EN DIS
+#                sutun/satir en iyisi (+11.8 / +9.9)
+#   cozunurluk : 64 ve 128 hicbir fps'te ayirmiyor; 384 secildi
+#   zaman      : 4 fps hicbir cozunurlukte ayirmiyor; 384 icin >= 8 fps
+KENAR_ORNEK_OLCU = (384, 216)
+KENAR_ORNEK_FPS = 8
+
+# ⚠ ESIK UYDURULMADI (I-55): YALNIZ train bandindan acik formulle turetildi
+#     esik = train_temiz_tabani / GUVENLIK_KATI = 12.468 / 2 = 6.234
+# Anlami: TEMIZ bir karenin isaretlenmesi icin, train'de olculen EN KOYU
+# temiz kenarin YARISI kadar daha koyulasmasi gerekir (2x pay).
+# HELD-OUT'a TEK KEZ bakildi: 4 kusurlu ornegin 4'u yakalandi (0.0-0.005),
+# 7 temiz ornegin 7'si temiz kaldi (taban 10.009) -> KACIRMA 0, YANLIS
+# POZITIF 0. Duyarlilik: guvenlik kati ~1.25-2494 araliginda sonuc AYNI.
+# ⚠ Bu esik `KENAR_SIYAH_ESIGI` (16) ile KARSILASTIRILAMAZ — farkli
+# ornekleme ve farkli agregasyon uzerinde tanimlidir.
+KENAR_DIS_ESIGI = 6.234
+
+
+def kenar_ornek_komutu(video_yolu: str, *,
+                       ornek_fps: int = KENAR_ORNEK_FPS,
+                       olcu: tuple = KENAR_ORNEK_OLCU) -> list:
+    """Kenar olcumunun KENDI ornekleme komutu — modul onu CALISTIRMAZ.
+
+    ⚠ Optik ornekleyiciden BAGIMSIZDIR: `optik_ornek_komutu` 4 fps/64x36
+    ile I-17 duraganlik esiklerine baglidir ve DEGISTIRILMEZ.
+    """
+    g, y = int(olcu[0]), int(olcu[1])
+    return ["ffmpeg", "-nostdin", "-v", "error", "-i", video_yolu, "-vf",
+            f"fps={int(ornek_fps)},scale={g}:{y},format=gray",
+            "-f", "rawvideo", "-"]
+
+
+def kenar_dis_olcusu(ham, *, olcu: tuple = KENAR_ORNEK_OLCU,
+                     esik: float = KENAR_DIS_ESIGI,
+                     genel_carpan: float = 2.0) -> dict:
+    """DORT kenarin EN DIS sutun/satirinda siyah bant var mi? (saf hesap)
+
+    Her kare icin sol/sag EN DIS SUTUN ve ust/alt EN DIS SATIR ortalamasi
+    alinir; en karanligi esikle karsilastirilir.
+
+    ⚠ KOYU GORUNTU KORUMASI korunur: kare geneli `esik * genel_carpan`in
+    altindaysa (yani goruntunun kendisi karanliksa) ihlal SAYILMAZ —
+    `kenar_siyahligi_olcusu` ile ayni sozlesme.
+    ⚠ OLCEMEDIYSE "temiz" DEMEZ: `olculdu=False` doner.
+    """
+    try:
+        g, y = int(olcu[0]), int(olcu[1])
+    except (TypeError, ValueError, IndexError):
+        return {"olculdu": False, "neden": "OLCU-YOK"}
+    n = g * y
+    if not ham or n <= 0 or len(ham) < n:
+        return {"olculdu": False, "neden": "ORNEK-YOK"}
+    esik_ = _sayi(esik, KENAR_DIS_ESIGI)
+    genel_esigi = esik_ * _sayi(genel_carpan, 2.0)
+    adet = len(ham) // n
+    ihlal, en_koyu = [], {"sol": 255.0, "sag": 255.0,
+                          "ust": 255.0, "alt": 255.0}
+    for k in range(adet):
+        blok = ham[k * n:(k + 1) * n]
+        genel = sum(blok) / n
+        kenarlar = {
+            "sol": sum(blok[r * g] for r in range(y)) / y,
+            "sag": sum(blok[r * g + g - 1] for r in range(y)) / y,
+            "ust": sum(blok[c] for c in range(g)) / g,
+            "alt": sum(blok[(y - 1) * g + c] for c in range(g)) / g,
+        }
+        for a, v in kenarlar.items():
+            if v < en_koyu[a]:
+                en_koyu[a] = v
+        yon, deger = min(kenarlar.items(), key=lambda x: x[1])
+        if deger < esik_ and genel > genel_esigi:
+            ihlal.append({"kare": k, "yon": yon, "deger": round(deger, 3),
+                          "genel": round(genel, 2)})
+    return {
+        "olculdu": True, "kare": adet, "olcu": [g, y], "esik": esik_,
+        "genel_esigi": round(genel_esigi, 3),
+        "ihlal_kare": len(ihlal),
+        "ihlal_orani": round(len(ihlal) / max(1, adet), 4),
+        "ornek_ihlal": ihlal[:3],
+        "en_koyu_sol": round(en_koyu["sol"], 2),
+        "en_koyu_sag": round(en_koyu["sag"], 2),
+        "en_koyu_ust": round(en_koyu["ust"], 2),
+        "en_koyu_alt": round(en_koyu["alt"], 2),
+        "temiz": not ihlal,
+    }
+
+
 def optik_ornek_komutu(video_yolu: str, *, ornek_fps: int = OPTIK_ORNEK_FPS,
                        olcu: tuple = OPTIK_ORNEK_OLCU) -> list:
     """Ornekleme komutunu URETIR — bu modul onu CALISTIRMAZ.

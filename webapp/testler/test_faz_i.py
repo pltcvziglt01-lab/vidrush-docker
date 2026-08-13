@@ -6412,6 +6412,139 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
         "KaynakEtiketi" in _GRAFIK_TSX
         and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
 
+blok("§40f I-56 — BAGIMSIZ KENAR OLCUM HATTI URETIME ALINDI")
+
+# ⚠ I-53/I-54/I-55'te olculen konfigurasyon ve esik ARTIK UYGULANIYOR.
+# Uydurma YOK: her sayi onceki atomlarin OLCUMUNDEN gelir.
+#   yapilandirma (I-54): dort yon + `dis1` (en dis sutun/satir)
+#                        + 384x216 ornek + 8 fps
+#   esik (I-55)        : 6.234 = TRAIN temiz tabani (12.468) / 2
+#                        held-out'ta KACIRMA 0, YANLIS POZITIF 0
+#
+# ⚠ MEVCUT SOZLESMEYE DOKUNULMADI:
+#   · `OPTIK_ORNEK_FPS` = 4 ve `OPTIK_ORNEK_OLCU` = (64,36) AYNEN
+#     (I-17 duraganlik esikleri bu ornekleme ile anlamli).
+#   · `kenar_siyahligi_olcusu` ve `KENAR_SIYAH_ESIGI` (16) AYNEN duruyor;
+#     yeni olcum AYRI bir fonksiyon ve AYRI bir birimdir.
+#   · POST-QA'nin mevcut `kenar` olcumu ve `POST-KENAR-SIYAH` kodu KORUNDU;
+#     yeni alan/kod GERIYE UYUMLU eklendi.
+
+kontrol("⭐ I-56 KIRMIZI: bagimsiz kenar ornekleyicisi VAR",
+        hasattr(_kk, "kenar_ornek_komutu"), "kenar ornekleyicisi yok")
+kontrol("⭐ I-56 KIRMIZI: dort yonlu dis olcum fonksiyonu VAR",
+        hasattr(_kk, "kenar_dis_olcusu"), "dort yonlu olcum yok")
+kontrol("⭐ I-56 KIRMIZI: OLCULEN yapilandirma sabitleri VAR (384x216 @ 8 fps)",
+        getattr(_kk, "KENAR_ORNEK_OLCU", None) == (384, 216)
+        and getattr(_kk, "KENAR_ORNEK_FPS", None) == 8,
+        [getattr(_kk, "KENAR_ORNEK_OLCU", None),
+         getattr(_kk, "KENAR_ORNEK_FPS", None)])
+kontrol("⭐ I-56 KIRMIZI: OLCULEN esik VAR (6.234, I-55 formulunden)",
+        abs(getattr(_kk, "KENAR_DIS_ESIGI", 0.0) - 6.234) < 1e-9,
+        getattr(_kk, "KENAR_DIS_ESIGI", None))
+
+if hasattr(_kk, "kenar_ornek_komutu"):
+    _kk56 = _kk.kenar_ornek_komutu("/tmp/v.mp4")
+    _vf56 = " ".join(_kk56)
+    kontrol("⭐ I-56: ornekleyici KENDI sozlesmesini kuruyor (8 fps, 384x216)",
+            "fps=8" in _vf56 and "scale=384:216" in _vf56
+            and "format=gray" in _vf56, _kk56)
+    kontrol("⭐ I-56: komut SAF liste — modul alt surec CALISTIRMAZ",
+            isinstance(_kk56, list) and _kk56[0] == "ffmpeg")
+    kontrol("⭐ I-56 GERILEME YOK: optik ornekleyici DEGISMEDI (4 fps/64x36)",
+            "fps=4" in " ".join(_kk.optik_ornek_komutu("/tmp/v.mp4"))
+            and "scale=64:36" in " ".join(
+                _kk.optik_ornek_komutu("/tmp/v.mp4")))
+
+if hasattr(_kk, "kenar_dis_olcusu"):
+    _G56, _Y56 = _kk.KENAR_ORNEK_OLCU
+    _duz56 = bytes([120]) * (_G56 * _Y56)
+    _o56 = _kk.kenar_dis_olcusu(_duz56)
+    kontrol("⭐ I-56: temiz kare TEMIZ (parlak duz kare)",
+            _o56.get("olculdu") is True and _o56.get("temiz") is True
+            and _o56.get("ihlal_kare") == 0, _o56)
+
+    def _bantli56(yon, bant_px=9):
+        """1080p'de `bant_px` piksellik bant -> 384x216 ornekte karsiligi."""
+        g, y = _G56, _Y56
+        kol = max(1, round(bant_px * g / 1920))
+        sat = max(1, round(bant_px * y / 1080))
+        kare = bytearray([120]) * (g * y)
+        for r in range(y):
+            for c in range(g):
+                if ((yon == "sol" and c < kol) or (yon == "sag" and c >= g - kol)
+                        or (yon == "ust" and r < sat)
+                        or (yon == "alt" and r >= y - sat)):
+                    kare[r * g + c] = 0
+        return bytes(kare)
+
+    for _yon56 in ("sol", "sag", "ust", "alt"):
+        _ob = _kk.kenar_dis_olcusu(_bantli56(_yon56))
+        kontrol(f"⭐ I-56 KIRMIZI: {_yon56.upper()} kenardaki bant YAKALANIYOR "
+                f"(I-53'te dikey yon TAMAMEN kordu)",
+                _ob.get("temiz") is False and _ob.get("ihlal_kare") == 1
+                and _yon56 in (_ob.get("ornek_ihlal") or [{}])[0].get("yon", ""),
+                _ob)
+    kontrol("⭐ I-56: KOYU ama BANTSIZ kare isaretlenmiyor "
+            "(genel karanlik korumasi)",
+            _kk.kenar_dis_olcusu(bytes([10]) * (_G56 * _Y56)).get("temiz")
+            is True)
+    kontrol("⭐ I-56: esik OLCULEN birimde uygulaniyor (6.234)",
+            abs(_o56.get("esik", 0) - 6.234) < 1e-9, _o56.get("esik"))
+    kontrol("⭐ I-56: EMIN DEGILSEN ENGELLEME — ornek yoksa hukum YOK",
+            _kk.kenar_dis_olcusu(b"").get("olculdu") is False
+            and "temiz" not in _kk.kenar_dis_olcusu(b""))
+    kontrol("I-56: bozuk girdi ISTISNA FIRLATMAZ",
+            _kk.kenar_dis_olcusu(None).get("olculdu") is False)
+    kontrol("⭐ I-56: her yon AYRI raporlaniyor (sol/sag/ust/alt en koyu)",
+            all(a in _o56 for a in ("en_koyu_sol", "en_koyu_sag",
+                                    "en_koyu_ust", "en_koyu_alt")), _o56)
+
+# ── POST-QA: GERIYE UYUMLU KABLOLAMA ──
+_QSN56 = oku(KOK, "editor/qa_son.py")
+kontrol("⭐ I-56 KIRMIZI: POST-QA yeni kenar ornegini KABUL EDIYOR",
+        "kenar_ham" in _QSN56, "kenar_ham parametresi yok")
+kontrol("⭐ I-56 KIRMIZI: yeni kod `POST-KENAR-DIS` VAR ve `fail` uretiyor",
+        '"POST-KENAR-DIS", "fail"' in _QSN56, "yeni kod yok")
+kontrol("⭐ I-56 GERIYE UYUMLU: eski `POST-KENAR-SIYAH` kodu DURUYOR",
+        '"POST-KENAR-SIYAH", "fail"' in _QSN56
+        and "kenar_siyahligi_olcusu" in _QSN56)
+kontrol("⭐ I-56 GERIYE UYUMLU: eski `kalite.kenar` olcum alani KORUNDU",
+        '["kenar"] = ke' in _QSN56)
+kontrol("I-56: yeni olcum AYRI alanda (mevcut rapor sozlesmesi bozulmadi)",
+        '"kenar_dis"' in _QSN56)
+
+# ── GERILEME YOK ──
+kontrol("⭐ I-56: eski kenar kapisi sabitleri DEGISMEDI (esik 16, serit %4)",
+        _kk.KENAR_SIYAH_ESIGI == 16.0
+        and abs(_kk.KENAR_SERIT_ORANI - 0.04) < 1e-9)
+kontrol("⭐ I-56: I-17 optik sozlesmesi ve esikleri DEGISMEDI",
+        _kk.OPTIK_ORNEK_FPS == 4 and _kk.OPTIK_ORNEK_OLCU == (64, 36)
+        and _kk.OPTIK_DURGUN_ESIGI == 2.0
+        and _kk.OPTIK_DURGUN_WARN_SN == 1.5
+        and _kk.OPTIK_DURGUN_FAIL_SN == 3.0)
+_V56 = oku(os.path.dirname(KOK), "app", "render-studio", "src", "Video.tsx")
+kontrol("⭐ I-56 GERILEME YOK: I-52 kosullu tabani ve I-43 zoom tabani DURUYOR",
+        "panYok ? 0 : panPx" in _V56 and "OPTIK_TABAN_ORANI = 0.045" in _V56)
+kontrol("⭐ I-56: diger esikler GEVSETILMEDI (enerji 11.589 / k 0.935)",
+        abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9
+        and abs(_kk.MODEL_K - 0.935) < 1e-6
+        and abs(_kk.MODEL_D0 - 3.012) < 1e-3)
+kontrol("I-56 GERILEME YOK: I-23/I-24/I-25/I-38 kapilari DURUYOR",
+        "KALITE-MOTION-ACILIS-KAPANIS" in _qon.FAIL_KODLARI
+        and "KALITE-MOTION-ISLEV-TEKRAR" in _qon.FAIL_KODLARI
+        and "KALITE-YAZI-SAHNE-DISI" in _qon.FAIL_KODLARI
+        and "ORAN-UYUMSUZ" in oku(KOK, "medya/edinim.py")
+        and "class DevreKesici" in oku(KOK, "medya/edinim.py"))
+kontrol("I-56 GERILEME YOK: lisans/provenance kapilari DURUYOR",
+        "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI
+        and "def lisans_suz" in oku(KOK, "edit_kopru.py"))
+kontrol("I-56 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("I-56: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in _V56
+        and "pan: 'right' | 'left' | 'top' | 'bottom' | 'yok'" in _V56)
+
 blok("§40e I-55 — KENAR ESIGI TURETILDI (train'den formulle, held-out TEK BAKIS)")
 
 # ⚠ YALNIZ KALIBRASYON. Uretim kodu DEGISMEDI; I-54'un yapilandirmasi
@@ -6514,10 +6647,13 @@ kontrol("⭐ I-55: `KENAR_SIYAH_ESIGI` DEGISMEDI (16) — yeni esik URETIME "
 kontrol("⭐ I-55: kenar serit orani ve optik ornekleme DEGISMEDI",
         abs(_kk.KENAR_SERIT_ORANI - 0.04) < 1e-9
         and _kk.OPTIK_ORNEK_FPS == 4 and _kk.OPTIK_ORNEK_OLCU == (64, 36))
-kontrol("⭐ I-55: yeni ornekleyici/dikey serit EKLENMEDI",
-        "kenar_ornek_komutu" not in _KKS55 and "KENAR_ORNEK_OLCU" not in _KKS55)
-kontrol("I-55: yeni esik sabiti URETIME sizmadi (6.234 kaynakta YOK)",
-        "6.234" not in _KKS55)
+# ⚠ I-56 DEVRALDI: I-55 esigi TURETMIS ama UYGULAMAMISTI (kalibrasyon);
+# I-56 onu uretime aldi. I-55'in TURETME ZINCIRI yukarida AYNEN kilitli.
+kontrol("⭐ I-55 (I-56 devraldi): turetilen esik URETIME ALINDI (6.234)",
+        abs(_kk.KENAR_DIS_ESIGI - _I55["esik"]) < 1e-9, _kk.KENAR_DIS_ESIGI)
+kontrol("⭐ I-55: esik DEGISTIRILMEDEN uygulandi (train formulunun sonucu)",
+        abs(_kk.KENAR_DIS_ESIGI
+            - _I55["train_temiz_alt"] / _I55["guvenlik_kati"]) < 1e-3)
 
 # ── GERILEME YOK ──
 _V55 = oku(os.path.dirname(KOK), "app", "render-studio", "src", "Video.tsx")
@@ -6653,11 +6789,10 @@ kontrol("⭐ I-54: kenar kapisi sabitleri DEGISMEDI (esik 16, serit %4)",
         and abs(_kk.KENAR_SERIT_ORANI - 0.04) < 1e-9)
 kontrol("⭐ I-54: optik ornekleme sozlesmesi DEGISMEDI (4 fps / 64x36)",
         _kk.OPTIK_ORNEK_FPS == 4 and _kk.OPTIK_ORNEK_OLCU == (64, 36))
-kontrol("⭐ I-54: yeni ornekleyici/esik/dikey serit EKLENMEDI (tanisal atom)",
-        "kenar_ornek_komutu" not in _KKS54
-        and "KENAR_ORNEK_OLCU" not in _KKS54
-        and '"ust"' not in _KKS54[_KKS54.find("def kenar_siyahligi_olcusu"):
-                                  _KKS54.find("def optik_ornek_komutu")])
+# ⚠ I-56 DEVRALDI: I-54 olculen yapilandirmayi UYGULAMAMISTI (tanisal);
+# I-56 onu uretime aldi. I-54'un OLCUMLERI yukarida AYNEN kilitli.
+kontrol("⭐ I-54 (I-56 devraldi): olculen yapilandirma URETIME ALINDI",
+        _kk.KENAR_ORNEK_OLCU == (384, 216) and _kk.KENAR_ORNEK_FPS == 8)
 
 # ── GERILEME YOK ──
 _V54 = oku(os.path.dirname(KOK), "app", "render-studio", "src", "Video.tsx")
@@ -6766,8 +6901,10 @@ kontrol("⭐ I-53 KOK NEDEN: serit %4 x kare genisligi (~77 px) ve ORTALAMA "
 kontrol("⭐ I-53 IKINCI KOR NOKTA: DIKEY bant HIC gorulmuyor (120 px bile)",
         120 in _I53["dikey_kacirilan_px"], _I53["dikey_kacirilan_px"])
 _KKS53 = oku(KOK, "editor/kalite_kapisi.py")
+# ⚠ I-56 sonrasi: yeni `kenar_dis_olcusu` bu ikisinin ARASINA girdi;
+# dilim ESKI fonksiyonla sinirlandirildi (iddia ESKI fonksiyon hakkinda).
 _KFN53 = _KKS53[_KKS53.find("def kenar_siyahligi_olcusu"):
-                _KKS53.find("def optik_ornek_komutu")]
+                _KKS53.find("# ═══════════ 7f)")]
 kontrol("⭐ I-53: dikey korlugun KAYNAK KANITI — yalniz sol/sag serit var",
         '"sol"' in _KFN53 and '"sag"' in _KFN53
         and '"ust"' not in _KFN53 and '"alt"' not in _KFN53)
@@ -6803,9 +6940,13 @@ kontrol("⭐ I-53: optik ornekleme sozlesmesi DEGISMEDI (4 fps / 64x36)",
         _kk.OPTIK_ORNEK_FPS == 4 and _kk.OPTIK_ORNEK_OLCU == (64, 36))
 kontrol("⭐ I-53: agregasyon HALA serit ORTALAMASI (degistirilmedi)",
         "sum(sol) / max(1, len(sol))" in _KFN53)
-kontrol("I-53: yeni ornekleyici/parametre EKLENMEDI",
-        "kenar_ornek_komutu" not in _KKS53
-        and "KENAR_ORNEK_OLCU" not in _KKS53)
+# ⚠ I-56 DEVRALDI: I-53 "tek parametrelik duzeltme yetmez" demisti ve
+# HAKLIYDI; I-54/I-55 uc parcayi da olctu, I-56 BAGIMSIZ HAT olarak uyguladi.
+# I-53'un KENDI bulgulari (kor noktalarin olcumu) yukarida AYNEN duruyor.
+kontrol("I-53 (I-56 devraldi): duzeltme TEK parametre degil BAGIMSIZ HAT "
+        "olarak geldi",
+        "kenar_ornek_komutu" in _KKS53 and "KENAR_ORNEK_OLCU" in _KKS53
+        and _kk.KENAR_SIYAH_ESIGI == 16.0)
 
 # ── GERILEME YOK ──
 kontrol("⭐ I-53 GERILEME YOK: I-52 kosullu tabani DURUYOR",

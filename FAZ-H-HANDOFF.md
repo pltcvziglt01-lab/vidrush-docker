@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 14 Ağu | **I-56 bağımsız kenar ölçüm hattı üretime alındı** | `PENDING` | ✅ **push edildi**, I-54 yapılandırması + I-55 eşiği **uygulandı**: `kenar_ornek_komutu` (384×216 @ **8 fps**, optik 64×36@4fps sözleşmesinden **bağımsız**) + `kenar_dis_olcusu` (**dört yön**, en dış sütun/satır, eşik **6.234**); POST-QA'ya **geriye uyumlu** bağlandı (`kenar_dis` alanı + `POST-KENAR-DIS` fail kodu; eski `kenar`/`POST-KENAR-SIYAH` **aynen** duruyor); kabul ölçütü sağlandı: I-52 karşı-örneği **FAIL**, **17 temiz videonun 17'si PASS** → **kaçırma 0, yanlış pozitif 0**; 25.2 sn 1080p pilot **POST-QA PASS**, 11/11 kare SHA-256 aynı, **kabul edilmiş MP4 DEĞİL** (b001/b002 semantik), deploy YOK |
 | 14 Ağu | **I-55 kenar eşiği türetildi (train→formül, held-out tek bakış)** | `e9f90c8` | ✅ **push edildi**, I-54'ün **ön-kayıtlı** bölünmesi değiştirilmeden okundu; eşik **yalnız TRAIN**'den açık formülle (`eşik = temiz_alt / 2` = **6.234**) türetildi ve TRAIN bandının içinde olduğu doğrulandı; **held-out'a tek bakış**: 4 kusurlu örneğin **4'ü yakalandı**, 7 temiz örneğin **7'si temiz** → **kaçırma 0, yanlış pozitif 0**; duyarlılık: güvenlik katı ~1.25–2494 aralığında sonuç değişmiyor; ⚠ ölçüm betiğinde pencere hatası bulunup düzeltildi (kusur 20.431→0.046, render değişmedi); **üretim kodu değişmedi** (eşik uygulanmadı, `KENAR_SIYAH_ESIGI` 16 duruyor), geçici varlıklar (345 MB) temizlendi, deploy YOK |
 | 14 Ağu | **I-54 kenar kapısı korpusu genişletildi, ayrım payı ölçüldü** | `61ecca8` | ✅ **push edildi**, korpus **gerçek render**la genişletildi (4 yön kusurlu + 15 gerçek temiz pilot), train/held-out **ölçümden önce** sabitlendi; dört eksen **ayrı** raporlandı: tek yön **hiç** ayırmıyor (dört yön zorunlu), mevcut `şerit_ort` agregasyonu **negatif**, 64/128 çözünürlük **hiç**, **4 fps hiçbir çözünürlükte** ayırmıyor; ayrım iki eksene birden bağlı (256 ≥15 fps, **384 ≥8 fps**); ölçülen band **kusur ≤0.02 / temiz ≥9.96** — **örtüşme yok**; ⚠ I-53'ün "kusur ≤2.9" iddiası **doğrulandı**, "temiz ≥15.0" **yanlış** (gerçek taban **10.01**, `onizleme_lawn_i40`); **eşik seçilmedi**, üretim kodu **değişmedi**, geçici varlıklar (345 MB) temizlendi, deploy YOK |
 | 14 Ağu | **I-53 kenar kapısı kör noktası: tek parametrelik düzeltme ELENDİ** | `f00ae2f` | ✅ **push edildi**, kör nokta sayısallaştırıldı: yatayda **yalnız ≥60 px** görülüyor, **dikey bant 120 px'te bile hiç** görülmüyor (yapısal — sadece sol/sağ şerit var); ⚠ **belirleyici**: I-52'nin gerçek 9 px bandı **4 fps ızgarasında hiç yok** (8 fps'te 0.0) → uzamsal düzeltme **tek başına yetmiyor**; sözleşmeyi bozmayan agregasyon düzeltmesi yanlış pozitif 0 ama **yeni fayda da 0**; kusuru yakalayan konfigürasyon (256/8 fps) **üç gerçek pilotta yanlış pozitif** üretiyor (15.8 vs eşik 16.0 — bıçak sırtı, gerçek koyu orman kenarı) → **üretim kodu DEĞİŞMEDİ**, geçici varlıklar temizlendi, deploy YOK |
@@ -5668,6 +5669,92 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 74. FAZ I-56 — BAĞIMSIZ KENAR ÖLÇÜM HATTI ÜRETİME ALINDI (14 Ağu)
+
+> **Durum: I-52'den beri süren zincir KAPANDI. I-54'ün ölçtüğü yapılandırma
+> ve I-55'in türettiği eşik **uygulandı**; kabul ölçütü sağlandı:
+> I-52 karşı-örneği **FAIL**, **17 temiz videonun 17'si PASS** →
+> **kaçırma 0, yanlış pozitif 0**. A–I yeşil (3544, 0 hata, 1 BLOKE — I-33).
+> 25.2 sn 1080p pilot **POST-QA PASS**, **11/11 kare SHA-256 aynı**.
+> MP4 **kabul edilmedi** (semantik). Deploy YOK. Maliyet $0.00.**
+> Değişen: `webapp/editor/kalite_kapisi.py` (2 saf fonksiyon + 3 ölçülen
+> sabit), `webapp/editor/qa_son.py` (1 opsiyonel parametre + 1 kod),
+> `webapp/testler/test_faz_i.py`. `Video.tsx`, `qa_on.py`, `medya/*`,
+> `deploy.sh`, **mevcut eşikler** ve **22 alan sözleşmesi** **dokunulmadı**.
+> I-23…I-55 **korundu**.
+
+### ⚠ Mevcut sözleşmeye dokunulmadı
+
+- `OPTIK_ORNEK_FPS` = **4** ve `OPTIK_ORNEK_OLCU` = **(64,36)** aynen
+  (I-17 durağanlık eşikleri bu örneklemeyle anlamlı).
+- `kenar_siyahligi_olcusu` ve `KENAR_SIYAH_ESIGI` (**16**) aynen duruyor.
+- POST-QA'nın mevcut `kalite.kenar` ölçümü ve `POST-KENAR-SIYAH` kodu
+  **korundu**; yeni ölçüm **ayrı alanda** (`kalite.kenar_dis`) ve **ayrı
+  kodda** (`POST-KENAR-DIS`). Yeni örnek verilmezse davranış **bit-bit**
+  eskisi gibidir.
+
+### Uygulanan hat (her sayı önceki atomların ÖLÇÜMÜNDEN)
+
+| parça | değer | kaynak |
+|---|---|---|
+| örnekleyici | `kenar_ornek_komutu` — **384×216 @ 8 fps** | I-54 |
+| yön | **dört yön** (sol/sağ/üst/alt) | I-54 |
+| agregasyon | **en dış sütun/satır** | I-54 |
+| eşik | **6.234** (= train temiz tabanı 12.468 / 2) | I-55 |
+| koyu görüntü koruması | kare geneli > eşik × 2 | `kenar_siyahligi_olcusu` ile aynı sözleşme |
+
+### Kabul ölçütü — ölçüldü
+
+| küme | sonuç |
+|---|---|
+| **I-52 karşı-örneği** (gerçek bant) | **FAIL** — 2/159 kare, en koyu sol **0.0**, sağ **0.08** ✅ |
+| **17 gerçek temiz video** | **17/17 PASS** (i15…i56, önizleme dâhil; en düşük taban 10.01) ✅ |
+| **kaçırma / yanlış pozitif** | **0 / 0** ✅ |
+
+Dört yönün her biri için sentetik 9 px bant testi de yeşil — I-53'te
+**tamamen kör** olan dikey yön artık yakalanıyor.
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **2130** | **3544** |
+
+0 hata. Faz I 2100 → **2130** (+30). Red-first: 6 XX.
+⚠ I-53/I-54/I-55'in "henüz uygulanmadı" kilitleyen 5 kontrolü **devralındı**;
+her atomun **kendi ölçümü** aynen kilitli kaldı.
+
+### 1080p pilot — `editorv2_lawn_i56.mp4` (25.2 sn)
+
+QA hükmü değiştiği için tam pilot koşuldu. Sadakat: **beat eşit=True,
+varlık eşit=True**.
+
+- **1920×1080 @ 30**, aac 48 kHz/2ch, 25.259 sn · **8 kesme** · **11 kare** (6 beat)
+- LUFS **−14.27** / TP **−3.10** · sessizlik **%0.0** · kırpma yok
+- **eski kenar (I-17)**: 0/101 temiz · **yeni kenar (I-56)**: **0/202 temiz**,
+  en koyu sol/sağ/üst/alt = 27.07 / 15.86 / 67.21 / 54.42 (eşik 6.234)
+- medya tekrarı **6 benzersiz**, bitişik yok · motion **4 hareket**, tekrar yok
+- tipografi dört ölçümde temiz · künye 5 sahnede · optik risk yok
+- I-47 dönem uyarısı: **b001** (doğru pozitif, sürüyor)
+- PRE-QA **WARN** (fail=0) · **POST-QA: PASS**
+- **Render değişmedi**: I-51 ile **11/11 kare SHA-256 birebir aynı**
+
+### ⛔ Kabul durumu
+
+Teknik POST-QA **PASS** ve yeni kenar hattı temiz. Buna rağmen **kabul
+edilmiş MP4 değildir**, mutlak yol verilmedi, **deploy yok**: b001/b002
+görselleri anlatımla **semantik uyumsuz** (bilinen sınıf; I-47 b001'i
+otomatik işaretliyor).
+
+### SONRAKİ ATOM
+
+1. **Semantik kabul engeli** (b002/b005) — dört bağımsız eleme sonrası
+   **kullanıcı kararı**: operatör onayı ya da VLM.
+2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
+3. Model **d > 1.31** hâlâ ölçülmemiş (I-51).
+4. ⚠ Yeni kenar hattı şu an **yalnız POST-QA**'da; PRE-QA tarafında karşılığı
+   yok (plan üzerinden kenar öngörüsü ayrı bir atom olur).
 
 ---
 
