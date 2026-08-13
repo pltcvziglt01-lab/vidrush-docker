@@ -196,6 +196,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-27 kamera punch büyütmesi ÇÖZÜLDÜ** | `6ccb739` | ✅ **push edildi**, büyüten beat 2→0, POST-QA **TAM PASS**, puan 100/100, Faz I BLOKE 0, deploy YOK |
 | 13 Ağu | **I-28 seçim sırası tanısı: KUSUR YOK** | `b61208d` | ✅ **push edildi**, öncül ölçümle çürüdü, üretim kodu DEĞİŞMEDİ, davranış kilitlendi, MP4 korundu, deploy YOK |
 | 13 Ağu | **I-29 afiş/pano sinyali: metadata GÜVENİLİR DEĞİL** | `015973e` | ✅ **push edildi**, recall %0 / hassasiyet %6 ölçüldü, üretim DEĞİŞMEDİ, MP4 korundu, deploy YOK |
+| 13 Ağu | **I-30 yatay güvenli alan kapısı eklendi** | `PENDING` | ✅ **push edildi**, sağ/sol taşma ölçülür oldu, pilotta ateşlemiyor, MP4 korundu, deploy YOK |
 
 ---
 
@@ -4413,3 +4414,101 @@ Kalan tek BLOKE Faz H'deki `QA_TEST_VIDEO` (opsiyonel, I-22'den beri aynı).
   yetenek; **kullanıcı kararı**.
 - **Sağlayıcı tekeli** teknik olarak çözülmüş durumda değil ama **mühendislik
   kusuru da değil**: Commons 429'u host/IP kaynaklı (I-28'de kanıtlandı).
+
+---
+
+## 48. FAZ I-30 — YATAY GÜVENLİ ALAN: SAĞ/SOL TAŞMA ÖLÇÜLMÜYORDU (13 Ağu)
+
+> **Durum: boşluk kapatıldı. Yerel yeşil (0 hata), push edildi. Deploy YOK.
+> Maliyet $0.00.**
+> Değişen: `webapp/editor/kalite_kapisi.py`, `webapp/editor/qa_on.py`,
+> `webapp/testler/test_faz_i.py` (+ handoff).
+> **OCR / harici servis / ağ / API YOK.**
+> `plan.py`, `motion.py`, `gramer.py`, `medya/*`, `pipeline.py`, `server.py`,
+> `deploy.sh`, smoke betiği, `Grafikler.tsx` ve 22 alan sözleşmesi
+> **dokunulmadı** (git ile doğrulandı). I-23…I-29 kapıları **korundu**.
+> **Pilot yeniden üretilmedi**: kapı mevcut pilotta **ateşlemiyor**, render
+> davranışı değişmedi → I-27'nin kabul edilmiş MP4'ü **korunuyor**.
+
+### Önce elenen aday: altyazı/çakışma zaten sağlam
+
+`yazi_cakismasi` incelendi: çakışma **zaman VE dikey** kesişimi birlikte
+arıyor — yani zaman-farkındalıklı ve doğru. Pilot raporundaki
+`TIPO-CAKISMA-DUSURULDU … "cozulemedi"` uyarısı ile ölçümün `temiz: true`
+demesi çelişkili görünüyordu; ölçüldü: **ölçüm haklı**. `source-label` #2
+(815.4–864.0 px) ile `chapter-title` (756–869.4 px) dikeyde kesişiyor ama
+**zamanda kesişmiyor**. Uyarı bir **yanlış alarm**; düzen gerçekten temiz.
+Bu yüzden oraya dokunulmadı.
+
+### ⛔ Bulunan gerçek boşluk: YATAY hiç ölçülmüyordu
+
+`guvenli_alan_olcusu` yalnızca `y_ust` / `yukseklik` okuyor — **sağ/sol
+taşma hiç ölçülmüyordu**. Risk yapısal ve somut:
+
+| bileşen | genişlik sınırı |
+|---|---|
+| `BolumBasligi` (başlık) | `maxWidth: '84%'` ✅ |
+| altyazı bandı | `maxWidth: 900` ✅ |
+| **`KaynakEtiketi` (künye)** | **YOK** ⛔ |
+
+`KaynakEtiketi` `position:absolute; right: GUVENLI_KENAR` ile sağa yaslanıyor
+ve genişlik sınırı taşımıyor → uzun bir atıf **sola doğru sınırsız** büyür.
+Bu teorik değil: pilotun **kendi aday havuzundaki** "Pleiades large.jpg"
+(yıldız kümesi) atfı **155 karakter**.
+
+### Genişlik modeli — uydurma değil, render'ın kendi sabiti
+
+`Grafikler.tsx:67` genişlik tahminini `uzunluk × punto × (0.72 + 0.01)` ile
+yapıyor. Künyenin harf aralığı 0.01 değil **0.04** (`Grafikler.tsx:205`),
+bu yüzden künye için `EM_BUYUK_HARF + 0.04 = 0.76` alındı.
+
+⚠ **DÜRÜST SINIR:** bu model **büyük harf** için türetilmiş; künye **karışık
+harf**. Render karesinden doğrudan ölçmeyi denedim ve **güvenilir çıkmadı**
+— düşük opaklıktaki (0.62) yazı değişken foto zemininde eşikle ayrılamıyor;
+örnekler **0.003 – 0.769** arasında savruldu. Yalnız **kendi kendini
+doğrulayan** tek örnek (t=5.99, ölçülen sağ kenar **1854** ≈ beklenen
+**1856**) **0.769** verdi ve bu, render'ın belgeli **0.76** sabitiyle **%1
+içinde örtüşüyor**. Model bu tek doğrulamaya dayanır; daha iyi bir ölçüm
+çıkarsa `KUNYE_HARF_ARALIGI_EM` bloğu güncellenmeli.
+
+### Eklenen: `yatay_guvenli_alan_olcusu` + PRE-QA kapısı
+
+Saf fonksiyon; ağ/dosya kullanmaz. Ölçüm **plan verisinden** (metin uzunluğu
++ punto + kare genişliği), OCR yok. Ölçülemeyen katman **engellenmez**.
+İhlal `KALITE-GUVENLI-ALAN` **fail** olarak PRE-QA'da hüküm verir.
+
+⚠ Öneri metni **lisans riskini açıkça söylüyor**: *"kırpma LİSANS ATFINI
+eksiltebilir — önce atıf politikasına bak."* Sessiz kırpma **önerilmiyor**;
+CC BY atfını kısaltmak bir hukuk kararı, mühendislik kararı değil.
+
+### ✅ Ölçülen sonuç — kırmızı vaka kırmızı, gerçek pilot temiz
+
+| katman | karakter | punto | tahmini | kullanılabilir | |
+|---|---|---|---|---|---|
+| `chapter-title` "GÜÇ" | 3 | 60 | 136.8 px | 1792 px | temiz |
+| `source-label` | 26 | 21 | 415.0 px | 1792 px | temiz |
+| `source-label` | 17 | 21 | 271.3 px | 1792 px | temiz |
+| `source-label` | 46 | 21 | 734.2 px | 1792 px | temiz |
+| **sentetik: gerçek 155 karakterlik atıf** | 155 | 21 | **2473.8 px** | 1792 px | ⛔ **TAŞMA** |
+
+Karakter tavanı (punto 21): **112**. Pilotun en uzunu 46 → **2.4× pay**.
+Kapı pilotta **ateşlemiyor** → PRE-QA hükmü ve render davranışı **değişmedi**.
+
+### Ölçülen test sonucu
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1644** | **3058** |
+
+0 hata. Faz I 1630 → **1644** (+14). Faz I BLOKE **0**.
+Kalan tek BLOKE Faz H'deki `QA_TEST_VIDEO` (opsiyonel, I-22'den beri aynı).
+
+### SONRAKİ ATOM (I-31 adayları)
+
+- **`KaynakEtiketi`'ne genişlik sınırı vermek** artık kapıyla *görünür* ama
+  **çözülmedi**: `maxWidth` + sarma, künyeyi ikinci satıra taşırıp dikey
+  planı bozar; `nowrap` + kırpma ise **atfı eksiltir**. Doğru çözüm bir
+  **atıf politikası** kararı gerektirir (ör. "eser sahibi + lisans" kısa
+  biçimi) — **kullanıcı kararı**.
+- **Afiş/pano tespiti** (I-29): metadata ile çözülemez, kare-bakan sinyal
+  gerekir; `medya.edinim`'in `kapsam_disi` listesinde açıkça kapsam dışı.

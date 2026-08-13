@@ -6281,6 +6281,70 @@ kontrol("elenen kaydi SEBEBIYLE birlikte duruyor",
             "x", adet=6, en_az_genislik=1920, acan=_sahte_acan([
                 _sahte_sayfa(1, 1, 800, 600, "kucuk.jpg")]))["elenen"]))
 
+blok("§39g I-30 — YATAY GUVENLI ALAN: SAG/SOL TASMA OLCULMUYORDU")
+
+# ⚠ I-30'DA BULUNAN BOSLUK: `guvenli_alan_olcusu` YALNIZCA DIKEY olcuyordu.
+# `Grafikler.tsx > KaynakEtiketi` saga yaslaniyor (`right: GUVENLI_KENAR`) ve
+# `maxWidth` TASIMIYOR — baslikta (84%) ve altyazida (900px) boyle bir sinir
+# VAR, kunyede YOK. Yani uzun atif SOLA DOGRU SINIRSIZ buyuyebilir.
+_G30 = oku(KOK, "..", "app/render-studio/src/editorv2/Grafikler.tsx")
+kontrol("⭐ I-30: KaynakEtiketi'nde genislik siniri YOK (yapisal risk)",
+        "maxWidth" not in _G30.split("KaynakEtiketi")[-1][:1000], "-")
+kontrol("I-30: baslik ve altyazida genislik siniri VAR (asimetri kaniti)",
+        "maxWidth: '84%'" in _G30 and "maxWidth: 900" in _G30)
+
+# ── SENTETIK TASMA VAKASI: pilotun KENDI aday havuzundan gercek atif ──
+# "Pleiades large.jpg" (yildiz kumesi) atfi 155 karakter.
+_UZUN30 = ("NASA, ESA, AURA/Caltech, Palomar Observatory The science team "
+           "consists of: D. Soderblom and E. Nelan (STScI), F. Benedict "
+           "and B. Arthur (U. Texas), and B. Jones")
+_YG30 = _kk.yatay_guvenli_alan_olcusu(
+    [{"ad": "source-label", "metin": _UZUN30, "punto": 21, "hizalama": "sag"}],
+    kare_genislik=1920, guvenli_kenar=64)
+kontrol("⭐ I-30 KIRMIZI: 155 karakterlik GERCEK atif YATAY TASIYOR",
+        _YG30["temiz"] is False and len(_YG30["ihlaller"]) == 1
+        and _YG30["ihlaller"][0]["ihlal"] == "YATAY",
+        _YG30["ihlaller"])
+kontrol("I-30: tasma miktari SAYIYLA raporlaniyor",
+        _YG30["ihlaller"][0]["tasma_px"] > 0
+        and _YG30["ihlaller"][0]["karakter"] == len(_UZUN30),
+        _YG30["ihlaller"][0])
+
+# ── GERCEK PILOT KUNYELERI TEMIZ (yanlis pozitif yok) ──
+_PILOT30 = [("Dominic Hart / NASA-PUBLIC", 26), ("GRC / NASA-PUBLIC", 17),
+            ("NASA/JPL-Caltech/Lockheed Martin / NASA-PUBLIC", 46)]
+_YG30b = _kk.yatay_guvenli_alan_olcusu(
+    [{"ad": "source-label", "metin": m, "punto": 21, "hizalama": "sag"}
+     for m, _ in _PILOT30], kare_genislik=1920, guvenli_kenar=64)
+kontrol("⭐ I-30: GERCEK pilot kunyelerinin UCU DE TEMIZ (yanlis pozitif yok)",
+        _YG30b["temiz"] is True and len(_YG30b["olcumler"]) == 3,
+        [(o["karakter"], o["tahmini_genislik_px"]) for o in _YG30b["olcumler"]])
+kontrol("I-30: karakter tavani hesaplaniyor ve pilot bunun ALTINDA",
+        _YG30b["sigan_karakter_tavani"] > max(n for _, n in _PILOT30),
+        _YG30b["sigan_karakter_tavani"])
+kontrol("I-30: genislik modeli RENDER SABITINDEN (0.72 + kunye araligi 0.04)",
+        abs(_YG30b["em_birim"] - (_kk.EM_BUYUK_HARF
+                                  + _kk.KUNYE_HARF_ARALIGI_EM)) < 1e-9)
+for _bz30 in ({"metin": "", "punto": 21}, {"metin": "x", "punto": 0},
+              {"metin": "x"}):
+    kontrol(f"I-30: olculemeyen katman ENGELLENMEZ {_bz30}",
+            _kk.yatay_guvenli_alan_olcusu(
+                [dict(_bz30, ad="x")], kare_genislik=1920,
+                guvenli_kenar=64)["temiz"] is True)
+kontrol("I-30: bozuk kare olcusu -> olculdu=False (uydurma yok)",
+        _kk.yatay_guvenli_alan_olcusu(
+            [{"ad": "x", "metin": "y", "punto": 21}],
+            kare_genislik=0, guvenli_kenar=64)["olculdu"] is False)
+kontrol("⭐ I-30: kapi FAIL kodunda (mevcut GUVENLI-ALAN koduna baglandi)",
+        "KALITE-GUVENLI-ALAN" in _qon.FAIL_KODLARI
+        and "yatay_guvenli_alan" in _sikistir(oku(KOK, "editor/qa_on.py")))
+kontrol("I-30: OCR/harici servis/ag YOK",
+        not re.search(r"(tesseract|ocr|pytesseract|requests|urlopen)",
+                      _kod_yalniz(oku(KOK, "editor/kalite_kapisi.py")), re.I))
+# ⚠ DURUST SINIR: kirpma LISANS ATFINI eksiltebilir; kapi bunu ONERIDE soyler.
+kontrol("I-30: oneri LISANS ATFI riskini SOYLUYOR (sessiz kirpma onerilmiyor)",
+        "LISANS ATFINI" in oku(KOK, "editor/qa_on.py"))
+
 blok("§39f I-29 — AFIS/PANO SINYALI: METADATA GUVENILIR DEGIL (olculdu)")
 
 # ⚠ I-26'da GOZLE yakalanan kusur: s01'e secilen Commons varligi CAM ARKASI

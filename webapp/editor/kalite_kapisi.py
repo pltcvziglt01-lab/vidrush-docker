@@ -540,6 +540,80 @@ def guvenli_alan_olcusu(katmanlar, *, kare_yukseklik: float,
             "temiz": not ihlaller}
 
 
+# ═══════════ 5b) YATAY GUVENLI ALAN (Faz I-30) ══════════════════════════
+#
+# ⚠ NEDEN VAR — I-30'DA OLCULEN BOSLUK:
+# `guvenli_alan_olcusu` YALNIZCA DIKEY olcuyordu (`y_ust`, `yukseklik`).
+# Sag/sol tasma HIC olculmuyordu. Risk somut: `Grafikler.tsx > KaynakEtiketi`
+# `position:absolute; right: GUVENLI_KENAR` ile SAGA yaslaniyor ve
+# `maxWidth` TASIMIYOR — yani uzun bir atif metni SOLA DOGRU SINIRSIZ buyur.
+# Baslik bandinda (`maxWidth:'84%'`) ve altyazida (`maxWidth:900`) boyle bir
+# sinir VAR; kunyede YOK. Pilotun KENDI aday havuzunda 155 karakterlik bir
+# atif olculdu ("NASA, ESA, AURA/Caltech, Palomar Observatory The science
+# team consists of: ..."), yani bu teorik degil.
+#
+# GENISLIK MODELI — uydurma degil, RENDER'IN KENDI SABITI:
+# `Grafikler.tsx:67` genislik tahmini `uzunluk * punto * (0.72 + 0.01)`
+# kullaniyor. Kunyenin harf araligi 0.01 degil **0.04** (Grafikler.tsx:205),
+# bu yuzden kunye icin `EM_BUYUK_HARF + 0.04` alinir.
+# ⚠ DURUST SINIR: bu model BUYUK HARF icin turetilmis; kunye KARISIK HARF.
+# Render karesinden dogrudan olcmeyi denedim ve GUVENILIR CIKMADI (dusuk
+# opakliktaki yazi degisken foto zemininde esikle ayrilamiyor; ornekler
+# 0.003-0.769 arasinda savruldu). Yalniz KENDI KENDINI DOGRULAYAN tek ornek
+# (t=5.99, sag kenar 1854 ~ beklenen 1856) **0.769** verdi ve bu, render'in
+# belgeli 0.76 sabitiyle %1 icinde ORTUSUYOR. Model bu tek dogrulamaya
+# dayanir; daha iyi bir olcum cikarsa BURASI guncellenmeli.
+KUNYE_HARF_ARALIGI_EM = 0.04
+
+
+def yatay_guvenli_alan_olcusu(katmanlar, *, kare_genislik: float,
+                              guvenli_kenar: float,
+                              em_orani: float = EM_BUYUK_HARF,
+                              harf_araligi_em: float = KUNYE_HARF_ARALIGI_EM
+                              ) -> dict:
+    """Yazi katmanlari YATAY guvenli alani asiyor mu? (saf fonksiyon)
+
+    `katmanlar`: [{"ad","metin","punto","hizalama"?} ...]
+    `hizalama`: "sag" (kunye) | "sol" (baslik/altyazi). Verilmezse "sol".
+    Olculemeyen katman ENGELLENMEZ (olcu/metin yoksa atlanir).
+    """
+    try:
+        liste = [k for k in (katmanlar or []) if isinstance(k, dict)]
+    except TypeError:
+        return {"olculdu": False, "neden": "GIRDI-BOZUK"}
+    g = _sayi(kare_genislik)
+    kenar = _sayi(guvenli_kenar)
+    if g <= 0:
+        return {"olculdu": False, "neden": "OLCU-YOK"}
+    kullanilabilir = g - 2 * kenar
+    birim = _sayi(em_orani) + _sayi(harf_araligi_em)
+    ihlaller, olcumler = [], []
+    for k in liste:
+        metin = str(k.get("metin") or "")
+        punto = _sayi(k.get("punto"))
+        if not metin or punto <= 0 or birim <= 0:
+            continue                      # olculemez -> ENGELLEME
+        genislik_px = len(metin) * punto * birim
+        kayit = {"ad": str(k.get("ad") or ""), "karakter": len(metin),
+                 "punto": punto,
+                 "tahmini_genislik_px": round(genislik_px, 1),
+                 "kullanilabilir_px": round(kullanilabilir, 1),
+                 "hizalama": str(k.get("hizalama") or "sol"),
+                 "em_birim": round(birim, 4)}
+        if genislik_px > kullanilabilir + 1e-6:
+            kayit["ihlal"] = "YATAY"
+            kayit["tasma_px"] = round(genislik_px - kullanilabilir, 1)
+            ihlaller.append(kayit)
+        olcumler.append(kayit)
+    return {"olculdu": True, "kare_genislik": g, "guvenli_kenar": kenar,
+            "kullanilabilir_px": round(kullanilabilir, 1),
+            "em_birim": round(birim, 4), "katman": len(olcumler),
+            "olcumler": olcumler, "ihlaller": ihlaller,
+            "sigan_karakter_tavani": (int(kullanilabilir / (birim * 21))
+                                      if birim > 0 else 0),
+            "temiz": not ihlaller}
+
+
 def yazi_cakismasi(katmanlar, *, tolerans: float = 0.005) -> dict:
     """Ayni anda ekranda olan yazilar birbirini ORTUYOR mu?
 

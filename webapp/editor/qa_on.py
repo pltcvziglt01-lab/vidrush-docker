@@ -503,6 +503,28 @@ def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
     ck = kk.yazi_cakismasi(kutular)
     olcum["guvenli_alan"] = ga
     olcum["yazi_cakismasi"] = ck
+    # ── I-30: YATAY guvenli alan (sag/sol tasma) ──
+    # ⚠ Bu boyut I-30'a kadar HIC olculmuyordu; `KaynakEtiketi` saga yaslanip
+    # `maxWidth` TASIMADIGI icin uzun bir atif SOLA DOGRU SINIRSIZ buyuyebilir.
+    # Olcum PLAN verisinden yapilir (metin uzunlugu + punto), OCR/ag YOK.
+    _yatay_kutu = [{"ad": getattr(k, "ad", ""),
+                    "metin": getattr(k, "metin", ""),
+                    "punto": getattr(k, "punto", 0),
+                    "hizalama": ("sag" if getattr(k, "ad", "") == "source-label"
+                                 else "sol")}
+                   for k in (yazi_katmanlari or [])]
+    yg = kk.yatay_guvenli_alan_olcusu(
+        _yatay_kutu, kare_genislik=genislik,
+        guvenli_kenar=p.tipografi.guvenli_kenar)
+    olcum["yatay_guvenli_alan"] = yg
+    for ih in (yg.get("ihlaller") or []):
+        _ekle("KALITE-GUVENLI-ALAN", "fail",
+              f"{ih['ad']}: YATAY tasma {ih['tasma_px']}px "
+              f"({ih['karakter']} karakter, punto {ih['punto']}, "
+              f"tahmini {ih['tahmini_genislik_px']}px > "
+              f"kullanilabilir {ih['kullanilabilir_px']}px)",
+              "atif metnini kisalt ya da katmana genislik siniri ver; "
+              "kirpma LISANS ATFINI eksiltebilir — once atif politikasina bak")
     for ih in (ga.get("ihlaller") or []):
         _ekle("KALITE-GUVENLI-ALAN", "fail",
               f"{ih['ad']}: {ih['ihlal']} kenardan {ih['tasma_px']}px tasiyor "
