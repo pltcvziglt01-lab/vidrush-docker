@@ -202,6 +202,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-33 gerçek koşum doğrulaması** | `584dea6` | ⚠ **push edildi**, kare planı KANITLANDI (b001 kapsandı), otomatik kapılar PASS ama MP4 **KABUL EDİLMEDİ** (b001 vitrin/pano), deploy YOK |
 | 13 Ağu | **I-34 vitrin sinyali: ELENDİ** | `7c5884f` | ✅ **push edildi**, 4 sinyal x 28 ölçüm: ayıran eşik YOK (en iyi precision 0.25), üretim DEĞİŞMEDİ, rerender/deploy YOK |
 | 13 Ağu | **I-35 s01 sorgu daraltması: ELENDİ** | `7709ae1` | ✅ **push edildi**, 10 sorgu ölçüldü: vitrini eleyen her daraltma NASA'yı boşaltıyor, sorgu DEĞİŞMEDİ, rerender/deploy YOK |
+| 13 Ağu | **I-36 sağlayıcı tutarsızlığı düzeltildi** | `PENDING` | ✅ **push edildi**, başarılı geçmiş 429 ile ezilmiyor, sağlayıcı seçilen varlıktan türüyor, rerender/deploy YOK |
 
 ---
 
@@ -5007,3 +5008,93 @@ neyi verdiğine dair her teşhis şüpheli kalıyor.
 (I-34 kare-bakan sinyal, I-35 sorgu daraltması). Geriye **operatör onayı**
 ve **s01 için sağlayıcı sırası** kalıyor; ikisi de bu atomda açıkça
 yasaklanmıştı ve **kullanıcı kararıdır**.
+
+---
+
+## 54. FAZ I-36 — SAĞLAYICI TUTARSIZLIĞI DÜZELTİLDİ (dar kalite atomu, 13 Ağu)
+
+> **Durum: I-35'te ölçülen rapor kusuru ÇÖZÜLDÜ. Yerel yeşil (0 hata,
+> 1 BLOKE — I-33 görsel inceleme kaydı sürüyor), push edildi.
+> Rerender YOK (medya/render davranışı değişmedi), deploy YOK.
+> Maliyet $0.00.**
+> Değişen: `webapp/medya/edinim.py`, `webapp/testler/test_faz_i.py`
+> (+ handoff).
+> `medya/commons.py`, `medya/nasa.py`, `medya/lisans.py`, `editor/plan.py`,
+> `editor/qa_on.py`, smoke betiği, pilot raporu ve 22 alan sözleşmesi
+> **dokunulmadı** (git ile doğrulandı). 429 devre kesici, tek `ara()`
+> çağrısı, kota/ağ bütçesi ve I-23…I-35 **korundu**.
+
+### ⛔ Ölçülen kusur (I-35'ten)
+
+I-33 raporunda s01 için:
+
+| alan | rapor diyordu | **gerçek** |
+|---|---|---|
+| Commons denemesi | `BAYT-YOK` / `HTTP 429` | **1 varlık İNDİRİLDİ**, sonra 429 |
+| `kullanilan_saglayici` | `nasa` | b001'in kaynağı **wikimedia** |
+
+İki ayrı hata birleşiyordu:
+1. **Başarılı geçmiş eziliyordu.** Sağlayıcı döngüsünün sonundaki hata bloğu,
+   o sağlayıcı bayt vermiş olsa bile `durum`u `BAYT-YOK` yapıyordu.
+2. **Genel sağlayıcı son adımdan türüyordu.** Erken dönüşte
+   `kullanilan_saglayici` = `ad` (o anki sağlayıcı) yazılıyordu; Commons
+   birinciyi, NASA ikinciyi verince hüküm **nasa** oluyordu — oysa kabul
+   edilen **ilk** varlık Commons'tandı.
+
+Sonuç: "hangi sağlayıcı neyi verdi" sorusu **üç atom boyunca** yanıltıcı
+cevaplandı (I-33'te b001'in kaynağını ancak zincirden çapraz okuyarak
+bulabildim).
+
+### Düzeltme
+
+- **Kaynak, toplama anında işaretleniyor.** Her toplanan varlığa
+  `kaynak_saglayici` yazılır (önbellek / doğrudan indirme / `BEKLE` sonrası
+  — üç toplama noktasının hepsinde).
+- **`saglayici_ozeti()` saf fonksiyonu**: `kullanilan_saglayici` ve
+  `saglayici_dagilimi` **yalnız toplanan varlıklardan** türer. Ağ/dosya
+  kullanmaz. Erken dönüş, kısmi başarı ve önbellek yolları **aynı** özeti
+  kullanır — tek kaynak.
+- **Deneme kaydı değişmez ve kronolojik.** Sağlayıcı bayt verdiyse
+  `durum = KISMI-OK` + `toplanan_katki = N`; son hata **silinmez**, ayrı
+  `son_hata` alanında durur. Hiç bayt gelmediyse `durum = BAYT-YOK` **aynen
+  kalır** (gevşetme yok).
+- **Geriye uyumlu**: `sebep`/`http`/`kalici`/`devre_acildi` alanları duruyor;
+  katkı varsa `sebep` artık *"N varlık ALINDI, sonra: …"* diyor. Rapor
+  iskeletine `saglayici_dagilimi` **eklendi** (yeni alan, kırıcı değil).
+
+### ✅ Ölçülen senaryolar (hepsi ağsız sahte sağlayıcıyla)
+
+| senaryo | sonuç |
+|---|---|
+| **başarı → 429** (I-33 sırası) | `KISMI-OK`, katkı 1, `kullanilan_saglayici=commons`, dağılım `{commons:1, nasa:1}` |
+| **429 → başarı** | `commons`, dağılım `{commons:1}` |
+| **çoklu başarı + son hata** | `KISMI-OK`, katkı **2**, dağılım `{commons:2}` |
+| **hiçbir başarı** | `BAYT-YOK`, katkı 0, `ok=False`, sağlayıcı `""`, dağılım `{}` |
+| **seçilen Commons + son hata 429** | `ok=True`, sağlayıcı **commons** (nasa değil) |
+| **gerçek I-33 fixture** | ilk varlık `wikimedia`, dağılım `{wikimedia:1, nasa:4}`, **tekel %80** dağılımdan doğru çıkıyor |
+
+Ayrıca doğrulandı: denemeler kronolojik (`commons` → `nasa`), her varlık kendi
+kaynağını taşıyor, **tek `ara()` çağrısı** korundu, boş girdi çökertmiyor.
+
+### Ölçülen test sonucu
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1727** | **3141** |
+
+0 hata. Faz I 1710 → **1727** (+17). **1 BLOKE** — I-33 görsel inceleme kaydı
+sürüyor; pilot hâlâ kabul edilmedi.
+
+⚠ **Rerender yapılmadı**: değişiklik yalnız **rapor doğruluğu**; hangi
+varlığın seçildiğini belirleyen mantık (sıralama, kapılar, kota, devre
+kesici) **bit-bit aynı**. Yeni `kaynak_saglayici` alanı manifeste sızmıyor
+(smoke aday sözlüğünü alan alan kuruyor), dolayısıyla render girdisi de aynı.
+
+### SONRAKİ ATOM — açık tek kusur değişmedi
+
+**b001 vitrin/pano kusuru** hâlâ açık ve pilot kabul edilmedi. Ölçülen üç
+seçenekten ikisi elendi (I-34 kare-bakan sinyal, I-35 sorgu daraltması).
+Kalan ikisi **kullanıcı kararı**: (a) s01 için sağlayıcı sırası,
+(b) operatör onayı. Bu atom teşhis güvenilirliğini onardığı için artık
+"hangi sağlayıcı neyi verdi" sorusu **rapordan doğrudan** okunabiliyor —
+(a) seçeneği ölçülerek değerlendirilebilir hale geldi.

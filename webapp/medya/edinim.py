@@ -281,6 +281,35 @@ def _oran_yeter(yol: str, aday: dict, hedef_oran: float,
     return bool(karar.get("uygun", True))
 
 
+def saglayici_ozeti(toplanan) -> dict:
+    """KULLANILAN saglayici ve dagilim — YALNIZ TOPLANAN varliklardan.
+
+    ⚠ NEDEN VAR — I-35'TE OLCULEN TUTARSIZLIK:
+    `kullanilan_saglayici` zinciri ERKEN DONUS anindaki saglayiciya (`ad`)
+    esitleniyordu. Gercek vaka (I-33, s01): Commons BIR varlik indirdi (vitrin),
+    sonra 429 aldi; NASA ikinciyi verdi ve erken donus `kullanilan_saglayici`yi
+    **nasa** yazdi. Oysa KABUL EDILEN ilk varlik (b001) **wikimedia**'dandi.
+    Rapor ayrica Commons denemesini `BAYT-YOK` gosteriyordu — bayt GELMISTI.
+    Sonuc: "hangi saglayici neyi verdi" sorusu uc atom boyunca yaniltici
+    cevaplandi.
+
+    Artik hukum SEcILEN VARLIKLARDAN turer; son hata genel saglayiciyi
+    degistiremez. Ag/dosya KULLANMAZ.
+    """
+    liste = [t for t in (toplanan or []) if isinstance(t, dict)]
+    dagilim: dict = {}
+    for t in liste:
+        s = str(t.get("kaynak_saglayici") or "")
+        if s:
+            dagilim[s] = dagilim.get(s, 0) + 1
+    return {
+        "kullanilan_saglayici": (str(liste[0].get("kaynak_saglayici") or "")
+                                 if liste else ""),
+        "saglayici_dagilimi": dagilim,
+        "toplanan_adet": len(liste),
+    }
+
+
 def _indir_tek(modul, aday: dict, hedef_yol: str) -> dict:
     """Saglayicidan TEK deneme iste — yeniden deneme politikasi BU MODULUN.
 
@@ -326,7 +355,8 @@ def edin(sorgu: str, hedef_yol: str, *, saglayicilar: list,
     toplanan: list = []
     rapor = {"ok": False, "sorgu": str(sorgu or ""), "aday": None,
              "adaylar": [], "istenen_adet": istenen,
-             "kullanilan_saglayici": "", "denemeler": [],
+             "kullanilan_saglayici": "", "saglayici_dagilimi": {},
+             "denemeler": [],
              "metadata_bulundu": 0, "bayt_indirildi": 0,
              "onbellekten": False, "failover_sn": None,
              "devre": None,
@@ -410,6 +440,9 @@ def edin(sorgu: str, hedef_yol: str, *, saglayicilar: list,
         # ham sonuc sayisi; `kullanilan_sorgu` = O SAGLAYICIYA GERCEKTEN
         # gonderilen sorgu (raporda sahne sorgusu gorunuyordu, saglayici
         # sorgusu DEGIL — bulasan bu yuzden gorunmez kalmisti).
+        # ⚠ I-36: bu saglayicinin KATKISI, deneme boyunca toplanan artisiyla
+        # olculur. Sondaki 429 basarili gecmisi EZEMEZ.
+        _katki_basla = len(toplanan)
         deneme = {"saglayici": ad, "kullanilan_sorgu": "",
                   "denenen": None, "metadata": 0, "elenen": 0,
                   "durum": "", "sebep": "", "sn": None}
@@ -498,12 +531,14 @@ def edin(sorgu: str, hedef_yol: str, *, saglayicilar: list,
             if url in onbellek and os.path.exists(onbellek[url]):
                 _k = dict(aday)
                 _k["yol"] = onbellek[url]
+                # ⚠ I-36: varligin GERCEK kaynagi TOPLAMA aninda isaretlenir.
+                _k["kaynak_saglayici"] = ad
                 toplanan.append(_k)
                 rapor["onbellekten"] = True
                 if len(toplanan) >= istenen:
                     rapor.update({"ok": True, "aday": dict(toplanan[0]),
-                                  "adaylar": list(toplanan),
-                                  "kullanilan_saglayici": ad})
+                                  "adaylar": list(toplanan)})
+                    rapor.update(saglayici_ozeti(toplanan))
                     deneme.update({"durum": "ONBELLEK",
                                    "sn": round(saat() - d_basla, 3)})
                     rapor["denemeler"].append(deneme)
@@ -528,12 +563,13 @@ def edin(sorgu: str, hedef_yol: str, *, saglayicilar: list,
                 kesici.basari(ad)
                 _k = dict(aday)
                 _k["yol"] = _yol
+                _k["kaynak_saglayici"] = ad          # I-36
                 toplanan.append(_k)
                 rapor["bayt_indirildi"] += 1
                 if len(toplanan) >= istenen:
                     rapor.update({"ok": True, "aday": dict(toplanan[0]),
-                                  "adaylar": list(toplanan),
-                                  "kullanilan_saglayici": ad})
+                                  "adaylar": list(toplanan)})
+                    rapor.update(saglayici_ozeti(toplanan))
                     deneme.update({"durum": "OK",
                                    "sn": round(saat() - d_basla, 3)})
                     rapor["denemeler"].append(deneme)
@@ -555,12 +591,13 @@ def edin(sorgu: str, hedef_yol: str, *, saglayicilar: list,
                     kesici.basari(ad)
                     _k = dict(aday)
                     _k["yol"] = _yol
+                    _k["kaynak_saglayici"] = ad      # I-36
                     toplanan.append(_k)
                     rapor["bayt_indirildi"] += 1
                     if len(toplanan) >= istenen:
                         rapor.update({"ok": True, "aday": dict(toplanan[0]),
-                                      "adaylar": list(toplanan),
-                                      "kullanilan_saglayici": ad})
+                                      "adaylar": list(toplanan)})
+                        rapor.update(saglayici_ozeti(toplanan))
                         deneme.update({"durum": "OK-BEKLEDIKTEN-SONRA",
                                        "sn": round(saat() - d_basla, 3)})
                         rapor["denemeler"].append(deneme)
@@ -574,20 +611,31 @@ def edin(sorgu: str, hedef_yol: str, *, saglayicilar: list,
 
         kalici = _kalici_mi(son)
         acildi = kesici.hata(ad, kalici=kalici)
-        deneme.update({"durum": "BAYT-YOK",
-                       "sebep": str(son.get("sebep") or "indirilemedi")[:120],
-                       "http": son.get("http"),
-                       "kalici": kalici, "devre_acildi": acildi,
-                       "sn": round(saat() - d_basla, 3)})
+        _katki = len(toplanan) - _katki_basla
+        _hata = {"sebep": str(son.get("sebep") or "indirilemedi")[:120],
+                 "http": son.get("http"), "kalici": kalici,
+                 "devre_acildi": acildi}
+        # ⚠ I-36'DA OLCULEN KUSUR: bu saglayici BAYT VERDIYSE (katki > 0)
+        # sonraki 429 onu "BAYT-YOK" yapamaz. I-33'te tam bu oldu: Commons
+        # vitrin varligini INDIRDI, sonra 429 aldi ve rapor Commons'i
+        # BAYT-YOK gosterdi. Basarili gecmis KORUNUR; son hata AYRI alanda.
+        deneme.update({
+            "durum": ("KISMI-OK" if _katki > 0 else "BAYT-YOK"),
+            "toplanan_katki": _katki,
+            "son_hata": _hata,
+            # Geriye uyumluluk: eski tuketiciler `sebep`/`http` okuyor.
+            "sebep": ((f"{_katki} varlik ALINDI, sonra: {_hata['sebep']}")
+                      if _katki > 0 else _hata["sebep"]),
+            "http": _hata["http"], "kalici": kalici, "devre_acildi": acildi,
+            "sn": round(saat() - d_basla, 3)})
         rapor["denemeler"].append(deneme)
 
     # ⚠ KISMI BASARI DURUSTCE: N istendi, daha azi geldiyse ELDE OLANI don
     # ve kac tane geldigini RAPORLA. Sahte aday uretilmez.
     if toplanan:
         rapor.update({"ok": True, "aday": dict(toplanan[0]),
-                      "adaylar": list(toplanan),
-                      "kullanilan_saglayici": rapor["kullanilan_saglayici"]
-                      or (toplanan[0].get("saglayici") or "")})
+                      "adaylar": list(toplanan)})
+        rapor.update(saglayici_ozeti(toplanan))
     rapor["failover_sn"] = round(saat() - basla, 3)
     rapor["devre"] = kesici.ozet()
     return rapor

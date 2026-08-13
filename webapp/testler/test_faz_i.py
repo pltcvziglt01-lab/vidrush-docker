@@ -6281,6 +6281,128 @@ kontrol("elenen kaydi SEBEBIYLE birlikte duruyor",
             "x", adet=6, en_az_genislik=1920, acan=_sahte_acan([
                 _sahte_sayfa(1, 1, 800, 600, "kucuk.jpg")]))["elenen"]))
 
+blok("§39l I-36 — SAGLAYICI TUTARSIZLIGI DUZELTILDI")
+
+# ⚠ I-35'TE OLCULEN KUSUR: I-33 raporunda s01 icin Commons denemesi
+# `durum: BAYT-YOK, sebep: HTTP 429` yaziyordu AMA kabul edilen b001 varligi
+# Commons'in vitrini idi (wikimedia/cc-by-sa). Yani Commons BIR BAYT VERDI,
+# sonraki 429 basarili gecmisi EZDI; ayrica `kullanilan_saglayici` erken
+# donuste SON saglayiciya (nasa) esitlendigi icin genel saglayici SAHTE
+# bicimde nasa gorunuyordu.
+
+class _S36:
+    """Sirali indirme sonuclari veren sahte saglayici (ag YOK)."""
+
+    def __init__(self, ad, adaylar, sonuclar):
+        self.ad = ad
+        self._a = adaylar
+        self._s = list(sonuclar)
+        self.ara_sayisi = 0
+        self.indir_sayisi = 0
+
+    def ara(self, sorgu, adet=6, en_az_genislik=0):
+        self.ara_sayisi += 1
+        return {"ok": True, "adaylar": list(self._a), "elenen": [],
+                "denenen": len(self._a), "hata": ""}
+
+    def indir(self, aday, hedef, deneme=1):
+        self.indir_sayisi += 1
+        r = self._s[min(self.indir_sayisi - 1, len(self._s) - 1)]
+        if r.get("ok"):
+            with open(hedef, "wb") as f:
+                f.write(b"x" * 20000)
+        return dict(r)
+
+
+_OK36 = {"ok": True}
+_429 = {"ok": False, "http": 429, "sebep": "HTTP 429"}
+with _tf25.TemporaryDirectory() as _d36:
+    _h36 = os.path.join(_d36, "a.jpg")
+    _ADAY36 = [_aday(f"https://s{i}.test/{i}.jpg") for i in range(4)]
+
+    # ── SENARYO 1: BASARI -> 429 (I-33'un gercek sirasi) ──
+    _co = _S36("commons", _ADAY36, [_OK36, _429, _429, _429])
+    _na = _S36("nasa", _ADAY36, [_OK36])
+    _r1 = _ed.edin("q", _h36, adet=2, saat=lambda: 0.0,
+                   saglayicilar=[{"ad": "commons", "modul": _co},
+                                 {"ad": "nasa", "modul": _na}])
+    _d_co = next(d for d in _r1["denemeler"] if d["saglayici"] == "commons")
+    kontrol("⭐ I-36: BAYT VEREN saglayici 429 sonrasi BAYT-YOK OLMUYOR",
+            _d_co["durum"] == "KISMI-OK" and _d_co["toplanan_katki"] == 1,
+            _d_co["durum"])
+    kontrol("⭐ I-36: son hata KAYBOLMUYOR, AYRI alanda duruyor",
+            _d_co["son_hata"]["http"] == 429
+            and "429" in _d_co["sebep"] and "ALINDI" in _d_co["sebep"])
+    kontrol("⭐ I-36: kullanilan_saglayici SECILEN varliktan turer (commons)",
+            _r1["kullanilan_saglayici"] == "commons", _r1["kullanilan_saglayici"])
+    kontrol("⭐ I-36: son hata genel saglayiciyi SAHTE bicimde nasa YAPMIYOR",
+            _r1["kullanilan_saglayici"] != "nasa")
+    kontrol("⭐ I-36: dagilim SADECE toplanan varliklardan",
+            _r1["saglayici_dagilimi"] == {"commons": 1, "nasa": 1},
+            _r1["saglayici_dagilimi"])
+    kontrol("I-36: her varlik KENDI kaynagini tasiyor",
+            [a["kaynak_saglayici"] for a in _r1["adaylar"]]
+            == ["commons", "nasa"])
+    kontrol("I-36: denemeler KRONOLOJIK (commons once)",
+            [d["saglayici"] for d in _r1["denemeler"]] == ["commons", "nasa"])
+    kontrol("I-36: TEK ara() cagrisi korundu",
+            _co.ara_sayisi == 1 and _na.ara_sayisi == 1)
+
+    # ── SENARYO 2: 429 -> BASARI (ayni saglayici icinde) ──
+    _co2 = _S36("commons", _ADAY36, [_429, _OK36, _OK36])
+    _r2 = _ed.edin("q", _h36, adet=1, saat=lambda: 0.0,
+                   saglayicilar=[{"ad": "commons", "modul": _co2}])
+    kontrol("⭐ I-36: 429 -> BASARI sirasinda saglayici DOGRU (commons)",
+            _r2["ok"] and _r2["kullanilan_saglayici"] == "commons"
+            and _r2["saglayici_dagilimi"] == {"commons": 1})
+
+    # ── SENARYO 3: COKLU BASARI + SON HATA ──
+    _co3 = _S36("commons", _ADAY36, [_OK36, _OK36, _429, _429])
+    _r3 = _ed.edin("q", _h36, adet=3, saat=lambda: 0.0,
+                   saglayicilar=[{"ad": "commons", "modul": _co3}])
+    _d3 = _r3["denemeler"][0]
+    kontrol("⭐ I-36: COKLU basari + son hata -> KISMI-OK, katki 2",
+            _d3["durum"] == "KISMI-OK" and _d3["toplanan_katki"] == 2
+            and _r3["saglayici_dagilimi"] == {"commons": 2}, _d3["durum"])
+
+    # ── SENARYO 4: HICBIR BASARI ──
+    _co4 = _S36("commons", _ADAY36, [_429, _429, _429, _429])
+    _r4 = _ed.edin("q", _h36, adet=1, saat=lambda: 0.0,
+                   saglayicilar=[{"ad": "commons", "modul": _co4}])
+    _d4 = _r4["denemeler"][0]
+    kontrol("⭐ I-36: HICBIR basari yoksa durum BAYT-YOK KALIR (gevsetme yok)",
+            _d4["durum"] == "BAYT-YOK" and _d4["toplanan_katki"] == 0
+            and _r4["ok"] is False and _r4["kullanilan_saglayici"] == ""
+            and _r4["saglayici_dagilimi"] == {})
+
+    # ── SENARYO 5: SECILEN Commons ama SON hata 429 (tek saglayici) ──
+    _co5 = _S36("commons", _ADAY36, [_OK36, _429, _429, _429])
+    _r5 = _ed.edin("q", _h36, adet=2, saat=lambda: 0.0,
+                   saglayicilar=[{"ad": "commons", "modul": _co5}])
+    kontrol("⭐ I-36: secilen commons, son hata 429 -> saglayici hala commons",
+            _r5["ok"] is True and _r5["kullanilan_saglayici"] == "commons"
+            and _r5["denemeler"][0]["durum"] == "KISMI-OK")
+
+# ── SENARYO 6: GERCEK I-33 fixture'i — b001 wikimedia + digerleri NASA ──
+_I33_ZINCIR = [("b001", "wikimedia"), ("b002", "nasa"), ("b003", "nasa"),
+               ("b004", "nasa"), ("b005", "nasa")]
+_oz36 = _ed.saglayici_ozeti(
+    [{"kaynak_saglayici": s} for _, s in _I33_ZINCIR])
+kontrol("⭐ I-36: I-33 fixture — ilk varlik wikimedia, kullanilan_saglayici "
+        "wikimedia",
+        _oz36["kullanilan_saglayici"] == "wikimedia", _oz36)
+kontrol("⭐ I-36: I-33 fixture — dagilim wikimedia 1 / nasa 4",
+        _oz36["saglayici_dagilimi"] == {"wikimedia": 1, "nasa": 4})
+_tekel36 = max(_oz36["saglayici_dagilimi"].values()) / _oz36["toplanan_adet"]
+kontrol("⭐ I-36: %80 TEKEL hesabi dagilimdan DOGRU cikiyor",
+        abs(_tekel36 - 0.8) < 1e-9, _tekel36)
+kontrol("I-36: ozet AG/DOSYA kullanmaz (saf fonksiyon), bos girdi COKMEZ",
+        _ed.saglayici_ozeti([])["kullanilan_saglayici"] == ""
+        and _ed.saglayici_ozeti(None)["saglayici_dagilimi"] == {})
+kontrol("I-36: 22 alan sozlesmesi ve devre kesici DOKUNULMADI",
+        "DEVRE_ESIGI = 2" in oku(KOK, "medya/edinim.py")
+        and "BEKLENEBILIR_TAVAN_SN = 30.0" in oku(KOK, "medya/edinim.py"))
+
 blok("§39k I-35 — s01 SORGU DARALTMASI: ELENDI (olculdu)")
 
 # ⚠ I-34, en kucuk ve bedava secenek olarak "s01 sorgusunu daralt" onermisti.
