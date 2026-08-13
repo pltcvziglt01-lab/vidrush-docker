@@ -191,7 +191,8 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-22 medyasız beat kusuru çözüldü** | `a220fcb` | ⚠ **push edildi**, POST-QA FAIL (dikey kaynak), MP4 teslim YOK |
 | 13 Ağu | **I-23 en-boy oranı uyumluluk kapısı (dar atom)** | `49c726e` | ✅ **push edildi**, POST-QA **TAMAMEN PASS**, Faz I BLOKE 0, deploy YOK |
 | 13 Ağu | **I-24 motion çeşitliliği ölçülebilir kapıya çevrildi** | `929b9b4` | ✅ **push edildi**, POST-QA PASS, kalite puanı **100/100**, deploy YOK |
-| 13 Ağu | **I-25 sağlayıcı-tekel tanısı: kök neden bizdeydi** | `4acf133` | ✅ **push edildi**, 2 gerçek hata düzeltildi, WARN **dürüst** (Commons 429), medya kümesi değişmedi, deploy YOK |
+| 13 Ağu | **I-25 sağlayıcı-tekel tanısı: kök neden bizdeydi** | `4acf133` |
+| 13 Ağu | **I-26 s03 aşırı dar sorgu çözüldü; pilot BLOKE** | `PENDING` | ⚠ **push edildi**, Commons s03 0→2 aday, tekel %100→%60, MP4 **KABUL EDİLMEDİ** (punch büyütme), deploy YOK | ✅ **push edildi**, 2 gerçek hata düzeltildi, WARN **dürüst** (Commons 429), medya kümesi değişmedi, deploy YOK |
 
 ---
 
@@ -3951,3 +3952,126 @@ duvar saati.
   edinim. İkisi de bu atomun kapsamı dışıdır ve **kullanıcı kararıdır**.
 - s03 için Commons'ta konu gerçekten yok; sorgu genişletme (ör. eş anlamlı
   terim) **ölçülerek** denenebilir — uydurma eşleşme değil.
+
+---
+
+## 44. FAZ I-26 — s03 AŞIRI DAR SORGU ÇÖZÜLDÜ; PİLOT ⛔ BLOKE (dar atom, 13 Ağu)
+
+> **Durum: atom hedefine ULAŞTI, ama pilot MP4 KABUL EDİLMİŞ SAYILMAZ.
+> Yerel yeşil (0 hata), push edildi. Deploy YOK. Maliyet $0.00.**
+> Değişen: `webapp/medya/edinim.py`,
+> `webapp/testler/smoke_konsept3_teknoloji_i20.py`,
+> `webapp/testler/test_faz_i.py`, `outputs/sample/teknoloji_i20_rapor.json`
+> (+ handoff).
+> **Yeni sağlayıcı YOK. Kota/ağ çağrısı artışı YOK. Sahte sağlayıcı PASS YOK.**
+> `pipeline.py`, `server.py`, `deploy.sh`, 22 alan sözleşmesi, `gramer.py`,
+> `qa_on.py`, `kalite_kapisi.py`, `motion.py`, `medya/lisans.py`,
+> `medya/guvenlik.py`, `medya/indirme.py`, `medya/nasa.py` **dokunulmadı**.
+> I-23/I-24/I-25 kapıları **korundu**.
+
+### ⚠ I-25'İN NOTU YANLIŞTI — ÖLÇÜMLE DÜZELTİLDİ
+
+I-25 s03 için şunu yazmıştı: *"Commons'ta bu konuda aday **gerçekten yok**"*.
+O hüküm **tek sorgu** üzerinde verilmişti. I-26'da 2–3 konuya sadık alternatif
+**aynı düşük maliyetli bütçede** ölçüldü ve iddia **çürüdü**:
+
+| sorgu | terim | denenen | aday |
+|---|---|---|---|
+| `Silicon Carbide Integrated Circuit Chip` (eski) | 5 | **0** | 0 |
+| `silicon carbide integrated circuit` | 4 | **2** | **2** ⭐ |
+| `integrated circuit chip` | 3 | 18 | 6 |
+| `microchip silicon` | 2 | 18 | 6 |
+| `"silicon carbide" OR "integrated circuit" OR microchip` | — | 18 | 6 |
+
+**Kök neden "Commons boş" değil, sorgunun AŞIRI DAR olmasıydı:**
+CirrusSearch terimleri **varsayılan olarak AND'ler**; 5 terimin hepsini birden
+taşıyan dosya yok.
+
+### Neden A seçildi — sayılarla
+
+- **Semantik sadakat:** A'nın iki adayı da NASA Glenn'in **gerçek silisyum
+  karbür entegre devreleri** (*Extremely durable silicon carbide
+  semiconductor*, *Heat-resistable ICs*). Anlatım "silikon üzerindeki
+  devreler" — birebir aynı konu. B/C/OR ise tüketici anakartları, fare çipi,
+  EPROM paketleri getiriyor: lisansı temiz ama **konuya uzak**.
+- **Kapılar:** A'nın iki adayı da **6000×3999** (oran 1.500) — çözünürlük
+  **ve** I-23 oran kapısından geçti. B'nin 6 adayından 4'ü ORAN-RED.
+- **TEK SORGU İLKESİ KORUNDU:** A hem Commons'ı açtı (**0 → 2**) hem NASA'yı
+  iyileştirdi (**1 → 2**) ve NASA'nın **birinci adayı değişmedi** (aynı GRC
+  çipi). Sağlayıcılara ayrı sorgu gitmiyor — I-25'in ilkesi bozulmadı.
+
+### Bedava tanı: AŞIRI DARLIK ipucu
+
+`ARAMA-BOS` sebebi artık terim sayısını da yazıyor ve ≥4 terimde
+*"çok terimli sorgu terimleri AND'leyen uçlarda boş dönebilir, daha genel bir
+eş-anlamlı DENENMELİ"* uyarısı veriyor. **Ek çağrı yok.**
+
+### ✅ ATOM HEDEFİNE ULAŞTI
+
+Gerçek koşumda s03 için Commons **meta=2** döndü (I-25'te 0'dı). Ama **indirme
+HTTP 429** verdi → devre kesici korundu → **NASA'ya dürüst düşüş**.
+**Sahte sağlayıcı PASS üretilmedi.**
+Sağlayıcı karışımı da ölçüldü: `wikimedia 2 / nasa 3` → tekel **%100 → %60**
+(tavan %40 olduğu için WARN **dürüstçe sürüyor**).
+
+### ⛔ PİLOT MP4 KABUL EDİLMİŞ SAYILMAZ — medya kümesi değişti ve KÖTÜLEŞTİ
+
+Küme değiştiği için tam rerender + POST-QA + 11 kare yapıldı.
+**Otomatik POST-QA PASS** (1920×1080, 17.109 sn, LUFS −14.36, TP −4.09,
+sessizlik/siyah/donmuş 0, kenar 0/68, 5 ayrı hareket, puan 100/100).
+**Ama 11 kare incelemesi kabul edilemez çıktı:**
+
+s01 artık Commons'tan geliyor (`Pleiades supercomputer racks 4.jpg`,
+2240×1344) ve bu görsel **cam arkasındaki bir müze afişinin fotoğrafı** —
+İngilizce metin blokları, yansımalar, amatör kadraj. Türkçe anlatımlı bir
+belgeselde "Güç burada üretilir" cümlesinin altında **İngilizce duvar panosu**
+duruyor. `detay_std` 52.3 → 38.2.
+
+### ⚠ ÖLÇÜMÜN AÇIĞA ÇIKARDIĞI GERÇEK KUSUR — "upscale YAPILMIYOR" İHLALİ
+
+Yeni `punch_buyutme` **ölçümü** (kapı değil) eklendi. Zoom değerleri yeniden
+türetilmiyor, **planın kendi motion spec'inden** okunuyor:
+
+`ekran_piksel_orani = kapsama × maks_zoom`, `kapsama = max(1920/g, 1080/y)`
+
+| beat | kaynak | kadraj | zoom | ekran oranı | |
+|---|---|---|---|---|---|
+| b001 | 2240×1344 | tam | 1.053 | 0.903 | küçültme |
+| **b002** | **2240×1344** | **punch-1.35** | 1.494 | **1.281** | ⛔ **BÜYÜTME** |
+| b003 | 3000×2000 | ust | 1.272 | 0.814 | küçültme |
+| **b004** | **3000×2250** | **punch-1.6** | 1.696 | **1.085** | ⛔ **BÜYÜTME** |
+| b005 | 4986×3744 | alt | 1.272 | 0.490 | küçültme |
+
+**b004 ZATEN I-24/I-25'in kabul edilen render'ında da büyütüyordu (1.085×).**
+Yani bu kusur I-26'nın ürettiği bir gerileme **değil**, atomun **açığa
+çıkardığı mevcut bir ihlal**: depo "upscale YAPILMIYOR" diyor, ama bu söz
+yalnızca **edinim eşiği** (`en_az_genislik=1920`) için geçerli; kamera
+`punch` kadrajında **sessizce ihlal ediliyor**.
+
+Testte **BLOKE** olarak duruyor; PASS sayılmadı.
+
+### Ölçülen test sonucu
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1563** | **2977** |
+
+0 hata. Faz I 1546 → **1563** (+17). **1 BLOKE** (I-26 punch büyütme) —
+sebebi ölçülmüş ve yazılı.
+
+### Düzeltilen kendi kilidim
+
+I-23b kilidi *"en az 1 ayırt reddi OLDU"* diye yazılmıştı; o sayı **aday
+listesine bağlı** ve Commons/NASA karışımı değişince reddedilecek benzer çift
+kalmayabiliyor. Asıl değişmez **"ayırt edilemez çift hayatta kalmadı"**;
+kilit ona çevrildi (gevşetme değil, doğru değişmez).
+
+### SONRAKİ ATOM (I-27) — net ve ölçülmüş
+
+**Kadraj, kaynağın çözünürlük payına göre seçilmeli.** Doğru çözüm kaynağı
+reddetmek DEĞİL (ölçüldü: `punch-1.6` için gereken ≥3254 px eşiği s02/s03'ü
+de eler ve pilot tamamen bloke olur), **kadrajı kaynağa uydurmaktır**:
+`kapsama × kadraj_ölçek ≤ 1.0` sağlayan en geniş kadraj deterministik
+seçilir (I-24'ün geometri kancası bunun için hazır).
+İkinci mesele: **konu dışı "afiş/pano fotoğrafı"** için ölçülebilir bir
+eleme sinyali (metin yoğunluğu ölçümü) — uydurma değil, ölçülerek.

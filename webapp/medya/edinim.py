@@ -451,8 +451,21 @@ def edin(sorgu: str, hedef_yol: str, *, saglayicilar: list,
             # ELENDI" AYRI SEBEPTIR. Ikisini tek cumleye sikistirmak
             # SAGLAYICI-TEKEL kusurunu dort atom boyunca gizledi.
             if _denenen == 0:
+                # ⚠ I-26'DA OLCULEN SINIF: cok terimli sorgu SESSIZCE bos
+                # doner. Bircok arama ucu (Commons/CirrusSearch dahil)
+                # terimleri VARSAYILAN OLARAK AND'ler; terim sayisi arttikca
+                # eslesme olasiligi duser. Olculen vaka: 5 terimli
+                # "Silicon Carbide Integrated Circuit Chip" -> 0 sonuc;
+                # ayni konunun 4 terimlisi -> 2 sonuc. Bu ipucu BEDAVA
+                # (ek cagri YOK) ve kok nedeni ilk bakista gorunur kilar.
+                _terim = len([t for t in str(_sorgu or "").split() if t])
                 _sebep = (f"ARAMA-BOS: saglayici {_sorgu!r} icin HIC sonuc "
-                          f"dondurmedi (lisans duvari CALISMADI BILE)")
+                          f"dondurmedi (lisans duvari CALISMADI BILE)"
+                          + (f" — sorgu {_terim} terim; cok terimli sorgu "
+                             f"terimleri AND'leyen uclarda BOS donebilir, "
+                             f"daha genel bir es-anlamli DENENMELI"
+                             if _terim >= 4 else ""))
+                deneme["sorgu_terim_sayisi"] = _terim
             elif _denenen:
                 _sebep = (f"HEPSI-ELENDI: {_denenen} ham sonuc geldi, "
                           f"{deneme['elenen']} aday elendi "

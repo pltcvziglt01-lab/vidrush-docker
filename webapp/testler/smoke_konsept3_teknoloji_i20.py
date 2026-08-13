@@ -61,7 +61,47 @@ SAHNE_TANIMI = [
      "metin": "Güç burada üretilir."},
     {"kimlik": "s02", "sorgu": "supercomputer facility",
      "metin": "Binlerce işlemci tek salonda, sıra sıra dizili duruyor."},
-    {"kimlik": "s03", "sorgu": "Silicon Carbide Integrated Circuit Chip",
+    # ⚠ I-26'DA OLCULEN DUZELTME — ASIRI DAR SORGU SESSIZCE BOS DONUYORDU.
+    # Eski sorgu: "Silicon Carbide Integrated Circuit Chip" (5 terim).
+    # CirrusSearch terimleri VARSAYILAN OLARAK AND'ler; 5 terimin hepsini
+    # birden tasiyan dosya Commons'ta YOK -> denenen=0.
+    # I-25 bunu "Commons'ta bu konuda aday GERCEKTEN yok" diye yazmisti;
+    # OLCUM BU IDDIAYI CURUTTU (asagi bak) ve not I-26'da duzeltildi.
+    #
+    # AYNI dusuk maliyetli arama butcesinde KARSILASTIRILAN adaylar
+    # (her biri TEK ara() cagrisi; secim yapildiktan sonra kosum yine TEK):
+    #   MEVCUT "Silicon Carbide Integrated Circuit Chip" -> denenen  0, aday 0
+    #   A      "silicon carbide integrated circuit"      -> denenen  2, aday 2  ⭐
+    #   B      "integrated circuit chip"                 -> denenen 18, aday 6
+    #   C      "microchip silicon"                       -> denenen 18, aday 6
+    #   OR     '"silicon carbide" OR "integrated circuit" OR microchip'
+    #                                                    -> denenen 18, aday 6
+    #
+    # A SECILDI — sebep SAYILARLA:
+    #   · SEMANTIK SADAKAT: A'nin iki adayi da NASA Glenn'in GERCEK silisyum
+    #     karbur entegre devreleri ("Extremely durable silicon carbide
+    #     semiconductor", "Heat-resistable ICs"). Anlatim cumlesi "silikon
+    #     uzerindeki devreler" — birebir ayni konu.
+    #     B/C/OR ise tuketici anakartlari, fare cipi, EPROM paketleri
+    #     getiriyor: lisansi temiz ama konuya UZAK.
+    #   · KAPILAR: A'nin iki adayi da 6000x3999 (oran 1.500) — cozunurluk VE
+    #     I-23 oran kapisindan gecti. B'nin 6 adayindan 4'u ORAN-RED,
+    #     OR'un ilk adayi da ORAN-RED.
+    #   · TEK SORGU ILKESI KORUNDU: A hem Commons'i acti (0 -> 2) hem de
+    #     NASA'yi IYILESTIRDI (1 -> 2 aday) ve NASA'nin BIRINCI adayi
+    #     DEGISMEDI (ayni GRC cipi). Yani saglayicilara AYRI sorgu gitmiyor;
+    #     I-25'in "Commons ve NASA AYNI konu sorgusunu alir" ilkesi bozulmadi.
+    {"kimlik": "s03", "sorgu": "silicon carbide integrated circuit",
+     "olculen_alternatifler": [
+         {"sorgu": "Silicon Carbide Integrated Circuit Chip",
+          "denenen": 0, "aday": 0, "not": "ESKI — 5 terim, AND ile bos"},
+         {"sorgu": "silicon carbide integrated circuit",
+          "denenen": 2, "aday": 2, "not": "SECILEN — konuya en sadik"},
+         {"sorgu": "integrated circuit chip",
+          "denenen": 18, "aday": 6, "not": "konuya uzak (tuketici cipleri)"},
+         {"sorgu": "microchip silicon",
+          "denenen": 18, "aday": 6, "not": "konuya uzak (anakartlar)"},
+     ],
      "metin": "Her hesaplama, silikon üzerindeki devrelerde gerçekleşiyor."},
     {"kimlik": "s04", "sorgu": "solar array power",
      "metin": "Bu işlem gücünün faturası ise enerjiyle ödeniyor."},
@@ -293,6 +333,79 @@ def benzerlik(a, b):
     return sum(1 for x, y in zip(ha, hb) if x == y) / len(ha)
 
 
+def punch_buyutme_olc(zincir, props, secilen):
+    """Kamera kadraji kaynagi EKRANDA BUYUTUYOR mu? (I-26 olcumu)
+
+    ⚠ NEDEN VAR — I-26'da OLCULDU. Depo "upscale YAPILMIYOR" diye yaziyor
+    ama bu soz yalnizca EDINIM esigi (`en_az_genislik=1920`) icin geceri.
+    Kamera `punch-1.35`/`punch-1.6` uygularken kaynak SESSIZCE buyutulur:
+
+        ekran_piksel_orani = kapsama x maks_zoom
+        kapsama = max(kare_g/kaynak_g, kare_y/kaynak_y)   (objectFit: cover)
+
+    Oran > 1.0 ise kaynagin 1 pikseli ekranda 1'den fazla piksele yayiliyor
+    demektir — YUMUSAMA. Olculen vaka: 2240x1344 kaynak `punch-1.35`te
+    1.157x buyuyor; 4192x2832 kaynak ayni kadrajda 0.618x KUCULUYOR.
+
+    ⚠ Bu bir KAPI DEGIL, OLCUMDUR. Davranis DEGISMEZ; kusur yalnizca
+    GORUNUR olur (sonraki atom esigi buradan turetebilir).
+    Zoom degerleri YENIDEN TURETILMEZ — planin KENDI motion spec'inden
+    okunur, yani olcum render'in gercegi.
+    """
+    olcu_haritasi = {}
+    for s in (secilen or []):
+        if not s:
+            continue
+        olcu_haritasi[s.get("asset_id")] = (s.get("genislik"), s.get("yukseklik"))
+        for y in (s.get("yedekler") or []):
+            olcu_haritasi[y.get("asset_id")] = (y.get("genislik"),
+                                                y.get("yukseklik"))
+    zoom_haritasi = {}
+
+    def _tara(o):
+        if isinstance(o, dict):
+            pr = o.get("parametre") or {}
+            if "zoom" in pr and o.get("beat_id"):
+                try:
+                    z = [float(v) for v in (pr.get("zoom") or [])]
+                except (TypeError, ValueError):
+                    z = []
+                if z:
+                    zoom_haritasi[o["beat_id"]] = max(
+                        zoom_haritasi.get(o["beat_id"], 0.0), max(z))
+            for v in o.values():
+                _tara(v)
+        elif isinstance(o, list):
+            for v in o:
+                _tara(v)
+
+    _tara(props)
+    kayitlar = []
+    for z in (zincir or []):
+        g, y = olcu_haritasi.get(z.get("asset_id"), (0, 0))
+        maks_zoom = zoom_haritasi.get(z.get("beat_id"))
+        if not g or not y or not maks_zoom:
+            kayitlar.append({"beat_id": z.get("beat_id"),
+                             "asset_id": z.get("asset_id"),
+                             "olculdu": False})
+            continue
+        kapsama = max(OLCU[0] / float(g), OLCU[1] / float(y))
+        oran = kapsama * float(maks_zoom)
+        kayitlar.append({
+            "beat_id": z.get("beat_id"), "asset_id": z.get("asset_id"),
+            "olculdu": True, "olcu": [g, y], "kadraj": z.get("kadraj"),
+            "kapsama": round(kapsama, 4), "maks_zoom": round(maks_zoom, 4),
+            "ekran_piksel_orani": round(oran, 4),
+            "buyutuyor": bool(oran > 1.0)})
+    buyuten = [k for k in kayitlar if k.get("buyutuyor")]
+    return {"olculdu": bool(kayitlar), "kayitlar": kayitlar,
+            "buyuten_beat": len(buyuten),
+            "en_yuksek_oran": max([k["ekran_piksel_orani"] for k in kayitlar
+                                   if k.get("olculdu")] or [0]),
+            "temiz": not buyuten,
+            "not": "OLCUM — kapi DEGIL; davranis degismedi"}
+
+
 def kk_esik():
     """Edinim ayirt-etme esigi QA esigiyle AYNI kaynaktan gelir.
 
@@ -394,6 +507,9 @@ def medya_edin(sahne_aday_adedi=None):
                 dict(_rd, kimlik=tanim["kimlik"], kaynak="EDINIM"))
         kayit = {"kimlik": tanim["kimlik"], "sorgu": tanim["sorgu"],
                  "istenen_aday": _istenen,
+                 # ⚠ I-26: sorgu SECIMI raporda AUDITLENEBILIR olsun —
+                 # hangi alternatifler hangi sayilarla elendi, gorunur.
+                 "olculen_alternatifler": tanim.get("olculen_alternatifler"),
                  "oran_kapisi": son.get("oran_kapisi"),
                  "saglayici": son.get("kullanilan_saglayici"),
                  "failover_sn": son.get("failover_sn"),
@@ -1229,6 +1345,9 @@ def main() -> int:
                  "kapsam_boslugu": sonuc["kapsam_bosluklari"],
                  "elenen_medya": sonuc["elenen_medya"]},
         "zincir": edit_kopru.sahne_zinciri(sonuc["props"]),
+        # ⚠ I-26 OLCUMU: kamera kadraji kaynagi ekranda BUYUTUYOR mu?
+        "punch_buyutme": punch_buyutme_olc(
+            edit_kopru.sahne_zinciri(sonuc["props"]), sonuc["props"], secilen),
         "ffprobe": ffp,
         "video_ses_olcumu": video_ses,
         "remaster": remaster,

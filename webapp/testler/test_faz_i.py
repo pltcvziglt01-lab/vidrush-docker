@@ -6281,6 +6281,118 @@ kontrol("elenen kaydi SEBEBIYLE birlikte duruyor",
             "x", adet=6, en_az_genislik=1920, acan=_sahte_acan([
                 _sahte_sayfa(1, 1, 800, 600, "kucuk.jpg")]))["elenen"]))
 
+blok("§39c I-26 — s03 ASIRI DAR SORGU: OLCUMLU ES-ANLAMLI GENISLETME")
+
+# ⚠ I-25'IN NOTU DUZELTILDI. I-25 s03 icin "Commons'ta bu konuda aday
+# GERCEKTEN yok" yazmisti; o hukum TEK sorgu uzerinde verilmisti.
+# I-26'da 2-3 konuya sadik alternatif AYNI dusuk maliyetli butcede
+# olculdu ve iddia CURUDU:
+#   "Silicon Carbide Integrated Circuit Chip" (5 terim) -> denenen  0
+#   "silicon carbide integrated circuit"     (4 terim) -> denenen  2  ⭐
+#   "integrated circuit chip"                          -> denenen 18
+#   "microchip silicon"                                -> denenen 18
+# Kok neden "Commons bos" DEGIL, sorgunun ASIRI DAR olmasiydi:
+# CirrusSearch terimleri VARSAYILAN OLARAK AND'ler.
+
+# ⚠ Smoke MODUL OLARAK CALISTIRILMAZ (yan etkisi olmasin): `SAHNE_TANIMI`
+# kaynaktan `ast` ile, yalnizca sabit degerler okunarak cikarilir.
+import ast as _ast26                                              # noqa: E402
+
+
+def _sahne_tanimi_oku(kaynak):
+    for _d in _ast26.parse(kaynak).body:
+        if (isinstance(_d, _ast26.Assign)
+                and any(getattr(t, "id", "") == "SAHNE_TANIMI"
+                        for t in _d.targets)):
+            return _ast26.literal_eval(_d.value)
+    return []
+
+
+_ST26 = _sahne_tanimi_oku(_SM25)
+kontrol("smoke SAHNE_TANIMI kaynaktan okunabildi (4 sahne)", len(_ST26) == 4)
+kontrol("⭐ I-26: s03 sorgusu OLCULEN kazanana cevrildi",
+        next(s["sorgu"] for s in _ST26 if s["kimlik"] == "s03")
+        == "silicon carbide integrated circuit")
+_alt26 = next((s.get("olculen_alternatifler") for s in _ST26
+               if s["kimlik"] == "s03"), None)
+kontrol("⭐ I-26: karsilastirilan alternatifler SAYILARIYLA kayitli",
+        isinstance(_alt26, list) and 3 <= len(_alt26) <= 5
+        and all({"sorgu", "denenen", "aday"} <= set(a) for a in _alt26),
+        _alt26)
+kontrol("I-26: ESKI sorgu 0 sonucla, SECILEN sorgu >0 sonucla kayitli",
+        any(a["sorgu"] == "Silicon Carbide Integrated Circuit Chip"
+            and a["denenen"] == 0 for a in _alt26)
+        and any(a["sorgu"] == "silicon carbide integrated circuit"
+                and a["denenen"] > 0 for a in _alt26))
+kontrol("⭐ I-26: TEK SORGU ILKESI KORUNDU — saglayicilara AYRI sorgu YOK",
+        re.sub(r"[ \t]+", "", _SM25).count('"sorgu":tanim["sorgu"]') >= 2
+        # ⚠ Yalniz CALISAN kod taranir: I-25'in aciklama yorumlari
+        # bulasandan SOZ EDIYOR, onu KULLANMIYOR.
+        and "Iceland" not in _sikistir(_SM25))
+kontrol("I-26: secilen sorgu ESKI sorgunun KONUSUNA sadik (alt kume)",
+        set("silicon carbide integrated circuit".lower().split())
+        < set("Silicon Carbide Integrated Circuit Chip".lower().split()))
+
+# ── ASIRI DARLIK IPUCU: BEDAVA, EK CAGRI YOK ──
+with _tf25.TemporaryDirectory() as _d26:
+    _h26 = os.path.join(_d26, "a.jpg")
+    _r26 = _ed.edin("x", _h26, saat=lambda: 0.0,
+                    saglayicilar=[{"ad": "bos", "modul": _SahteBos(),
+                                   "sorgu": "bir iki uc dort bes"}])
+    _d26k = _r26["denemeler"][0]
+    kontrol("⭐ I-26: 5 terimli BOS sorguda ASIRI DARLIK ipucu veriliyor",
+            _d26k["sorgu_terim_sayisi"] == 5
+            and "AND" in _d26k["sebep"] and "es-anlamli" in _d26k["sebep"],
+            _d26k["sebep"])
+    _r26b = _ed.edin("x", _h26, saat=lambda: 0.0,
+                     saglayicilar=[{"ad": "bos2", "modul": _SahteBos(),
+                                    "sorgu": "bir iki"}])
+    kontrol("I-26: KISA sorguda darlik ipucu VERILMEZ (yanlis yonlendirme yok)",
+            _r26b["denemeler"][0]["sorgu_terim_sayisi"] == 2
+            and "AND" not in _r26b["denemeler"][0]["sebep"])
+    kontrol("I-26: ipucu EK AG CAGRISI URETMIYOR (ara yine 1 kez)",
+            _SahteBos().ara_sayisi == 0)
+kontrol("I-26: HEPSI-ELENDI yolunda darlik ipucu YOK (farkli kok neden)",
+        "sorgu_terim_sayisi" not in str(_de) or "AND" not in str(_de["sebep"]))
+
+# ── PUNCH BUYUTME OLCUMU (I-26'da bulundu; KAPI DEGIL, OLCUM) ──
+# ⚠ Smoke dosya yolundan yuklenir; `main()` yalnizca __main__'de kosar,
+# yani import YAN ETKISIZDIR (render/ag baslatmaz).
+import importlib.util as _iu26                                    # noqa: E402
+_spec26 = _iu26.spec_from_file_location(
+    "_sm26", os.path.join(KOK, "testler",
+                          "smoke_konsept3_teknoloji_i20.py"))
+_sm26 = _iu26.module_from_spec(_spec26)
+_spec26.loader.exec_module(_sm26)
+kontrol("smoke YAN ETKISIZ import edilebildi (render baslatmadi)",
+        callable(getattr(_sm26, "punch_buyutme_olc", None)))
+# ⚠ Depo "upscale YAPILMIYOR" diyor ama bu yalnizca EDINIM esigi icin
+# geceriydi. Kamera `punch` uygularken kaynak SESSIZCE buyuyor.
+_PB = _sm26.punch_buyutme_olc(
+    [{"beat_id": "b1", "asset_id": "a1", "kadraj": "punch-1.35"},
+     {"beat_id": "b2", "asset_id": "a2", "kadraj": "tam"}],
+    {"katmanlar": [
+        {"beat_id": "b1", "parametre": {"zoom": [1.4944, 1.35]}},
+        {"beat_id": "b2", "parametre": {"zoom": [1.0, 1.0534]}}]},
+    [{"asset_id": "a1", "genislik": 2240, "yukseklik": 1344,
+      "yedekler": [{"asset_id": "a2", "genislik": 4192, "yukseklik": 2832}]}])
+kontrol("⭐ I-26: DUSUK cozunurluklu kaynak punch'ta BUYUTULUYOR (olculdu)",
+        _PB["kayitlar"][0]["buyutuyor"] is True
+        and _PB["kayitlar"][0]["ekran_piksel_orani"] > 1.0,
+        _PB["kayitlar"][0])
+kontrol("⭐ I-26: YUKSEK cozunurluklu kaynak KUCULUYOR (keskin)",
+        _PB["kayitlar"][1]["buyutuyor"] is False
+        and _PB["kayitlar"][1]["ekran_piksel_orani"] < 1.0,
+        _PB["kayitlar"][1])
+kontrol("I-26: zoom YENIDEN TURETILMIYOR, planin KENDI spec'inden okunuyor",
+        _PB["kayitlar"][0]["maks_zoom"] == 1.4944)
+kontrol("I-26: olcum bir KAPI DEGIL (davranis degistirmiyor)",
+        "OLCUM" in _PB["not"] and "kapi DEGIL" in _PB["not"])
+kontrol("I-26: olculemeyen beat SESSIZCE temiz sayilmiyor",
+        _sm26.punch_buyutme_olc(
+            [{"beat_id": "b9", "asset_id": "yok"}], {}, [])
+        ["kayitlar"][0]["olculdu"] is False)
+
 blok("§39a I-24 — MOTION CESITLILIGI OLCULEBILIR KAPIYA CEVRILDI")
 
 # ⚠ BAGIMSIZ DOGRULANAN KOK NEDEN: teknoloji pilotunda `motion_cesitlilik`
@@ -6492,10 +6604,18 @@ else:
     kontrol("I-23: hedef oran 16:9 ve esik ADLANDIRILMIS sabitten",
             _oz23.get("hedef_oran") == 1.7778
             and _oz23.get("en_az_korunan") == _ed.ORAN_EN_AZ_KORUNAN)
-    kontrol("⭐ I-23b: ayirt-etme kapisi ayni akista calisti",
-            _oz23.get("ayirt_esigi") == 0.86
-            and (_oz23.get("ayirt_reddedilen") or 0) >= 1,
-            _oz23)
+    # ⚠ I-26'DA DUZELTILEN KILIT: burasi "en az 1 ayirt reddi OLDU" diye
+    # yaziyordu. O sayi ADAY LISTESINE bagli — Commons/NASA karisimi
+    # degisince reddedilecek benzer cift kalmayabiliyor (I-26 kosumunda
+    # tam bu oldu). ASIL DEGISMEZ "ayirt edilemez cift HAYATTA KALMADI"dir;
+    # kilit ona cevrildi (gevsetme degil, DOGRU degismez).
+    kontrol("⭐ I-23b: ayirt-etme kapisi ACIK ve QA esigine bagli",
+            _oz23.get("ayirt_esigi") == 0.86, _oz23)
+    _mc26 = _R20.get("medya_cesitliligi") or {}
+    kontrol("⭐ I-23b: AYIRT EDILEMEZ cift HAYATTA KALMADI",
+            not [c for c in (_mc26.get("ciftler") or [])
+                 if c.get("benzerlik", 0) >= _mc26.get("esik", 0.86)],
+            _mc26.get("ciftler"))
     kontrol("I-23: medya GERCEK saglayicidan, fixture DEGIL",
             all(str(s.get("saglayici") or "").lower() in ("nasa", "commons")
                 for s in (_me20.get("sahneler") or [])
@@ -6560,6 +6680,26 @@ else:
     kontrol("I-25: elenme nedenleri raporda sayilabilir",
             all(isinstance(d.get("elenme_nedenleri"), list)
                 for d in _cd_arayan))
+    # ── I-26: KAMERA PUNCH'I KAYNAGI BUYUTUYOR MU? ──
+    _pb26 = _R20.get("punch_buyutme") or {}
+    kontrol("⭐ I-26: punch buyutme olcumu raporda",
+            _pb26.get("olculdu") is True and "kayitlar" in _pb26)
+    kontrol("I-26: her beat icin ekran piksel orani olculdu",
+            all(k.get("olculdu") for k in (_pb26.get("kayitlar") or [])),
+            _pb26.get("kayitlar"))
+    # ⚠ OLCULEN KUSUR SESSIZCE GECILMEZ. Bu bir KAPI DEGIL (davranis
+    # degismedi) ama sonuc PASS diye GORMEZDEN de GELINMEZ.
+    if (_pb26.get("buyuten_beat") or 0) > 0:
+        bloke_yaz(
+            "I-26 teknoloji pilotu — KAYNAK BUYUTULUYOR",
+            f"{_pb26['buyuten_beat']} beat kaynagi ekranda BUYUTUYOR "
+            f"(en yuksek oran {_pb26.get('en_yuksek_oran')}). Depo "
+            f"'upscale YAPILMIYOR' diyor; bu soz yalnizca EDINIM esigi icin "
+            f"geceri, kamera `punch` kadrajinda IHLAL EDILIYOR. "
+            f"⚠ POST-QA otomatik olcumleri PASS veriyor ama 11 kare "
+            f"incelemesinde s01 (Commons 2240x1344) CAM ARKASI MUZE AFISI "
+            f"cikti: Ingilizce metin bloklari, yansima, yumusak. "
+            f"MP4 KABUL EDILMIS SAYILMAZ.")
     # ⚠ POST-QA FAIL ise SESSIZCE GECILMEZ — BLOKE yazilir.
     if _R20["post_qa"]["durum"] == "FAIL":
         _nedenler = [s["kod"] for s in _R20["post_qa"]["sorunlar"]
