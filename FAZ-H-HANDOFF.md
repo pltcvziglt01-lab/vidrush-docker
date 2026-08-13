@@ -203,6 +203,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-34 vitrin sinyali: ELENDİ** | `7c5884f` | ✅ **push edildi**, 4 sinyal x 28 ölçüm: ayıran eşik YOK (en iyi precision 0.25), üretim DEĞİŞMEDİ, rerender/deploy YOK |
 | 13 Ağu | **I-35 s01 sorgu daraltması: ELENDİ** | `7709ae1` | ✅ **push edildi**, 10 sorgu ölçüldü: vitrini eleyen her daraltma NASA'yı boşaltıyor, sorgu DEĞİŞMEDİ, rerender/deploy YOK |
 | 13 Ağu | **I-36 sağlayıcı tutarsızlığı düzeltildi** | `6bab9f9` | ✅ **push edildi**, başarılı geçmiş 429 ile ezilmiyor, sağlayıcı seçilen varlıktan türüyor, rerender/deploy YOK |
+| 13 Ağu | **I-37 beat→scene→asset bağı kopamaz** | `3ccc73c` | ✅ **push edildi**, çapraz sahne kayması ÇÖZÜLDÜ + PRE-QA kapısı; lawn MP4 **KABUL EDİLMEDİ** (s01 tek varlık), deploy YOK |
 
 ---
 
