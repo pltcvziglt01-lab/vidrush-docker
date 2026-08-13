@@ -188,7 +188,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-19 edinim dayanıklılığı — I-18'in BLOKE'si açıldı** | `888063e` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-20 üçüncü konsept: motor sınandı, render BLOKE** | `beaee8f` | ⚠ **push edildi**, MP4 YOK, deploy YOK |
 | 12 Ağu | **I-21 bölünen beat ayrı varlık alır (dar atom)** | `efbf111` | ⚠ **push edildi**, POST-QA FAIL, MP4 teslim YOK |
-| 12 Ağu | **I-22 medyasız beat kusuru çözüldü** | `PENDING` | ⚠ **push edildi**, POST-QA FAIL (dikey kaynak), MP4 teslim YOK |
+| 12 Ağu | **I-22 medyasız beat kusuru çözüldü** | `a220fcb` | ⚠ **push edildi**, POST-QA FAIL (dikey kaynak), MP4 teslim YOK |
 
 ---
 
