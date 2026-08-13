@@ -5535,3 +5535,121 @@ B-roll/video yok, hook/kapanış zayıf, müzik/SFX yok. I-40 bunlara
 2. **Önizlemede altyazı yok** (yukarıda ölçüldü) — dar ve bedava.
 3. **`kaynakYazi` `VidrushVideo` yolunda taşınmıyor** (I-38'den devir;
    `pipeline.py` hattı hâlâ ölçülmedi).
+
+---
+
+## 59. FAZ I-41 — `kaynakYazi` ÜRETİM HATTINDA DÜŞÜYORDU (lisans görünürlüğü, 13 Ağu)
+
+> **Durum: I-38'den devir kusurun GERÇEK kök nedeni ölçüldü ve ÇÖZÜLDÜ.
+> A–I yeşil (3220, 0 hata). Değişen üretim kompozisyonu (`VidrushVideo`)
+> 1080p'de render edildi: künye artık **ÇİZİLİYOR** (kareyle doğrulandı).
+> ⛔ O pilotun **POST-QA'sı FAIL** — nedenleri I-41 DIŞI, aşağıda ayrıştırıldı.
+> editorv2 hattı gerilemedi: **11/11 kare SHA-256 aynı**, POST-QA PASS.
+> Deploy YOK. Maliyet $0.00.**
+> Değişen: `webapp/pipeline.py` (1 yardımcı + 1 satır montaj),
+> `app/render-studio/src/Video.tsx` (1 alan + 1 bileşen),
+> `webapp/hizli_render.py` (1 konum ifadesi), `webapp/testler/test_faz_i.py`.
+> `editor/*`, `medya/*`, `server.py`, `deploy.sh`, `Grafikler.tsx`,
+> `EditorV2.tsx` ve **22 alan sözleşmesi** **dokunulmadı** (test kilitliyor).
+
+### ⛔ Ölçülen kök neden — I-38'in tahmininden DAHA DERİNDE
+
+I-38 notu *"`Video.tsx` `Sahne` tipinde alan yok"* diyordu. Ölçüldü: kusur
+**daha önce** başlıyor. `pipeline.py` CC/lisanslı klip alındığında
+`s["kaynakYazi"]` yazıyor (**3 nokta**: avcı atfı, `kaynak.atif_al` kanalı,
+genel yedek sorgu) — ama `props_sahneler` sahneyi **alan alan** kuruyor ve bu
+alanı **hiç kopyalamıyordu**. Yani künye **props sınırında** düşüyordu ve
+sonrasındaki **iki renderer da** onu göremiyordu:
+
+| renderer | durum |
+|---|---|
+| Remotion `VidrushVideo` (**varsayılan**) | `Sahne` tipinde alan **yok**, katman **yok** |
+| `hizli_render` (`RENDER_MOTOR=ffmpeg`) | `_kaynak_yazi_filtre` alanı **okuyor** ama props'ta alan olmadığı için **her zaman boş** dönüyordu |
+
+Sonuç: **CC klip kullanan her üretimde ekran atfı hiç çizilmedi.** Lisansın
+resmî atıf yeri video açıklamasıdır (`kaynak.atif_listesi`) ve o **çalışıyor**;
+düşen şey ürün sözünün parçası olan **görünür künye**ydi.
+
+⚠ `/api/generate`in **22 alanlık sözleşmesi etkilenmez**: `kaynakYazi`
+kullanıcıdan gelmez, medya edinimi sırasında **üretilir**. Test bunu kilitliyor.
+
+### Düzeltme (kayıpsız taşıma + tek geometri)
+
+1. **`pipeline._kaynak_yazi_props(s)`** — `_alt_band_props` ile aynı desen:
+   künye varsa `{"kaynakYazi": ...}` (80 karakter tavanı), **yoksa `{}`** →
+   künyesiz işlerde props **bit-bit aynı** kalır. Montajda
+   `**_kaynak_yazi_props(s)`.
+2. **`Video.tsx`**: `Sahne.kaynakYazi?: string` + `KaynakYazi` bileşeni.
+   Konum **hesaplandı**, "yeterince kenarda" varsayılmadı: alt şerit altyazının
+   (`paddingBottom: 72`), sol üst `GeriSayimRozeti`nin, üst orta
+   `OverlayBaslik`ın → **sağ üst boş**. Oran I-39'da ölçülen
+   `KAYNAK_ETIKETI_ALTYAZILI` (**0.075**), kenar **64 px** (ölçüyle oranlanır).
+3. **`hizli_render`**: `x=w-tw-26:y=h-th-22` → `x=w-tw-64:y=h*0.075`.
+   Eski konum 1080p'de alt kenardan 22 px'teydi — yayın güvenli alanının
+   (64 px) **dışında**. İki renderer artık **aynı sayıları** kullanıyor;
+   **ikinci aritmetik yok** (I-40 dersi).
+
+### Testler (red-first) — gerçek sözleşme akışında
+
+Kırmızı önce çökmeden koştu: 19 hedefli kontrolün **11'i XX**. `pipeline.py`
+import anında `/opt/vidrush` altına yazmaya çalıştığı için **import edilmez**;
+`_kaynak_yazi_props` **kaynaktan çıkarılıp yalıtılmış koşturulur** — davranış
+gerçekten ölçülür, dizgi eşleşmesi değil. Düzeltme sonrası **19/19 yeşil**.
+
+⚠ Yol boyunca **kapının kendi belgesini kusur sanması** yakalandı ve
+düzeltildi: ilk sürümde testler dosya metninde `y=h-th-22` arıyordu ve
+*"eski sabit şöyleydi"* diyen **açıklama satırı** kapıyı kırıyordu. Kapı artık
+**çizilen ifadeyi** ölçüyor (fonksiyon gövdesinden yorumlar ayıklanır, TSX
+bileşeninin gövdesi izole edilir).
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1806** | **3220** |
+
+0 hata. Faz I 1787 → **1806** (+19). 2 BLOKE (I-33 kaydı + opsiyonel fixture).
+
+### ✅ Değişen kompozisyonun 1080p pilotu: `vidrushvideo_kunye_i41.mp4`
+
+Props **üretim hattının kendi yardımcısıyla** kuruldu; medya/ses **önbellekten**;
+ağ yok, **$0.00**. Ölçümler (`outputs/sample/vidrushvideo_i41_rapor.json`):
+
+- **1920×1080 @ 30**, aac 48 kHz/2ch, 12.05 sn, 54.4 MB · **2 kesme**
+- LUFS −15.02 / TP −4.49 · sessizlik 2 aralık (1.92 sn) · **11 kare**
+- kenar siyahlığı **0/48 ihlal**
+- **KAYIPSIZLIK ÖLÇÜLDÜ**: künyeli 2 sahnede alan props'a taşındı, künyesiz
+  sahnede alan **hiç geçmedi**
+- **KARE KANITI**: 2.01 sn'de `Famartin / CC BY-SA` **sağ üstte çizili**
+  (önceden **hiçbir şey** yoktu); 10.04 sn'de künye **yok** — eski davranış
+  künyesiz sahnede birebir korunuyor
+
+⛔ **POST-QA: FAIL — sahte PASS verilmedi.** Dört bulgunun **hiçbiri**
+`kaynakYazi` değişikliğinden gelmiyor; nedenler ayrıştırıldı:
+
+| bulgu | gerçek nedeni |
+|---|---|
+| `POST-SESSIZ-ORAN` %16 (tavan %15) | Pilot anlatımı önbellek master'ından **4'er sn dilimlendi**; cümle araları sessizlik olarak sayıldı. Kaynak sesin özelliği. |
+| `POST-OPTIK-DURGUN` ×3 | `VidrushVideo` zoom hızını **sahne indeksinden** deterministik seçiyor (`ZOOM_KOVA`); indeks 0 kovası **%0.4/sn** (ihmal edilebilir). 3 kısa sahnede hareket, **editorv2 için kalibre edilmiş** 2.0 eşiğinin altında kaldı. |
+| `POST-LUFS` −15.02 (warn) | Pilot dilimleri **master'lanmadı**; üretim hattı mastering'i render sonrası ayrı adımda yapıyor. |
+
+Eşik **gevşetilmedi**, pilot **eşiği geçsin diye ayarlanmadı**. I-41'in iddiası
+(künye taşınıyor ve çiziliyor) **kareyle** ve **props ölçümüyle** kanıtlandı.
+
+⚠ **KOŞULMAYAN**: `/api/generate`in tam hattı (ücretli LLM + TTS) bu oturumda
+**çalıştırılmadı**; koşan şey I-41'in değiştirdiği yerdir — pipeline props
+sözleşmesi → `VidrushVideo`.
+
+### ✅ editorv2 hattı — GERİLEME YOK
+
+`editorv2_lawn_i41.mp4` yeniden üretildi: sadakat kapısı `beat/varlık esit=True`,
+POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
+11'i de SHA-256 birebir aynı**. Lawn pilotunun **semantik kusurları duruyor**
+(b001/b002/b005) — **kabul edilmiş MP4 değildir**, mutlak yol verilmedi.
+
+### SONRAKİ ATOM (I-42) — yalnız ölçülen kusurdan
+
+1. **`VidrushVideo` açılış sahnesi neredeyse durağan**: `ZOOM_KOVA` indeks 0
+   kovası %0.4/sn veriyor ve kısa sahnede "donmuş görüntü" hissi ölçüldü
+   (POST-QA optik eşiğinin altında). Dar, bedava, ölçülebilir.
+2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
+3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
+   daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.

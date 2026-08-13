@@ -6412,6 +6412,136 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
         "KaynakEtiketi" in _GRAFIK_TSX
         and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
 
+blok("§39q I-41 — kaynakYazi URETIM HATTINDA DUSUYORDU (lisans gorunurlugu)")
+
+# ⚠ I-38'DEN DEVIR, I-41'DE OLCULEN GERCEK KOK NEDEN:
+# I-38 notu "Video.tsx `Sahne` tipinde alan yok" diyordu. Olculdu: kusur DAHA
+# ONCE basliyor. `pipeline.py` CC/lisansli klip alindiginda `s["kaynakYazi"]`
+# yaziyor (3 nokta: avci atfi, `atif_al` kanali, yedek sorgu) — ama
+# `props_sahneler` sahneyi ALAN ALAN kuruyor ve bu alani HIC KOPYALAMIYOR.
+# Yani kunye props SINIRINDA dusuyor; sonrasindaki IKI renderer da onu
+# goremiyor:
+#   · Remotion `VidrushVideo` (VARSAYILAN yol)  -> `Sahne` tipinde alan yok
+#   · `hizli_render.ffmpeg_render` (RENDER_MOTOR=ffmpeg) -> `_kaynak_yazi_filtre`
+#     alani OKUYOR ama props'ta alan olmadigi icin HER ZAMAN bos donuyor
+# Sonuc: CC klip kullanan her uretimde EKRAN ATFI HIC CIZILMIYOR. Lisans
+# atfinin resmi yeri video aciklamasi (`kaynak.atif_listesi`) olsa da, ekran
+# kunyesi urun sozunun parcasiydi ve SESSIZCE kayboluyordu.
+# ⚠ Bu, `/api/generate`in 22 alanlik sozlesmesine DOKUNMAZ: `kaynakYazi`
+# kullanicidan gelmez, medya edinimi sirasinda URETILIR.
+
+_PP41 = oku(KOK, "pipeline.py")
+_HR41 = oku(KOK, "hizli_render.py")
+_VID41 = oku(os.path.dirname(KOK), "app", "render-studio", "src", "Video.tsx")
+
+
+def _fn_kaynak(kod, ad):
+    """Modulu IMPORT ETMEDEN tek bir saf fonksiyonun kaynagini al.
+
+    ⚠ `pipeline.py` import ANINDA `/opt/vidrush` altina dizin acmaya calisiyor;
+    testte import edilemez. Bu yuzden fonksiyon kaynaktan cikarilip yalitilmis
+    bir ad uzayinda kosturulur — davranis GERCEKTEN olculur, dizgi eslesmesi
+    degil."""
+    i = kod.find(f"\ndef {ad}(")
+    if i < 0:
+        return None
+    j = kod.find("\ndef ", i + 1)
+    return kod[i:j if j > 0 else len(kod)]
+
+
+_KY_KAYNAK = _fn_kaynak(_PP41, "_kaynak_yazi_props")
+kontrol("⭐ I-41 KIRMIZI: `_kaynak_yazi_props` yardimcisi VAR",
+        bool(_KY_KAYNAK), "pipeline.py'de bulunamadi")
+_KY_AD = {}
+if _KY_KAYNAK:
+    exec(compile(_KY_KAYNAK, "<pipeline._kaynak_yazi_props>", "exec"), _KY_AD)
+_ky = _KY_AD.get("_kaynak_yazi_props")
+
+
+def _ky41(s):
+    return _ky(s) if callable(_ky) else None
+
+
+kontrol("⭐ I-41 KIRMIZI: dolu kunye props alanina TASINIYOR",
+        _ky41({"kaynakYazi": "NASA Goddard / CC BY"})
+        == {"kaynakYazi": "NASA Goddard / CC BY"},
+        _ky41({"kaynakYazi": "NASA Goddard / CC BY"}))
+kontrol("I-41: kunye YOKSA alan HIC gecmiyor (eski props BIT-BIT ayni)",
+        _ky41({}) == {} and _ky41({"kaynakYazi": ""}) == {}
+        and _ky41({"kaynakYazi": "   "}) == {},
+        (_ky41({}), _ky41({"kaynakYazi": ""})))
+kontrol("I-41: uzun atif KIRPILIYOR (hizli_render 34, props tavani 80)",
+        len((_ky41({"kaynakYazi": "K" * 200}) or {}).get("kaynakYazi", "")) == 80,
+        len((_ky41({"kaynakYazi": "K" * 200}) or {}).get("kaynakYazi", "")))
+kontrol("I-41: bozuk girdi ISTISNA FIRLATMIYOR",
+        _ky41({"kaynakYazi": None}) == {} and _ky41({"kaynakYazi": 42}) != None,
+        _ky41({"kaynakYazi": 42}))
+# ── PROPS MONTAJI: alan GERCEKTEN sahneye giriyor mu? ──
+_MONTAJ41 = _PP41[_PP41.find("props_sahneler.append({"):
+                  _PP41.find("kumulatif_sn += sure")]
+kontrol("⭐ I-41 KIRMIZI: props montaji `_kaynak_yazi_props`u CAGIRIYOR",
+        "**_kaynak_yazi_props(s)" in _MONTAJ41,
+        "props_sahneler.append blogunda yok")
+kontrol("I-41: kunye KAYNAGI korundu (pipeline 3 noktada hala ATIYOR)",
+        _PP41.count('s["kaynakYazi"] = ') == 3,
+        _PP41.count('s["kaynakYazi"] = '))
+from editor import adapter as _adp41                            # noqa: E402
+kontrol("I-41: `kaynakYazi` kayipsizlik sozlesmesinde ZATEN vardi",
+        "kaynakYazi" in _adp41.HIZLI_RENDER_ALANLARI
+        and "kaynakYazi" in _adp41.REMOTION_ALANLARI)
+
+# ── VARSAYILAN RENDERER: Remotion `VidrushVideo` ──
+kontrol("⭐ I-41 KIRMIZI: `Sahne` tipi `kaynakYazi` alanini TASIYOR",
+        re.search(r"kaynakYazi\?\s*:\s*string", _VID41) is not None,
+        "Video.tsx Sahne tipinde alan yok")
+kontrol("⭐ I-41 KIRMIZI: `KaynakYazi` bileseni VAR ve sahnede CIZILIYOR",
+        "const KaynakYazi" in _VID41 and "<KaynakYazi" in _VID41,
+        "bilesen yok / cizilmiyor")
+kontrol("⭐ I-41: kunye geometrisi I-39 ile AYNI (0.075 / guvenli kenar 64)",
+        "0.075" in _VID41 and "64" in _VID41
+        and abs(_etipo.KAYNAK_ETIKETI_ALTYAZILI - 0.075) < 1e-9,
+        "Video.tsx'te I-39 konumu yok")
+# ⚠ Bu kompozisyonda altyazi ALTTA (paddingBottom 72) ve rozet SOL USTTE;
+# sag ust bos. I-39'da olculen "nefes" kurali burada da gecerli.
+# ⚠ KAPI CIZILEN IFADEYI olcer, YORUM METNINI degil: bilesenin KENDI govdesi
+# ayiklanir (aksi halde "eski sabit soyle idi" diyen bir yorum kapiyi kirar).
+_KY_TSX = _VID41[_VID41.find("const KaynakYazi"):]
+_KY_TSX = _KY_TSX[:_KY_TSX.find("\ntype Gorunum")]
+kontrol("I-41: kunye USTTEN konumlaniyor, ALT seritte DEGIL",
+        "top:" in _KY_TSX and "bottom" not in _KY_TSX
+        and "KUNYE_Y_ORANI * height" in _KY_TSX, _KY_TSX[:120])
+
+# ── IKINCI RENDERER: hizli_render (ayni props) ──
+# ⚠ Yine CIZILEN IFADE olculur: fonksiyon govdesinden YORUM SATIRLARI
+# ayiklanir. Aksi halde "eski sabit soyle idi" diyen bir aciklama kapiyi kirar
+# ve kapi kendi belgesini kusur sanar.
+_HR_FN = _fn_kaynak(_HR41, "_kaynak_yazi_filtre") or ""
+_HR_KOD = "\n".join(l for l in _HR_FN.splitlines()
+                    if not l.strip().startswith("#"))
+kontrol("⭐ I-41 KIRMIZI: hizli_render kunyesi SABIT `y=h-th-22`den KURTULDU",
+        bool(_HR_KOD) and "y=h-th-22" not in _HR_KOD
+        and "x=w-tw-26" not in _HR_KOD, "eski ifade duruyor")
+kontrol("⭐ I-41: iki renderer AYNI konumu kullaniyor (ikinci geometri YOK)",
+        "x=w-tw-64:y=h*0.075" in _HR_KOD
+        and "KUNYE_Y_ORANI = 0.075" in _VID41
+        and "KUNYE_GUVENLI_KENAR = 64" in _VID41,
+        "hizli_render ile Video.tsx ayrisiyor")
+kontrol("I-41: hizli_render kunyeyi HALA `kaynakYazi`dan okuyor",
+        'sahne.get("kaynakYazi")' in _HR41)
+kontrol("I-41: kunye YALNIZ lisansli klipte ciziliyor (bos ise yok)",
+        "if not kanal:" in _HR41 and "return \"\"" in _HR41)
+
+# ── GERILEME YOK ──
+kontrol("I-41 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("I-41 GERILEME YOK: I-39 konum sabitleri DEGISMEDI",
+        abs(_etipo.KAYNAK_ETIKETI_ALTYAZILI - 0.075) < 1e-9
+        and _etipo.KONUM["chapter-title"] == 0.60)
+kontrol("I-41: pipeline.py ve hizli_render.py DERLENIYOR",
+        _derlenir(os.path.join(KOK, "pipeline.py"))
+        and _derlenir(os.path.join(KOK, "hizli_render.py")))
+
 blok("§39p I-40 — ONIZLEME YOLU REMOTION GEOMETRISINDEN AYRISIYORDU")
 
 # ⚠ I-39'DA BULUNAN, I-40'TA OLCULEN KUSUR: `editor/onizleme.py` (ffmpeg

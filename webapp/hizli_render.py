@@ -329,8 +329,14 @@ def _kaynak_yazi_filtre(sahne, fps, F):
     fs = 21
     # Okunurluk zemine birakilmaz: ince koyu kontur + hafif golge. Bant KOYMUYORUZ,
     # cunku bu yazi bilgi degil kunye — goze batmamali ama secilmeli.
+    # ⚠ FAZ I-41: KONUM HESAPLANDI, "yeterince kenarda" VARSAYILMADI.
+    # Eski `x=w-tw-26:y=h-th-22` 1080p'de alt kenardan 22 px'te duruyordu —
+    # yayin guvenli alani (64 px) DISINDA ve altyazi seridinin dibinde.
+    # Yeni konum SAG UST: oran `tipografi.KAYNAK_ETIKETI_ALTYAZILI` (0.075),
+    # kenar 64 px. `Video.tsx > KaynakYazi` AYNI sayilari kullanir; iki
+    # renderer arasinda IKINCI ARITMETIK YOKTUR (I-40 dersi).
     return (f",drawtext=fontfile='{fnt}':text='{m}':"
-            f"x=w-tw-26:y=h-th-22:fontsize={fs}:fontcolor=white@0.62:"
+            f"x=w-tw-64:y=h*0.075:fontsize={fs}:fontcolor=white@0.62:"
             f"borderw=2:bordercolor=black@0.5:shadowx=1:shadowy=1:shadowcolor=black@0.4")
 
 

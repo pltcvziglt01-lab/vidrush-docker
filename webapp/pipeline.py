@@ -3196,6 +3196,29 @@ def _alt_band_props(s: dict) -> dict:
     return {"altBand": {"baslik": b, **({"alt": a} if a else {})}}
 
 
+def _kaynak_yazi_props(s: dict) -> dict:
+    """Ekran kunyesi (CC atfi) — sahne sozlugunden props'a KAYIPSIZ tasinir.
+
+    ⚠ FAZ I-41'DE OLCULEN KUSUR: yukarida uc noktada `s["kaynakYazi"]`
+    yaziliyordu (avci atfi, `kaynak.atif_al` kanali, genel yedek sorgu) ama
+    `props_sahneler` sahneyi ALAN ALAN kurdugu icin bu alan props SINIRINDA
+    DUSUYORDU. Sonuc: CC klip kullanan her uretimde ekran atfi HIC
+    cizilmiyordu — ne Remotion `VidrushVideo` yolunda (tipte alan yoktu) ne de
+    `hizli_render` yolunda (`_kaynak_yazi_filtre` alani okuyor ama props'ta
+    alan olmadigi icin her zaman bos donuyordu).
+
+    ⚠ Lisansin RESMI atif yeri video aciklamasidir (`kaynak.atif_listesi`);
+    bu ekran kunyesi onun yerine GECMEZ, gorunur karsiligidir.
+
+    Kunye yoksa alan HIC gecmez -> props eskisiyle BIT-BIT ayni kalir.
+    """
+    try:
+        k = " ".join(str(s.get("kaynakYazi") or "").split()).strip()
+    except Exception:
+        return {}
+    return {"kaynakYazi": k[:80]} if k else {}
+
+
 def _etiket_props(s: dict) -> dict:
     """Plan'in urettigi etiket/vurgu alanlarini DOGRULAYIP props'a cevirir.
     Model bazen koordinati 0-100 olarak ya da metni cok uzun veriyor; kare disina
@@ -4460,6 +4483,9 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             # Bolum basligi: plan sadece bolumun ILK sahnesine koyar, digerlerinde bos
             **_etiket_props(s),
             **_alt_band_props(s),
+            # ⚠ FAZ I-41: CC/lisansli klip atfi. Bu satir YOKKEN kunye props
+            # sinirinda dusuyordu ve IKI renderer da onu goremiyordu.
+            **_kaynak_yazi_props(s),
             # Efekt atamasi: stil temeli + islev vurgusu (deterministik, LLM'e sorulmaz)
             # ⚠ FAZ I-2d: bilesik profil varsa gorsel imza ONDAN turetilir;
             # yoksa `_gorsel_ek` None kalir ve eski tablolar aynen isler.

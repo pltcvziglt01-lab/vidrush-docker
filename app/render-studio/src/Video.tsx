@@ -44,6 +44,11 @@ export type Sahne = {
   efektler?: Efekt[];         // Efektler.tsx: sarsinti, grain, glitch, hologram, grade...
   gecisImza?: string;         // 'karartma' | 'flash' | 'whip' — BOSSA sert kesme (olculen %80)
   altBand?: {baslik: string; alt?: string};   // en cok kullanilan yazi turu (olculen %33)
+  // ⚠ FAZ I-41: CC/lisansli klip atfi ("Kanal Adi / CC BY"). Bu alan
+  // `pipeline.py` tarafinda medya edinimi sirasinda URETILIR (kullanicidan
+  // gelmez, 22 alanlik /api/generate sozlesmesinin parcasi DEGILDIR).
+  // Alan YOKSA katman cizilmez -> eski davranis birebir korunur.
+  kaynakYazi?: string;
   altyazi: AltyaziParcasi[];
   vurgu?: boolean; // hikaye kanalı açılış sahnesi: yoğun hareket (derin zoom + push-in + paralaks)
   // Metin derin analizinden gelen anlatım işlevi — geçiş tipini o belirler.
@@ -394,6 +399,62 @@ const Altyazi: React.FC<{
   );
 };
 
+/**
+ * EKRAN KUNYESI — "Kanal Adi / CC BY" (Faz I-41).
+ *
+ * NEDEN VAR: Creative Commons klip kullanmak ATIF ZORUNLULUGU getirir.
+ * `pipeline.py` atfi sahneye yaziyordu ama props sinirinda DUSUYORDU; bu
+ * kompozisyonun `Sahne` tipinde alan bile yoktu, dolayisiyla CC klip kullanan
+ * her uretimde ekran atfi HIC cizilmedi.
+ *
+ * ⚠ BU YAZI TELIF IZNI DEGILDIR ve lisansin RESMI atif yerinin (video
+ * aciklamasi, `kaynak.atif_listesi`) yerine GECMEZ.
+ *
+ * KONUM HESAPLANDI, "yeterince kenarda" VARSAYILMADI (I-12/I-16/I-39 dersi):
+ *   · alt serit ALTYAZININ (bu kompozisyonda `paddingBottom: 72`) ve
+ *     eski `y=h-th-22` sabiti yayin guvenli alaninin DISINDAYDI
+ *   · sol ust `GeriSayimRozeti`nde, ust orta `OverlayBaslik`ta
+ *   -> SAG UST bos. Oran I-39'da olculen `tipografi.KAYNAK_ETIKETI_ALTYAZILI`
+ *      (0.075) ve guvenli kenar 64 px (1080p tabanli, olcuyle oranlanir).
+ * `hizli_render._kaynak_yazi_filtre` AYNI sayilari kullanir — iki renderer
+ * arasinda IKINCI ARITMETIK YOK (I-40 dersi).
+ */
+const KUNYE_Y_ORANI = 0.075;
+const KUNYE_GUVENLI_KENAR = 64;
+
+const KaynakYazi: React.FC<{metin?: string}> = ({metin}) => {
+  const {height, width} = useVideoConfig();
+  const m = (metin || '').trim();
+  if (!m) return null;
+  const olcek = height / 1080;
+  const punto = Math.round(21 * olcek);
+  const kenar = Math.round(KUNYE_GUVENLI_KENAR * olcek);
+  return (
+    <AbsoluteFill style={{pointerEvents: 'none'}}>
+      <div
+        style={{
+          position: 'absolute',
+          right: kenar,
+          top: Math.round(KUNYE_Y_ORANI * height),
+          maxWidth: width * 0.5,
+          overflow: 'hidden',
+          whiteSpace: 'nowrap',
+          textOverflow: 'ellipsis',
+          fontFamily: fontAilesi('Montserrat'),
+          fontWeight: 600,
+          fontSize: punto,
+          letterSpacing: '0.04em',
+          color: '#FFFFFF',
+          opacity: 0.62,
+          textShadow: '0 1px 3px rgba(0,0,0,0.75), 0 0 1px rgba(0,0,0,0.9)',
+        }}
+      >
+        {m}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
 type Gorunum = {transform: string};
 
 // ── ZOOM MIKTARI SABIT DEGIL, SURE ILE BUYUR (5 Agu 2026 olcumu) ──
@@ -583,6 +644,7 @@ const SahneGorunumu: React.FC<{
       <AltBand baslik={sahne.altBand?.baslik} alt={sahne.altBand?.alt} kareSayisi={K} />
       <BolumBasligi metin={sahne.bolum} yer={sahne.bolumYeri} kareSayisi={K} />
       <GeriSayimRozeti metin={sahne.overlay || ''} kareSayisi={K} />
+      <KaynakYazi metin={sahne.kaynakYazi} />
       <OverlayBaslik metin={sahne.overlay || ''} motion={motion} kareSayisi={K} />
       <Altyazi
         parcalar={sahne.altyazi}
