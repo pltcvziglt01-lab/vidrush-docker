@@ -47,6 +47,12 @@ FAIL_KODLARI = {
     "KALITE-YAZI-NEFES-YOK",
     # ── Faz I-27: kamera punch'i kaynagi BUYUTEMEZ ──
     "KALITE-PUNCH-BUYUTME",
+    # ── Faz I-46: BEKLENEN optik hareket esigin altinda ──
+    # ⚠ Bu kod FAIL'dir cunku hukum OLCULEN hata payiyla veriliyor:
+    # yalnizca `beklenen x (1 + en_kotu_hata)` HALA esigin altindaysa uretilir
+    # (12 kontrollu + 6 tutulan noktada YANLIS FAIL yok). Belirsiz bant
+    # `warn` seviyesinde kalir -> EMIN DEGILSEN ENGELLEME korunur.
+    "KALITE-OPTIK-DURGUN-BEKLENEN",
 }
 
 # I-14 kapisinin urettigi kodlar. Kapi KAPALIYKEN bunlarin HICBIRI uretilmez;
@@ -78,7 +84,9 @@ KALITE_KODLARI = ("KALITE-BASLIK-KIRPIK", "KALITE-BASLIK-TASMA",
                   # ⚠ Esik TEK bir kamera konfigurasyonunda (gezinme
                   # 0.0577 /sn) olculdu. Daha hizli gezinen cekimde hukum
                   # VERILMEZ; sessizce de gecilmez -> ayri bilgi kodu.
-                  "KALITE-MEDYA-ENERJI-KAPSAM-DISI")
+                  "KALITE-MEDYA-ENERJI-KAPSAM-DISI",
+                  # ── Faz I-46: risk OPTIK BIRIMDE ──
+                  "KALITE-OPTIK-DURGUN-BEKLENEN")
 
 
 @dataclass
@@ -792,6 +800,12 @@ def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
                     _gezinme = _gz2["hiz"]
                     _s2["gezinme_hizi"] = _gezinme
                     _s2["gezinme"] = _gz2
+                # ── I-46: YER DEGISTIRME ALANI (pan ve zoom AYRI) ──
+                _yd2 = kk.yer_degistirme_alani(_uc[0], _uc[1],
+                                               sure_sn=_s2["sure_sn"])
+                if _yd2.get("olculdu"):
+                    _s2["yer_degistirme"] = _yd2["d"]
+                    _s2["yer_degistirme_alani"] = _yd2
                 _kirpma = _uc
         if enerji_okuyucu:
             _yol2 = (_ad2.get("yerel_yol") or _ad2.get("medya_yolu") or "")
@@ -874,6 +888,22 @@ def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
                   "daha detayli (dokulu) bir lisansli aday sec ya da "
                   "kadraji dokunun yogun oldugu bolgeye getir",
                   beat_id=de["beat_id"])
+        # ── I-46: RISK OPTIK BIRIMDE (enerji x yer degistirme) ──
+        # ⚠ Yeni esik YOK: karsilastirma `OPTIK_DURGUN_ESIGI` ile yapilir;
+        # eklenen tek sey modelin OLCULEN hata payidir.
+        for orsk in (mg.get("optik_riski") or []):
+            _sv = "fail" if orsk.get("seviye") == "fail" else "warn"
+            _ek = ("olculen hata payiyla bile esigi GECEMEZ"
+                   if _sv == "fail" else
+                   "hata payi icinde esigi gecebilir — hukum KESIN DEGIL")
+            _ekle("KALITE-OPTIK-DURGUN-BEKLENEN", _sv,
+                  f"{orsk['beat_id']}: beklenen optik hareket "
+                  f"{orsk['beklenen']} (ust sinir {orsk['ust_sinir']}) < esik "
+                  f"{orsk['esik']} — enerji {orsk['enerji']} x yer degistirme "
+                  f"{orsk['d']} ornek piksel/kare; {_ek}",
+                  "daha detayli (dokulu) aday sec, kadraji dokuya getir ya da "
+                  "kamera hareketini artir (zoom/pan)",
+                  beat_id=orsk["beat_id"])
         # ── I-45: kalibrasyon alani disinda kalan cekimler ──
         for kd in (mg.get("gezinme_kapsam_disi") or []):
             _ekle("KALITE-MEDYA-ENERJI-KAPSAM-DISI", "bilgi",

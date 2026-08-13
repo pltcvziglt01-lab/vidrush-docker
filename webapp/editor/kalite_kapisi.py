@@ -1539,6 +1539,147 @@ def kadraj_gezinme_hizi(bas: dict, son: dict, *, sure_sn: float,
             "kalibrasyon_icinde": bool(hiz <= kal + 1e-9)}
 
 
+# ═══════════ 7e) BEKLENEN OPTIK HAREKET (Faz I-46) ══════════════════════
+#
+# ⚠ NEDEN VAR — I-45'TE OLCULEN KUSUR:
+# Enerji-optik iliskisi TEK bir gezinme hizinda kalibre edilmisti; baska
+# hizlarda gecerli olmadigi icin kapi o cekimlerde HUKUM VEREMIYORDU.
+# Ustelik pan ile zoom AYNI "gezinme"yi uretse bile optikte AYRI davraniyor
+# (olculdu: b003 ortusme 0.707 -> optik 7.485, b002 0.774 -> 2.288).
+#
+# ⚠ MODEL TURETILDI, UYDURULMADI. Optik olcum ardisik ORNEK KARELER arasi
+# ortalama mutlak farktir. Duragan bir goruntu kayarken birinci mertebede:
+#         |I(p + d) - I(p)|  ~  |grad I| . d
+# yani ENERJI (ornek piksel basina ort. mutlak gradyan) x YER DEGISTIRME
+# (ornek piksel). Yer degistirme ALANI I-45 kadraj geometrisinden CIKAR:
+#     ekranda (u,v) -> kaynakta (x + u.w, y + v.h)
+#     Ds_x = Dx + u.Dw      d_x(u) = ornek_g . Ds_x / w
+#     Ds_y = Dy + v.Dh      d_y(v) = ornek_y . Ds_y / h
+# PAN saf OTELEME (Dx): d TUM karede ayni.
+# ZOOM OLCEK degisimi (Dw): d merkezde 0, kenarda en buyuk -> ortalamasi
+# kacinilmaz olarak KUCUK. Iki alan bu yuzden AYRI raporlanir.
+
+
+def yer_degistirme_alani(bas: dict, son: dict, *, sure_sn: float,
+                         ornek_fps: int = OPTIK_ORNEK_FPS,
+                         olcu: tuple = OPTIK_ORNEK_OLCU,
+                         izgara: int = 9) -> dict:
+    """Ornek kare basina ORTALAMA yer degistirme (ornek piksel). Saf hesap.
+
+    `d_oteleme` (pan) ve `d_olcek` (zoom) bilesenleri AYRI raporlanir.
+    ⚠ Olcemezse hukum vermez: `olculdu=False`.
+    """
+    try:
+        s = float(sure_sn)
+        fps = max(1, int(ornek_fps))
+        g, yy = float(olcu[0]), float(olcu[1])
+        n_iz = max(2, int(izgara))
+    except (TypeError, ValueError, IndexError):
+        return {"olculdu": False, "neden": "GIRDI-BOZUK"}
+    if s <= 0 or not (isinstance(bas, dict) and isinstance(son, dict)):
+        return {"olculdu": False, "neden": "GIRDI-YOK"}
+    if not (bas.get("olculdu") and son.get("olculdu")):
+        return {"olculdu": False, "neden": "KIRPMA-OLCULEMEDI"}
+    pay = (1.0 / fps) / s                    # bir ornek araligina dusen kesir
+    dw = (_sayi(son.get("w")) - _sayi(bas.get("w"))) * pay
+    dh = (_sayi(son.get("h")) - _sayi(bas.get("h"))) * pay
+    # ⚠ AYRISTIRMA MERKEZDEN YAPILIR, KOSEDEN DEGIL. Kose kaymasi
+    # (Dx = Dcx - Dw/2) zoom bilesenini de icerir; saf OTELEME merkezin
+    # kaymasidir. Toplam yer degistirme her iki yazimda da AYNIDIR:
+    #     Dx + u.Dw  =  Dcx + (u - 0.5).Dw
+    dcx = ((_sayi(son.get("x")) + _sayi(son.get("w")) / 2.0)
+           - (_sayi(bas.get("x")) + _sayi(bas.get("w")) / 2.0)) * pay
+    dcy = ((_sayi(son.get("y")) + _sayi(son.get("h")) / 2.0)
+           - (_sayi(bas.get("y")) + _sayi(bas.get("h")) / 2.0)) * pay
+    w = (_sayi(bas.get("w")) + _sayi(son.get("w"))) / 2.0
+    h = (_sayi(bas.get("h")) + _sayi(son.get("h"))) / 2.0
+    if w <= 0 or h <= 0:
+        return {"olculdu": False, "neden": "KIRPMA-GECERSIZ"}
+    top = otel = olcekli = 0.0
+    adet = 0
+    for i in range(n_iz):
+        u = (i + 0.5) / n_iz
+        for j in range(n_iz):
+            v = (j + 0.5) / n_iz
+            ax = g * (dcx + (u - 0.5) * dw) / w
+            ay = yy * (dcy + (v - 0.5) * dh) / h
+            top += (ax * ax + ay * ay) ** 0.5
+            otel += ((g * dcx / w) ** 2 + (yy * dcy / h) ** 2) ** 0.5
+            olcekli += ((g * (u - 0.5) * dw / w) ** 2
+                        + (yy * (v - 0.5) * dh / h) ** 2) ** 0.5
+            adet += 1
+    return {"olculdu": True, "d": round(top / adet, 5),
+            "d_oteleme": round(otel / adet, 5),
+            "d_olcek": round(olcekli / adet, 5),
+            "ornek_fps": fps, "sure_sn": round(s, 3)}
+
+
+# ⚠ MODEL KATSAYISI — GERCEK RENDER'DA OLCULDU (I-46 kontrollu ailesi):
+# editorv2 1080p, IKI enerji seviyesi x (UC zoom hizi + UC pan hizi) = 12
+# nokta. Her nokta icin k = optik / (enerji x d):
+#     zoom 18.565/0.15031 -> 2.477 (k 0.888)   pan 18.625/0.01616 -> 0.378 (1.256)
+#     zoom 19.067/0.28945 -> 4.562 (k 0.827)   pan 18.591/0.04920 -> 0.779 (0.852)
+#     zoom 19.709/0.20190 -> 3.303 (k 0.830)   pan 18.612/0.12261 -> 1.863 (0.816)
+#     zoom  8.756/0.15031 -> 1.270 (k 0.965)   pan  8.483/0.01616 -> 0.188 (1.371)
+#     zoom  8.756/0.28945 -> 2.135 (k 0.842)   pan  8.471/0.04920 -> 0.398 (0.955)
+#     zoom  8.756/0.20190 -> 1.563 (k 0.884)   pan  8.502/0.12261 -> 0.934 (0.896)
+# MEDYAN 0.8877 alindi (ortalama degil: uc noktalara dayanikli).
+MODEL_K = 0.8877
+
+# ⚠ MODELIN EN KOTU HATASI — TUTULAN ORNEKTE olculdu (I-45'in ALTI gercek
+# cekimi; kalibrasyona GIRMEDILER):
+#     b001 beklenen 3.949 / olculen 4.438  (-11.0%)
+#     b002 beklenen 2.356 / olculen 2.288  ( +3.0%)
+#     b003 beklenen 8.753 / olculen 7.485  (+16.9%)
+#     b004 beklenen 20.193 / olculen 16.431 (+22.9%)  <- EN KOTU
+#     b005 beklenen 2.411 / olculen 2.686  (-10.2%)
+#     b006 beklenen 3.130 / olculen 3.116  ( +0.5%)
+# Ortalama mutlak hata %10.8. En kotu sapma b004'te (d = 1.31 ornek piksel;
+# birinci mertebe rejiminin disinda) ve model FAZLA tahmin ediyor — "hareket
+# az" kapisi icin GUVENLI yon.
+MODEL_EN_KOTU_HATA = 0.229
+
+
+def beklenen_optik_olcusu(*, enerji, d, esik: float = OPTIK_DURGUN_ESIGI,
+                          k: float = MODEL_K,
+                          en_kotu_hata: float = MODEL_EN_KOTU_HATA) -> dict:
+    """Cekimin BEKLENEN optik hareketi — risk OPTIK BIRIMDE ifade edilir.
+
+    ⚠ YENI ESIK UYDURULMADI: karsilastirma `OPTIK_DURGUN_ESIGI` (2.0) ile
+    yapilir; tek eklenen sey modelin OLCULEN hata payidir.
+      · `fail`  : beklenen x (1 + en_kotu_hata) HALA esigin ALTINDA
+                  -> gercek deger olculen hata payi icinde esigi gecemez.
+      · `warn`  : beklenen esigin altinda AMA hata payiyla gecebilir
+                  (EMIN DEGILSEN ENGELLEME).
+      · `temiz` : beklenen esigin ustunde.
+    ⚠ Olcemezse hukum vermez: `olculdu=False` ve `seviye` HIC yazilmaz.
+    """
+    if enerji is None or d is None:
+        return {"olculdu": False, "neden": "GIRDI-YOK"}
+    try:
+        e = float(enerji)
+        dd = float(d)
+    except (TypeError, ValueError):
+        return {"olculdu": False, "neden": "GIRDI-BOZUK"}
+    if e < 0 or dd < 0:
+        return {"olculdu": False, "neden": "GIRDI-GECERSIZ"}
+    kk_ = _sayi(k, MODEL_K)
+    hata = _sayi(en_kotu_hata, MODEL_EN_KOTU_HATA)
+    esik_ = _sayi(esik, OPTIK_DURGUN_ESIGI)
+    beklenen = kk_ * e * dd
+    ust = beklenen * (1.0 + hata)
+    if ust < esik_:
+        seviye = "fail"
+    elif beklenen < esik_:
+        seviye = "warn"
+    else:
+        seviye = "temiz"
+    return {"olculdu": True, "beklenen": round(beklenen, 4),
+            "ust_sinir": round(ust, 4), "esik": esik_, "k": kk_,
+            "en_kotu_hata": hata, "enerji": round(e, 3), "d": round(dd, 5),
+            "seviye": seviye}
+
+
 def uzamsal_enerji_olcusu(ham, *, olcu: tuple = GORSEL_ORNEK_OLCU,
                           esik: float = UZAMSAL_ENERJI_ESIGI) -> dict:
     """Gorselin UZAMSAL DETAYI: komsu pikseller arasi ort. mutlak fark.
@@ -1651,6 +1792,11 @@ def motion_grammar_olcusu(sahneler, *, pencere: int = HAREKET_PENCERESI,
     # uyusmazliginin aynisidir. Sessizce gecilmez: `gezinme_kapsam_disi`.
     _esik = _sayi(enerji_esigi, UZAMSAL_ENERJI_ESIGI)
     dusuk_enerji, enerji_olculdu, gezinme_kapsam_disi = [], False, []
+    # ⚠ FAZ I-46: `yer_degistirme` verilen cekimlerde risk OPTIK BIRIMDE
+    # hesaplanir (enerji x yer degistirme) ve enerji-esigi bacagi ATLANIR —
+    # o bacak tek bir gezinme hizinda kalibre edilmisti, bu ise hizdan
+    # BAGIMSIZ. Verilmezse I-45 davranisi BIT-BIT ayni kalir.
+    optik_riski = []
     for i, s in enumerate(liste):
         ham = s.get("uzamsal_enerji")
         if ham is None:
@@ -1659,6 +1805,15 @@ def motion_grammar_olcusu(sahneler, *, pencere: int = HAREKET_PENCERESI,
         if str(s.get("medya_turu") or "image").lower() == "video":
             continue
         e = _sayi(ham, -1.0)
+        _yd = s.get("yer_degistirme")
+        if _yd is not None:
+            _bo = beklenen_optik_olcusu(enerji=e, d=_yd)
+            if _bo.get("olculdu"):
+                if _bo["seviye"] != "temiz":
+                    optik_riski.append({
+                        "indeks": i, "beat_id": str(s.get("beat_id") or ""),
+                        "hareket": hareketler[i], **_bo})
+                continue
         if not (0 <= e <= _esik):
             continue
         _gz = s.get("gezinme_hizi")
@@ -1689,6 +1844,9 @@ def motion_grammar_olcusu(sahneler, *, pencere: int = HAREKET_PENCERESI,
         # ⚠ I-45: esigin kalibrasyon alani DISINDA kalan cekimler.
         "gezinme_kapsam_disi": gezinme_kapsam_disi,
         "kalibrasyon_gezinme_hizi": KALIBRASYON_GEZINME_HIZI,
+        # ⚠ I-46: risk OPTIK BIRIMDE (enerji x yer degistirme).
+        "optik_riski": optik_riski,
+        "model_k": MODEL_K, "model_en_kotu_hata": MODEL_EN_KOTU_HATA,
         "benzersiz_hareket": len({h for h in hareketler if h}),
         "ardisik_tekrar": ardisik_tekrar,
         "pencere_tekrari": pencere_tekrar,

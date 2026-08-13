@@ -6412,6 +6412,188 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
         "KaynakEtiketi" in _GRAFIK_TSX
         and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
 
+blok("§39v I-46 — RISK OPTIK BIRIMDE IFADE EDILMIYORDU (enerji x yer degistirme)")
+
+# ⚠ I-45'TE OLCULEN KUSUR: enerji-optik iliskisi TEK bir gezinme hizinda
+# kalibre edilmisti; baska hizlarda gecerli olmadigi icin kapi o cekimlerde
+# HUKUM VEREMIYORDU (b002/b005 "kapsam disi"). Ayrica pan ile zoom AYNI
+# gezinmeyi uretse bile optikte AYRI davraniyor (b003 IoU 0.707 -> 7.485,
+# b002 IoU 0.774 -> 2.288) — tek skaler "gezinme" yetmiyor.
+#
+# ⚠ MODEL TURETILDI, UYDURULMADI. Optik olcum ardisik ORNEK KARELER arasi
+# ortalama mutlak farktir; duragan bir goruntu kayarken birinci mertebede
+#     |I(p + d) - I(p)|  ~  |grad I| . d
+# yani ENERJI (ornek piksel basina ort. mutlak gradyan) x YER DEGISTIRME
+# (ornek piksel). Alan I-45 kadraj geometrisinden CIKAR:
+#     ekranda (u,v) -> kaynakta (x + u.w, y + v.h)
+#     Ds_x = Dx + u.Dw      d_x(u) = 64 . Ds_x / w
+#     Ds_y = Dy + v.Dh      d_y(v) = 36 . Ds_y / h
+# PAN saf OTELEME (Dx): d tum karede AYNI.
+# ZOOM OLCEK degisimi (Dw): d merkezde 0, kenarda en buyuk -> ortalamasi
+# kacinilmaz olarak KUCUK. Iki alan bu yuzden ayri; ayirmadan model olmaz.
+#
+# ⚠ KONTROLLU AILE — GERCEK RENDER'DA olculdu (editorv2, 1080p, iki enerji
+# seviyesi x uc zoom hizi + uc pan hizi = 12 nokta, $0.00):
+#     tur   E       d        optik    k = optik/(E.d)
+#     zoom  18.565  0.15031  2.477    0.888
+#     zoom  19.067  0.28945  4.562    0.827
+#     zoom  19.709  0.20190  3.303    0.830
+#     pan   18.625  0.01616  0.378    1.256
+#     pan   18.591  0.04920  0.779    0.852
+#     pan   18.612  0.12261  1.863    0.816
+#     zoom   8.756  0.15031  1.270    0.965
+#     zoom   8.756  0.28945  2.135    0.842
+#     zoom   8.756  0.20190  1.563    0.884
+#     pan    8.483  0.01616  0.188    1.371
+#     pan    8.471  0.04920  0.398    0.955
+#     pan    8.502  0.12261  0.934    0.896
+# k MEDYANI 0.8877 (min 0.816, maks 1.371).
+#
+# ⚠ TUTULAN ORNEK (I-45'in ALTI GERCEK cekimi — kalibrasyona GIRMEDI):
+#     beat  E       d       beklenen  olculen  hata
+#     b001  15.596  0.2852     3.949    4.438  -11.0%
+#     b002   9.391  0.2826     2.356    2.288   +3.0%
+#     b003  19.962  0.4940     8.753    7.485  +16.9%
+#     b004  17.347  1.3113    20.193   16.431  +22.9%   <- EN KOTU
+#     b005  10.469  0.2595     2.411    2.686  -10.2%
+#     b006  13.467  0.2618     3.130    3.116   +0.5%
+# Ortalama mutlak hata %10.8, EN KOTU %22.9 (b004; d=1.31 ornek piksel ile
+# birinci mertebe rejiminin disinda — model FAZLA tahmin ediyor, yani
+# "hareket az" kapisi icin GUVENLI yonde).
+#
+# ⚠ FAIL SARTI OLCULEN HATADAN TURETILDI, ESIK UYDURULMADI: gercek deger
+# `beklenen x (1 + EN_KOTU_HATA)` ustune cikamadi -> yalnizca
+#     beklenen x 1.229 < OPTIK_DURGUN_ESIGI (2.0)
+# oldugunda FAIL. 12 kontrollu + 6 tutulan noktanin HICBIRINDE yanlis fail
+# yok; gercek dusuk-hareket vakalari (optik 0.188 / 0.398 / 0.934 / 1.270 /
+# 1.563) DOGRU yakalaniyor. Belirsiz bant (beklenen < 2.0 ama guven yok)
+# `warn` kalir -> EMIN DEGILSEN ENGELLEME korunur.
+
+kontrol("⭐ I-46 KIRMIZI: `yer_degistirme_alani` VAR",
+        hasattr(_kk, "yer_degistirme_alani"), "yer degistirme alani yok")
+kontrol("⭐ I-46 KIRMIZI: `beklenen_optik_olcusu` VAR",
+        hasattr(_kk, "beklenen_optik_olcusu"), "beklenen optik olcumu yok")
+kontrol("⭐ I-46 KIRMIZI: model katsayisi OLCULEN degerdir (k=0.8877)",
+        abs(getattr(_kk, "MODEL_K", 0.0) - 0.8877) < 1e-4,
+        getattr(_kk, "MODEL_K", None))
+kontrol("⭐ I-46 KIRMIZI: model EN KOTU HATASI belgeli (%22.9)",
+        abs(getattr(_kk, "MODEL_EN_KOTU_HATA", 0.0) - 0.229) < 1e-6,
+        getattr(_kk, "MODEL_EN_KOTU_HATA", None))
+
+if hasattr(_kk, "yer_degistirme_alani"):
+    # b002'nin GERCEK kadraj uclari (I-45 geometrisiyle)
+    _u0 = _kk.kadraj_kirpma_bolgesi(
+        olcek=1.5342, pan_x=[0.5, 0.5], odak=[0.5, 0.5], guvenli_pay=0.1567,
+        kaynak_g=3456, kaynak_y=2592, kare_g=1920, kare_y=1080, t=0.0)
+    _u1 = _kk.kadraj_kirpma_bolgesi(
+        olcek=1.35, pan_x=[0.5, 0.5], odak=[0.5, 0.5], guvenli_pay=0.1567,
+        kaynak_g=3456, kaynak_y=2592, kare_g=1920, kare_y=1080, t=1.0)
+    _yd = _kk.yer_degistirme_alani(_u0, _u1, sure_sn=2.201)
+    kontrol("⭐ I-46: b002 yer degistirmesi OLCULDU (0.2826 ornek piksel)",
+            _yd.get("olculdu") is True and abs(_yd["d"] - 0.2826) < 2e-3, _yd)
+    kontrol("⭐ I-46: ZOOM cekiminde OTELEME bileseni YOK, olcek bileseni VAR",
+            _yd["d_oteleme"] < 1e-4        # kirpma yuvarlamasinin kalintisi
+            and abs(_yd["d_olcek"] - _yd["d"]) < 1e-4, _yd)
+    # Saf PAN: olcek sabit, kirpma yanal kayar
+    _p0 = _kk.kadraj_kirpma_bolgesi(
+        olcek=1.06, pan_x=[0.15, 0.85], odak=[0.5, 0.5], guvenli_pay=0.0255,
+        kaynak_g=5712, kaynak_y=4284, kare_g=1920, kare_y=1080, t=0.0)
+    _p1 = _kk.kadraj_kirpma_bolgesi(
+        olcek=1.06, pan_x=[0.15, 0.85], odak=[0.5, 0.5], guvenli_pay=0.0255,
+        kaynak_g=5712, kaynak_y=4284, kare_g=1920, kare_y=1080, t=1.0)
+    _ydp = _kk.yer_degistirme_alani(_p0, _p1, sure_sn=4.0)
+    kontrol("⭐ I-46: PAN cekiminde OLCEK bileseni YOK, oteleme VAR "
+            "(iki alan AYRISIYOR)",
+            _ydp["d_olcek"] < 1e-4
+            and abs(_ydp["d_oteleme"] - _ydp["d"]) < 1e-4, _ydp)
+    kontrol("I-46: sure/kirpma yoksa hukum YOK (`olculdu=False`)",
+            _kk.yer_degistirme_alani(_u0, _u1, sure_sn=0).get("olculdu")
+            is False
+            and _kk.yer_degistirme_alani({}, {}, sure_sn=4).get("olculdu")
+            is False)
+
+if hasattr(_kk, "beklenen_optik_olcusu"):
+    # b002: E=9.391, d=0.2826 -> beklenen 2.356 (olculen 2.288)
+    _b = _kk.beklenen_optik_olcusu(enerji=9.391, d=0.2826)
+    kontrol("⭐ I-46: b002 beklenen optigi OLCULENE yakin (2.356 vs 2.288)",
+            _b.get("olculdu") is True and abs(_b["beklenen"] - 2.356) < 5e-3,
+            _b)
+    kontrol("⭐ I-46: risk OPTIK BIRIMDE ifade ediliyor (esik 2.0 AYNEN)",
+            abs(_b["esik"] - _kk.OPTIK_DURGUN_ESIGI) < 1e-9
+            and "beklenen" in _b and "ust_sinir" in _b, _b)
+    kontrol("⭐ I-46: b002 esigi GECIYOR -> risk YOK (yanlis alarm degil)",
+            _b.get("seviye") == "temiz", _b)
+    # Kontrollu ailedeki GERCEK dusuk-hareket vakasi: E=8.483, d=0.01616
+    _f = _kk.beklenen_optik_olcusu(enerji=8.483, d=0.01616)
+    kontrol("⭐ I-46 KIRMIZI: GERCEKTEN duragan cekim `fail` seviyesinde",
+            _f.get("seviye") == "fail" and _f["ust_sinir"] < _kk.OPTIK_DURGUN_ESIGI,
+            _f)
+    # Belirsiz bant: beklenen < 2.0 ama ust sinir >= 2.0 -> warn
+    _w = _kk.beklenen_optik_olcusu(enerji=10.0, d=0.2)
+    kontrol("⭐ I-46: BELIRSIZ bant `warn` (EMIN DEGILSEN ENGELLEME)",
+            _w["beklenen"] < _kk.OPTIK_DURGUN_ESIGI
+            and _w["ust_sinir"] >= _kk.OPTIK_DURGUN_ESIGI
+            and _w.get("seviye") == "warn", _w)
+    kontrol("⭐ I-46: fail sarti OLCULEN hatadan turetiliyor (x1.229)",
+            abs(_f["ust_sinir"] - _f["beklenen"] * (1 + _kk.MODEL_EN_KOTU_HATA))
+            < 1e-3, _f)
+    kontrol("I-46: girdi yoksa hukum YOK (`olculdu=False`, seviye yok)",
+            _kk.beklenen_optik_olcusu(enerji=None, d=0.2).get("olculdu")
+            is False
+            and "seviye" not in _kk.beklenen_optik_olcusu(enerji=None, d=0.2))
+
+# ── MOTION GRAMMAR: OPTIK BIRIMDEKI RISK ──
+_mg46 = _kk.motion_grammar_olcusu([
+    {"beat_id": "b002", "hareket": "pull-out", "islev": "hook", "sure_sn": 2.201,
+     "medya_turu": "image", "uzamsal_enerji": 9.391, "yer_degistirme": 0.2826},
+    {"beat_id": "bD", "hareket": "push-in", "islev": "aciklama", "sure_sn": 4.0,
+     "medya_turu": "image", "uzamsal_enerji": 8.483, "yer_degistirme": 0.01616}])
+kontrol("⭐ I-46 KIRMIZI: motion grammar OPTIK BIRIMDE risk raporluyor",
+        [r["beat_id"] for r in (_mg46.get("optik_riski") or [])] == ["bD"],
+        _mg46.get("optik_riski"))
+kontrol("⭐ I-46: gecen cekim (b002) ARTIK isaretlenmiyor",
+        not any(r["beat_id"] == "b002"
+                for r in (_mg46.get("optik_riski") or [])))
+kontrol("I-46 GERILEME YOK: yer degistirme verilmezse I-45 davranisi AYNEN",
+        [d["beat_id"] for d in (_kk.motion_grammar_olcusu(
+            [{"beat_id": "b1", "hareket": "push-in", "islev": "hook",
+              "sure_sn": 4.0, "medya_turu": "image",
+              "uzamsal_enerji": 7.557}]).get("dusuk_enerji") or [])] == ["b1"])
+
+# ── PRE-QA ──
+kontrol("⭐ I-46 KIRMIZI: `KALITE-OPTIK-DURGUN-BEKLENEN` kodu VAR",
+        "KALITE-OPTIK-DURGUN-BEKLENEN" in _qon.KALITE_KODLARI)
+kontrol("⭐ I-46: kod FAIL kodlarinda (olculen hata payiyla GUVENLI)",
+        "KALITE-OPTIK-DURGUN-BEKLENEN" in _qon.FAIL_KODLARI)
+_QON46 = oku(KOK, "editor/qa_on.py")
+kontrol("⭐ I-46 KIRMIZI: PRE-QA yer degistirmeyi kadrajdan turetiyor",
+        "yer_degistirme_alani" in _QON46, "yer degistirme PRE-QA'ya baglanmadi")
+kontrol("I-46: PRE-QA modulu HALA GORSEL ACMAZ",
+        "subprocess" not in _QON46)
+
+# ── GERILEME YOK ──
+kontrol("⭐ I-46: ESIKLER GEVSETILMEDI (optik 2.0 / enerji 11.589)",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0
+        and abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9
+        and _kk.OPTIK_DURGUN_WARN_SN == 1.5
+        and _kk.OPTIK_DURGUN_FAIL_SN == 3.0)
+_V46 = oku(os.path.dirname(KOK), "app", "render-studio", "src", "Video.tsx")
+kontrol("⭐ I-46: ZOOM KOVASI/TABANI DEGISMEDI (0.045 + 4 kova)",
+        "OPTIK_TABAN_ORANI = 0.045" in _V46
+        and all(f"oran: {o}" in _V46
+                for o in (0.004, 0.014, 0.032, 0.062)))
+kontrol("I-46 GERILEME YOK: I-45 kalibrasyon alani sabiti DURUYOR",
+        abs(_kk.KALIBRASYON_GEZINME_HIZI - 0.0577) < 5e-4)
+kontrol("I-46 GERILEME YOK: lisans/provenance ve tekrar kapilari DURUYOR",
+        "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI
+        and "KALITE-MEDYA-TEKRAR" in _qon.FAIL_KODLARI)
+kontrol("I-46 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("I-46: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in _V46
+        and "pan: 'right' | 'left' | 'top' | 'bottom' | 'yok'" in _V46)
+
 blok("§39u I-45 — ENERJI GOSTERILMEYEN PIKSELLERDE OLCULUYORDU")
 
 # ⚠ I-44'TE OLCULEN KUSUR: enerji TUM KAREDE olculuyordu, oysa renderer

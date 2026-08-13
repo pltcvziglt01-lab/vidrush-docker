@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 13 Ağu | **I-46 risk optik birimde ifade ediliyor (enerji × yer değiştirme)** | `PENDING` | ✅ **push edildi**, I-45 tek gezinme hızında kalibre olduğu için b002/b005'te **hüküm veremiyordu**; model **türetildi** (|ΔI| ≈ |∇I|·d) ve pan (öteleme) ile zoom (ölçek) alanları **ayrıldı**; 12 kontrollü nokta ile **k=0.8877** ölçüldü, **tutulan 6 gerçek çekimde** ort. hata **%10.8** / en kötü **%22.9**; risk artık **optik birimde** (eşik 2.0 aynen) ve fail yalnız `beklenen×1.229 < 2.0` iken → **kapsam dışı 2 → 0**, yanlış alarm **0**, `KALITE-OPTIK-DURGUN-BEKLENEN` **FAIL** seviyesine çıkarıldı (12+6 noktada yanlış fail yok); render **11/11 kare SHA-256 aynı**, POST-QA **PASS**, **kabul edilmiş MP4 DEĞİL** (b001/b002 semantik), deploy YOK |
 | 13 Ağu | **I-45 enerji gösterilen kadraj bölgesinde ölçülüyor** | `79422de` | ✅ **push edildi**, I-44 enerjiyi **ekrana hiç gelmeyen** piksellerde de ölçüyordu → gösterilen bölge `Kamera.tsx` transformundan **birebir türetildi**; ⚠ **ölçüm hipotezi çürüttü** (kırpmada ölçmek yanlış alarmı azaltmadı, b005 ile **artırdı**) → gerçek kök neden ölçüldü: eşik **tek bir kamera konfigürasyonunda** (gezinme **0.0577/sn**) kalibre edilmişti; artık **kalibrasyon alanı dışında hüküm verilmiyor** → pilotta yanlış alarm **1 → 0** (PRE-QA warn 4→3), b002/b005 **bilgi** olarak raporlanıyor; fail'e **yükseltilmedi** (ölçüm kesinleşmedi), render **11/11 kare SHA-256 aynı**, POST-QA **PASS** ama **kabul edilmiş MP4 DEĞİL** (b001/b002 semantik), deploy YOK |
 | 13 Ağu | **I-44 görselin uzamsal enerjisi ölçülüyor** | `5911e1c` | ✅ **push edildi**, düz görselin statik fotoğraf olarak hareket üretemediği I-43'te ölçülmüştü ama **hiçbir kapı ölçmüyordu** → `uzamsal_enerji_olcusu` + PRE-QA kapısı (**ölçülen eşik 11.589**); 25.2 sn editorv2 pilotunda kapı **doğru varlığı** işaretledi (b002, enerji 7.557), diğer 5 varlık (12.33–18.08) işaretlenmedi; render **11/11 kare SHA-256 aynı** (gerileme yok), POST-QA **PASS** ama **kabul edilmiş MP4 DEĞİL** (b001/b002 semantik, gözle doğrulandı), deploy YOK |
 | 13 Ağu | **I-43 zoom kovaları optik ölçüm birimiyle hizalandı** | `ac3ef27` | ✅ **push edildi**, kovalar referans kanal birimindeydi (%/sn zoom), kapı ekran farkını ölçüyordu → **ölçülen taban 0.045**; 25.2 sn pilotta eşiği geçen sahne **2/6 → 5/6** (aynı props ile karşı-olgu render'ı), eşik gevşetilmedi, kova tablosu/aritmetik/22 alan dokunulmadı; POST-QA **WARN** (s1 — kök neden ölçüldü: **görsel enerjisi**, |grad| 4.21 vs 10.9–15.2), **kabul edilmiş MP4 DEĞİL**, deploy YOK |
@@ -5658,6 +5659,140 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 64. FAZ I-46 — RİSK OPTİK BİRİMDE İFADE EDİLMİYORDU (kalite atomu, 13 Ağu)
+
+> **Durum: enerji×yer değiştirme ilişkisi ÖLÇÜLEREK kalibre edildi, pan ve
+> zoom alanları AYRIŞTIRILDI, risk artık OPTİK BİRİMDE ifade ediliyor.
+> Kapsam dışı çekim **2 → 0**, yanlış alarm **0**; kod ölçülen hata payıyla
+> **FAIL** seviyesine çıkarıldı. A–I yeşil (3335, 0 hata). Render **11/11
+> kare SHA-256 aynı**. POST-QA **PASS**, MP4 **kabul edilmedi** (semantik).
+> Deploy YOK. Maliyet $0.00.**
+> Değişen: `webapp/editor/kalite_kapisi.py` (2 saf fonksiyon + 2 ölçülen
+> sabit + motion grammar optik bacağı), `webapp/editor/qa_on.py` (1 kod +
+> kablolama), `webapp/testler/test_faz_i.py`. `Video.tsx`, `Kamera.tsx`,
+> `motion.py`, `pipeline.py`, `medya/*`, **eşikler** ve **22 alan
+> sözleşmesi** **dokunulmadı**. I-23…I-45 **korundu**.
+
+### ⛔ Ölçülen kusur
+
+I-45 eşiği **tek bir gezinme hızında** (0.0577/sn) kalibreydi; dışındaki
+çekimlerde **hüküm veremiyordu** (b002/b005 "kapsam dışı"). Ayrıca pan ile
+zoom **aynı** gezinmeyi üretse bile optikte ayrı davranıyor (ölçüldü:
+b003 örtüşme 0.707 → 7.485; b002 0.774 → 2.288) — tek skaler yetmiyor.
+
+### Model TÜRETİLDİ, uydurulmadı
+
+Optik ölçüm ardışık örnek kareler arası ortalama mutlak farktır; durağan bir
+görüntü kayarken birinci mertebede `|I(p+d) − I(p)| ≈ |∇I|·d`, yani
+**enerji × yer değiştirme**. Alan I-45 kadraj geometrisinden çıkar:
+
+```
+ekranda (u,v) → kaynakta (x + u·w, y + v·h)
+Ds_x = Dcx + (u−0.5)·Dw     d_x(u) = 64 · Ds_x / w
+Ds_y = Dcy + (v−0.5)·Dh     d_y(v) = 36 · Ds_y / h
+```
+
+⚠ Ayrıştırma **merkezden** yapılır, köşeden değil: köşe kayması
+`Dx = Dcx − Dw/2` zoom bileşenini de içerir (ilk denemede bu kusur ölçüldü —
+saf zoom'da `d_oteleme` 0.53 çıkıyordu, düzeltmeden sonra ~0). **PAN** saf
+öteleme (tüm karede aynı), **ZOOM** merkezde 0 / kenarda en büyük.
+
+### Kalibrasyon — GERÇEK RENDER'DA, 12 kontrollü nokta
+
+editorv2 1080p, iki enerji seviyesi × (üç zoom hızı + üç pan hızı), $0.00:
+
+| tür | E | d | optik | k = optik/(E·d) |
+|---|---|---|---|---|
+| zoom | 18.565 | 0.15031 | 2.477 | 0.888 |
+| zoom | 19.067 | 0.28945 | 4.562 | 0.827 |
+| zoom | 19.709 | 0.20190 | 3.303 | 0.830 |
+| pan | 18.625 | 0.01616 | 0.378 | 1.256 |
+| pan | 18.591 | 0.04920 | 0.779 | 0.852 |
+| pan | 18.612 | 0.12261 | 1.863 | 0.816 |
+| zoom | 8.756 | 0.15031 | 1.270 | 0.965 |
+| zoom | 8.756 | 0.28945 | 2.135 | 0.842 |
+| zoom | 8.756 | 0.20190 | 1.563 | 0.884 |
+| pan | 8.483 | 0.01616 | 0.188 | 1.371 |
+| pan | 8.471 | 0.04920 | 0.398 | 0.955 |
+| pan | 8.502 | 0.12261 | 0.934 | 0.896 |
+
+**`MODEL_K = 0.8877`** (medyan; uç noktalara dayanıklı).
+
+### Doğrulama — TUTULAN ÖRNEK (kalibrasyona girmedi)
+
+I-45'in altı gerçek çekimi:
+
+| beat | E | d | beklenen | ölçülen | hata |
+|---|---|---|---|---|---|
+| b001 | 15.596 | 0.2852 | 3.949 | 4.438 | −11.0% |
+| b002 | 9.391 | 0.2826 | **2.356** | **2.288** | **+3.0%** |
+| b003 | 19.962 | 0.4940 | 8.753 | 7.485 | +16.9% |
+| b004 | 17.347 | 1.3113 | 20.193 | 16.431 | **+22.9%** |
+| b005 | 10.469 | 0.2595 | 2.411 | 2.686 | −10.2% |
+| b006 | 13.467 | 0.2618 | 3.130 | 3.116 | +0.5% |
+
+Ortalama mutlak hata **%10.8**, en kötü **%22.9** (b004; d=1.31 örnek piksel
+ile birinci mertebe rejiminin dışında) — ve model **fazla** tahmin ediyor,
+yani "hareket az" kapısı için **güvenli yön**. **`MODEL_EN_KOTU_HATA = 0.229`**.
+
+### Düzeltme (en küçük) — risk OPTİK BİRİMDE
+
+- `yer_degistirme_alani(bas, son, sure_sn)` — **saf**; `d`, `d_oteleme`
+  (pan), `d_olcek` (zoom) ayrı raporlanır.
+- `beklenen_optik_olcusu(enerji, d)` — **saf**; `beklenen = k·E·d`,
+  `ust_sinir = beklenen·(1 + en_kotu_hata)`.
+- Hüküm **mevcut `OPTIK_DURGUN_ESIGI` (2.0)** ile verilir — **yeni eşik yok**:
+  · `fail` : `ust_sinir < 2.0` (ölçülen hata payıyla bile eşiği geçemez)
+  · `warn` : `beklenen < 2.0` ama üst sınır geçebiliyor → **EMIN DEGILSEN ENGELLEME**
+  · `temiz`: `beklenen ≥ 2.0`
+- `motion_grammar_olcusu`: `yer_degistirme` verilirse **optik bacağı** çalışır
+  ve enerji-eşiği bacağı atlanır (o bacak tek hızda kalibreydi). Verilmezse
+  **I-45 davranışı bit-bit aynı** (test kilitler).
+- PRE-QA: `KALITE-OPTIK-DURGUN-BEKLENEN` — **FAIL_KODLARI'na eklendi**.
+
+⚠ **FAIL'E YÜKSELTME GEREKÇESİ ÖLÇÜLDÜ**: 12 kontrollü + 6 tutulan noktanın
+**hiçbirinde yanlış fail yok**; gerçek düşük-hareket vakaları (ölçülen optik
+0.188 / 0.398 / 0.934 / 1.270 / 1.563) doğru yakalanıyor. Bir gerçek pozitif
+kaçıyor (pan 0.7, ölçülen 1.863) — **az engelleme** yönünde, kasıtlı.
+⚠ Hiçbir eşik gevşetilmedi (optik 2.0 / enerji 11.589 / zoom tabanı 0.045).
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1921** | **3335** |
+
+0 hata. Faz I 1893 → **1921** (+28). Red-first: 8 XX.
+
+### 1080p pilot — `editorv2_lawn_i46.mp4` (25.2 sn)
+
+Sadakat kapısı **beat eşit=True, varlık eşit=True**.
+
+- **Kapsam dışı 2 → 0**: b002/b005 artık **yargılanıyor** ve `temiz` çıkıyor
+  (I-45'te hüküm verilemiyordu)
+- **Yanlış alarm 0**, PRE-QA warn **3** (üçü de I-44 öncesinden)
+- **1920×1080 @ 30**, 25.259 sn · 8 kesme · **11 kare** (6 beat)
+- LUFS **−14.27** / TP −3.10 · sessizlik %0.0 · kenar **0/101**
+- medya tekrarı: 6 benzersiz varlık · motion: 4 hareket, tekrar yok ·
+  tipografi dört ölçümde temiz · künye 5 sahnede
+- **POST-QA: PASS** · **Gerileme yok**: I-45 ile **11/11 kare SHA-256 aynı**
+
+### ⛔ Kabul durumu
+
+Otomatik kapıların hepsi PASS. Yine de **kabul edilmiş MP4 değildir**, mutlak
+yol verilmedi, deploy yok: b001/b002 görselleri anlatımla **semantik uyumsuz**.
+
+### SONRAKİ ATOM (I-47) — yalnız ölçülen kusurdan
+
+1. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — artık
+   **kabul engelinin TEK nedeni**; hareket/enerji tarafı I-42…I-46 ile
+   ölçülebilir hale geldi.
+2. **Model büyük yer değiştirmede doygunlaşıyor** (ölçüldü: d=1.31'de %22.9
+   fazla tahmin). d ≳ 0.5 için doygunluk terimi ölçülüp eklenirse hata payı
+   daralır ve fail bandı genişler.
+3. **Kısa sahnede zoom yolunun çoğunu pan taşma payı yiyor** (I-43).
+4. **Önizlemede altyazı hiç çizilmiyor** (I-40).
 
 ---
 
