@@ -190,7 +190,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-21 bölünen beat ayrı varlık alır (dar atom)** | `efbf111` | ⚠ **push edildi**, POST-QA FAIL, MP4 teslim YOK |
 | 12 Ağu | **I-22 medyasız beat kusuru çözüldü** | `a220fcb` | ⚠ **push edildi**, POST-QA FAIL (dikey kaynak), MP4 teslim YOK |
 | 13 Ağu | **I-23 en-boy oranı uyumluluk kapısı (dar atom)** | `49c726e` | ✅ **push edildi**, POST-QA **TAMAMEN PASS**, Faz I BLOKE 0, deploy YOK |
-| 13 Ağu | **I-24 motion çeşitliliği ölçülebilir kapıya çevrildi** | `PENDING` | ✅ **push edildi**, POST-QA PASS, kalite puanı **100/100**, deploy YOK |
+| 13 Ağu | **I-24 motion çeşitliliği ölçülebilir kapıya çevrildi** | `929b9b4` | ✅ **push edildi**, POST-QA PASS, kalite puanı **100/100**, deploy YOK |
 
 ---
 
