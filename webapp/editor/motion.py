@@ -76,6 +76,18 @@ GRAFIK_HAREKETI = {
 }
 
 
+# ⚠ FAZ I-27 — KADRAJ OLCEKLERI TEK KAYNAKTAN.
+# Bu tablo `kamera_spec` icinde GOMULU idi. I-27'de plan tarafinin da ayni
+# olcekleri bilmesi gerekti (kaynagi BUYUTMEYEN kadraji secmek icin); iki yere
+# ayri yazmak sessiz ayrisma riski demekti. `Kamera.tsx > KADRAJ_OLCEK` ile
+# AYNI degerler (TSX tarafi render'da ayni carpani uyguluyor).
+KADRAJ_OLCEK = {"tam": 1.0, "ust": 1.2, "alt": 1.2,
+                "punch-1.35": 1.35, "punch-1.6": 1.6}
+# Buyutmeyen kadraj ararken denenecek SIRA: en genis (en az olcekli) EN SONDA.
+# Deterministik; rastgelelik YOK.
+KADRAJ_MERDIVENI = ("punch-1.6", "punch-1.35", "ust", "alt", "tam")
+
+
 def _guvenli_pay(s_maks: float, guvenlik: float = 0.9) -> float:
     """Pan kaymasinin KENARDA SIYAH BANT uretmeyecegi en buyuk pay.
 
@@ -133,8 +145,7 @@ def kamera_spec(hareket: str, sure_sn: float, kadraj: str, *,
     # zaten %30 kullaniyordu (tutarli aile).
     pan = {"pan-right": (0.15, 0.85), "pan-left": (0.85, 0.15),
            "slow-drift": (0.35, 0.65)}.get(hareket, (0.5, 0.5))
-    olcek = {"tam": 1.0, "punch-1.35": 1.35, "punch-1.6": 1.6,
-             "ust": 1.2, "alt": 1.2}.get(kadraj, 1.0)
+    olcek = KADRAJ_OLCEK.get(kadraj, 1.0)
     odak = {"ust": (0.5, 0.30), "alt": (0.5, 0.70)}.get(kadraj, (0.5, 0.5))
 
     return _spec("push-in" if hareket == "soft-zoom" else hareket,

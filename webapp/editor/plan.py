@@ -215,11 +215,64 @@ def _altyazi_dagit(kupler, bas_sn: float, sure_sn: float) -> list:
 
 
 def _motion_kur(cekimler: list, beatler: list, p: EditProfili,
-                kare_genislik: Optional[float] = None) -> list:
-    """Her beat icin motion spec listesi (beat_id ile etiketli)."""
+                kare_genislik: Optional[float] = None,
+                adaylar_index: Optional[dict] = None,
+                kare_olcu: Optional[tuple] = None) -> list:
+    """Her beat icin motion spec listesi (beat_id ile etiketli).
+
+    ⚠ FAZ I-27 — PUNCH BUYUTME DUZELTMESI. Kamera kadraji kaynagi ekranda
+    BUYUTUYORSA (kapsama x zoom > 1.0) plan, `motion.KADRAJ_MERDIVENI`
+    icinden BUYUTMEYEN EN DAR kadraja DETERMINISTIK gecer. Yeni kadraj
+    UYDURULMAZ, blur/pillarbox/sentetik doldurma YAPILMAZ, hareket
+    (anlati islevi) DEGISMEZ — yalnizca kadraj darligi kaynagin tasiyabildigi
+    kadar geri cekilir. Hicbir kadraj yetmiyorsa kadraj OLDUGU GIBI birakilir
+    ve hukmu PRE-QA verir (`KALITE-PUNCH-BUYUTME` fail).
+    """
+    _kg, _ky = 0, 0
+    if kare_olcu:
+        try:
+            _kg, _ky = int(kare_olcu[0]), int(kare_olcu[1])
+        except (TypeError, ValueError, IndexError):
+            _kg, _ky = 0, 0
+    if not _kg or not _ky:
+        _kg = int(kare_genislik or getattr(p, "genislik", 0) or 0)
+        _ky = int(round(_kg * 9 / 16)) if _kg else 0
     specler = []
+    _onceki_kadraj = ""
     for i, (c, b) in enumerate(zip(cekimler, beatler)):
+        _aday = (adaylar_index or {}).get(getattr(c, "asset_id", "")) or {}
+        _g, _y = _aday.get("genislik"), _aday.get("yukseklik")
+        _pb = {"olculdu": False, "neden": "OLCU-YOK", "buyutuyor": False}
+        if _g and _y and _kg and _ky and getattr(c, "kaynak_turu", "") == "medya":
+            # Hareketin KENDI zoom ucu: kadraj carpani UYGULANMADAN.
+            _taban = motion.kamera_spec(c.hareket, b.sure_sn, "tam", p=p)
+            try:
+                _tz = max(float(v) for v in _taban.parametre["zoom"])
+            except (KeyError, TypeError, ValueError):
+                _tz = 0.0
+            if _tz > 0:
+                _sec = kalite_kapisi.kadraj_buyutmeyen(
+                    _g, _y, _kg, _ky, _tz, motion.KADRAJ_MERDIVENI,
+                    motion.KADRAJ_OLCEK, tercih=c.kadraj,
+                    kacinilacak=_onceki_kadraj)
+                if _sec.get("secilen") and _sec.get("degisti"):
+                    _eski = c.kadraj
+                    c.kadraj = _sec["secilen"]
+                    c.uyarilar.append(
+                        f"PUNCH-BUYUTME: kadraj {_eski} -> {c.kadraj} "
+                        f"(kaynak {_g}x{_y} buyutuluyordu)")
+                _pb = dict(_sec.get("olcum") or _pb)
+                _pb["denenen_kadraj"] = _sec.get("denenen")
+                _pb["kadraj_degisti"] = bool(_sec.get("degisti"))
+                _pb["cozulemedi"] = _sec.get("secilen") is None
+        _onceki_kadraj = c.kadraj
         yerel = [motion.kamera_spec(c.hareket, b.sure_sn, c.kadraj, p=p)]
+        # ⚠ Olcum spec'e ISLENIR: render_plan.json'da GORUNUR ve PRE-QA
+        # onu YENIDEN TURETMEDEN okur (tek kaynak).
+        try:
+            yerel[0].parametre["punch_buyutme"] = _pb
+        except (AttributeError, TypeError):
+            pass
         yerel += motion.taban_katmanlar(b.sure_sn, p=p)
 
         if c.cekim_turu == "archive" and c.kaynak_turu == "medya":
@@ -328,7 +381,8 @@ def uret(*, cumleler: list, medya_manifest: dict,
         kapsam_bosluklari=bosluklar, saglayici_tavani=saglayici_tavani)
     # 3) MOTION
     _kare_gen = (kare_olcu or (None,))[0]
-    specler = _motion_kur(cekimler, bplan.beatler, p, _kare_gen)
+    specler = _motion_kur(cekimler, bplan.beatler, p, _kare_gen,
+                          adaylar_index=index, kare_olcu=kare_olcu)
     # 4) TIPOGRAFI
     _altyazi_var = bool(altyazi_kupleri)
     katmanlar, tipo_rapor = _yazi_katmanlari_kur(

@@ -193,6 +193,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-24 motion çeşitliliği ölçülebilir kapıya çevrildi** | `929b9b4` | ✅ **push edildi**, POST-QA PASS, kalite puanı **100/100**, deploy YOK |
 | 13 Ağu | **I-25 sağlayıcı-tekel tanısı: kök neden bizdeydi** | `4acf133` | ✅ **push edildi**, 2 gerçek hata düzeltildi, WARN **dürüst** (Commons 429), medya kümesi değişmedi, deploy YOK |
 | 13 Ağu | **I-26 s03 aşırı dar sorgu çözüldü; pilot BLOKE** | `2928130` | ⚠ **push edildi**, Commons s03 0→2 aday, tekel %100→%60, MP4 **KABUL EDİLMEDİ** (punch büyütme), deploy YOK |
+| 13 Ağu | **I-27 kamera punch büyütmesi ÇÖZÜLDÜ** | `PENDING` | ✅ **push edildi**, büyüten beat 2→0, POST-QA **TAM PASS**, puan 100/100, Faz I BLOKE 0, deploy YOK |
 
 ---
 
@@ -4075,3 +4076,123 @@ de eler ve pilot tamamen bloke olur), **kadrajı kaynağa uydurmaktır**:
 seçilir (I-24'ün geometri kancası bunun için hazır).
 İkinci mesele: **konu dışı "afiş/pano fotoğrafı"** için ölçülebilir bir
 eleme sinyali (metin yoğunluğu ölçümü) — uydurma değil, ölçülerek.
+
+---
+
+## 45. FAZ I-27 — KAMERA PUNCH'I KAYNAĞI BÜYÜTEMEZ (dar kalite atomu, 13 Ağu)
+
+> **Durum: ÇÖZÜLDÜ. POST-QA TAMAMEN PASS, kalite puanı 100/100, Faz I BLOKE
+> 0, push edildi. Deploy YOK. Maliyet $0.00.**
+> Değişen: `webapp/editor/motion.py`, `webapp/editor/kalite_kapisi.py`,
+> `webapp/editor/plan.py`, `webapp/editor/qa_on.py`,
+> `webapp/testler/smoke_konsept3_teknoloji_i20.py`,
+> `webapp/testler/test_faz_i.py`, `outputs/sample/teknoloji_i20_rapor.json`
+> (+ handoff).
+> **Blur/pillarbox/sentetik doldurma YOK. Rastgelelik YOK. Yeni
+> sağlayıcı/ağ/kota/API/maliyet YOK.**
+> `pipeline.py`, `server.py`, `deploy.sh`, 22 alan sözleşmesi, `gramer.py`,
+> `beat.py`, `medya/*` (commons, edinim, nasa, lisans, guvenlik, indirme)
+> **dokunulmadı** (git ile doğrulandı). I-23…I-26 kapıları **korundu**.
+
+### ✅ I-26'NIN İKİ İHLALİ ÖNCE KIRMIZI GÖSTERİLDİ
+
+| beat | kaynak | kadraj | maks zoom | ekran oranı | |
+|---|---|---|---|---|---|
+| b002 | 2240×1344 | punch-1.35 | 1.4944 | **1.281** | ⛔ |
+| b004 | 3000×2250 | punch-1.6 | 1.696 | **1.085** | ⛔ (kabul edilen render'da DA) |
+
+Testte bu iki değer **birebir sabitlendi** (`_IHLAL27`), yani kusur önce
+**kırmızı** kanıtlandı, sonra düzeltildi.
+
+### Çözüm 1 — deterministik kadraj merdiveni
+
+`kapsama = max(1920/g, 1080/y)` (objectFit: cover), `ekran = kapsama × zoom`.
+Oran > 1.0 ise plan, `motion.KADRAJ_MERDIVENI` içinden **büyütmeyen en dar**
+kadraja geçer. Ölçülen sonuç:
+
+- b002 `punch-1.35` → **`tam`** (1.281 → 0.949)
+- b004 `punch-1.6` → **`punch-1.35`** (1.085 → 0.916) — **punch hissi korundu**
+
+⚠ Yeni kadraj **uydurulmaz** (yalnız merdivendekiler), hareket/anlatı işlevi
+**değişmez**, büyütmeyen kadraj **aynen korunur**, hiçbiri yetmezse kadraj
+olduğu gibi bırakılır ve hükmü PRE-QA verir: **`KALITE-PUNCH-BUYUTME` (fail)**.
+Kadraj ölçek tablosu `kamera_spec` içinde gömülüydü; **tek kaynağa**
+(`motion.KADRAJ_OLCEK`) çıkarıldı ki plan ile render sessizce ayrışmasın.
+
+### ⚠ Çözüm 1 İKİNCİ HALKAYI AÇIĞA ÇIKARDI — ölçülüp kapatıldı
+
+İlk rerender **POST-QA FAIL** verdi: `POST-OPTIK-DURGUN`, b005 optik **1.415**
+(eşik 2.0), 3.75 sn durağan. Kök neden ölçüldü: **pan sürüşüyle** hareket eden
+çekimlerde zoom sabittir (1.06) ve tüm hareket pan'dan gelir; pan payı ise
+`_guvenli_pay(zoom × kadraj_ölçek)`:
+
+| kadraj | ölçek | pan payı |
+|---|---|---|
+| **tam** | 1.00 | **0.0255** ← hareket açlığı |
+| ust/alt | 1.20 | **0.0962** ← ~4 katı |
+
+Yani büyütmemek için kadrajı `tam`a çekmek, hareketi durağanlık eşiğinin
+altına düşürebiliyor. **Kadrajı zorlamak çözüm değil**; kaynak en az bir
+punch'ı taşımalı. Eşik **türetildi, uydurulmadı**:
+
+```
+en_az_genislik = kare_genislik × EN_DAR_PUNCH_OLCEGI(1.2) × PAN_TABANLI_ZOOM(1.06)
+               = 1920 × 1.2 × 1.06 = 2443 px
+```
+
+Eski `1920` yalnızca `tam` kadrajı garanti ediyordu — yani **açlık kadrajını**.
+Yeni eşik tam da sorunlu iki Commons kaynağını eliyor (2240 müze afişi,
+2100 Columbia) ve iyi olanların hepsini geçiriyor (Commons Ohio 5184, NASA
+3000/4192/4986).
+
+### ✅ ÖLÇÜLEN ÖNCE → SONRA
+
+| Ölçüm | I-26 | **I-27** |
+|---|---|---|
+| Büyüten beat | **2** | ✅ **0** |
+| En yüksek ekran oranı | **1.281** | ✅ **0.916** |
+| POST-QA | PASS (ama kabul edilmedi) | ✅ **PASS** |
+| Optik durağanlık | temiz | ✅ **temiz** (5/5 beat hareketli) |
+| Kalite puanı | 100/100 | ✅ **100/100** |
+| s01 görseli | ⛔ cam arkası müze afişi | ✅ **NASA süperbilgisayar rafı** |
+| b001 / b002 keskinlik | 5.47 / 5.37 | ✅ **15.74 / 19.60** (≈3×) |
+| Faz I BLOKE | **1** | ✅ **0** |
+
+### ✅ PİLOT TAM DOĞRULANDI
+
+**ffprobe:** h264 **1920×1080** @30fps + aac 48 kHz/2ch, **17.109 sn**, 40.50 MB.
+**Ses:** LUFS **−14.36**, TP **−4.09**, LRA 3.6, sessizlik **%0** (ince tarama
+da boş). **Kesmeler:** 7. **Siyah/donmuş aralık:** yok. **Kenar:** 0/68.
+**Optik:** genel 14.734, durgun ihlal 0 (40.9 / 5.4 / 8.2 / 14.1 / 4.0).
+**Kareler:** **11 adet** incelendi; ayrıca hepsinde tam çözünürlükte dört
+kenar ölçüldü — en koyu kenar **24.93** (siyah eşiği 16'nın üstünde).
+**Semantik:** b002 "Güç burada üretilir" → NASA süperbilgisayar rafı;
+b004 "silikon üzerindeki devreler" → NASA GRC silisyum karbür IC test kartı.
+**Medya:** 4/4 **NASA**, fixture yok, maliyet **$0.00**.
+**Punch:** 5/5 beat ölçüldü, **büyüten 0**, en yüksek **0.9158**.
+
+### Ölçülen test sonucu
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1604** | **3018** |
+
+0 hata. Faz I 1563 → **1604** (+41). **Faz I BLOKE 1 → 0.**
+Kalan tek BLOKE Faz H'deki `QA_TEST_VIDEO` (opsiyonel, I-22'den beri aynı).
+
+### Düzeltilen kendi kilidim (I-23, I-26'dakiyle aynı sınıf)
+
+I-23 kilidi *"en az 1 dikey red OLDU"* diyordu; o sayı **aday listesine
+bağlı** ve I-27'nin yükseltilmiş çözünürlük eşiği dikey adayları **oran
+kapısına varmadan** eliyor. Asıl değişmez **"kabul edilen hiçbir varlık
+dikey/kare değil"**; kilit ona çevrildi (gevşetme değil, doğru değişmez).
+
+### SONRAKİ ATOM (I-28 adayları)
+
+- **Sağlayıcı tekeli** yine %100 `nasa`: yeni eşik (2443) Commons'ın alaka
+  sırasındaki ilk adaylarını eliyor. Commons'ta **yüksek çözünürlüklü ve
+  konuya sadık** aday var (Ohio OSC 5184×3456, alaka 2) — eşik **sonra**
+  değil **arama sıralamasıyla birlikte** değerlendirilirse tekel gerçekten
+  kırılabilir. Ölçülerek denenmeli.
+- **"Afiş/pano fotoğrafı"** için ölçülebilir eleme sinyali (metin yoğunluğu)
+  — I-26'da gözle yakalandı, otomatik ölçümü yok.

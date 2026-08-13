@@ -128,6 +128,15 @@ AMBANS_DUCK = 0.5
 
 # ⚠ SABIT GORSEL HAVUZU YOK. Medya `medya.commons` ile konuya gore EDINILIR.
 DETAY_ESIGI = 20.0          # I-13'te olculdu: esik alti kare DUZ GRI cikiyor
+
+
+def _en_az_genislik():
+    """Edinim esigi KADRAJ MERDIVENINDEN turetilir (I-27) — sabit rakam YOK."""
+    from editor import kalite_kapisi as _kk27
+    return _kk27.en_az_kaynak_genisligi(OLCU[0])
+
+
+EN_AZ_GENISLIK = _en_az_genislik()
 # ⚠ I-21: sahne basina N aday. Bolunen bir sahne IKI beat uretirse `gramer`
 # ikisine FARKLI varlik atayabilsin diye. EK AG CAGRISI YOK — adaylar zaten
 # `ara()`nin dondurdugu listeden geliyor; kota da DEGISMIYOR.
@@ -434,7 +443,11 @@ def medya_edin(sahne_aday_adedi=None):
         "atlanan_saglayicilar": [
             {"ad": "pexels", "sebep": "mevcut anahtar GECERSIZ (HTTP 401) — "
                                       "yeni anahtar ALINMADI"}],
-        "en_az_genislik": 1920,
+        # ⚠ I-27: esik 1920 DEGIL, KADRAJ MERDIVENINDEN TURETILIR.
+        # 1920 yalnizca `tam` kadraji garanti eder; o kadrajda pan payi
+        # 0.0255'e duser ve pan surusuyle hareket eden cekim DURAGAN kalir
+        # (olculdu: b005 optik 1.415 < esik 2.0 -> POST-QA FAIL).
+        "en_az_genislik": EN_AZ_GENISLIK,
         # ⚠ I-23: 16:9 cikti icin EN-BOY ORANI UYUMLULUK KAPISI.
         "hedef_oran": round(edinim.HEDEF_ORAN_16_9, 4),
         "oran_en_az_korunan": edinim.ORAN_EN_AZ_KORUNAN,
@@ -474,7 +487,8 @@ def medya_edin(sahne_aday_adedi=None):
                    "aday": dict(_kunye, yol=hedef)}
         else:
             son = edinim.edin(
-                tanim["sorgu"], hedef, en_az_genislik=1920, kesici=kesici,
+                tanim["sorgu"], hedef, en_az_genislik=EN_AZ_GENISLIK,
+                kesici=kesici,
                 onbellek=onbellek, adet=_istenen,
                 hedef_oran=edinim.HEDEF_ORAN_16_9,
                 benzerlik_okuyucu=benzerlik,

@@ -1063,6 +1063,136 @@ def motion_grammar_olcusu(sahneler, *, pencere: int = HAREKET_PENCERESI) -> dict
     }
 
 
+# ═══════════ 8b) PUNCH BUYUTME (Faz I-27) ═══════════════════════════════
+#
+# ⚠ NEDEN VAR — I-26'DA OLCULEN IHLAL:
+# Depo "upscale YAPILMIYOR" diyor, ama bu soz yalnizca EDINIM esigi
+# (`en_az_genislik=1920`) icin geceriydi. Kamera `punch` kadraji uygularken
+# kaynak SESSIZCE buyutuluyordu:
+#     b002  2240x1344  punch-1.35  ->  1.281x  BUYUTME
+#     b004  3000x2250  punch-1.6   ->  1.085x  BUYUTME  (I-24/I-25'in KABUL
+#                                                        EDILEN render'inda DA)
+# `objectFit: cover` ile kaynagin ekrandaki olcegi:
+#     kapsama = max(kare_g / kaynak_g, kare_y / kaynak_y)
+# Kamera zoom'u BUNUN USTUNE biner:
+#     ekran_piksel_orani = kapsama x maks_zoom
+# Oran > 1.0 ise kaynagin 1 pikseli ekranda 1'den fazla piksele yayilir —
+# YUMUSAMA. 1080p iddiasi o cekimde KARSILIKSIZ kalir.
+PUNCH_BUYUTME_TAVANI = 1.0
+
+# ⚠ I-27'DE OLCULEN IKINCI HALKA — KADRAJ DARALTMA ile OPTIK DURAGANLIK
+# BIRBIRINE BAGLI. Pan surusuyle hareket eden cekimlerde (`slow-drift`,
+# `pan-*`) zoom SABITTIR (1.06); tum hareket pan'dan gelir ve pan payi
+# `_guvenli_pay(zoom x kadraj_olcek)` ile olceklenir:
+#     tam (1.00) -> pay 0.0255      <- HAREKET ACLIGI
+#     ust (1.20) -> pay 0.0962      <- yaklasik 4 KATI
+# Yani buyutmemek icin kadraji `tam`a cekmek, hareketi I-17'nin duraganlik
+# esigi altina dusurebiliyor (olculdu: b005 optik 1.415 < 2.0 -> FAIL).
+# Cozum kadraji zorlamak DEGIL, kaynagin EN AZ BIR punch'i tasimasini
+# istemektir. En dar non-`tam` kadraj 1.2 oldugundan:
+#     en_az_genislik = kare_genislik x 1.2 x 1.06
+PAN_TABANLI_ZOOM = 1.06
+EN_DAR_PUNCH_OLCEGI = 1.2
+
+
+def en_az_kaynak_genisligi(kare_genislik, *,
+                           kadraj_olcek: float = EN_DAR_PUNCH_OLCEGI,
+                           taban_zoom: float = PAN_TABANLI_ZOOM) -> int:
+    """Kaynak, EN AZ BIR punch kadrajini BUYUTMEDEN tasiyabilmeli.
+
+    ⚠ `en_az_genislik=1920` yalnizca `tam` kadraji garanti eder; o kadrajda
+    pan payi 0.0255'e duser ve cekim DURAGAN sayilir. Bu esik uydurma degil,
+    kadraj merdiveni ile `_guvenli_pay` aritmetiginden TURETILMISTIR.
+    """
+    try:
+        kg = float(kare_genislik)
+        return int(math.ceil(kg * float(kadraj_olcek) * float(taban_zoom)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def punch_buyutme_olcusu(kaynak_g, kaynak_y, kare_g, kare_y,
+                         maks_zoom, *, tavan: float = PUNCH_BUYUTME_TAVANI,
+                         kadraj: str = "") -> dict:
+    """Kamera kadraji kaynagi EKRANDA BUYUTUYOR mu? (saf fonksiyon)
+
+    Ag/dosya KULLANMAZ. Olculemezse `olculdu=False` doner ve ENGELLEMEZ —
+    cozunurluk/oran kapilariyla ayni sozlesme ("emin degilsen engelleme").
+    """
+    try:
+        g, y = float(kaynak_g), float(kaynak_y)
+        kg, ky = float(kare_g), float(kare_y)
+        z = float(maks_zoom)
+    except (TypeError, ValueError):
+        return {"olculdu": False, "neden": "OLCU-OKUNAMADI", "buyutuyor": False}
+    if g <= 0 or y <= 0 or kg <= 0 or ky <= 0 or z <= 0:
+        return {"olculdu": False, "neden": "OLCU-GECERSIZ", "buyutuyor": False}
+    kapsama = max(kg / g, ky / y)
+    oran = kapsama * z
+    try:
+        tvn = float(tavan)
+    except (TypeError, ValueError):
+        tvn = PUNCH_BUYUTME_TAVANI
+    return {
+        "olculdu": True,
+        "kaynak": [int(g), int(y)], "kare": [int(kg), int(ky)],
+        "kadraj": str(kadraj or ""),
+        "kapsama": round(kapsama, 4),
+        "maks_zoom": round(z, 4),
+        "ekran_piksel_orani": round(oran, 4),
+        "tavan": tvn,
+        "buyutuyor": bool(oran > tvn),
+        "sebep": "" if oran <= tvn else (
+            f"PUNCH-BUYUTME: kaynak {int(g)}x{int(y)} kadraj "
+            f"{kadraj or '?'} ile ekranda {oran:.3f}x buyuyor "
+            f"(kapsama {kapsama:.3f} x zoom {z:.3f} > tavan {tvn:.3f})"),
+    }
+
+
+def kadraj_buyutmeyen(kaynak_g, kaynak_y, kare_g, kare_y, taban_zoom,
+                      merdiven, olcek_tablosu, *,
+                      tercih: str = "", kacinilacak: str = "",
+                      tavan: float = PUNCH_BUYUTME_TAVANI) -> dict:
+    """Kaynagi BUYUTMEYEN EN DAR kadraji DETERMINISTIK sec.
+
+    `taban_zoom`: kadraj carpani UYGULANMADAN once hareketin kendi zoom ucu.
+    `merdiven`  : denenecek kadraj sirasi (en dar -> en genis).
+    `tercih`    : plan bu kadraji istedi; BUYUTMUYORSA aynen korunur.
+    `kacinilacak`: onceki cekimin kadraji — esit gecerli iki aday arasinda
+                   surekliligi korumak icin ikinci sirada denenir.
+
+    ⚠ Rastgelelik YOK, yeni kadraj UYDURULMAZ: yalnizca `merdiven`de zaten
+    var olan kadrajlar denenir. Hicbiri buyutmuyorsa `secilen=None` doner ve
+    KARARI CAGIRAN VERIR (kapi FAIL yazar) — sessizce kirpma/blur YOK.
+    """
+    def _oran(kadraj):
+        z = float(taban_zoom or 0.0) * float(
+            (olcek_tablosu or {}).get(kadraj, 1.0))
+        return punch_buyutme_olcusu(kaynak_g, kaynak_y, kare_g, kare_y, z,
+                                    tavan=tavan, kadraj=kadraj)
+
+    istenen = _oran(tercih) if tercih else {"olculdu": False}
+    if istenen.get("olculdu") and not istenen.get("buyutuyor"):
+        return {"secilen": tercih, "degisti": False, "olcum": istenen,
+                "denenen": [tercih]}
+    if not istenen.get("olculdu"):
+        # Olculemedi -> ENGELLEME, plani OLDUGU GIBI birak.
+        return {"secilen": tercih or None, "degisti": False,
+                "olcum": istenen, "denenen": []}
+    # Sirali arama: once merdiven, ama `kacinilacak` esitlerde geri plana.
+    sirali = [k for k in (merdiven or ()) if k != kacinilacak]
+    sirali += [k for k in (merdiven or ()) if k == kacinilacak]
+    denenen = []
+    for k in sirali:
+        denenen.append(k)
+        o = _oran(k)
+        if o.get("olculdu") and not o.get("buyutuyor"):
+            return {"secilen": k, "degisti": k != tercih, "olcum": o,
+                    "denenen": denenen}
+    return {"secilen": None, "degisti": False, "olcum": istenen,
+            "denenen": denenen}
+
+
 # ═══════════ 9) IZLEYICI KALITE PUANI (Faz I-17) ════════════════════════
 #
 # ⚠ DURUST ETIKET: bu bir IZLEYICI ARASTIRMASI DEGIL. Zaten OLCULEN

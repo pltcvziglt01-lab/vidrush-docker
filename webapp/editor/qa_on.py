@@ -37,6 +37,8 @@ FAIL_KODLARI = {
     "KALITE-MEDYASIZ-BEAT",
     # ── Faz I-24: motion cesitliligi OLCULEBILIR KAPI ──
     "KALITE-MOTION-ACILIS-KAPANIS", "KALITE-MOTION-ISLEV-TEKRAR",
+    # ── Faz I-27: kamera punch'i kaynagi BUYUTEMEZ ──
+    "KALITE-PUNCH-BUYUTME",
 }
 
 # I-14 kapisinin urettigi kodlar. Kapi KAPALIYKEN bunlarin HICBIRI uretilmez;
@@ -50,7 +52,8 @@ KALITE_KODLARI = ("KALITE-BASLIK-KIRPIK", "KALITE-BASLIK-TASMA",
                   "KALITE-MOTION-TEKRAR", "KALITE-GECIS-TEKDUZE",
                   "KALITE-MEDYASIZ-BEAT",
                   "KALITE-MOTION-ACILIS-KAPANIS",
-                  "KALITE-MOTION-ISLEV-TEKRAR")
+                  "KALITE-MOTION-ISLEV-TEKRAR",
+                  "KALITE-PUNCH-BUYUTME")
 
 
 @dataclass
@@ -610,6 +613,32 @@ def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
                   f"tek gecis ailesi kullanildi: {mg.get('gecis_dagilimi')} "
                   f"— isleve bagli en az iki aile beklenir",
                   "kapanis/kanit gecislerini isleve gore cesitlendir")
+        # ── I-27: KAMERA PUNCH'I KAYNAGI BUYUTEMEZ ──
+        # ⚠ Olcum YENIDEN TURETILMEZ: plan onu spec'e islemistir (tek kaynak).
+        _pb_kayit = []
+        for sp in (motion_specler or []):
+            _pb = ((sp.get("parametre") or {}).get("punch_buyutme") or {})
+            if not _pb.get("olculdu"):
+                continue
+            _pb_kayit.append(dict(_pb, beat_id=sp.get("beat_id", "")))
+            if _pb.get("buyutuyor"):
+                _ek = ("hicbir kadraj yetmedi"
+                       if _pb.get("cozulemedi") else "kadraj dusurulemedi")
+                _ekle("KALITE-PUNCH-BUYUTME", "fail",
+                      f"{sp.get('beat_id', '')}: {_pb.get('sebep') or ''} "
+                      f"({_ek})",
+                      "daha yuksek cozunurluklu kaynak sec ya da kadraji "
+                      "genislet; upscale/blur/pillarbox YAPILMAZ",
+                      beat_id=sp.get("beat_id", ""))
+        olcum["punch_buyutme"] = {
+            "olculen_beat": len(_pb_kayit),
+            "buyuten": [k for k in _pb_kayit if k.get("buyutuyor")],
+            "kadraj_dusurulen": [k for k in _pb_kayit
+                                 if k.get("kadraj_degisti")],
+            "en_yuksek_oran": max([k.get("ekran_piksel_orani", 0)
+                                   for k in _pb_kayit] or [0]),
+            "temiz": not [k for k in _pb_kayit if k.get("buyutuyor")]}
+
         for st in (mg.get("statik_sahneler") or []):
             if kk._sayi(st.get("sure_sn")) > kk.OPTIK_DURGUN_FAIL_SN:
                 _ekle("KALITE-OPTIK-DURGUN", "fail",

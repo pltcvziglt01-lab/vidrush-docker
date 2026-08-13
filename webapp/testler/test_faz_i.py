@@ -6281,6 +6281,126 @@ kontrol("elenen kaydi SEBEBIYLE birlikte duruyor",
             "x", adet=6, en_az_genislik=1920, acan=_sahte_acan([
                 _sahte_sayfa(1, 1, 800, 600, "kucuk.jpg")]))["elenen"]))
 
+blok("§39d I-27 — KAMERA PUNCH'I KAYNAGI BUYUTEMEZ")
+
+import math                                                       # noqa: E402
+from editor import motion as _mo                                  # noqa: E402
+
+# ⚠ I-26'DA OLCULEN IKI IHLAL — burada KIRMIZI olarak sabitlendi.
+# Depo "upscale YAPILMIYOR" diyordu; soz yalnizca EDINIM esigi icin
+# geceriydi ve kamera `punch` kadrajinda SESSIZCE ihlal ediliyordu.
+_IHLAL27 = [
+    ("b002 s01 Commons afisi", 2240, 1344, "punch-1.35", 1.4944, 1.2809),
+    ("b004 s03 NASA (KABUL EDILEN render'da DA)", 3000, 2250,
+     "punch-1.6", 1.696, 1.0854),
+]
+for _ad, _g27, _y27, _kd, _mz, _bek in _IHLAL27:
+    _o27 = _kk.punch_buyutme_olcusu(_g27, _y27, 1920, 1080, _mz, kadraj=_kd)
+    kontrol(f"⭐ I-27 KIRMIZI: {_ad} BUYUTUYOR",
+            _o27["buyutuyor"] is True
+            and abs(_o27["ekran_piksel_orani"] - _bek) < 0.001,
+            _o27["ekran_piksel_orani"])
+    kontrol(f"I-27: {_ad} sebebi olculen SAYILARLA yazili",
+            "PUNCH-BUYUTME" in _o27["sebep"] and "kapsama" in _o27["sebep"])
+kontrol("I-27: YUKSEK cozunurluklu kaynak TEMIZ (yanlis pozitif yok)",
+        _kk.punch_buyutme_olcusu(4986, 3744, 1920, 1080, 1.272,
+                                 kadraj="alt")["buyutuyor"] is False)
+kontrol("I-27: tam 1.000 oran TAVANI ASMAZ (sinirda engelleme yok)",
+        _kk.punch_buyutme_olcusu(1920, 1080, 1920, 1080, 1.0)["buyutuyor"]
+        is False)
+for _bz in ((None, None), (0, 0), ("a", "b")):
+    kontrol(f"I-27: olcu gecersiz {_bz} -> ENGELLEMEZ",
+            _kk.punch_buyutme_olcusu(_bz[0], _bz[1], 1920, 1080,
+                                     1.3)["buyutuyor"] is False)
+
+# ── DETERMINISTIK KADRAJ SECIMI ──
+def _taban_zoom(maks, kadraj):
+    return maks / _mo.KADRAJ_OLCEK[kadraj]
+
+
+_s27a = _kk.kadraj_buyutmeyen(2240, 1344, 1920, 1080,
+                              _taban_zoom(1.4944, "punch-1.35"),
+                              _mo.KADRAJ_MERDIVENI, _mo.KADRAJ_OLCEK,
+                              tercih="punch-1.35")
+kontrol("⭐ I-27: b002 punch-1.35 -> BUYUTMEYEN kadraja gecti",
+        _s27a["secilen"] == "tam" and _s27a["degisti"] is True
+        and _s27a["olcum"]["buyutuyor"] is False, _s27a["secilen"])
+_s27b = _kk.kadraj_buyutmeyen(3000, 2250, 1920, 1080,
+                              _taban_zoom(1.696, "punch-1.6"),
+                              _mo.KADRAJ_MERDIVENI, _mo.KADRAJ_OLCEK,
+                              tercih="punch-1.6")
+kontrol("⭐ I-27: b004 punch-1.6 -> punch-1.35 (PUNCH HISSI KORUNDU)",
+        _s27b["secilen"] == "punch-1.35" and _s27b["degisti"] is True
+        and _s27b["olcum"]["buyutuyor"] is False, _s27b["secilen"])
+kontrol("I-27: EN DAR uygun kadraj secilir (gereksiz genisleme yok)",
+        _mo.KADRAJ_OLCEK[_s27b["secilen"]] > _mo.KADRAJ_OLCEK["tam"])
+_s27c = _kk.kadraj_buyutmeyen(4986, 3744, 1920, 1080,
+                              _taban_zoom(1.272, "alt"),
+                              _mo.KADRAJ_MERDIVENI, _mo.KADRAJ_OLCEK,
+                              tercih="alt")
+kontrol("I-27: BUYUTMEYEN kadraj AYNEN KORUNUR (kullanici secimi bozulmaz)",
+        _s27c["secilen"] == "alt" and _s27c["degisti"] is False)
+kontrol("I-27: hicbir kadraj yetmezse secilen=None (sessiz kirpma YOK)",
+        _kk.kadraj_buyutmeyen(400, 300, 1920, 1080, 1.3,
+                              _mo.KADRAJ_MERDIVENI,
+                              _mo.KADRAJ_OLCEK,
+                              tercih="tam")["secilen"] is None)
+kontrol("I-27: olculemezse plan OLDUGU GIBI kalir",
+        _kk.kadraj_buyutmeyen(None, None, 1920, 1080, 1.3,
+                              _mo.KADRAJ_MERDIVENI, _mo.KADRAJ_OLCEK,
+                              tercih="punch-1.6")["degisti"] is False)
+kontrol("⭐ I-27: YENI kadraj UYDURULMUYOR (yalniz merdivendekiler)",
+        all(k in _mo.KADRAJ_OLCEK for k in _mo.KADRAJ_MERDIVENI)
+        and set(_mo.KADRAJ_MERDIVENI) == set(_mo.KADRAJ_OLCEK))
+_det27 = [_kk.kadraj_buyutmeyen(3000, 2250, 1920, 1080,
+                                _taban_zoom(1.696, "punch-1.6"),
+                                _mo.KADRAJ_MERDIVENI, _mo.KADRAJ_OLCEK,
+                                tercih="punch-1.6")["secilen"]
+          for _ in range(5)]
+kontrol("I-27: ayni girdi -> AYNI kadraj (rastgelelik YOK)",
+        len(set(_det27)) == 1, _det27)
+kontrol("I-27: kadraj olcek tablosu TEK KAYNAK (kamera_spec gomulu tablo YOK)",
+        "KADRAJ_OLCEK.get(kadraj" in _sikistir(oku(KOK, "editor/motion.py"))
+        .replace(" ", "")
+        or "KADRAJ_OLCEK" in _kod_yalniz(oku(KOK, "editor/motion.py")))
+kontrol("⭐ I-27: kapi FAIL kodunda ve kalite bayragina bagli",
+        "KALITE-PUNCH-BUYUTME" in _qon.FAIL_KODLARI
+        and "KALITE-PUNCH-BUYUTME" in _qon.KALITE_KODLARI)
+kontrol("I-27: blur/pillarbox/upscale ile KURTARMA YOK",
+        not re.search(r"(boxblur|pad\s*=|pillarbox|letterbox|upscale|scale2ref)",
+                      _kod_yalniz(oku(KOK, "editor/plan.py")), re.I))
+kontrol("I-27: plan olcumu YENIDEN TURETMIYOR, spec'e ISLIYOR",
+        "punch_buyutme" in _sikistir(oku(KOK, "editor/plan.py"))
+        or "punch_buyutme" in oku(KOK, "editor/plan.py"))
+
+# ── IKINCI HALKA: kadraj daraltma ile OPTIK DURAGANLIK bagli ──
+# ⚠ OLCULDU: kadraji `tam`a cekmek pan surusuyle hareket eden cekimi
+# duragan birakiyor (b005 optik 1.415 < esik 2.0 -> POST-QA FAIL).
+kontrol("⭐ I-27: `tam` kadrajda pan payi ACLIK seviyesinde",
+        _mo._guvenli_pay(1.06 * _mo.KADRAJ_OLCEK["tam"]) < 0.03)
+kontrol("⭐ I-27: en dar punch (1.2) pan payini ~4 KATINA cikariyor",
+        _mo._guvenli_pay(1.06 * _mo.KADRAJ_OLCEK["ust"])
+        > 3 * _mo._guvenli_pay(1.06 * _mo.KADRAJ_OLCEK["tam"]))
+kontrol("⭐ I-27: edinim esigi MERDIVENDEN turetiliyor (2443, sabit rakam yok)",
+        _kk.en_az_kaynak_genisligi(1920) == 2443
+        and _kk.en_az_kaynak_genisligi(1920) == int(math.ceil(
+            1920 * _kk.EN_DAR_PUNCH_OLCEGI * _kk.PAN_TABANLI_ZOOM)))
+kontrol("I-27: esik 1920'den YUKSEK (eski esik yalniz `tam`i garanti ederdi)",
+        _kk.en_az_kaynak_genisligi(1920) > 1920)
+for _ad27, _g27b, _bekle27 in [("Commons afis 2240", 2240, False),
+                               ("Commons Columbia 2100", 2100, False),
+                               ("Commons Ohio 5184", 5184, True),
+                               ("NASA 3000", 3000, True),
+                               ("NASA 4192", 4192, True)]:
+    kontrol(f"I-27 esigi: {_ad27} -> {'GECER' if _bekle27 else 'RED'}",
+            (_g27b >= _kk.en_az_kaynak_genisligi(1920)) is _bekle27)
+kontrol("I-27: gecersiz kare olcusu 0 doner (uydurma esik yok)",
+        _kk.en_az_kaynak_genisligi(None) == 0)
+kontrol("⭐ I-27: smoke edinim esigini TURETIYOR (1920 gomulu degil)",
+        "EN_AZ_GENISLIK" in _sikistir(_SM25)
+        and "en_az_kaynak_genisligi" in oku(
+            KOK, "testler/smoke_konsept3_teknoloji_i20.py"))
+
 blok("§39c I-26 — s03 ASIRI DAR SORGU: OLCUMLU ES-ANLAMLI GENISLETME")
 
 # ⚠ I-25'IN NOTU DUZELTILDI. I-25 s03 icin "Commons'ta bu konuda aday
@@ -6588,10 +6708,18 @@ else:
     kontrol("⭐ I-23: KABUL EDILEN HER varlik oran kapisini gecti",
             _oz23.get("hepsi_uygun") is True
             and len(_oz23.get("kabul_edilen_oranlar") or []) == 4, _oz23)
-    kontrol("⭐ I-23: DIKEY kaynak GERCEKTEN reddedildi (>=1 red)",
-            (_oz23.get("reddedilen") or 0) >= 1
-            and any(x.get("yon") == "dikey"
-                    for x in (_me20.get("oran_reddi") or [])),
+    # ⚠ I-27'DE DUZELTILEN KILIT (I-23b ile ayni sinif): burasi "en az 1
+    # dikey red OLDU" diyordu. O sayi ADAY LISTESINE bagli — I-27'nin
+    # yukseltilmis cozunurluk esigi dikey adaylari ORAN kapisina VARMADAN
+    # eliyor. ASIL DEGISMEZ "kabul edilen hicbir varlik dikey/kare DEGIL";
+    # kilit ona cevrildi (gevsetme degil, DOGRU degismez).
+    kontrol("⭐ I-23: KABUL EDILEN hicbir varlik DIKEY/KARE degil",
+            all(o >= 1.244 for o in (_oz23.get("kabul_edilen_oranlar") or []))
+            and bool(_oz23.get("kabul_edilen_oranlar")),
+            _oz23.get("kabul_edilen_oranlar"))
+    kontrol("I-23: oran reddi olduysa DIKEY olarak siniflandirilmis",
+            all(x.get("yon") in ("dikey", "kare", "asiri-genis")
+                for x in (_me20.get("oran_reddi") or [])),
             _me20.get("oran_reddi"))
     kontrol("⭐ I-23: red kaydinda OLCULEN oran + HEDEF oran + NEDEN var",
             all(x.get("olculen_oran") and x.get("hedef_oran")
@@ -6687,19 +6815,41 @@ else:
     kontrol("I-26: her beat icin ekran piksel orani olculdu",
             all(k.get("olculdu") for k in (_pb26.get("kayitlar") or [])),
             _pb26.get("kayitlar"))
-    # ⚠ OLCULEN KUSUR SESSIZCE GECILMEZ. Bu bir KAPI DEGIL (davranis
-    # degismedi) ama sonuc PASS diye GORMEZDEN de GELINMEZ.
+    # ⚠ OLCULEN KUSUR SESSIZCE GECILMEZ.
     if (_pb26.get("buyuten_beat") or 0) > 0:
         bloke_yaz(
-            "I-26 teknoloji pilotu — KAYNAK BUYUTULUYOR",
+            "I-27 teknoloji pilotu — KAYNAK BUYUTULUYOR",
             f"{_pb26['buyuten_beat']} beat kaynagi ekranda BUYUTUYOR "
-            f"(en yuksek oran {_pb26.get('en_yuksek_oran')}). Depo "
-            f"'upscale YAPILMIYOR' diyor; bu soz yalnizca EDINIM esigi icin "
-            f"geceri, kamera `punch` kadrajinda IHLAL EDILIYOR. "
-            f"⚠ POST-QA otomatik olcumleri PASS veriyor ama 11 kare "
-            f"incelemesinde s01 (Commons 2240x1344) CAM ARKASI MUZE AFISI "
-            f"cikti: Ingilizce metin bloklari, yansima, yumusak. "
+            f"(en yuksek oran {_pb26.get('en_yuksek_oran')}). "
             f"MP4 KABUL EDILMIS SAYILMAZ.")
+    else:
+        kontrol("⭐ I-27: HICBIR beat kaynagi BUYUTMUYOR (I-26'da 2 taneydi)",
+                _pb26.get("temiz") is True
+                and (_pb26.get("en_yuksek_oran") or 0) <= 1.0,
+                _pb26.get("en_yuksek_oran"))
+    # ── I-27: PRE-QA punch olcumu ve kadraj dusurme ──
+    _pq27 = ((_R20["plan"]["on_render_qa"]["olcumler"].get("kalite") or {})
+             .get("punch_buyutme") or {})
+    kontrol("⭐ I-27: PRE-QA punch olcumu RAPORDA ve TEMIZ",
+            _pq27.get("temiz") is True and _pq27.get("olculen_beat") == 5
+            and not _pq27.get("buyuten"), _pq27)
+    kontrol("⭐ I-27: kadraj DETERMINISTIK dusuruldu ve gerekcesi yazili",
+            all(k.get("kadraj") in _mo.KADRAJ_OLCEK
+                for k in (_pq27.get("kadraj_dusurulen") or [])),
+            _pq27.get("kadraj_dusurulen"))
+    kontrol("I-27: edinim esigi TURETILEN degere esit (2443)",
+            _R20["medya_edinim"].get("en_az_genislik")
+            == _kk.en_az_kaynak_genisligi(1920))
+    kontrol("⭐ I-27: OPTIK DURAGANLIK kapisi da TEMIZ (kadraj daraltma "
+            "hareketi ac birakmadi)",
+            (_R20.get("optik_hareket") or {}).get("temiz") is True,
+            (_R20.get("optik_hareket") or {}).get("genel_ortalama"))
+    kontrol("I-27: kabul edilen HER varlik turetilen esigi geciyor",
+            all((s.get("olcu") or [0])[0]
+                >= _kk.en_az_kaynak_genisligi(1920)
+                for s in (_R20["medya_edinim"].get("sahneler") or [])
+                if s.get("durum") == "OK"),
+            [s.get("olcu") for s in _R20["medya_edinim"].get("sahneler") or []])
     # ⚠ POST-QA FAIL ise SESSIZCE GECILMEZ — BLOKE yazilir.
     if _R20["post_qa"]["durum"] == "FAIL":
         _nedenler = [s["kod"] for s in _R20["post_qa"]["sorunlar"]
