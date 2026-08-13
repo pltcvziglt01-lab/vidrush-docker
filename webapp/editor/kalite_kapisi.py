@@ -566,6 +566,123 @@ def guvenli_alan_olcusu(katmanlar, *, kare_yukseklik: float,
 KUNYE_HARF_ARALIGI_EM = 0.04
 
 
+# ═══════════ 5d) KARE ORNEKLEME PLANI (Faz I-32) ═══════════════════════
+#
+# ⚠ NEDEN VAR — I-31'DE OLCULEN KOR NOKTA:
+# Zorunlu gorsel/semantik inceleme karelerini secen kod SAHNE (cumle)
+# suresi uzerinden gidiyordu, BEAT uzerinden DEGIL. Pilotta 4 cumle ama
+# 5 beat vardi: s001 cumlesi 2.587 sn oldugu icin "sahne ortasi" 1.29'a
+# dusuyordu — yani b002'nin icine. **b001 (0-0.862 sn) HICBIR kareyle
+# orneklenmiyordu** ve kusurlu ACILIS PLANI incelemenin disinda kaldi
+# (cam arkasi muze vitrini ancak ELLE kare cikarilinca goruldu).
+# Ustelik yakinlik elemesi (`>= 0.35 sn`) bir beat'in TEK temsilcisini de
+# eleyebiliyordu — sessiz atlama.
+#
+# BU PLANLAYICI: her beat'e ZORUNLU bir temsil karesi verir; zorunlu kareler
+# yakinlik elemesiyle ASLA dusurulmez. Kare zamanlari FPS izgarasina oturur
+# ve beat sinirindan yarim kare (epsilon) iceride tutulur — boylece komsu
+# beat'e TASMAZ. Toplam hedef `max(en_az_kare, beat_sayisi)`: beat sayisi
+# 11'i asarsa kare sayisi OLCULU olarak yukseltilir, sessizce atlanmaz.
+KARE_EN_AZ = 11
+KARE_MIN_AYRIM_SN = 0.35
+
+
+def kare_ornekleme_plani(beatler, *, sure_sn: float,
+                         en_az_kare: int = KARE_EN_AZ, fps: float = 30.0,
+                         min_ayrim_sn: float = KARE_MIN_AYRIM_SN) -> dict:
+    """Her beat'i EN AZ bir kareyle kapsayan DETERMINISTIK ornekleme plani.
+
+    `beatler`: [{"beat_id","bas_sn","sure_sn"} ...]
+    Doner: {"anlar", "beat_kare", "kapsanmayan", "zorunlu", "dolgu",
+            "hedef", "yeterli", "epsilon_sn"}
+    Ag/dosya KULLANMAZ; rastgelelik YOK.
+    """
+    try:
+        liste = [b for b in (beatler or []) if isinstance(b, dict)]
+    except TypeError:
+        return {"olculdu": False, "neden": "GIRDI-BOZUK", "yeterli": False}
+    toplam = _sayi(sure_sn)
+    f = _sayi(fps) or 30.0
+    if not liste or toplam <= 0 or f <= 0:
+        return {"olculdu": False, "neden": "OLCU-YOK", "yeterli": False}
+    eps = 0.5 / f                      # YARIM KARE — sinirdan iceride kal
+    hedef = max(int(en_az_kare or 0), len(liste))
+
+    def _izgara(t, alt, ust):
+        """Zamani FPS izgarasina oturt ve [alt, ust] araliginda TUT."""
+        t = min(max(t, alt), ust)
+        k = round(t * f)
+        v = k / f
+        if v < alt:
+            v = math.ceil(alt * f) / f
+        if v > ust:
+            v = math.floor(ust * f) / f
+        return round(min(max(v, alt), ust), 4)
+
+    zorunlu, beat_kare, kapsanmayan = [], {}, []
+    for b in liste:
+        bid = str(b.get("beat_id") or "")
+        b0 = _sayi(b.get("bas_sn"))
+        b1 = b0 + _sayi(b.get("sure_sn"))
+        b1 = min(b1, toplam)
+        alt, ust = b0 + eps, b1 - eps
+        if ust < alt:                  # beat yarim kareden kisa
+            kapsanmayan.append(bid)
+            beat_kare[bid] = []
+            continue
+        t = _izgara(b0 + (b1 - b0) / 2.0, alt, ust)
+        zorunlu.append(t)
+        beat_kare[bid] = [t]
+
+    # ── DOLGU: hedefe ulasmak icin zaman cizgisine DETERMINISTIK dagit ──
+    anlar = list(zorunlu)
+    dolgu = []
+    if len(anlar) < hedef:
+        bolme = hedef - len(anlar) + 1
+        adaylar = [toplam * (i / bolme) for i in range(1, bolme)]
+        # Ek aday: her beat'in ilk ve son ceyregi (deterministik sira)
+        for b in liste:
+            b0 = _sayi(b.get("bas_sn"))
+            b1 = min(b0 + _sayi(b.get("sure_sn")), toplam)
+            if b1 - b0 > 4 * eps:
+                adaylar.append(b0 + (b1 - b0) * 0.25)
+                adaylar.append(b0 + (b1 - b0) * 0.75)
+        for ham in adaylar:
+            if len(anlar) >= hedef:
+                break
+            # Dolgu karesi de BIR BEAT'IN ICINDE olmali (edge-safe)
+            yer = None
+            for b in liste:
+                b0 = _sayi(b.get("bas_sn"))
+                b1 = min(b0 + _sayi(b.get("sure_sn")), toplam)
+                if b0 + eps <= ham <= b1 - eps:
+                    yer = (str(b.get("beat_id") or ""), b0 + eps, b1 - eps)
+                    break
+            if not yer:
+                continue
+            t = _izgara(ham, yer[1], yer[2])
+            if any(abs(t - x) < min_ayrim_sn for x in anlar):
+                continue
+            anlar.append(t)
+            dolgu.append(t)
+            beat_kare.setdefault(yer[0], []).append(t)
+
+    anlar = sorted(set(anlar))
+    for bid in beat_kare:
+        beat_kare[bid] = sorted(set(beat_kare[bid]))
+    return {
+        "olculdu": True, "anlar": anlar, "beat_kare": beat_kare,
+        "kapsanmayan": kapsanmayan, "zorunlu": sorted(set(zorunlu)),
+        "dolgu": sorted(set(dolgu)), "hedef": hedef, "fps": f,
+        "epsilon_sn": round(eps, 5), "beat": len(liste),
+        "kare": len(anlar),
+        "yeterli": (not kapsanmayan) and len(anlar) >= hedef,
+        "sebep": ("" if (not kapsanmayan) and len(anlar) >= hedef else
+                  (f"kapsanmayan beat: {kapsanmayan}" if kapsanmayan else
+                   f"{len(anlar)} kare < hedef {hedef}")),
+    }
+
+
 # ═══════════ 5c) EKRAN KUNYESI KISA BICIMI (Faz I-31) ══════════════════
 #
 # ⚠ POLITIKA (I-31, deterministik ve aciklanabilir):

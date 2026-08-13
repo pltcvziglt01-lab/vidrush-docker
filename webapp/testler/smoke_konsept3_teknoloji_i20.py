@@ -1190,20 +1190,22 @@ def main() -> int:
     # EN AZ 6 kare: her sahnenin ortasi + baslik bandi ani + video boyunca
     # esit araliklar. Yakin dusenler (< 0.35 sn) teke indirilir.
     sure_video = float(bic.get("duration") or toplam)
-    adaylar_an = [1.2]                       # baslik bandinin gorundugu an
-    _t = 0.0
-    for c in cumleler:                       # her sahnenin ortasi
-        adaylar_an.append(round(_t + c["sure_sn"] / 2, 2))
-        _t += c["sure_sn"]
-    for pay in (0.1, 0.22, 0.35, 0.48, 0.6, 0.72, 0.85, 0.95):
-        adaylar_an.append(round(sure_video * pay, 2))
-    kare_anlari = []
-    for t in sorted(set(adaylar_an)):
-        if 0 <= t < sure_video and all(abs(t - x) >= 0.35 for x in kare_anlari):
-            kare_anlari.append(t)
-    if len(kare_anlari) < 9:
-        print(f"      ⚠ yalnizca {len(kare_anlari)} ayri kare ani cikti "
-              f"(hedef >= 9)")
+    # ⚠ I-32: ornekleme artik SAHNE (cumle) suresi uzerinden DEGIL, BEAT
+    # zaman cizgisi uzerinden yapiliyor. I-31'de olculdu: 4 cumle / 5 beat
+    # oldugu icin "sahne ortasi" 1.29'a dusuyor ve b001 (0-0.862 sn)
+    # HICBIR kareyle orneklenmiyordu — kusurlu ACILIS PLANI incelemenin
+    # KOR NOKTASINDA kaliyordu. Plan her beat'e ZORUNLU temsil karesi verir,
+    # FPS izgarasina oturur ve beat sinirindan yarim kare iceride kalir.
+    _ornek = kk.kare_ornekleme_plani(
+        [{"beat_id": z["beat_id"], "bas_sn": z["bas_sn"],
+          "sure_sn": z["sure_sn"]} for z in zincir],
+        sure_sn=sure_video, en_az_kare=11, fps=float(FPS))
+    kare_anlari = list(_ornek.get("anlar") or [])
+    print(f"      ornekleme: {_ornek.get('kare')} kare / "
+          f"{_ornek.get('beat')} beat (hedef {_ornek.get('hedef')}), "
+          f"yeterli={_ornek.get('yeterli')}")
+    if not _ornek.get("yeterli"):
+        print(f"      ⚠ YETERSIZ ORNEKLEME: {_ornek.get('sebep')}")
     kareler = []
     for t in kare_anlari:
         ad = f"i20_kare_{str(t).replace('.', '_')}s.png"
@@ -1368,6 +1370,8 @@ def main() -> int:
         "kesmeler": {"sayi": len(kesmeler), "anlar": kesmeler},
         "post_qa": pd,
         "kareler": kareler,
+        # ⚠ I-32: beat<->kare eslemesi RAPORDA GORUNUR.
+        "kare_ornekleme": _ornek,
         "kapsam": {
             "gercek_motor": [
                 "editor.plan.uret (beat/gramer/motion/tipografi/ses/QA-on)",

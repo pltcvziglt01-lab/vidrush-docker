@@ -6281,6 +6281,92 @@ kontrol("elenen kaydi SEBEBIYLE birlikte duruyor",
             "x", adet=6, en_az_genislik=1920, acan=_sahte_acan([
                 _sahte_sayfa(1, 1, 800, 600, "kucuk.jpg")]))["elenen"]))
 
+blok("§39i I-32 — KARE ORNEKLEME HER BEAT'I KAPSAR")
+
+# ⚠ I-31'DE OLCULEN KOR NOKTA: ornekleme SAHNE (cumle) suresi uzerinden
+# yapiliyordu. Pilotta 4 cumle / 5 beat vardi; s001 cumlesi 2.587 sn oldugu
+# icin "sahne ortasi" 1.29'a dusuyordu (yani b002'ye) ve **b001 (0-0.862 sn)
+# HICBIR kareyle orneklenmiyordu**. Kusurlu ACILIS PLANI ancak ELLE kare
+# cikarilinca goruldu.
+
+def _b32(i, bas, sure):
+    return {"beat_id": f"b{i:03d}", "bas_sn": bas, "sure_sn": sure}
+
+
+# ── GERCEK PILOT ZAMAN CIZGISI (I-31 raporundan birebir) ──
+_PILOT32 = [_b32(1, 0.0, 0.862), _b32(2, 0.862, 1.725), _b32(3, 2.587, 4.738),
+            _b32(4, 7.325, 4.9), _b32(5, 12.225, 4.825)]
+_ESKI32 = [1.2, 1.71, 3.76, 4.96, 5.99, 8.21, 9.78, 10.27, 12.32, 14.54, 16.25]
+kontrol("⭐ I-32 KIRMIZI: ESKI ornekleme b001'i HIC kapsamiyordu",
+        not [t for t in _ESKI32 if 0.0 <= t < 0.862] and len(_ESKI32) == 11)
+_P32 = _kk.kare_ornekleme_plani(_PILOT32, sure_sn=17.109, fps=30.0)
+kontrol("⭐ I-32: YENI plan b001'i KAPSIYOR",
+        bool(_P32["beat_kare"].get("b001")), _P32["beat_kare"].get("b001"))
+kontrol("⭐ I-32: HICBIR beat kapsamsiz DEGIL",
+        _P32["kapsanmayan"] == [] and _P32["yeterli"] is True, _P32["sebep"])
+kontrol("⭐ I-32: EN AZ 11 kare sarti KORUNDU",
+        _P32["kare"] >= 11, _P32["kare"])
+for _b in _PILOT32:
+    _b0, _b1 = _b["bas_sn"], _b["bas_sn"] + _b["sure_sn"]
+    _ic = _P32["beat_kare"][_b["beat_id"]]
+    kontrol(f"⭐ I-32: {_b['beat_id']} kareleri KOMSU BEAT'E TASMIYOR",
+            bool(_ic) and all(_b0 <= t < _b1 for t in _ic), (_b0, _ic, _b1))
+kontrol("I-32: epsilon YARIM KARE (fps hassas)",
+        abs(_P32["epsilon_sn"] - 0.5 / 30.0) < 1e-4, _P32["epsilon_sn"])
+# ⚠ Zamanlar raporda okunabilir olsun diye 4 haneye yuvarlaniyor; bu,
+# izgaradan en fazla 0.00005 sn saptirir — yarim karenin (0.0167 sn) BINDE
+# BIRI. Olculen ozellik "kare izgarasina oturuyor" olmali, ondalik esitlik
+# degil (ilk yazdigim iddia bu yuzden fazla katiydi).
+kontrol("I-32: kare zamanlari FPS IZGARASINDA (yarim karenin cok altinda)",
+        all(abs(t * 30.0 - round(t * 30.0)) < 0.01 for t in _P32["anlar"]),
+        [round(abs(t * 30.0 - round(t * 30.0)), 5) for t in _P32["anlar"]])
+
+# ── COK KISA ACILIS ve KAPANIS ──
+_KISA32 = [_b32(1, 0.0, 0.862), _b32(2, 0.862, 8.0), _b32(3, 8.862, 0.4)]
+_PK32 = _kk.kare_ornekleme_plani(_KISA32, sure_sn=9.262, fps=30.0)
+kontrol("⭐ I-32: 0.862 sn ACILIS beat'i kapsandi",
+        len(_PK32["beat_kare"]["b001"]) >= 1)
+kontrol("⭐ I-32: 0.4 sn KAPANIS beat'i kapsandi",
+        len(_PK32["beat_kare"]["b003"]) >= 1,
+        _PK32["beat_kare"]["b003"])
+kontrol("I-32: cok kisa beatlerin kareleri de kendi sinirlarinda",
+        all(8.862 <= t < 9.262 for t in _PK32["beat_kare"]["b003"])
+        and all(0.0 <= t < 0.862 for t in _PK32["beat_kare"]["b001"]))
+
+# ── BEAT SAYISI 11'DEN FAZLA: kare sayisi OLCULU olarak yukselir ──
+_ONIKI32 = [_b32(i + 1, i * 1.0, 1.0) for i in range(12)]
+_P12 = _kk.kare_ornekleme_plani(_ONIKI32, sure_sn=12.0, fps=30.0)
+kontrol("⭐ I-32: 12 beat -> kare sayisi BEAT SAYISINA yukseldi (sessiz "
+        "atlama YOK)",
+        _P12["hedef"] == 12 and _P12["kare"] >= 12
+        and _P12["kapsanmayan"] == [], (_P12["hedef"], _P12["kare"]))
+kontrol("I-32: 12 beat'in HEPSI kapsandi",
+        all(_P12["beat_kare"][b["beat_id"]] for b in _ONIKI32))
+
+# ── 5 BEAT / 11 KARE: dolgu deterministik dagitiliyor ──
+kontrol("⭐ I-32: 5 beat -> 5 zorunlu + dolgu ile 11 kare",
+        len(_P32["zorunlu"]) == 5 and _P32["kare"] == 11
+        and len(_P32["dolgu"]) == 6, (_P32["zorunlu"], _P32["dolgu"]))
+kontrol("I-32: dolgu kareleri de BIR BEAT'IN icinde (edge-safe)",
+        all(any(b["bas_sn"] <= t < b["bas_sn"] + b["sure_sn"]
+                for b in _PILOT32) for t in _P32["dolgu"]))
+_det32 = [tuple(_kk.kare_ornekleme_plani(_PILOT32, sure_sn=17.109,
+                                         fps=30.0)["anlar"]) for _ in range(5)]
+kontrol("I-32: ayni girdi -> AYNI plan (rastgelelik YOK)",
+        len(set(_det32)) == 1)
+kontrol("I-32: bozuk girdi -> olculdu=False (uydurma plan YOK)",
+        _kk.kare_ornekleme_plani([], sure_sn=10)["olculdu"] is False
+        and _kk.kare_ornekleme_plani(_PILOT32,
+                                     sure_sn=0)["olculdu"] is False)
+kontrol("⭐ I-32: smoke ornekleme plani KULLANIYOR (cumle ortasi GITTI)",
+        "kare_ornekleme_plani" in oku(
+            KOK, "testler/smoke_konsept3_teknoloji_i20.py")
+        and "for c in cumleler:                       # her sahnenin ortasi"
+        not in oku(KOK, "testler/smoke_konsept3_teknoloji_i20.py"))
+kontrol("I-32: beat<->kare eslemesi RAPORA yaziliyor",
+        '"kare_ornekleme": _ornek' in oku(
+            KOK, "testler/smoke_konsept3_teknoloji_i20.py"))
+
 blok("§39h I-31 — EKRAN KUNYESI POLITIKASI: ATIF EKSILMEDEN SIGDIRMA")
 
 from medya import lisans as _lis                                  # noqa: E402

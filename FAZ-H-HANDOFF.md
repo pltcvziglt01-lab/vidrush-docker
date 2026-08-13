@@ -198,6 +198,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-29 afiş/pano sinyali: metadata GÜVENİLİR DEĞİL** | `015973e` | ✅ **push edildi**, recall %0 / hassasiyet %6 ölçüldü, üretim DEĞİŞMEDİ, MP4 korundu, deploy YOK |
 | 13 Ağu | **I-30 yatay güvenli alan kapısı eklendi** | `527cd28` | ✅ **push edildi**, sağ/sol taşma ölçülür oldu, pilotta ateşlemiyor, MP4 korundu, deploy YOK |
 | 13 Ağu | **I-31 ekran künyesi politikası** | `73d91e1` | ⚠ **push edildi**, taşma çözüldü + tam atıf korundu, MP4 **KABUL EDİLMEDİ** (açılış vitrin planı), deploy YOK |
+| 13 Ağu | **I-32 kare örnekleme her beat'i kapsıyor** | `PENDING` | ✅ **push edildi**, b001 kör noktası çözüldü, rerender YOK (talimat), BLOKE kanıt olarak duruyor, deploy YOK |
 
 ---
 
@@ -4619,3 +4620,89 @@ Teste **beat kapsama kontrolü** eklendi ve şu an **BLOKE** yazıyor:
 2. **Vitrin/pano tespiti** hâlâ açık: I-29'da metadata ile çözülemeyeceği
    ölçüldü; kare-bakan sinyal gerekir ve `medya.edinim`'de açıkça kapsam
    dışı — **kullanıcı kararı**.
+
+---
+
+## 50. FAZ I-32 — KARE ÖRNEKLEME HER BEAT'İ KAPSIYOR (13 Ağu)
+
+> **Durum: I-31'in BLOKE'sinin kök nedeni çözüldü. Yerel yeşil
+> (0 hata, 1 BLOKE — kanıt), push edildi. Deploy YOK. Maliyet $0.00.**
+> Değişen: `webapp/editor/kalite_kapisi.py`,
+> `webapp/testler/smoke_konsept3_teknoloji_i20.py`,
+> `webapp/testler/test_faz_i.py` (+ handoff).
+> **Pilot YENİDEN RENDER EDİLMEDİ** (talimat gereği): atom yalnızca QA
+> örnekleme/rapor davranışını değiştiriyor; render/medya seçimi aynı.
+> `plan.py`, `qa_on.py`, `motion.py`, `gramer.py`, `medya/*`, `pipeline.py`,
+> `server.py`, `deploy.sh`, `Grafikler.tsx`, pilot raporu ve 22 alan
+> sözleşmesi **dokunulmadı** (git ile doğrulandı). I-23…I-31 **korundu**.
+
+### ⛔ Kök neden — örnekleme BEAT'e değil CÜMLEYE bakıyordu
+
+Kare seçimi `for c in cumleler` üzerinden "sahne ortası" hesaplıyordu.
+Pilotta **4 cümle ama 5 beat** var: `s001` cümlesi 2.587 sn olduğu için
+ortası **1.29**'a düşüyor — yani **b002'nin içine**. Sonuç: **b001
+(0–0.862 sn) hiçbir kareyle örneklenmiyordu**. Üstelik yakınlık elemesi
+(`>= 0.35 sn`) bir beat'in **tek** temsilcisini de düşürebiliyordu.
+
+### ✅ Kanıt — I-31 pilotunun GERÇEK zaman çizgisinde
+
+| beat | aralık | ESKİ kare | **YENİ kare** |
+|---|---|---|---|
+| **b001** | 0.000–0.862 | ⛔ **YOK** | ✅ **0.4333** |
+| b002 | 0.862–2.587 | 1.2, 1.71 | 1.3, 1.7333, 2.4333 |
+| b003 | 2.587–7.325 | 3.76, 4.96, 5.99 | 3.7667, 4.9667, 6.1333 |
+| b004 | 7.325–12.225 | 8.21, 9.78, 10.27 | 8.5333, 9.7667, 11.0 |
+| b005 | 12.225–17.050 | 12.32, 14.54, 16.25 | 14.6333 |
+
+Eski: **11 kare, kapsanmayan `['b001']`**.
+Yeni: **11 kare, kapsanmayan `[]`, `yeterli=True`**.
+⚠ Yeni kapı I-31'in **mevcut kusurlu raporunu** hâlâ görünür biçimde
+**BLOKE ediyor** (`ornekleNMEDI: ['b001']`) — yani kapı gerçekten çalışıyor
+ve kusuru gizlemiyor.
+
+### Planlayıcının sözleşmesi
+
+- Her beat'e **zorunlu** bir temsil karesi; zorunlular yakınlık elemesiyle
+  **asla düşürülmez** (sessiz atlama yok).
+- Zamanlar **FPS ızgarasına** oturur ve beat sınırından **yarım kare**
+  (`epsilon = 0.5/fps = 0.01667 sn @30fps`) içeride tutulur → **komşu
+  beat'e taşma yok** (testle beat-beat doğrulandı).
+- Hedef `max(11, beat_sayısı)`: **beat sayısı 11'i aşarsa kare sayısı
+  ölçülü olarak yükselir** (12 beat → 12 kare, kapsanmayan `[]`).
+- Dolgu kareleri zaman çizgisine deterministik dağıtılır ve **bir beat'in
+  içinde** kalır. Rastgelelik **yok** (5 koşum → aynı plan).
+- Beat yarım kareden kısaysa dürüstçe `kapsanmayan`a yazılır — uydurma yok.
+- **beat↔kare eşlemesi rapora yazılıyor** (`kare_ornekleme`).
+
+### Ölçülen test sonucu
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1684** | **3098** |
+
+0 hata. Faz I 1662 → **1684** (+22). **1 BLOKE** — I-31 pilotunun eski
+kareleri b001'i kapsamıyor; bu **kanıt**, kapı doğru çalışıyor.
+
+Test edilen senaryolar: 0.862 sn açılış · 0.4 sn kapanış · 5 beat/11 kare ·
+12 beat → 12 kare · sınır karesi komşu beat'e taşmıyor · determinizm ·
+bozuk girdi.
+
+### Düzeltilen kendi hatam
+
+"Kare zamanları FPS ızgarasında" iddiasını ondalık **eşitlik** olarak
+yazmıştım; rapor okunabilirliği için 4 haneye yuvarlama ızgaradan en fazla
+**0.00005 sn** saptırıyor — yarım karenin **binde biri**. İddia ölçülen
+özelliğe (ızgaraya oturma) çevrildi.
+
+### SONRAKİ ATOM (I-33) — ölçülen sonuçtan
+
+**Pilotu yeni örneklemeyle yeniden üret ve b001'i gözle incele.** BLOKE
+ancak yeni kareler üretilince kapanır. Beklenen sonuç ikiden biri:
+1. Medya kümesi yine kayar ve b001 temiz bir varlık alır → MP4 kabul
+   edilebilir;
+2. b001 yine **vitrin/pano** sınıfı bir varlık alır → bu kez **11 kare
+   içinde görünür** ve kusur ölçülebilir biçimde belgelenir.
+
+İkinci durumda sıra, I-29'da metadata ile çözülemeyeceği ölçülen
+**vitrin/pano tespitine** gelir; o **kare-bakan** bir sinyal gerektirir ve
+`medya.edinim`'de açıkça kapsam dışıdır — **kullanıcı kararı**.
