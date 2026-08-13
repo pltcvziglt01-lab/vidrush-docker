@@ -357,7 +357,15 @@ def _katman_specleri(katmanlar: list, beatler: list, p: EditProfili) -> list:
         else:
             sp = motion.callout_spec(k.metin, 0.5, k.y_orani, k.sure_sn, p=p)
         d = sp.sozluk()
-        d["bas_sn"] = k.bas_sn
+        # ⚠ I-38'DE OLCULEN KUSUR: burada `d["bas_sn"] = k.bas_sn` yaziyordu,
+        # yani katmanin MUTLAK zaman cizgisi baslangici. Ama spec bir SAHNEYE
+        # bagli gidiyor ve tuketici (editorv2/Grafikler.tsx `KaynakEtiketi`,
+        # `BolumBasligi`) `spec.bas_sn`i SAHNEYE GORELI okuyup zarfi
+        # SAHNE-YEREL kare ile hesapliyor. Sonuc: b004 kunyesi 5.35 sn'lik
+        # sahnede 10.037 sn'de baslamak zorunda kaliyor ve HIC cizilmiyor.
+        # CC-BY/CC-BY-SA dort sahnenin ekran atfi boyle DUSTU.
+        # `chapter-title` yalniz TESADUFEN calisiyordu (b001 sifirdan baslar).
+        d["bas_sn"] = round(max(0.0, k.bas_sn - hedef.bas_sn), 3)
         d["beat_id"] = hedef.beat_id
         d["scene_id"] = hedef.scene_id
         d["fact_id"] = k.fact_id or hedef.fact_id

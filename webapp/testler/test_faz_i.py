@@ -6281,6 +6281,137 @@ kontrol("elenen kaydi SEBEBIYLE birlikte duruyor",
             "x", adet=6, en_az_genislik=1920, acan=_sahte_acan([
                 _sahte_sayfa(1, 1, 800, 600, "kucuk.jpg")]))["elenen"]))
 
+blok("§39n I-38 — YAZI SPEC'I SAHNEYE GORELI (EKRAN KUNYESI CIZILIYOR)")
+
+# ⚠ I-38'DE OLCULEN KUSUR (lawn pilotu, GERCEK 1080p render, 6 beat):
+# `_katman_specleri` grafik spec'ine katmanin MUTLAK zaman cizgisi
+# baslangicini yaziyordu (`d["bas_sn"] = k.bas_sn`). Remotion tarafi
+# (editorv2/Grafikler.tsx `KaynakEtiketi`) `spec.bas_sn`i SAHNEYE GORELI
+# okur ve `zarf()`i SAHNE-YEREL kare ile hesaplar. Olculen:
+#   b002 sahne 2.20 sn, bas_sn 2.287  -> HIC gorunmez
+#   b003 sahne 5.55 sn, bas_sn 4.488  -> yalniz son ~1 sn
+#   b004 sahne 5.35 sn, bas_sn 10.037 -> HIC gorunmez
+#   b005 sahne 5.27 sn, bas_sn 15.388 -> HIC gorunmez
+#   b006 sahne 4.94 sn, bas_sn 20.662 -> HIC gorunmez
+# Sonuc: CC-BY / CC-BY-SA olan DORT sahnenin EKRAN KUNYESI hic cizilmedi;
+# atif yalniz `attribution.txt`te kaldi. `chapter-title` TESADUFEN
+# calisiyordu: b001 sifirdan basliyor, orada mutlak == goreli.
+# Hicbir kapi gormedi — kusur ancak KAREYE BAKINCA cikti.
+
+
+class _B38:
+    """beat ikamesi — `_katman_specleri`nin okudugu alanlar."""
+
+    def __init__(self, bid, sid, fid, bas, sure):
+        self.beat_id = bid
+        self.scene_id = sid
+        self.fact_id = fid
+        self.bas_sn = bas
+        self.sure_sn = sure
+        self.bitis_sn = round(bas + sure, 3)
+
+
+# Gercek lawn zaman cizgisi (render_plan.json'dan OLCULDU)
+_BEAT38 = [_B38("b001", "s001", "s01", 0.0, 1.887),
+           _B38("b002", "s001", "s01", 1.887, 2.201),
+           _B38("b003", "s002", "s02", 4.088, 5.549),
+           _B38("b004", "s003", "s03", 9.637, 5.351),
+           _B38("b005", "s004", "s04", 14.988, 5.274),
+           _B38("b006", "s005", "s05", 20.262, 4.938)]
+_P38 = _eprofil.profil("premium-modern")
+_KAT38 = [_etipo.katman_kur("chapter-title", "THERE IS A BAG OF GRASS",
+                            0.2, 3.387, fact_id="s01", p=_P38, y_orani=0.7)]
+for _b38, _mt38 in ((_BEAT38[1], "Forest and Kim Starr / CC-BY"),
+                    (_BEAT38[2], "Famartin / CC-BY-SA"),
+                    (_BEAT38[3], "Anton / CC-BY-SA"),
+                    (_BEAT38[4], "Macleay Grass Man / CC-BY"),
+                    (_BEAT38[5], "Dietmar Rabich / CC-BY-SA")):
+    _KAT38.append(_etipo.katman_kur(
+        "source-label", _mt38, _b38.bas_sn + 0.4, min(3.0, _b38.sure_sn),
+        fact_id=_b38.fact_id, p=_P38, y_orani=0.755))
+
+_SP38 = _ep2._katman_specleri(_KAT38, _BEAT38, _P38)
+_SP_BEAT = {s["beat_id"]: s for s in _SP38}
+
+
+def _sahne_suresi(bid):
+    return next(b.sure_sn for b in _BEAT38 if b.beat_id == bid)
+
+
+# ── KIRMIZI 1: spec bas_sn SAHNEYE GORELI olmali (mutlak DEGIL) ──
+_disarida = [(s["beat_id"], s["ad"], s["bas_sn"], _sahne_suresi(s["beat_id"]))
+             for s in _SP38 if s["bas_sn"] >= _sahne_suresi(s["beat_id"])]
+kontrol("⭐ I-38 KIRMIZI: hicbir yazi spec'i SAHNE DISINDA baslamiyor",
+        not _disarida, _disarida)
+kontrol("⭐ I-38: source-label bas_sn SAHNEYE GORELI (hepsi 0.4)",
+        all(abs(_SP_BEAT[b]["bas_sn"] - 0.4) < 0.01
+            for b in ("b002", "b003", "b004", "b005", "b006")),
+        {b: _SP_BEAT[b]["bas_sn"] for b in
+         ("b002", "b003", "b004", "b005", "b006")})
+kontrol("⭐ I-38: b004 kunyesi ARTIK cizilebilir (10.037 -> 0.4)",
+        _SP_BEAT["b004"]["bas_sn"] < _sahne_suresi("b004"),
+        _SP_BEAT["b004"]["bas_sn"])
+# ── GERILEME YOK: ilk sahnede deger DEGISMEZ (mutlak == goreli) ──
+kontrol("I-38 GERILEME YOK: b001 chapter-title bas_sn 0.2 KALDI",
+        abs(_SP_BEAT["b001"]["bas_sn"] - 0.2) < 0.001,
+        _SP_BEAT["b001"]["bas_sn"])
+kontrol("I-38: sure_sn ve y_orani DOKUNULMADI",
+        abs(_SP_BEAT["b003"]["sure_sn"] - 3.0) < 0.01
+        and abs(_SP_BEAT["b003"]["parametre"]["y_orani"] - 0.755) < 0.001)
+kontrol("I-38: her spec DOGRU beat/scene'e bagli (I-37 bagi korunur)",
+        all(_SP_BEAT[b]["scene_id"] == s for b, s in
+            (("b003", "s002"), ("b004", "s003"),
+             ("b005", "s004"), ("b006", "s005"))))
+kontrol("I-38: kunye METINLERI korunuyor (atif kaybolmaz)",
+        _SP_BEAT["b005"]["parametre"]["metin"] == "Macleay Grass Man / CC-BY")
+
+# ── KIRMIZI 2: PRE-QA bu SESSIZ DUSUSU yakalamali ──
+
+
+def _yazi38(specler, beatler):
+    q = _qon.QaSonucu()
+    _qon._kalite_denetle(q, beatler=beatler, cekimler=[], yazi_katmanlari=[],
+                         adaylar_index={}, p=_qon.VARSAYILAN,
+                         kare_olcu=(1920, 1080), anlatim_bitis_sn=None,
+                         toplam=25.2, benzerlik_okuyucu=None, acik=True,
+                         motion_specler=specler)
+    return q
+
+
+# KIRMIZI kurulum: I-38 ONCESI davranis (mutlak bas_sn) yeniden uretilir.
+_SP_KIRMIZI = [dict(s) for s in _SP38]
+for _s38 in _SP_KIRMIZI:
+    _b0 = next(b for b in _BEAT38 if b.beat_id == _s38["beat_id"])
+    _s38["bas_sn"] = round(_b0.bas_sn + 0.4, 3) if _s38["ad"] != "chapter-title" \
+        else _s38["bas_sn"]
+_q38k = _yazi38(_SP_KIRMIZI, _BEAT38)
+_yd = _q38k.olcumler["kalite"]["yazi_sahne_penceresi"]
+kontrol("⭐ I-38 KIRMIZI: sahne disi yazi spec'i YAKALANIYOR (4 spec)",
+        len(_yd["disarida"]) == 4 and _yd["temiz"] is False,
+        [d["beat_id"] for d in _yd["disarida"]])
+kontrol("⭐ I-38: sahne disi yazi PRE-QA'da FAIL uretiyor",
+        any(x.kod == "KALITE-YAZI-SAHNE-DISI" and x.seviye == "fail"
+            for x in _q38k.sorunlar))
+kontrol("I-38: kayit beat/ad/bas_sn/sahne_sure GOSTERIYOR",
+        {"beat_id", "ad", "bas_sn", "sahne_sure_sn"} <= set(_yd["disarida"][0]),
+        _yd["disarida"][0])
+# YESIL: duzeltilmis (sahneye goreli) specler temiz gecer.
+_q38y = _yazi38(_SP38, _BEAT38)
+_ydy = _q38y.olcumler["kalite"]["yazi_sahne_penceresi"]
+kontrol("⭐ I-38 YESIL: sahneye goreli speclerde ihlal YOK",
+        _ydy["temiz"] is True and not _ydy["disarida"])
+kontrol("⭐ I-38: kapi FAIL ve KALITE kodlarinda (bayraga bagli)",
+        "KALITE-YAZI-SAHNE-DISI" in _qon.FAIL_KODLARI
+        and "KALITE-YAZI-SAHNE-DISI" in _qon.KALITE_KODLARI)
+kontrol("I-38: olcum HER yazi spec'ini kapsiyor (6 spec)",
+        _ydy["olculen"] == 6, _ydy.get("olculen"))
+# ── Remotion tarafi sozlesmesi: tuketici GORELI okuyor (kanit) ──
+_GRAFIK_TSX = oku(os.path.dirname(KOK), "app", "render-studio", "src",
+                  "editorv2", "Grafikler.tsx")
+kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
+        "KaynakEtiketi" in _GRAFIK_TSX
+        and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
+
 blok("§39m I-37 — BEAT->SCENE->FACT->ASSET BAGI KOPAMAZ")
 
 # ⚠ I-37'DE OLCULEN KUSUR (lawn pilotu, gercek render):

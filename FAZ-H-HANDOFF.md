@@ -5177,3 +5177,100 @@ varlık kullanılamaz ve künye **uydurulmaz**. İkinci adayı indirmek Commons'
    `grass seedling` sorgusunun 0. adayı (*Grass seedlings near Dreenhill*,
    4032×3024) tüm kapılardan geçiyor ama indirmesi 429'a takılmıştı;
    `cikti/_i37_medya/s04_*` silinip yeniden alınmalı.
+
+---
+
+## 56. FAZ I-38 — YAZI SPEC'İ SAHNEYE GÖRELİ: EKRAN KÜNYESİ ÇİZİLİYOR (dar kalite atomu, 13 Ağu)
+
+> **Durum: kök neden ÇÖZÜLDÜ, kapı eklendi, A–I yeşil (3162, 0 hata).
+> Lawn pilotu HÂLÂ kabul edilmedi (iki ayrı, ölçülen sebep). Deploy YOK.
+> Maliyet $0.00.**
+> Değişen: `webapp/editor/plan.py` (1 satır + gerekçe),
+> `webapp/editor/qa_on.py` (yeni kapı), `webapp/testler/test_faz_i.py`.
+> `medya/*`, `adapter.py`, `motion.py`, `tipografi.py`, `remotion_v2.py`,
+> TSX'lerin **hiçbiri**, `pipeline.py`, `server.py`, `deploy.sh` ve 22 alan
+> sözleşmesi **dokunulmadı**. I-22…I-37 **korundu**.
+
+### ⛔ Ölçülen kök neden
+
+`_katman_specleri` grafik spec'ine katmanın **MUTLAK zaman çizgisi**
+başlangıcını yazıyordu (`d["bas_sn"] = k.bas_sn`). Tüketici
+(`app/render-studio/src/editorv2/Grafikler.tsx` → `KaynakEtiketi`,
+`BolumBasligi`) `spec.bas_sn`i **SAHNEYE GÖRELİ** okur ve zarfı
+**sahne-yerel kare** ile hesaplar. Gerçek render'da ölçüldü:
+
+| beat | sahne süresi | spec `bas_sn` | sonuç |
+|---|---|---|---|
+| b002 | 2.201 | 2.287 | **hiç görünmez** |
+| b003 | 5.549 | 4.488 | yalnız son ~1 sn |
+| b004 | 5.351 | 10.037 | **hiç görünmez** |
+| b005 | 5.274 | 15.388 | **hiç görünmez** |
+| b006 | 4.938 | 20.662 | **hiç görünmez** |
+| b001 `chapter-title` | 1.887 | 0.2 | çalışıyor |
+
+Yani **CC-BY / CC-BY-SA olan dört sahnenin EKRAN KÜNYESİ hiç çizilmedi**;
+atıf yalnız `attribution.txt`te kaldı. `chapter-title` **tesadüfen**
+çalışıyordu: b001 sıfırdan başlar, orada mutlak == göreli. I-31 politikası
+ölçülüyor, planlanıyor, `kunye_kararlari`'nda `TAM` raporlanıyordu — **ekrana
+ulaşmıyordu**. Hiçbir otomatik kapı görmedi; kusur ancak **kareye bakınca**
+çıktı (I-33 dersinin aynısı).
+
+### Düzeltme (en küçük güvenli)
+
+1. **Spec zamanı sahneye göreli.** `d["bas_sn"] = max(0.0, k.bas_sn − hedef.bas_sn)`.
+   Beş künyenin hepsi `0.4`'e iner (plan zaten `b.bas_sn + 0.4` veriyordu);
+   b001 `chapter-title` `0.2`'de **değişmeden** kalır — gerileme yok.
+2. **Yeni PRE-QA kapısı `KALITE-YAZI-SAHNE-DISI` (fail).** `bas_sn >= sahne
+   süresi` olan yazı katmanı sahne-yerel karede **hiç gelmez** → sessizce
+   düşer. Ölçüm `olcum["yazi_sahne_penceresi"]` ile **raporda görünür**
+   (ölçülen sayısı + dışarıda kalan listesi).
+
+### Testler
+
+Kırmızı önce: gerçek lawn zaman çizgisiyle kapı **4 sahne-dışı spec** yakaladı
+ve `KALITE-YAZI-SAHNE-DISI` **fail** üretti; düzeltilmiş speclerde temiz.
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1748** | **3162** |
+
+0 hata. Faz I 1734 → **1748**. A–H bit-bit değişmedi. 1 BLOKE (I-33 kaydı).
+
+### ✅ Rerender: künye GÖRÜNÜYOR, ama pilot yine kabul edilmedi
+
+1080p yeniden üretildi. Ekran künyesi **kareyle doğrulandı**:
+`Famartin / CC-BY-SA` (6.0 sn), `Anton / CC-BY-SA` (11.5 sn),
+`Macleay Grass Man / CC-BY` (17.0 sn), `Dietmar Rabich / CC-BY-SA` (22.0 sn)
+— sağa hizalı, güvenli alan içinde. Ölçümler: 1920×1080/30fps, 25.3 sn,
+LUFS −14.26 / TP −2.57, sessizlik 0, siyah 0, donma 0, 5 benzersiz kesme,
+ardışık aynı varlık **yok**, beat→fact→asset kopuk **0**, 11 tam çözünürlük
+kare, izleyici kalite puanı 100/100.
+
+⛔ **İki sebeple KABUL EDİLMEDİ:**
+
+1. **POST-QA FAIL — `POST-KENAR-SIYAH`** (1/101 kare, sağ kenar **15.99** vs
+   eşik **16.0**). Bıçak sırtı: I-37 render'ı aynı ölçümde **16.06** ile
+   geçiyordu (pay 0.06). İhlal karesi ≈20.4 sn — b005 künyesi 18.388'de bitti,
+   b006'nınki 20.662'de başlıyor, yani **o karede ekranda künye yok**;
+   düzeltme o kareyi içerik olarak değiştirmiyor. Kare `karartma` geçişinin
+   içinde. **Eşik GEVŞETİLMEDİ.**
+2. **Semantik kusurlar sürüyor** (I-37'den devir, medya değişmedi):
+   b001 *"garage shelf"* → 1900 sepya hasat; b002 → Kahoʻolawe kurak
+   restorasyon sahası; b005 *"seedling"* → **Ricinus** (kene otu) geniş
+   yapraklı fide. b003/b004/b006 semantik olarak **doğru**.
+
+**MP4 kabul edilmiş değil, mutlak yol verilmedi, deploy yok.**
+
+### SONRAKİ ATOM (I-39) — yalnız ölçülen kusurdan
+
+1. **`POST-KENAR-SIYAH` geçiş karelerini ayırt etmiyor.** `karartma`/`flash`
+   geçişi kareyi meşru olarak karartır; kapı bunu "kamera kadrajdan taşıyor"
+   diye raporluyor. Ölçülebilir atom: geçiş penceresindeki kareleri ya hariç
+   tut ya da geçiş için ayrı eşik ölç. Eşiği körlemesine düşürmek **yanlış**.
+2. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005). Seçici
+   çözünürlük/detay/orana göre puanlıyor; "grass seedling" sorgusuna keskin
+   4000×3000 Ricinus'u çim fidesinin üstüne koyuyor. Bu **ayrı ve daha büyük**
+   bir atom — sorguyu ya da eşiği zorlamak çözüm değil.
+3. **`kaynakYazi` `VidrushVideo` yolunda taşınmıyor** (`Video.tsx` `Sahne`
+   tipinde alan yok; `adapter.REMOTION_ALANLARI` ise içeriyor). Bu hat
+   (`pipeline.py`) I-38'de **ölçülmedi**; ayrı atom olarak doğrulanmalı.

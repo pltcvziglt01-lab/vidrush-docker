@@ -41,6 +41,8 @@ FAIL_KODLARI = {
     "KALITE-KUNYE-EKSIK",
     # ── Faz I-37: beat->scene->fact->asset bagi KOPAMAZ ──
     "KALITE-BAG-KOPUK",
+    # ── Faz I-38: yazi spec'i SAHNE PENCERESININ disinda baslayamaz ──
+    "KALITE-YAZI-SAHNE-DISI",
     # ── Faz I-27: kamera punch'i kaynagi BUYUTEMEZ ──
     "KALITE-PUNCH-BUYUTME",
 }
@@ -58,7 +60,7 @@ KALITE_KODLARI = ("KALITE-BASLIK-KIRPIK", "KALITE-BASLIK-TASMA",
                   "KALITE-MOTION-ACILIS-KAPANIS",
                   "KALITE-MOTION-ISLEV-TEKRAR",
                   "KALITE-PUNCH-BUYUTME", "KALITE-KUNYE-EKSIK",
-                  "KALITE-BAG-KOPUK")
+                  "KALITE-BAG-KOPUK", "KALITE-YAZI-SAHNE-DISI")
 
 
 @dataclass
@@ -418,6 +420,44 @@ def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
               "medya siralamasi/secimi SAHNE BAGINI korumali; varlik baska "
               "sahnenin beat'ine TASINAMAZ",
               scene_id=_bk["scene_id"], beat_id=_bk["beat_id"])
+
+    # ── I-38: YAZI SPEC'I SAHNE PENCERESININ DISINDA BASLAYAMAZ ──
+    # ⚠ OLCULEN KUSUR: grafik spec'ine katmanin MUTLAK zaman cizgisi
+    # baslangici yaziliyordu; tuketici (Remotion) onu SAHNEYE GORELI okuyor.
+    # `bas_sn >= sahne suresi` olan bir yazi katmani SAHNE-YEREL karede HIC
+    # gelmez -> sessizce DUSER. Lawn pilotunda CC-BY/CC-BY-SA dort sahnenin
+    # ekran kunyesi boyle kayboldu ve HICBIR kapi gormedi.
+    _YAZI_ADLARI = ("chapter-title", "lower-third", "source-label", "callout",
+                    "quote-card", "kinetic-title", "text-in-video")
+    _sure_beat = {str(getattr(_b1, "beat_id", "") or ""):
+                  float(getattr(_b1, "sure_sn", 0) or 0) for _b1 in beatler}
+    _yazi_disarida, _yazi_olculen = [], 0
+    for _sp1 in (motion_specler or []):
+        if str(_sp1.get("ad") or "") not in _YAZI_ADLARI:
+            continue
+        _yazi_olculen += 1
+        _bid1 = str(_sp1.get("beat_id") or "")
+        _ssure = _sure_beat.get(_bid1)
+        if not _ssure:
+            continue
+        _bas1 = float(_sp1.get("bas_sn") or 0)
+        if _bas1 >= _ssure:
+            _yazi_disarida.append({
+                "beat_id": _bid1, "ad": _sp1.get("ad"),
+                "scene_id": str(_sp1.get("scene_id") or ""),
+                "bas_sn": round(_bas1, 3),
+                "sahne_sure_sn": round(_ssure, 3)})
+    olcum["yazi_sahne_penceresi"] = {"olculen": _yazi_olculen,
+                                     "disarida": _yazi_disarida,
+                                     "temiz": not _yazi_disarida}
+    for _yd1 in _yazi_disarida:
+        _ekle("KALITE-YAZI-SAHNE-DISI", "fail",
+              f"{_yd1['beat_id']} {_yd1['ad']}: bas_sn {_yd1['bas_sn']} sn "
+              f">= sahne suresi {_yd1['sahne_sure_sn']} sn — bu katman "
+              f"SAHNE-YEREL karede HIC cizilmez (sessiz dusus)",
+              "yazi spec'inin bas_sn'i SAHNEYE GORELI olmali "
+              "(mutlak zaman cizgisi DEGIL)",
+              scene_id=_yd1["scene_id"], beat_id=_yd1["beat_id"])
 
     # ── (1) BASLIK: kelime ortasi kesik + bant tasmasi ──
     baslik_olcumleri = []
