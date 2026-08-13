@@ -201,7 +201,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-32 kare örnekleme her beat'i kapsıyor** | `7098f4b` | ✅ **push edildi**, b001 kör noktası çözüldü, rerender YOK (talimat), BLOKE kanıt olarak duruyor, deploy YOK |
 | 13 Ağu | **I-33 gerçek koşum doğrulaması** | `584dea6` | ⚠ **push edildi**, kare planı KANITLANDI (b001 kapsandı), otomatik kapılar PASS ama MP4 **KABUL EDİLMEDİ** (b001 vitrin/pano), deploy YOK |
 | 13 Ağu | **I-34 vitrin sinyali: ELENDİ** | `7c5884f` | ✅ **push edildi**, 4 sinyal x 28 ölçüm: ayıran eşik YOK (en iyi precision 0.25), üretim DEĞİŞMEDİ, rerender/deploy YOK |
-| 13 Ağu | **I-35 s01 sorgu daraltması: ELENDİ** | `PENDING` | ✅ **push edildi**, 10 sorgu ölçüldü: vitrini eleyen her daraltma NASA'yı boşaltıyor, sorgu DEĞİŞMEDİ, rerender/deploy YOK |
+| 13 Ağu | **I-35 s01 sorgu daraltması: ELENDİ** | `7709ae1` | ✅ **push edildi**, 10 sorgu ölçüldü: vitrini eleyen her daraltma NASA'yı boşaltıyor, sorgu DEĞİŞMEDİ, rerender/deploy YOK |
 
 ---
 
