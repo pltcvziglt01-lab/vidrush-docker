@@ -200,6 +200,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-31 ekran künyesi politikası** | `73d91e1` | ⚠ **push edildi**, taşma çözüldü + tam atıf korundu, MP4 **KABUL EDİLMEDİ** (açılış vitrin planı), deploy YOK |
 | 13 Ağu | **I-32 kare örnekleme her beat'i kapsıyor** | `7098f4b` | ✅ **push edildi**, b001 kör noktası çözüldü, rerender YOK (talimat), BLOKE kanıt olarak duruyor, deploy YOK |
 | 13 Ağu | **I-33 gerçek koşum doğrulaması** | `584dea6` | ⚠ **push edildi**, kare planı KANITLANDI (b001 kapsandı), otomatik kapılar PASS ama MP4 **KABUL EDİLMEDİ** (b001 vitrin/pano), deploy YOK |
+| 13 Ağu | **I-34 vitrin sinyali: ELENDİ** | `PENDING` | ✅ **push edildi**, 4 sinyal x 28 ölçüm: ayıran eşik YOK (en iyi precision 0.25), üretim DEĞİŞMEDİ, rerender/deploy YOK |
 
 ---
 
@@ -4807,3 +4808,108 @@ En küçük ölçülebilir ilk adım önerisi: **indirilen görselde metin yoğu
 kusurlu varlık ile kabul edilen NASA varlıkları üzerinde **recall/hassasiyet
 ölçümü** — I-29'daki disiplinin aynısı. Güvenilir çıkarsa kapı, çıkmazsa
 dürüstçe elenir.
+
+---
+
+## 52. FAZ I-34 — VİTRİN/PANO KARE-BAKAN SİNYAL: **ELENDİ** (yalnız tanısal, 13 Ağu)
+
+> **Durum: sinyal ÖLÇÜLDÜ ve ELENDİ. Üretim kodu DEĞİŞMEDİ; ölçüm ve gerekçe
+> teste kilitlendi. Yerel yeşil (0 hata, 1 BLOKE — I-33 kaydı sürüyor),
+> push edildi. Rerender YOK, deploy YOK. Maliyet $0.00.**
+> Değişen: **yalnızca** `webapp/testler/test_faz_i.py` (+ handoff).
+> `medya/*`, `editor/*`, smoke betiği, pilot raporu ve 22 alan sözleşmesi
+> **dokunulmadı** (git ile doğrulandı). I-23…I-33 **korundu**.
+> Yeni sağlayıcı/ağ/ücretli API **yok**; ölçüm yalnız yerel `ffmpeg` +
+> saf Python ile yapıldı (`numpy`/`cv2`/`scipy` **yok**, OCR **yok**).
+
+### Kurulan küme
+
+**Pozitif (1 varlık):** `s01_..._2.jpg` — 3410×2634, `wikimedia`, `cc-by-sa`,
+*"Pleiades supercomputer node on display at NASA Ames visitor center"*
+(I-31 ve I-33'te **iki kez** b001'e düşen cam arkası müze vitrini).
+**Negatif (6 varlık):** I-27/I-33'te semantik olarak kabul edilen NASA
+varlıkları (rack, facility, chip, solar) + kapı elemeli ama semantik temiz
+olanlar (dikey s02, düşük çözünürlüklü s04).
+**Varyantlar (4):** `tam` · `merkez70` · `sol50` · `ust50`
+→ **28 ölçüm** (4 pozitif + 24 negatif varyant).
+
+### Ölçülen sinyaller (hepsi ffmpeg + saf Python)
+
+`S1` metin satırı yoğunluğu · `S2` `edgedetect` kenar oranı ·
+`S3` düz-parlak pano koşuları · `S4` specular (cam yansıması vekili).
+
+| varlık | S1 | S2 | S3 | S4 |
+|---|---|---|---|---|
+| **POZ vitrin** | **0.0000–0.2083** | 0.0396–0.0688 | 0.0455–0.1873 | 0.0003–0.0104 |
+| NEG s01 rack | 0.0000–0.0000 | 0.0523–0.0661 | 0.0000–0.0131 | 0.0006–0.0013 |
+| NEG s03 chip | 0.0000–0.0000 | 0.0183–0.0355 | 0.1082–**0.2608** | 0.0002–0.0011 |
+| NEG s04 solar | 0.0000–0.0000 | 0.0465–0.0678 | 0.1116–**0.3355** | 0.0205–0.0504 |
+| NEG s02 dikey | 0.0000–0.0417 | 0.0210–0.0318 | 0.1290–0.2266 | 0.0033–**0.1126** |
+| NEG s04 düşük | 0.0194–**0.2222** | 0.0476–0.0647 | 0.0519–0.0761 | 0.0074–0.0404 |
+
+### ⛔ Hüküm: ayıran eşik YOK
+
+**Dört sinyalin dördünde de pozitif aralık negatiflerle örtüşüyor.**
+Eşik süpürmesi (en iyi F1):
+
+| sinyal | eşik | F1 | recall | **precision** | TP/FN/FP/TN |
+|---|---|---|---|---|---|
+| S2 kenar | 0.0396 | 0.400 | 1.00 | **0.25** | 4/0/**12**/12 |
+| S1 metin | 0.0028 | 0.333 | 0.50 | **0.25** | 2/2/6/18 |
+| S3 düz | 0.0455 | 0.320 | 1.00 | **0.19** | 4/0/**17**/7 |
+| S4 spec | 0.0048 | 0.316 | 0.75 | **0.20** | 3/1/12/12 |
+
+İkili birleşimlerin en iyisi **S2+S3: F1 0.545, recall 0.75, precision 0.43**
+— yani pozitif varyantların **birini kaçırıyor** ve **4 temiz varyantı**
+yanlış eliyor.
+
+**En iyi tek sinyal (S2) recall 1.00 veriyor ama precision 0.25:** 24 temiz
+varyantın **12'si** — yani kabul edilen NASA varlıklarının yarısı —
+**yanlışlıkla elenirdi**.
+
+### ⚠ İki ek ölçülen sorun
+
+1. **Pozitifin kendisi kararsız.** S1, kırpma varyantına göre
+   **0.0000 → 0.2083** arasında savruluyor; 4 varyantın **2'sinde tam 0**.
+   Yani vitrin, kadrajın neresine bakıldığına göre "görünmez" olabiliyor.
+2. **İki sinyal TERS çalışıyor.** `S3`: temiz solar paneli **0.3355** ile
+   pozitifin maksimumunun (0.1873) çok üstünde. `S4`: temiz dikey s02
+   **0.1126** ile pozitifin (0.0104) **on katı**. Yani bu sinyaller vitrini
+   değil, **düz/parlak yüzeyleri** ölçüyor.
+
+### ⚠ Örneklem sınırı — genellenebilir PASS DENMEZ
+
+Küme **1 pozitif varlık** içeriyor. Bu boyutta recall pratikte ikili bir
+sayıdır ve **genellenebilir bir sonuç vermez**. Sinyal ayrışsaydı bile
+"çözüldü" denemezdi. Burada zaten **ayrışmıyor**.
+
+**Kusurlu varlığa özel kara liste genel çözüm olarak sunulmadı** ve üretim
+kodunda **yok** (testle kilitli). Üretim dosyalarına vitrin/pano sinyal
+kapısı **eklenmedi** (beş dosya için ayrı ayrı doğrulandı).
+
+### Ölçülen test sonucu
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1701** | **3115** |
+
+0 hata. Faz I 1685 → **1701** (+16). **1 BLOKE** — I-33 görsel inceleme
+kaydı **sürüyor** (pilot hâlâ kabul edilmedi).
+
+### SONRAKİ ATOM — yalnız ölçülen sonuç belirliyor
+
+Kare-bakan basit sinyaller **elendi**; bu yolla otomatik vitrin tespiti
+**mevcut yerel bağımlılıklarla mümkün değil**. Ölçülen duruma göre geriye
+**üç seçenek** kalıyor ve üçü de **kullanıcı kararı**:
+
+1. **Kaynağı değiştir:** Commons'ın b001'e verdiği tek varlık vitrin çıktı.
+   Pilotun s01 sorgusu (`Pleiades supercomputer`) daraltılabilir
+   (ör. `Pleiades supercomputer racks`) — **I-26'daki ölçümlü sorgu
+   disiplininin** aynısı, ağ/kota artışı yok.
+2. **Sağlayıcı sırasını s01 için ölçüp değiştir** (NASA'nın bu sahnede
+   semantik olarak daha güvenilir olduğu iki koşumda gözlendi).
+3. **Kabul et ve elle seç:** b001 varlığını operatör onayına bağla.
+
+⚠ Yeni yetenek (gerçek görüntü sınıflandırma / VLM) **kapsam dışı** ve
+maliyet doğurur; bu atomun ölçümü onu **gerekçelendirmiyor** çünkü sorun
+sinyal seçimi değil, **basit sinyallerin bu ayrımı taşıyamaması**.

@@ -6281,6 +6281,86 @@ kontrol("elenen kaydi SEBEBIYLE birlikte duruyor",
             "x", adet=6, en_az_genislik=1920, acan=_sahte_acan([
                 _sahte_sayfa(1, 1, 800, 600, "kucuk.jpg")]))["elenen"]))
 
+blok("§39j I-34 — VITRIN/PANO KARE-BAKAN SINYAL: ELENDI (olculdu)")
+
+# ⚠ I-33'te IKI KEZ dogrulanan kusur: b001'e dusen Commons varligi cam arkasi
+# MUZE VITRINI. I-34 sorusu: bu, indirilen GORSEL uzerinde AGSIZ/OCR'SIZ bir
+# kare-bakan sinyalle DETERMINISTIK yakalanabilir mi? OLCUM: HAYIR.
+#
+# Kume: 1 POZITIF varlik (s01_..._2.jpg, 3410x2634, "node on display at NASA
+# Ames visitor center") + 6 NEGATIF varlik (I-27/I-33'te semantik olarak
+# kabul edilen NASA varliklari + kapi elemeli ama semantik temiz olanlar).
+# Her varlik 4 varyantta olculdu: tam / merkez70 / sol50 / ust50.
+# Sinyaller (yalniz ffmpeg + saf Python; numpy/cv2 YOK):
+#   S1 metin satiri yogunlugu · S2 edgedetect kenar orani
+#   S3 duz-parlak pano kosulari · S4 specular (cam yansimasi vekili)
+#
+# OLCULEN ARALIKLAR (varyantlar arasi min-max):
+_I34 = {
+    "POZ s01_2 (VITRIN)": {"lab": 1, "S1": (0.0000, 0.2083),
+                           "S2": (0.0396, 0.0688), "S3": (0.0455, 0.1873),
+                           "S4": (0.0003, 0.0104)},
+    "NEG s01 rack":       {"lab": 0, "S1": (0.0000, 0.0000),
+                           "S2": (0.0523, 0.0661), "S3": (0.0000, 0.0131),
+                           "S4": (0.0006, 0.0013)},
+    "NEG s03 chip":       {"lab": 0, "S1": (0.0000, 0.0000),
+                           "S2": (0.0183, 0.0355), "S3": (0.1082, 0.2608),
+                           "S4": (0.0002, 0.0011)},
+    "NEG s04 solar":      {"lab": 0, "S1": (0.0000, 0.0000),
+                           "S2": (0.0465, 0.0678), "S3": (0.1116, 0.3355),
+                           "S4": (0.0205, 0.0504)},
+    "NEG s02 dikey":      {"lab": 0, "S1": (0.0000, 0.0417),
+                           "S2": (0.0210, 0.0318), "S3": (0.1290, 0.2266),
+                           "S4": (0.0033, 0.1126)},
+    "NEG s04 dusuk":      {"lab": 0, "S1": (0.0194, 0.2222),
+                           "S2": (0.0476, 0.0647), "S3": (0.0519, 0.0761),
+                           "S4": (0.0074, 0.0404)},
+}
+_POZ34 = [v for v in _I34.values() if v["lab"] == 1]
+_NEG34 = [v for v in _I34.values() if v["lab"] == 0]
+for _sig in ("S1", "S2", "S3", "S4"):
+    _pmin = min(v[_sig][0] for v in _POZ34)
+    _pmax = max(v[_sig][1] for v in _POZ34)
+    _nmin = min(v[_sig][0] for v in _NEG34)
+    _nmax = max(v[_sig][1] for v in _NEG34)
+    kontrol(f"⭐ I-34: {_sig} pozitif araligi negatiflerle ORTUSUYOR "
+            f"(ayiran esik YOK)",
+            _nmax >= _pmin and _nmin <= _pmax,
+            f"poz {_pmin}-{_pmax} | neg {_nmin}-{_nmax}")
+# Olculen en iyi esik supurmesi sonuclari (4 poz varyant / 24 neg varyant):
+_I34_SUPURME = {"S1": (0.333, 0.50, 0.25), "S2": (0.400, 1.00, 0.25),
+                "S3": (0.320, 1.00, 0.19), "S4": (0.316, 0.75, 0.20)}
+_I34_IKILI = {"S1+S3": (0.500, 0.50, 0.50), "S2+S3": (0.545, 0.75, 0.43),
+              "S2+S4": (0.400, 1.00, 0.25)}
+kontrol("⭐ I-34: EN IYI TEK sinyal precision yalniz 0.25 (24 temiz "
+        "varyantin 12'si YANLIS ELENIRDI)",
+        max(v[0] for v in _I34_SUPURME.values()) == 0.400
+        and _I34_SUPURME["S2"][2] == 0.25)
+kontrol("⭐ I-34: EN IYI IKILI birlesim bile F1=0.545 / precision=0.43",
+        max(v[0] for v in _I34_IKILI.values()) == 0.545
+        and _I34_IKILI["S2+S3"][2] == 0.43)
+kontrol("⭐ I-34: POZITIF varliğin kendisi KIRPMAYA gore KARARSIZ "
+        "(S1 0.0000-0.2083)",
+        _I34["POZ s01_2 (VITRIN)"]["S1"] == (0.0000, 0.2083))
+for _sig, _neg_ad in (("S3", "NEG s04 solar"), ("S4", "NEG s02 dikey")):
+    kontrol(f"⭐ I-34: {_sig} TERS calisiyor — '{_neg_ad}' pozitiften YUKSEK",
+            _I34[_neg_ad][_sig][1] > _I34["POZ s01_2 (VITRIN)"][_sig][1],
+            (_I34[_neg_ad][_sig], _I34["POZ s01_2 (VITRIN)"][_sig]))
+kontrol("⭐ I-34: ORNEKLEM 1 POZITIF varlik — GENELLENEBILIR PASS DENMEZ",
+        len(_POZ34) == 1 and len(_NEG34) == 5)
+# ── HUKUM: guvenilir ayrim YOK -> URETIM KODUNA BAGLANMADI ──
+for _d34 in ("medya/commons.py", "medya/edinim.py", "editor/qa_on.py",
+             "editor/plan.py", "editor/kalite_kapisi.py"):
+    kontrol(f"⭐ I-34: {_d34} vitrin/pano SINYAL KAPISI icermiyor",
+            not re.search(r"(edgedetect|specular|vitrin|pano_|metin_yogunlu)",
+                          _kod_yalniz(oku(KOK, _d34)), re.I), _d34)
+kontrol("⭐ I-34: KUSURLU VARLIGA OZEL KARA LISTE URETIM KODUNDA YOK",
+        not any("s01_11066148" in oku(KOK, _d)
+                or "node on display" in oku(KOK, _d)
+                for _d in ("medya/commons.py", "medya/edinim.py",
+                           "editor/plan.py", "editor/qa_on.py",
+                           "editor/kalite_kapisi.py")))
+
 blok("§39i I-32 — KARE ORNEKLEME HER BEAT'I KAPSAR")
 
 # ⚠ I-31'DE OLCULEN KOR NOKTA: ornekleme SAHNE (cumle) suresi uzerinden
