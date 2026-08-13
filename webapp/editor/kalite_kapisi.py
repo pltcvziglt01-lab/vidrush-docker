@@ -1395,16 +1395,148 @@ UZAMSAL_ENERJI_ESIGI = 11.589
 
 
 def gorsel_ornek_komutu(gorsel_yolu: str, *,
-                        olcu: tuple = GORSEL_ORNEK_OLCU) -> list:
+                        olcu: tuple = GORSEL_ORNEK_OLCU,
+                        kirpma: Optional[dict] = None) -> list:
     """Ornekleme komutunu URETIR — bu modul onu CALISTIRMAZ.
 
     ⚠ `optik_ornek_komutu` ile AYNI olcu ve AYNI gri bicim; tek fark tek
     kare alinmasi. Iki taraf ayrisirsa esik anlamini yitirir.
+
+    ⚠ FAZ I-45: `kirpma` verilirse (normalize {x,y,w,h}) once KIRPILIR,
+    sonra ornek olcusune indirgenir — cunku renderer da once kadrajlar.
+    Kirpma YOKSA komut I-44'teki haliyle BIT-BIT aynidir.
     """
     g, y = int(olcu[0]), int(olcu[1])
+    vf = f"scale={g}:{y},format=gray"
+    if kirpma:
+        try:
+            kx, ky = _sayi(kirpma.get("x")), _sayi(kirpma.get("y"))
+            kw, kh = _sayi(kirpma.get("w")), _sayi(kirpma.get("h"))
+        except (AttributeError, TypeError):
+            kx = ky = kw = kh = 0.0
+        if kw > 0 and kh > 0:
+            vf = (f"crop=iw*{kw:.6f}:ih*{kh:.6f}:iw*{kx:.6f}:ih*{ky:.6f},"
+                  + vf)
     return ["ffmpeg", "-nostdin", "-v", "error", "-i", gorsel_yolu, "-vf",
-            f"scale={g}:{y},format=gray", "-frames:v", "1",
-            "-f", "rawvideo", "-"]
+            vf, "-frames:v", "1", "-f", "rawvideo", "-"]
+
+
+# ═══════════ 7d) GOSTERILEN KADRAJ BOLGESI (Faz I-45) ═══════════════════
+#
+# ⚠ NEDEN VAR — I-44 PILOTUNDA OLCULEN YANLIS ALARM:
+# I-44 enerjiyi TUM KAREDE olcuyordu, oysa renderer `kadraj`/`punch` ile
+# KIRPIYOR: olculen piksellerin bir kismi ekrana HIC gelmiyor. b002 tam
+# karede 7.557 olcup isaretlendi ama gercek render'da optik 2.288 ile esigi
+# GECTI.
+#
+# ⚠ GEOMETRI UYDURULMADI — `editorv2/Kamera.tsx`ten BIREBIR turetildi:
+#     Zemin %100x%100, objectFit: cover,
+#     transform: scale(S) translate(x%, y%), transformOrigin center.
+#     CSS transform SAGDAN SOLA uygulanir ve yuzde kayma ELEMANIN KENDI
+#     olcusune goredir:   q = merkez + S * ((p - merkez) + (dx, dy))
+#     Tersi -> ekranda gorunen ELEMAN dikdortgeni:
+#         genislik W/S, yukseklik H/S, merkez (W/2 - dx, H/2 - dy)
+#     `cover` icin kapsama = max(W/sw, H/sh)  — `punch_buyutme_olcusu` ile
+#     AYNI aritmetik (tek kaynak). KAYNAK piksel uzayinda normalize:
+#         w = W/(S*kapsama*sw)     cx = 0.5 - dx/(kapsama*sw)
+#         h = H/(S*kapsama*sh)     cy = 0.5 - dy/(kapsama*sh)
+#     Kamera.tsx: kaymaX = (pxT-0.5)*2*pay*100,
+#                 kaymaY = (0.5-odakY)*2*pay*100   (dx = kaymaX/100 * W)
+
+
+def kadraj_kirpma_bolgesi(*, olcek, pan_x=(0.5, 0.5), odak=(0.5, 0.5),
+                          guvenli_pay: float = 0.0,
+                          kaynak_g=0, kaynak_y=0,
+                          kare_g: float = 1920.0, kare_y: float = 1080.0,
+                          t: float = 0.0) -> dict:
+    """`t` aninda EKRANDA GORUNEN kaynak bolgesi (normalize, saf aritmetik).
+
+    ⚠ OLCEMEDIYSE ENGELLEMEZ: gecersiz olcude `olculdu=False` doner
+    (cozunurluk/oran kapilariyla ayni "emin degilsen engelleme" sozlesmesi).
+    """
+    try:
+        W, H = float(kare_g), float(kare_y)
+        sw, sh = float(kaynak_g), float(kaynak_y)
+        S = float(olcek)
+        pay = float(guvenli_pay)
+        tt = min(max(float(t), 0.0), 1.0)
+    except (TypeError, ValueError):
+        return {"olculdu": False, "neden": "OLCU-OKUNAMADI"}
+    if W <= 0 or H <= 0 or sw <= 0 or sh <= 0 or S <= 0:
+        return {"olculdu": False, "neden": "OLCU-GECERSIZ"}
+    try:
+        px0 = float(pan_x[0])
+        px1 = float(pan_x[1]) if len(pan_x) > 1 else px0
+        odak_y = float(odak[1]) if len(odak) > 1 else 0.5
+    except (TypeError, ValueError, IndexError):
+        px0 = px1 = 0.5
+        odak_y = 0.5
+    kapsama = max(W / sw, H / sh)
+    pxT = px0 + (px1 - px0) * tt
+    dx = (pxT - 0.5) * 2.0 * pay * W
+    dy = (0.5 - odak_y) * 2.0 * pay * H
+    w = W / (S * kapsama * sw)
+    h = H / (S * kapsama * sh)
+    cx = 0.5 - dx / (kapsama * sw)
+    cy = 0.5 - dy / (kapsama * sh)
+    x0 = min(max(cx - w / 2.0, 0.0), 1.0)
+    y0 = min(max(cy - h / 2.0, 0.0), 1.0)
+    return {"olculdu": True, "olcek": round(S, 4), "kapsama": round(kapsama, 4),
+            "x": round(x0, 6), "y": round(y0, 6),
+            "w": round(min(w, 1.0 - x0), 6), "h": round(min(h, 1.0 - y0), 6)}
+
+
+# ⚠ ESIGIN KALIBRASYON ALANI — UYDURMA DEGIL, I-44 KALIBRASYONUNUN KENDI
+# KONFIGURASYONUNDAN TURETILDI. `UZAMSAL_ENERJI_ESIGI` (11.589) su tek
+# konfigurasyonda olculmustu: `VidrushVideo`, oran 0.045, 4.0 sn, pan=yok.
+# O konfigurasyonun kendi aritmetigi (Video.tsx `kbHesap`/`SURE_ZOOM`):
+#     taban olcek = 1 + 2*22/1920 + 0.012 = 1.0349
+#     tepe  olcek = max(1 + 0.045*4, taban + 0.06) = 1.1800
+# Ic ice (merkezli) dikdortgenlerde ortusme  IoU = (1.0349/1.1800)^2 = 0.769
+#     gezinme hizi = (1 - 0.769) / 4.0 sn = 0.0577 /sn
+#
+# ⚠ I-45'TE OLCULEN NEDEN: editorv2 cekimleri 0.0527-0.1139 /sn araliginda
+# geziniyor. b002 tam 0.1025 /sn ile kalibrasyonun 1.78 KATI; kalibrasyon
+# ailesinde ~9.1 enerjide optik 1.294 olculmustu ve 1.294 x 1.78 = 2.30,
+# gercek render'da olculen 2.288 ile ortusuyor. Yani esigi BASKA bir
+# gezinme hizinda uygulamak I-43'un birim uyusmazliginin AYNISIDIR ->
+# alan disinda HUKUM VERILMEZ.
+KALIBRASYON_GEZINME_HIZI = 0.0577
+
+
+def kadraj_gezinme_hizi(bas: dict, son: dict, *, sure_sn: float,
+                        kalibrasyon: float = KALIBRASYON_GEZINME_HIZI) -> dict:
+    """Kameranin saniyede ne kadar YENI icerik gosterdigi (saf aritmetik).
+
+    Iki uc kadraj dikdortgeninin ortusmemesi (1 - IoU) sureye bolunur.
+    ⚠ Olcemezse hukum vermez: `olculdu=False`.
+    """
+    try:
+        s = float(sure_sn)
+    except (TypeError, ValueError):
+        return {"olculdu": False, "neden": "SURE-OKUNAMADI"}
+    if s <= 0 or not (isinstance(bas, dict) and isinstance(son, dict)):
+        return {"olculdu": False, "neden": "GIRDI-YOK"}
+    if not (bas.get("olculdu") and son.get("olculdu")):
+        return {"olculdu": False, "neden": "KIRPMA-OLCULEMEDI"}
+    ax0, ay0 = _sayi(bas.get("x")), _sayi(bas.get("y"))
+    ax1, ay1 = ax0 + _sayi(bas.get("w")), ay0 + _sayi(bas.get("h"))
+    bx0, by0 = _sayi(son.get("x")), _sayi(son.get("y"))
+    bx1, by1 = bx0 + _sayi(son.get("w")), by0 + _sayi(son.get("h"))
+    kesisim = (max(0.0, min(ax1, bx1) - max(ax0, bx0))
+               * max(0.0, min(ay1, by1) - max(ay0, by0)))
+    birlesim = ((ax1 - ax0) * (ay1 - ay0) + (bx1 - bx0) * (by1 - by0)
+                - kesisim)
+    if birlesim <= 0:
+        return {"olculdu": False, "neden": "ALAN-YOK"}
+    ortusme = kesisim / birlesim
+    hiz = (1.0 - ortusme) / s
+    kal = _sayi(kalibrasyon, KALIBRASYON_GEZINME_HIZI)
+    return {"olculdu": True, "ortusme": round(ortusme, 4),
+            "hiz": round(hiz, 4), "sure_sn": round(s, 3),
+            "kalibrasyon_hizi": kal,
+            # ⚠ Esik yalniz KALIBRASYON HIZINA KADAR gecerlidir.
+            "kalibrasyon_icinde": bool(hiz <= kal + 1e-9)}
 
 
 def uzamsal_enerji_olcusu(ham, *, olcu: tuple = GORSEL_ORNEK_OLCU,
@@ -1513,8 +1645,12 @@ def motion_grammar_olcusu(sahneler, *, pencere: int = HAREKET_PENCERESI,
 
     # ── UZAMSAL ENERJI BACAGI (Faz I-44) ──
     # ⚠ Yalniz STATIK FOTOGRAF: `medya_turu` "video" ise atlanir.
+    # ⚠ FAZ I-45: esik TEK bir kamera konfigurasyonunda (gezinme 0.0577 /sn)
+    # olculdu. `gezinme_hizi` verilen ve o hizin USTUNDE gezinen cekimlerde
+    # HUKUM VERILMEZ — olculen alanin disina hukum tasimak I-43'un birim
+    # uyusmazliginin aynisidir. Sessizce gecilmez: `gezinme_kapsam_disi`.
     _esik = _sayi(enerji_esigi, UZAMSAL_ENERJI_ESIGI)
-    dusuk_enerji, enerji_olculdu = [], False
+    dusuk_enerji, enerji_olculdu, gezinme_kapsam_disi = [], False, []
     for i, s in enumerate(liste):
         ham = s.get("uzamsal_enerji")
         if ham is None:
@@ -1523,11 +1659,22 @@ def motion_grammar_olcusu(sahneler, *, pencere: int = HAREKET_PENCERESI,
         if str(s.get("medya_turu") or "image").lower() == "video":
             continue
         e = _sayi(ham, -1.0)
-        if 0 <= e <= _esik:
-            dusuk_enerji.append({
+        if not (0 <= e <= _esik):
+            continue
+        _gz = s.get("gezinme_hizi")
+        if _gz is not None and _sayi(_gz, 0.0) > KALIBRASYON_GEZINME_HIZI + 1e-9:
+            gezinme_kapsam_disi.append({
                 "indeks": i, "beat_id": str(s.get("beat_id") or ""),
-                "hareket": hareketler[i], "uzamsal_enerji": round(e, 3),
-                "esik": _esik})
+                "uzamsal_enerji": round(e, 3), "esik": _esik,
+                "gezinme_hizi": round(_sayi(_gz, 0.0), 4),
+                "kalibrasyon_hizi": KALIBRASYON_GEZINME_HIZI})
+            continue
+        dusuk_enerji.append({
+            "indeks": i, "beat_id": str(s.get("beat_id") or ""),
+            "hareket": hareketler[i], "uzamsal_enerji": round(e, 3),
+            "esik": _esik,
+            **({"gezinme_hizi": round(_sayi(_gz, 0.0), 4)}
+               if _gz is not None else {})})
 
     return {
         "olculdu": True,
@@ -1539,6 +1686,9 @@ def motion_grammar_olcusu(sahneler, *, pencere: int = HAREKET_PENCERESI,
         "enerji_olculdu": enerji_olculdu,
         "enerji_esigi": _esik,
         "dusuk_enerji": dusuk_enerji,
+        # ⚠ I-45: esigin kalibrasyon alani DISINDA kalan cekimler.
+        "gezinme_kapsam_disi": gezinme_kapsam_disi,
+        "kalibrasyon_gezinme_hizi": KALIBRASYON_GEZINME_HIZI,
         "benzersiz_hareket": len({h for h in hareketler if h}),
         "ardisik_tekrar": ardisik_tekrar,
         "pencere_tekrari": pencere_tekrar,

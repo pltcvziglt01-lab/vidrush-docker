@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 13 Ağu | **I-45 enerji gösterilen kadraj bölgesinde ölçülüyor** | `PENDING` | ✅ **push edildi**, I-44 enerjiyi **ekrana hiç gelmeyen** piksellerde de ölçüyordu → gösterilen bölge `Kamera.tsx` transformundan **birebir türetildi**; ⚠ **ölçüm hipotezi çürüttü** (kırpmada ölçmek yanlış alarmı azaltmadı, b005 ile **artırdı**) → gerçek kök neden ölçüldü: eşik **tek bir kamera konfigürasyonunda** (gezinme **0.0577/sn**) kalibre edilmişti; artık **kalibrasyon alanı dışında hüküm verilmiyor** → pilotta yanlış alarm **1 → 0** (PRE-QA warn 4→3), b002/b005 **bilgi** olarak raporlanıyor; fail'e **yükseltilmedi** (ölçüm kesinleşmedi), render **11/11 kare SHA-256 aynı**, POST-QA **PASS** ama **kabul edilmiş MP4 DEĞİL** (b001/b002 semantik), deploy YOK |
 | 13 Ağu | **I-44 görselin uzamsal enerjisi ölçülüyor** | `5911e1c` | ✅ **push edildi**, düz görselin statik fotoğraf olarak hareket üretemediği I-43'te ölçülmüştü ama **hiçbir kapı ölçmüyordu** → `uzamsal_enerji_olcusu` + PRE-QA kapısı (**ölçülen eşik 11.589**); 25.2 sn editorv2 pilotunda kapı **doğru varlığı** işaretledi (b002, enerji 7.557), diğer 5 varlık (12.33–18.08) işaretlenmedi; render **11/11 kare SHA-256 aynı** (gerileme yok), POST-QA **PASS** ama **kabul edilmiş MP4 DEĞİL** (b001/b002 semantik, gözle doğrulandı), deploy YOK |
 | 13 Ağu | **I-43 zoom kovaları optik ölçüm birimiyle hizalandı** | `ac3ef27` | ✅ **push edildi**, kovalar referans kanal birimindeydi (%/sn zoom), kapı ekran farkını ölçüyordu → **ölçülen taban 0.045**; 25.2 sn pilotta eşiği geçen sahne **2/6 → 5/6** (aynı props ile karşı-olgu render'ı), eşik gevşetilmedi, kova tablosu/aritmetik/22 alan dokunulmadı; POST-QA **WARN** (s1 — kök neden ölçüldü: **görsel enerjisi**, |grad| 4.21 vs 10.9–15.2), **kabul edilmiş MP4 DEĞİL**, deploy YOK |
 
@@ -5657,6 +5658,148 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 63. FAZ I-45 — ENERJİ EKRANA GELMEYEN PİKSELLERDE DE ÖLÇÜLÜYORDU (kalite atomu, 13 Ağu)
+
+> **Durum: gösterilen kadraj bölgesi ARTIK GERÇEK RENDERER TRANSFORMUNDAN
+> türetiliyor ve enerji ORADA ölçülüyor. ⚠ Atomun hipotezi ÖLÇÜMLE ÇÜRÜDÜ
+> (aşağıya bakınız) ve gerçek kök neden ölçülerek bulundu → pilotta
+> **yanlış alarm 1 → 0**, PRE-QA warn 4 → 3. A–I yeşil (3307, 0 hata).
+> Render **11/11 kare SHA-256 aynı** — gerileme yok. POST-QA **PASS**, ama
+> MP4 **kabul edilmedi** (b001/b002 semantik). Deploy YOK. Maliyet $0.00.**
+> Değişen: `webapp/editor/kalite_kapisi.py` (2 saf fonksiyon + 1 sabit +
+> örnekleyiciye kırpma + motion grammar alan kontrolü),
+> `webapp/editor/qa_on.py` (1 kod + kablolama), `webapp/testler/test_faz_i.py`.
+> `Video.tsx`, `Kamera.tsx`, `motion.py`, `pipeline.py`, `medya/*`,
+> `server.py`, `deploy.sh`, **eşikler** ve **22 alan sözleşmesi**
+> **dokunulmadı**. I-23…I-44 **korundu**.
+
+### ⛔ Ölçülen kusur
+
+I-44 enerjiyi **tüm karede** ölçüyordu; oysa renderer `kadraj`/`punch` ile
+**kırpıyor** — ölçülen piksellerin bir kısmı ekrana **hiç gelmiyor**. I-44
+pilotunda b002 tam karede 7.557 ölçülüp işaretlendi ama gerçek render'da
+optik **2.288** ile eşiği **geçti** (yanlış alarm).
+
+### Geometri UYDURULMADI — `Kamera.tsx`ten birebir türetildi
+
+```
+Zemin: %100×%100, objectFit: cover,
+       transform: scale(S) translate(x%, y%), transformOrigin center
+CSS transform SAĞDAN SOLA uygulanır, yüzde kayma ELEMANIN KENDİ ölçüsüne göre:
+       q = merkez + S · ((p − merkez) + (dx, dy))
+Tersi → görünen eleman dikdörtgeni: W/S × H/S, merkez (W/2 − dx, H/2 − dy)
+cover → kapsama = max(W/sw, H/sh)   (`punch_buyutme_olcusu` ile AYNI aritmetik)
+KAYNAK piksel uzayında:  w = W/(S·kapsama·sw)   cx = 0.5 − dx/(kapsama·sw)
+                         h = H/(S·kapsama·sh)   cy = 0.5 − dy/(kapsama·sh)
+Kamera.tsx: kaymaX = (pxT−0.5)·2·pay·100,  kaymaY = (0.5−odakY)·2·pay·100
+```
+
+Pilotun **gerçek** b002 parametreleriyle (`zoom [1.5342, 1.35]`, `pay 0.1567`,
+kaynak 3456×2592) doğrulandı: t=1'de kırpma **0.7407×0.5556** (ortalı),
+t=0'da **0.6518×0.4889**. Testler bu sayıları ve pan/odak yönlerini kilitler.
+
+### ⚠ ATOMUN HİPOTEZİ ÖLÇÜMLE ÇÜRÜDÜ
+
+Pilotun altı çekimi gerçek kadrajlarıyla ölçüldü:
+
+| beat | kadraj | tam kare | **kırpma** | optik | tam-kare kapı | kırpma-kapı |
+|---|---|---|---|---|---|---|
+| b001 | tam | 14.887 | 15.596 | 4.438 | temiz | temiz |
+| **b002** | punch-1.35 | **7.557** | **9.391** | **2.288** | ⚠ alarm | ⚠ **hâlâ alarm** |
+| b003 | ust | 15.792 | 19.962 | 7.485 | temiz | temiz |
+| b004 | punch-1.6 | 18.083 | 17.347 | 16.431 | temiz | temiz |
+| **b005** | alt | 12.330 | **10.469** | 2.686 | temiz | ⚠ **YENİ yanlış alarm** |
+| b006 | tam | 13.867 | 13.467 | 3.116 | temiz | temiz |
+
+**Kırpmada ölçmek yanlış alarmı azaltmadı — artırdı.** Tahmin değil, ölçüm.
+
+### Gerçek kök neden — EŞİĞİN KALİBRASYON ALANI
+
+`UZAMSAL_ENERJI_ESIGI` (11.589) **tek bir kamera konfigürasyonunda**
+ölçülmüştü: `VidrushVideo`, oran 0.045, 4.0 sn, pan=yok. O konfigürasyonun
+**kendi aritmetiğinden** gezinme hızı türetilir (Video.tsx `kbHesap`):
+
+```
+taban ölçek = 1 + 2·22/1920 + 0.012 = 1.0349
+tepe  ölçek = max(1 + 0.045·4, taban + 0.06) = 1.1800
+iç içe dikdörtgenlerde IoU = (1.0349/1.1800)² = 0.769
+gezinme hızı = (1 − 0.769) / 4.0 sn = 0.0577 /sn
+```
+
+editorv2 çekimleri **0.0527–0.1139 /sn** aralığında geziniyor. b002 tam
+**0.1025 /sn** ile kalibrasyonun **1.78 katı**; kalibrasyon ailesinde ~9.1
+enerjide optik **1.294** ölçülmüştü ve **1.294 × 1.78 = 2.30**, gerçek
+render'da ölçülen **2.288** ile örtüşüyor. Yani eşiği başka bir gezinme
+hızında uygulamak **I-43'ün birim uyuşmazlığının aynısıdır**.
+
+### Düzeltme (en küçük)
+
+- `kadraj_kirpma_bolgesi(...)` — **saf**; `t` anında ekrana gelen kaynak
+  bölgesi. Ölçü geçersizse `olculdu=False` (**engellemez**).
+- `kadraj_gezinme_hizi(bas, son, sure_sn)` — **saf**; (1 − IoU)/süre ve
+  `kalibrasyon_icinde` bayrağı.
+- `KALIBRASYON_GEZINME_HIZI = 0.0577` — uydurma değil, **kalibrasyonun kendi
+  konfigürasyonundan** türetildi (yukarıdaki aritmetik).
+- `gorsel_ornek_komutu(..., kirpma=...)` — önce **kırpar**, sonra 64×36 gri
+  örnekler (renderer da önce kadrajlıyor). ⚠ Kırpmasız çağrı I-44'teki
+  komutu **bit-bit** üretir (test kilitler).
+- `motion_grammar_olcusu`: enerji eşiği yalnız **kalibrasyon alanı içindeki**
+  çekimlere uygulanır; dışındakiler sessizce geçilmez → `gezinme_kapsam_disi`.
+- PRE-QA: `KALITE-MEDYA-ENERJI-KAPSAM-DISI` (**bilgi**).
+- ⚠ Enerji **iki uçta da** ölçülür ve **en yükseği** alınır — varlığa en
+  elverişli uç; `EMIN DEGILSEN ENGELLEME` yönünde muhafazakâr.
+
+⚠ **FAIL'E YÜKSELTİLMEDİ**: ölçüm yeterince kesinleşmedi — kırpma enerjisi
+b002'yi hâlâ eşiğin altında bırakıyor (9.391 ≤ 11.589) hâlde çekim geçiyor.
+`warn` ve `EMIN DEGILSEN ENGELLEME` korundu. Hiçbir eşik gevşetilmedi
+(optik 2.0, enerji 11.589), zoom kovası yükseltilmedi (I-43 tabanı 0.045).
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1893** | **3307** |
+
+0 hata. Faz I 1865 → **1893** (+28). Red-first: 20 kontrolün **9'u XX**.
+
+### 1080p pilot — `editorv2_lawn_i45.mp4` (25.2 sn)
+
+Üretim hattının kendi yolu; sadakat kapısı **beat eşit=True, varlık eşit=True**.
+
+- **Yanlış alarm 1 → 0**: `isaretlenen: []` (I-44'te b002 warn'lanıyordu);
+  PRE-QA **warn 4 → 3** (kalan üçü I-44 öncesinden: PERDE-EKSIK,
+  SAGLAYICI-TEKEL, GECIS-ASIRI)
+- **Kapsam dışı (bilgi, sessiz değil)**: b002 (enerji 9.391, gezinme 0.1025/sn),
+  b005 (10.469, 0.0819/sn)
+- **1920×1080 @ 30**, aac 48 kHz/2ch, 25.259 sn · 8 kesme · **11 kare** (6 beat)
+- LUFS **−14.27** / TP −3.10 · sessizlik **%0.0** · kenar **0/101**
+- medya tekrarı: 6 benzersiz varlık, bitişik tekrar yok · motion: 4 farklı
+  hareket, ardışık/işlev tekrarı yok, açılış≠kapanış · tipografi dört ölçümde
+  temiz · künye 5 sahnede
+- **POST-QA: PASS**
+- **Gerileme yok**: I-44 render'ıyla **11/11 kare SHA-256 birebir aynı**
+  (I-45 render'a dokunmaz; kareler I-44'te gözle de incelenmişti)
+
+### ⛔ Kabul durumu
+
+Otomatik kapıların hepsi PASS. Buna rağmen **kabul edilmiş MP4 değildir**,
+mutlak yol verilmedi, deploy yok: b001/b002 görselleri anlatımla **semantik
+uyumsuz** (I-39'dan beri açık b001/b002/b005 sınıfı).
+
+### SONRAKİ ATOM (I-46) — yalnız ölçülen kusurdan
+
+1. **Enerji–optik ilişkisi gezinme hızına bağlı ve yalnız TEK hızda ölçüldü**
+   (0.0577/sn). Ölçülen kanıt: aynı enerjide 1.78× gezinme → 1.78× optik
+   (1.294 → 2.288 beklendi/ölçüldü). Doğru atom: **enerji × gezinme**
+   yüzeyini birkaç hızda ölçüp eşiği **optik birimde** ifade etmek — o zaman
+   kapsam dışı çekimler de yargılanabilir ve kapı **fail**'e çıkabilir.
+   ⚠ Pan ile zoom farklı davranıyor (ölçüldü: b003 IoU 0.707 → optik 7.485,
+   b002 IoU 0.774 → 2.288); yüzey **yer değiştirme alanı** ile kurulmalı.
+2. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — **kabul
+   engelinin tek kalan nedeni budur**, dördüncü kez gözle doğrulandı.
+3. **Kısa sahnede zoom yolunun çoğunu pan taşma payı yiyor** (I-43'te ölçüldü).
+4. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 
 ---
 

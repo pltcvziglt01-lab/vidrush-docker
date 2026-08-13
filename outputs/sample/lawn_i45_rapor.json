@@ -1,0 +1,1722 @@
+{
+  "video": "/Users/polatcan/vidrush-docker/outputs/sample/editorv2_lawn_i45.mp4",
+  "ffprobe": {
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "codec_type": "video",
+        "width": 1920,
+        "height": 1080,
+        "r_frame_rate": "30/1",
+        "side_data_list": [
+          {}
+        ]
+      },
+      {
+        "codec_name": "aac",
+        "codec_type": "audio",
+        "sample_rate": "48000",
+        "channels": 2,
+        "r_frame_rate": "0/0"
+      }
+    ],
+    "format": {
+      "duration": "25.258667",
+      "size": "105243212",
+      "bit_rate": "33332942"
+    }
+  },
+  "video_ses_olcumu": {
+    "codec": "aac",
+    "ornekleme_hz": 96000,
+    "kanal": 2,
+    "sure_sn": 25.3,
+    "lufs": -14.27,
+    "tepe_dbtp": -3.1,
+    "lra": 3.2,
+    "sessizlikler": [],
+    "sessiz_sn": 0,
+    "sessiz_pct": 0.0,
+    "kirpma_var": false
+  },
+  "remaster": {
+    "uygulandi": true,
+    "once": {
+      "codec": "aac",
+      "ornekleme_hz": 48000,
+      "kanal": 2,
+      "sure_sn": 25.259,
+      "lufs": -15.4,
+      "tepe_dbtp": -4.31,
+      "lra": 3.3,
+      "sessizlikler": [],
+      "sessiz_sn": 0,
+      "sessiz_pct": 0.0,
+      "kirpma_var": false
+    },
+    "sonra": {
+      "codec": "aac",
+      "ornekleme_hz": 96000,
+      "kanal": 2,
+      "sure_sn": 25.3,
+      "lufs": -14.27,
+      "tepe_dbtp": -3.1,
+      "lra": 3.2,
+      "sessizlikler": [],
+      "sessiz_sn": 0,
+      "sessiz_pct": 0.0,
+      "kirpma_var": false
+    },
+    "yol": "ffmpeg loudnorm, video akisi KOPYALANDI",
+    "maliyet_usd": 0.0
+  },
+  "kesmeler": {
+    "sayi": 8,
+    "anlar": [
+      0.033,
+      1.9,
+      1.933,
+      4.1,
+      4.133,
+      9.633,
+      15.0,
+      20.267
+    ]
+  },
+  "optik_hareket": {
+    "olculdu": true,
+    "ornek": 100,
+    "ornek_fps": 4,
+    "durgun_esigi": 2.0,
+    "asiri_esigi": 45.0,
+    "warn_sn": 1.5,
+    "fail_sn": 3.0,
+    "genel_ortalama": 9.2,
+    "sahneler": [
+      {
+        "ad": "b001 push-in",
+        "bas_sn": 0.0,
+        "sure_sn": 1.887,
+        "ornek": 4,
+        "ortalama": 4.438,
+        "en_dusuk": 4.192,
+        "en_yuksek": 4.611,
+        "durgun_sn": 0.0,
+        "durgun": false,
+        "asiri": false
+      },
+      {
+        "ad": "b002 pull-out",
+        "bas_sn": 1.887,
+        "sure_sn": 2.201,
+        "ornek": 5,
+        "ortalama": 2.288,
+        "en_dusuk": 2.028,
+        "en_yuksek": 2.519,
+        "durgun_sn": 0.0,
+        "durgun": false,
+        "asiri": false
+      },
+      {
+        "ad": "b003 pan-right",
+        "bas_sn": 4.088,
+        "sure_sn": 5.549,
+        "ornek": 18,
+        "ortalama": 7.485,
+        "en_dusuk": 5.925,
+        "en_yuksek": 9.679,
+        "durgun_sn": 0.0,
+        "durgun": false,
+        "asiri": false
+      },
+      {
+        "ad": "b004 pan-left",
+        "bas_sn": 9.637,
+        "sure_sn": 5.351,
+        "ornek": 17,
+        "ortalama": 16.431,
+        "en_dusuk": 13.719,
+        "en_yuksek": 18.744,
+        "durgun_sn": 0.0,
+        "durgun": false,
+        "asiri": false
+      },
+      {
+        "ad": "b005 push-in",
+        "bas_sn": 14.988,
+        "sure_sn": 5.274,
+        "ornek": 18,
+        "ortalama": 2.686,
+        "en_dusuk": 1.837,
+        "en_yuksek": 3.277,
+        "durgun_sn": 0.5,
+        "durgun": false,
+        "asiri": false
+      },
+      {
+        "ad": "b006 pull-out",
+        "bas_sn": 20.262,
+        "sure_sn": 4.938,
+        "ornek": 15,
+        "ortalama": 3.116,
+        "en_dusuk": 2.383,
+        "en_yuksek": 3.667,
+        "durgun_sn": 0.0,
+        "durgun": false,
+        "asiri": false
+      }
+    ],
+    "ihlaller": [],
+    "en_durgun_sahne": {
+      "ad": "b002 pull-out",
+      "bas_sn": 1.887,
+      "sure_sn": 2.201,
+      "ornek": 5,
+      "ortalama": 2.288,
+      "en_dusuk": 2.028,
+      "en_yuksek": 2.519,
+      "durgun_sn": 0.0,
+      "durgun": false,
+      "asiri": false
+    },
+    "temiz": true
+  },
+  "kenar_siyahligi": {
+    "olculdu": true,
+    "kare": 101,
+    "serit_sutun": 2,
+    "siyah_esigi": 16.0,
+    "ihlal_kare": 0,
+    "ihlal_orani": 0.0,
+    "ornek_ihlal": [],
+    "en_koyu_sol": 31.74,
+    "en_koyu_sag": 16.01,
+    "temiz": true
+  },
+  "post_qa": {
+    "durum": "PASS",
+    "olcumler": {
+      "video": {
+        "genislik": 1920,
+        "yukseklik": 1080,
+        "fps": 30.0,
+        "codec": "h264",
+        "sure_sn": 25.3,
+        "boyut_bayt": 104841563
+      },
+      "ses_akisi": {
+        "codec": "aac",
+        "ornekleme": 96000,
+        "kanal": 2
+      },
+      "siyah_araliklar": [],
+      "donmus_araliklar": [],
+      "kesmeler": [
+        0.0333333,
+        1.9,
+        1.933333,
+        4.1,
+        4.133333,
+        9.633333,
+        15.0,
+        20.266667
+      ],
+      "kesme_sayisi": 8,
+      "loudness": {
+        "lufs": -14.27,
+        "tepe_dbtp": -3.1,
+        "lra": 3.2
+      },
+      "sessizlikler": [],
+      "sessizlikler_ince": [],
+      "sure_farki_sn": 0.1,
+      "kalite": {
+        "kapi_acik": true,
+        "miks": {
+          "olculdu": true,
+          "sure_sn": 25.3,
+          "aralik_sayisi": 0,
+          "araliklar": [],
+          "sessiz_sn": 0,
+          "sessiz_orani": 0.0,
+          "sessiz_oran_tavani": 0.15,
+          "sessiz_oran_asildi": false,
+          "olu_final_sn": 0.0,
+          "olu_final_esigi": 0.5,
+          "olu_final_asildi": false,
+          "kaynak_gecis": "sessizlik_ince(d=0.30)"
+        },
+        "ambans": {
+          "olculdu": false,
+          "neden": "OLCUM-YOK",
+          "duyulabilir": null
+        },
+        "optik": {
+          "olculdu": true,
+          "ornek": 100,
+          "ornek_fps": 4,
+          "durgun_esigi": 2.0,
+          "asiri_esigi": 45.0,
+          "warn_sn": 1.5,
+          "fail_sn": 3.0,
+          "genel_ortalama": 9.2,
+          "sahneler": [
+            {
+              "ad": "b001 push-in",
+              "bas_sn": 0.0,
+              "sure_sn": 1.887,
+              "ornek": 4,
+              "ortalama": 4.438,
+              "en_dusuk": 4.192,
+              "en_yuksek": 4.611,
+              "durgun_sn": 0.0,
+              "durgun": false,
+              "asiri": false
+            },
+            {
+              "ad": "b002 pull-out",
+              "bas_sn": 1.887,
+              "sure_sn": 2.201,
+              "ornek": 5,
+              "ortalama": 2.288,
+              "en_dusuk": 2.028,
+              "en_yuksek": 2.519,
+              "durgun_sn": 0.0,
+              "durgun": false,
+              "asiri": false
+            },
+            {
+              "ad": "b003 pan-right",
+              "bas_sn": 4.088,
+              "sure_sn": 5.549,
+              "ornek": 18,
+              "ortalama": 7.485,
+              "en_dusuk": 5.925,
+              "en_yuksek": 9.679,
+              "durgun_sn": 0.0,
+              "durgun": false,
+              "asiri": false
+            },
+            {
+              "ad": "b004 pan-left",
+              "bas_sn": 9.637,
+              "sure_sn": 5.351,
+              "ornek": 17,
+              "ortalama": 16.431,
+              "en_dusuk": 13.719,
+              "en_yuksek": 18.744,
+              "durgun_sn": 0.0,
+              "durgun": false,
+              "asiri": false
+            },
+            {
+              "ad": "b005 push-in",
+              "bas_sn": 14.988,
+              "sure_sn": 5.274,
+              "ornek": 18,
+              "ortalama": 2.686,
+              "en_dusuk": 1.837,
+              "en_yuksek": 3.277,
+              "durgun_sn": 0.5,
+              "durgun": false,
+              "asiri": false
+            },
+            {
+              "ad": "b006 pull-out",
+              "bas_sn": 20.262,
+              "sure_sn": 4.938,
+              "ornek": 15,
+              "ortalama": 3.116,
+              "en_dusuk": 2.383,
+              "en_yuksek": 3.667,
+              "durgun_sn": 0.0,
+              "durgun": false,
+              "asiri": false
+            }
+          ],
+          "ihlaller": [],
+          "en_durgun_sahne": {
+            "ad": "b002 pull-out",
+            "bas_sn": 1.887,
+            "sure_sn": 2.201,
+            "ornek": 5,
+            "ortalama": 2.288,
+            "en_dusuk": 2.028,
+            "en_yuksek": 2.519,
+            "durgun_sn": 0.0,
+            "durgun": false,
+            "asiri": false
+          },
+          "temiz": true
+        },
+        "kenar": {
+          "olculdu": true,
+          "kare": 101,
+          "serit_sutun": 2,
+          "siyah_esigi": 16.0,
+          "ihlal_kare": 0,
+          "ihlal_orani": 0.0,
+          "ornek_ihlal": [],
+          "en_koyu_sol": 31.74,
+          "en_koyu_sag": 16.01,
+          "temiz": true
+        }
+      }
+    },
+    "sorunlar": [],
+    "komutlar": [
+      {
+        "ad": "ffprobe",
+        "komut": "ffprobe -v error -select_streams v:0 -show_entries ...",
+        "rc": 0
+      },
+      {
+        "ad": "ffprobe_ses",
+        "komut": "ffprobe -v error -select_streams a:0 -show_entries ...",
+        "rc": 0
+      },
+      {
+        "ad": "siyah",
+        "komut": "ffmpeg -nostdin -i /Users/polatcan/vidrush-docker/outputs/sample/editorv2_lawn_i45.mp4 -vf blackdetect=d=0.05:pix_th=0.10 ...",
+        "rc": 0
+      },
+      {
+        "ad": "donmus",
+        "komut": "ffmpeg -nostdin -i /Users/polatcan/vidrush-docker/outputs/sample/editorv2_lawn_i45.mp4 -vf freezedetect=n=0.003:d=1.0 ...",
+        "rc": 0
+      },
+      {
+        "ad": "kesme",
+        "komut": "ffmpeg -nostdin -i /Users/polatcan/vidrush-docker/outputs/sample/editorv2_lawn_i45.mp4 -filter:v select='gt(scene,0.12)',showinfo ...",
+        "rc": 0
+      },
+      {
+        "ad": "loudness",
+        "komut": "ffmpeg -nostdin -i /Users/polatcan/vidrush-docker/outputs/sample/editorv2_lawn_i45.mp4 -af loudnorm=print_format=json ...",
+        "rc": 0
+      },
+      {
+        "ad": "sessizlik",
+        "komut": "ffmpeg -nostdin -i /Users/polatcan/vidrush-docker/outputs/sample/editorv2_lawn_i45.mp4 -af silencedetect=noise=-45dB:d=1.2 ...",
+        "rc": 0
+      },
+      {
+        "ad": "sessizlik_ince",
+        "komut": "ffmpeg -nostdin -i /Users/polatcan/vidrush-docker/outputs/sample/editorv2_lawn_i45.mp4 -af silencedetect=noise=-45dB:d=0.30 ...",
+        "rc": 0
+      }
+    ]
+  },
+  "kare_ornekleme": {
+    "olculdu": true,
+    "anlar": [
+      0.4667,
+      0.9333,
+      3.0,
+      4.2,
+      6.8667,
+      8.4333,
+      12.3,
+      16.8333,
+      17.6333,
+      21.0333,
+      22.7333
+    ],
+    "beat_kare": {
+      "b001": [
+        0.4667,
+        0.9333
+      ],
+      "b002": [
+        3.0
+      ],
+      "b003": [
+        4.2,
+        6.8667,
+        8.4333
+      ],
+      "b004": [
+        12.3
+      ],
+      "b005": [
+        16.8333,
+        17.6333
+      ],
+      "b006": [
+        21.0333,
+        22.7333
+      ]
+    },
+    "kapsanmayan": [],
+    "zorunlu": [
+      0.9333,
+      3.0,
+      6.8667,
+      12.3,
+      17.6333,
+      22.7333
+    ],
+    "dolgu": [
+      0.4667,
+      4.2,
+      8.4333,
+      16.8333,
+      21.0333
+    ],
+    "hedef": 11,
+    "fps": 30.0,
+    "epsilon_sn": 0.01667,
+    "beat": 6,
+    "kare": 11,
+    "yeterli": true,
+    "sebep": ""
+  },
+  "kareler": [
+    {
+      "an_sn": 0.4667,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i45_calisma/kareler/i45_kare_0_4667s.png"
+    },
+    {
+      "an_sn": 0.9333,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i45_calisma/kareler/i45_kare_0_9333s.png"
+    },
+    {
+      "an_sn": 3.0,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i45_calisma/kareler/i45_kare_3_0s.png"
+    },
+    {
+      "an_sn": 4.2,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i45_calisma/kareler/i45_kare_4_2s.png"
+    },
+    {
+      "an_sn": 6.8667,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i45_calisma/kareler/i45_kare_6_8667s.png"
+    },
+    {
+      "an_sn": 8.4333,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i45_calisma/kareler/i45_kare_8_4333s.png"
+    },
+    {
+      "an_sn": 12.3,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i45_calisma/kareler/i45_kare_12_3s.png"
+    },
+    {
+      "an_sn": 16.8333,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i45_calisma/kareler/i45_kare_16_8333s.png"
+    },
+    {
+      "an_sn": 17.6333,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i45_calisma/kareler/i45_kare_17_6333s.png"
+    },
+    {
+      "an_sn": 21.0333,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i45_calisma/kareler/i45_kare_21_0333s.png"
+    },
+    {
+      "an_sn": 22.7333,
+      "yol": "/Users/polatcan/vidrush-docker/cikti/_i45_calisma/kareler/i45_kare_22_7333s.png"
+    }
+  ],
+  "plan_qa": {
+    "durum": "WARN",
+    "fail": 0,
+    "warn": 3,
+    "sorun_sayisi": 10
+  },
+  "on_render_qa": {
+    "durum": "WARN",
+    "fail": 0,
+    "warn": 3,
+    "olcumler": {
+      "pacing": {
+        "beat": 6,
+        "ortalama_sn": 4.2,
+        "en_kisa": 1.89,
+        "en_uzun": 5.55,
+        "kisa_cekim_orani": 0.333,
+        "referans_kisa_orani": 0.32,
+        "histogram": {
+          "1-2": 1,
+          "2-3": 1,
+          "4-5": 1,
+          "5-6": 3
+        }
+      },
+      "perde": {
+        "acilis": 2,
+        "gelisme": 4,
+        "kapanis": 0
+      },
+      "islev": {
+        "hook": 2,
+        "aciklama": 2,
+        "sonuc": 2
+      },
+      "kapsam": {
+        "cekim": 6,
+        "medya": 6,
+        "fallback": 0,
+        "kapsam_orani": 1.0
+      },
+      "saglayici": {
+        "wikimedia": 6
+      },
+      "tek_saglayici_orani": 1.0,
+      "efekt": {
+        "toplam": 37,
+        "beat_basina_ort": 6.17
+      },
+      "gecis": {
+        "toplam": 6,
+        "seyrek": 0,
+        "hard_cut_orani": 0.5
+      },
+      "tipografi": {
+        "katman": 6,
+        "sorun": 0
+      },
+      "ses": {
+        "lufs_hedef": -14.0,
+        "tepe_tavan": -1.0,
+        "sfx_dakikada": 1.0,
+        "on_zincir_adim": 5,
+        "ducking_araligi": 0
+      },
+      "kalite": {
+        "kare_genislik": 1920,
+        "kare_olcu_verildi": true,
+        "kapi_acik": true,
+        "beat_bagi": {
+          "kayitlar": [
+            {
+              "beat_id": "b001",
+              "scene_id": "s001",
+              "fact_id": "s01",
+              "asset_id": "s01_5156581",
+              "varlik_scene_id": "s001",
+              "bagli": true
+            },
+            {
+              "beat_id": "b002",
+              "scene_id": "s001",
+              "fact_id": "s01",
+              "asset_id": "s01y1_9559294",
+              "varlik_scene_id": "s001",
+              "bagli": true
+            },
+            {
+              "beat_id": "b003",
+              "scene_id": "s002",
+              "fact_id": "s02",
+              "asset_id": "s02_63708224",
+              "varlik_scene_id": "s002",
+              "bagli": true
+            },
+            {
+              "beat_id": "b004",
+              "scene_id": "s003",
+              "fact_id": "s03",
+              "asset_id": "s03_745812",
+              "varlik_scene_id": "s003",
+              "bagli": true
+            },
+            {
+              "beat_id": "b005",
+              "scene_id": "s004",
+              "fact_id": "s04",
+              "asset_id": "s04_86323697",
+              "varlik_scene_id": "s004",
+              "bagli": true
+            },
+            {
+              "beat_id": "b006",
+              "scene_id": "s005",
+              "fact_id": "s05",
+              "asset_id": "s05_2732961",
+              "varlik_scene_id": "s005",
+              "bagli": true
+            }
+          ],
+          "kopuk": [],
+          "temiz": true
+        },
+        "yazi_sahne_penceresi": {
+          "olculen": 6,
+          "disarida": [],
+          "temiz": true
+        },
+        "altyazi_nefesi": {
+          "olculdu": true,
+          "esik_px": 47.5,
+          "carpan": 1.25,
+          "altyazi_punto": 38.0,
+          "kare_yukseklik": 1080.0,
+          "bant_ust_px": 874.8,
+          "katman": 6,
+          "kayitlar": [
+            {
+              "ad": "chapter-title",
+              "y_orani": 0.6,
+              "punto": 60.0,
+              "bant": true,
+              "alt_px": 751.0,
+              "nefes_px": 123.8,
+              "yeterli": true
+            },
+            {
+              "ad": "source-label",
+              "y_orani": 0.075,
+              "punto": 21.0,
+              "bant": false,
+              "alt_px": 108.3,
+              "nefes_px": 766.5,
+              "yeterli": true
+            },
+            {
+              "ad": "source-label",
+              "y_orani": 0.075,
+              "punto": 21.0,
+              "bant": false,
+              "alt_px": 108.3,
+              "nefes_px": 766.5,
+              "yeterli": true
+            },
+            {
+              "ad": "source-label",
+              "y_orani": 0.075,
+              "punto": 21.0,
+              "bant": false,
+              "alt_px": 108.3,
+              "nefes_px": 766.5,
+              "yeterli": true
+            },
+            {
+              "ad": "source-label",
+              "y_orani": 0.075,
+              "punto": 21.0,
+              "bant": false,
+              "alt_px": 108.3,
+              "nefes_px": 766.5,
+              "yeterli": true
+            },
+            {
+              "ad": "source-label",
+              "y_orani": 0.075,
+              "punto": 21.0,
+              "bant": false,
+              "alt_px": 108.3,
+              "nefes_px": 766.5,
+              "yeterli": true
+            }
+          ],
+          "ihlaller": [],
+          "temiz": true
+        },
+        "baslik": [
+          {
+            "olculdu": true,
+            "metin": "THERE IS A BAG OF GRASS",
+            "karakter": 23,
+            "punto_taban": 60.0,
+            "kare_genislik": 1920.0,
+            "kullanilabilir_px": 1552.8,
+            "olcek": 1.0,
+            "kucultme_tabani_vuruldu": false,
+            "uygulanan_punto": 60,
+            "cizilen_px": 1007.4,
+            "tasma_px": 0.0,
+            "sigar": true,
+            "bant_sag_px": 1687.8,
+            "bant_kare_disi": false,
+            "kelime_kesik": {
+              "olculdu": true,
+              "on_ek": true,
+              "kesik": false,
+              "ham": "There is a bag of grass",
+              "gosterilen": "THERE IS A BAG OF GRASS",
+              "yarim_kelime": "",
+              "tam_kelime": ""
+            },
+            "sigan_karakter": 45
+          }
+        ],
+        "medya_tekrari": {
+          "olculdu": true,
+          "sahne": 6,
+          "benzersiz_asset": 6,
+          "tekrar_eden_asset": {},
+          "bitisik_ayni_asset": [],
+          "benzerlik_olculdu": true,
+          "benzerlik_esigi": 0.86,
+          "benzer_ciftler": [],
+          "okunamayan_cift": 0,
+          "benzerlik_temiz": true
+        },
+        "ritim": {
+          "olculdu": true,
+          "sahne": 6,
+          "sureler": [
+            1.887,
+            2.201,
+            5.549,
+            5.351,
+            5.274,
+            4.938
+          ],
+          "yayilim_sn": 3.662,
+          "sure_yayilim_orani": 0.6599,
+          "sabit_esik_sn": 0.05,
+          "sabit_blok": false,
+          "anlatim_agirliklari": [
+            6.0,
+            7.0,
+            17.0,
+            15.0,
+            17.0,
+            11.0
+          ],
+          "agirlik_yayilim_orani": 0.6471,
+          "anlatim_sapma_esigi": 0.15,
+          "anlatim_bagi": true,
+          "toplam_sn": 25.2,
+          "anlatim_bitis_sn": 24.85,
+          "olu_final_sn": 0.35,
+          "olu_final_esigi": 0.5,
+          "olu_final_asildi": false
+        },
+        "guvenli_alan": {
+          "olculdu": true,
+          "kare_yukseklik": 1080.0,
+          "guvenli_kenar": 64.0,
+          "alt_sinir_px": 1016.0,
+          "katman": 7,
+          "olcumler": [
+            {
+              "ad": "chapter-title",
+              "ust_px": 648.0,
+              "alt_px": 761.4,
+              "tavan_px": 1016.0,
+              "taban_px": 64.0
+            },
+            {
+              "ad": "source-label",
+              "ust_px": 81.0,
+              "alt_px": 129.6,
+              "tavan_px": 1016.0,
+              "taban_px": 64.0
+            },
+            {
+              "ad": "source-label",
+              "ust_px": 81.0,
+              "alt_px": 129.6,
+              "tavan_px": 1016.0,
+              "taban_px": 64.0
+            },
+            {
+              "ad": "source-label",
+              "ust_px": 81.0,
+              "alt_px": 129.6,
+              "tavan_px": 1016.0,
+              "taban_px": 64.0
+            },
+            {
+              "ad": "source-label",
+              "ust_px": 81.0,
+              "alt_px": 129.6,
+              "tavan_px": 1016.0,
+              "taban_px": 64.0
+            },
+            {
+              "ad": "source-label",
+              "ust_px": 81.0,
+              "alt_px": 129.6,
+              "tavan_px": 1016.0,
+              "taban_px": 64.0
+            },
+            {
+              "ad": "subtitle",
+              "ust_px": 874.8,
+              "alt_px": 1015.2,
+              "tavan_px": 1016.0,
+              "taban_px": 64.0
+            }
+          ],
+          "ihlaller": [],
+          "temiz": true
+        },
+        "yazi_cakismasi": {
+          "olculdu": true,
+          "katman": 7,
+          "cakisan_cift": [],
+          "tolerans": 0.005,
+          "temiz": true
+        },
+        "yatay_guvenli_alan": {
+          "olculdu": true,
+          "kare_genislik": 1920.0,
+          "guvenli_kenar": 64.0,
+          "kullanilabilir_px": 1792.0,
+          "em_birim": 0.76,
+          "katman": 6,
+          "olcumler": [
+            {
+              "ad": "chapter-title",
+              "karakter": 23,
+              "punto": 60.0,
+              "tahmini_genislik_px": 1048.8,
+              "kullanilabilir_px": 1792.0,
+              "hizalama": "sol",
+              "em_birim": 0.76
+            },
+            {
+              "ad": "source-label",
+              "karakter": 28,
+              "punto": 21.0,
+              "tahmini_genislik_px": 446.9,
+              "kullanilabilir_px": 1792.0,
+              "hizalama": "sag",
+              "em_birim": 0.76
+            },
+            {
+              "ad": "source-label",
+              "karakter": 19,
+              "punto": 21.0,
+              "tahmini_genislik_px": 303.2,
+              "kullanilabilir_px": 1792.0,
+              "hizalama": "sag",
+              "em_birim": 0.76
+            },
+            {
+              "ad": "source-label",
+              "karakter": 16,
+              "punto": 21.0,
+              "tahmini_genislik_px": 255.4,
+              "kullanilabilir_px": 1792.0,
+              "hizalama": "sag",
+              "em_birim": 0.76
+            },
+            {
+              "ad": "source-label",
+              "karakter": 25,
+              "punto": 21.0,
+              "tahmini_genislik_px": 399.0,
+              "kullanilabilir_px": 1792.0,
+              "hizalama": "sag",
+              "em_birim": 0.76
+            },
+            {
+              "ad": "source-label",
+              "karakter": 25,
+              "punto": 21.0,
+              "tahmini_genislik_px": 399.0,
+              "kullanilabilir_px": 1792.0,
+              "hizalama": "sag",
+              "em_birim": 0.76
+            }
+          ],
+          "ihlaller": [],
+          "sigan_karakter_tavani": 112,
+          "temiz": true
+        },
+        "kunye_politikasi": {
+          "karar": 5,
+          "kisaltilan": [],
+          "eksik": [],
+          "yontemler": [
+            "TAM"
+          ],
+          "temiz": true
+        },
+        "altyazi": {
+          "olculdu": true,
+          "kup_sayisi": 6,
+          "birlestirilen": 0,
+          "maks_karakter": 42,
+          "maks_satir": 2,
+          "min_sn": 1.2,
+          "maks_cps": 20.0,
+          "olculen_kup": 6,
+          "orantili_kup": 0,
+          "cok_hizli": [],
+          "uzun_satir": [],
+          "cok_satir": [],
+          "temiz": true
+        },
+        "medyasiz_beat": {
+          "beat": 6,
+          "medyasiz": 0,
+          "kayitlar": [],
+          "temiz": true
+        },
+        "motion_grammar": {
+          "olculdu": true,
+          "sahne": 6,
+          "hareketler": [
+            "push-in",
+            "pull-out",
+            "pan-right",
+            "pan-left",
+            "push-in",
+            "pull-out"
+          ],
+          "islevler": [
+            "hook",
+            "hook",
+            "aciklama",
+            "aciklama",
+            "sonuc",
+            "sonuc"
+          ],
+          "islev_tekrari": [],
+          "enerji_olculdu": true,
+          "enerji_esigi": 11.589,
+          "dusuk_enerji": [],
+          "gezinme_kapsam_disi": [
+            {
+              "indeks": 1,
+              "beat_id": "b002",
+              "uzamsal_enerji": 9.391,
+              "esik": 11.589,
+              "gezinme_hizi": 0.1025,
+              "kalibrasyon_hizi": 0.0577
+            },
+            {
+              "indeks": 4,
+              "beat_id": "b005",
+              "uzamsal_enerji": 10.469,
+              "esik": 11.589,
+              "gezinme_hizi": 0.0819,
+              "kalibrasyon_hizi": 0.0577
+            }
+          ],
+          "kalibrasyon_gezinme_hizi": 0.0577,
+          "benzersiz_hareket": 4,
+          "ardisik_tekrar": [],
+          "pencere_tekrari": [],
+          "pencere": 3,
+          "statik_sahneler": [],
+          "gecisler": [
+            "hard-cut",
+            "flash",
+            "hard-cut",
+            "hard-cut",
+            "l-cut",
+            "karartma"
+          ],
+          "benzersiz_gecis": 4,
+          "gecis_dagilimi": {
+            "karartma": 1,
+            "flash": 1,
+            "hard-cut": 3,
+            "l-cut": 1
+          },
+          "acilis_hareketi": "push-in",
+          "kapanis_hareketi": "pull-out",
+          "acilis_kapanis_ayri": true
+        },
+        "punch_buyutme": {
+          "olculen_beat": 6,
+          "buyuten": [],
+          "kadraj_dusurulen": [],
+          "en_yuksek_oran": 0.8524,
+          "temiz": true
+        }
+      }
+    },
+    "sorunlar": [
+      {
+        "kod": "PERDE-EKSIK",
+        "seviye": "warn",
+        "scene_id": "",
+        "beat_id": "",
+        "detay": "perdeler: ['acilis', 'gelisme'] (3 perde bekleniyor)",
+        "oneri": "senaryoyu acilis/gelisme/kapanis olarak dengele"
+      },
+      {
+        "kod": "SUREKLILIK-AYNI-SAGLAYICI",
+        "seviye": "uyari",
+        "scene_id": "",
+        "beat_id": "b002",
+        "detay": "ardil ayni saglayici (wikimedia)",
+        "oneri": "alternatif varlik/kadraj/hareket sec"
+      },
+      {
+        "kod": "SUREKLILIK-AYNI-SAGLAYICI",
+        "seviye": "uyari",
+        "scene_id": "",
+        "beat_id": "b003",
+        "detay": "ardil ayni saglayici (wikimedia)",
+        "oneri": "alternatif varlik/kadraj/hareket sec"
+      },
+      {
+        "kod": "SUREKLILIK-AYNI-SAGLAYICI",
+        "seviye": "uyari",
+        "scene_id": "",
+        "beat_id": "b004",
+        "detay": "ardil ayni saglayici (wikimedia)",
+        "oneri": "alternatif varlik/kadraj/hareket sec"
+      },
+      {
+        "kod": "SUREKLILIK-AYNI-SAGLAYICI",
+        "seviye": "uyari",
+        "scene_id": "",
+        "beat_id": "b005",
+        "detay": "ardil ayni saglayici (wikimedia)",
+        "oneri": "alternatif varlik/kadraj/hareket sec"
+      },
+      {
+        "kod": "SUREKLILIK-AYNI-SAGLAYICI",
+        "seviye": "uyari",
+        "scene_id": "",
+        "beat_id": "b006",
+        "detay": "ardil ayni saglayici (wikimedia)",
+        "oneri": "alternatif varlik/kadraj/hareket sec"
+      },
+      {
+        "kod": "SAGLAYICI-TEKEL",
+        "seviye": "warn",
+        "scene_id": "",
+        "beat_id": "",
+        "detay": "tek saglayici %100 (tavan %40): wikimedia",
+        "oneri": "alternatif saglayici adayi kullan ya da coverage_gap birak"
+      },
+      {
+        "kod": "GECIS-ASIRI",
+        "seviye": "warn",
+        "scene_id": "",
+        "beat_id": "",
+        "detay": "sert kesme orani %50 (referans %80)",
+        "oneri": "efektli gecisleri azalt"
+      },
+      {
+        "kod": "KALITE-MEDYA-ENERJI-KAPSAM-DISI",
+        "seviye": "bilgi",
+        "scene_id": "",
+        "beat_id": "b002",
+        "detay": "b002: gorunen kadrajin uzamsal enerjisi 9.391 <= esik 11.589 AMA kamera 0.1025/sn geziniyor — esik 0.0577/sn konfigurasyonunda olculdu, bu cekim OLCUM ALANININ DISINDA; hukum VERILMEDI",
+        "oneri": "bu gezinme hizinda enerji-optik iliskisini olcup kalibre et (esigi tasima)"
+      },
+      {
+        "kod": "KALITE-MEDYA-ENERJI-KAPSAM-DISI",
+        "seviye": "bilgi",
+        "scene_id": "",
+        "beat_id": "b005",
+        "detay": "b005: gorunen kadrajin uzamsal enerjisi 10.469 <= esik 11.589 AMA kamera 0.0819/sn geziniyor — esik 0.0577/sn konfigurasyonunda olculdu, bu cekim OLCUM ALANININ DISINDA; hukum VERILMEDI",
+        "oneri": "bu gezinme hizinda enerji-optik iliskisini olcup kalibre et (esigi tasima)"
+      }
+    ],
+    "adapter_kayip_efekt": [
+      {
+        "beat_id": "b001",
+        "spec": "light-sweep",
+        "kayip": "yonlu isik sizmasi yok, kisa flash"
+      }
+    ],
+    "adapter_remotion_gerekli": [
+      "b001"
+    ]
+  },
+  "yazi_katmanlari": [
+    {
+      "ad": "chapter-title",
+      "metin": "THERE IS A BAG OF GRASS",
+      "bas_sn": 0.2,
+      "sure_sn": 3.387,
+      "x": 100,
+      "y_orani": 0.6,
+      "punto": 60,
+      "agirlik": 700,
+      "bant": true,
+      "fact_id": "s01",
+      "kaydirildi": false,
+      "uyarilar": []
+    },
+    {
+      "ad": "source-label",
+      "metin": "Forest and Kim Starr / CC-BY",
+      "bas_sn": 2.287,
+      "sure_sn": 2.201,
+      "x": 100,
+      "y_orani": 0.075,
+      "punto": 21,
+      "agirlik": 700,
+      "bant": false,
+      "fact_id": "s01",
+      "kaydirildi": false,
+      "uyarilar": []
+    },
+    {
+      "ad": "source-label",
+      "metin": "Famartin / CC-BY-SA",
+      "bas_sn": 4.488,
+      "sure_sn": 3.0,
+      "x": 100,
+      "y_orani": 0.075,
+      "punto": 21,
+      "agirlik": 700,
+      "bant": false,
+      "fact_id": "s02",
+      "kaydirildi": false,
+      "uyarilar": []
+    },
+    {
+      "ad": "source-label",
+      "metin": "Anton / CC-BY-SA",
+      "bas_sn": 10.037,
+      "sure_sn": 3.0,
+      "x": 100,
+      "y_orani": 0.075,
+      "punto": 21,
+      "agirlik": 700,
+      "bant": false,
+      "fact_id": "s03",
+      "kaydirildi": false,
+      "uyarilar": []
+    },
+    {
+      "ad": "source-label",
+      "metin": "Macleay Grass Man / CC-BY",
+      "bas_sn": 15.388,
+      "sure_sn": 3.0,
+      "x": 100,
+      "y_orani": 0.075,
+      "punto": 21,
+      "agirlik": 700,
+      "bant": false,
+      "fact_id": "s04",
+      "kaydirildi": false,
+      "uyarilar": []
+    },
+    {
+      "ad": "source-label",
+      "metin": "Dietmar Rabich / CC-BY-SA",
+      "bas_sn": 20.662,
+      "sure_sn": 3.0,
+      "x": 100,
+      "y_orani": 0.075,
+      "punto": 21,
+      "agirlik": 700,
+      "bant": false,
+      "fact_id": "s05",
+      "kaydirildi": false,
+      "uyarilar": []
+    }
+  ],
+  "kunye_kararlari": [
+    {
+      "eser_sahibi": "Forest and Kim Starr",
+      "lisans": "CC-BY",
+      "punto": 21.0,
+      "kullanilabilir_px": 1792.0,
+      "metin": "Forest and Kim Starr / CC-BY",
+      "eksik": false,
+      "yontem": "TAM",
+      "kisaltildi": false,
+      "sahip_butce": 104,
+      "scene_id": "s001",
+      "beat_id": "b002",
+      "asset_id": "s01y1_9559294"
+    },
+    {
+      "eser_sahibi": "Famartin",
+      "lisans": "CC-BY-SA",
+      "punto": 21.0,
+      "kullanilabilir_px": 1792.0,
+      "metin": "Famartin / CC-BY-SA",
+      "eksik": false,
+      "yontem": "TAM",
+      "kisaltildi": false,
+      "sahip_butce": 101,
+      "scene_id": "s002",
+      "beat_id": "b003",
+      "asset_id": "s02_63708224"
+    },
+    {
+      "eser_sahibi": "Anton",
+      "lisans": "CC-BY-SA",
+      "punto": 21.0,
+      "kullanilabilir_px": 1792.0,
+      "metin": "Anton / CC-BY-SA",
+      "eksik": false,
+      "yontem": "TAM",
+      "kisaltildi": false,
+      "sahip_butce": 101,
+      "scene_id": "s003",
+      "beat_id": "b004",
+      "asset_id": "s03_745812"
+    },
+    {
+      "eser_sahibi": "Macleay Grass Man",
+      "lisans": "CC-BY",
+      "punto": 21.0,
+      "kullanilabilir_px": 1792.0,
+      "metin": "Macleay Grass Man / CC-BY",
+      "eksik": false,
+      "yontem": "TAM",
+      "kisaltildi": false,
+      "sahip_butce": 104,
+      "scene_id": "s004",
+      "beat_id": "b005",
+      "asset_id": "s04_86323697"
+    },
+    {
+      "eser_sahibi": "Dietmar Rabich",
+      "lisans": "CC-BY-SA",
+      "punto": 21.0,
+      "kullanilabilir_px": 1792.0,
+      "metin": "Dietmar Rabich / CC-BY-SA",
+      "eksik": false,
+      "yontem": "TAM",
+      "kisaltildi": false,
+      "sahip_butce": 101,
+      "scene_id": "s005",
+      "beat_id": "b006",
+      "asset_id": "s05_2732961"
+    }
+  ],
+  "zincir": [
+    {
+      "beat_id": "b001",
+      "scene_id": "s001",
+      "fact_id": "s01",
+      "asset_id": "s01_5156581",
+      "saglayici": "wikimedia",
+      "lisans": "public-domain",
+      "sure_sn": 1.887,
+      "bas_sn": 0.0,
+      "cekim_turu": "close-detail",
+      "hareket": "push-in",
+      "kadraj": "tam",
+      "motion": [
+        "push-in",
+        "grain",
+        "vignette",
+        "grade",
+        "light-sweep",
+        "hard-cut",
+        "chapter-title"
+      ],
+      "gecis": [
+        "hard-cut"
+      ],
+      "altyazi_adet": 1,
+      "tipografi": [
+        "chapter-title"
+      ],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "hook"
+    },
+    {
+      "beat_id": "b002",
+      "scene_id": "s001",
+      "fact_id": "s01",
+      "asset_id": "s01y1_9559294",
+      "saglayici": "wikimedia",
+      "lisans": "cc-by",
+      "sure_sn": 2.201,
+      "bas_sn": 1.887,
+      "cekim_turu": "close-detail",
+      "hareket": "pull-out",
+      "kadraj": "punch-1.35",
+      "motion": [
+        "pull-out",
+        "grain",
+        "vignette",
+        "grade",
+        "flash",
+        "source-label"
+      ],
+      "gecis": [
+        "flash"
+      ],
+      "altyazi_adet": 1,
+      "tipografi": [],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "hook"
+    },
+    {
+      "beat_id": "b003",
+      "scene_id": "s002",
+      "fact_id": "s02",
+      "asset_id": "s02_63708224",
+      "saglayici": "wikimedia",
+      "lisans": "cc-by-sa",
+      "sure_sn": 5.549,
+      "bas_sn": 4.088,
+      "cekim_turu": "medium",
+      "hareket": "pan-right",
+      "kadraj": "ust",
+      "motion": [
+        "pan-right",
+        "grain",
+        "vignette",
+        "grade",
+        "hard-cut",
+        "source-label"
+      ],
+      "gecis": [
+        "hard-cut"
+      ],
+      "altyazi_adet": 2,
+      "tipografi": [],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "aciklama"
+    },
+    {
+      "beat_id": "b004",
+      "scene_id": "s003",
+      "fact_id": "s03",
+      "asset_id": "s03_745812",
+      "saglayici": "wikimedia",
+      "lisans": "cc-by-sa",
+      "sure_sn": 5.351,
+      "bas_sn": 9.637,
+      "cekim_turu": "medium",
+      "hareket": "pan-left",
+      "kadraj": "punch-1.6",
+      "motion": [
+        "pan-left",
+        "grain",
+        "vignette",
+        "grade",
+        "hard-cut",
+        "source-label"
+      ],
+      "gecis": [
+        "hard-cut"
+      ],
+      "altyazi_adet": 1,
+      "tipografi": [],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "aciklama"
+    },
+    {
+      "beat_id": "b005",
+      "scene_id": "s004",
+      "fact_id": "s04",
+      "asset_id": "s04_86323697",
+      "saglayici": "wikimedia",
+      "lisans": "cc-by",
+      "sure_sn": 5.274,
+      "bas_sn": 14.988,
+      "cekim_turu": "establishing",
+      "hareket": "push-in",
+      "kadraj": "alt",
+      "motion": [
+        "push-in",
+        "grain",
+        "vignette",
+        "grade",
+        "l-cut",
+        "source-label"
+      ],
+      "gecis": [],
+      "altyazi_adet": 1,
+      "tipografi": [],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": true,
+      "islev": "sonuc"
+    },
+    {
+      "beat_id": "b006",
+      "scene_id": "s005",
+      "fact_id": "s05",
+      "asset_id": "s05_2732961",
+      "saglayici": "wikimedia",
+      "lisans": "cc-by-sa",
+      "sure_sn": 4.938,
+      "bas_sn": 20.262,
+      "cekim_turu": "establishing",
+      "hareket": "pull-out",
+      "kadraj": "tam",
+      "motion": [
+        "pull-out",
+        "grain",
+        "vignette",
+        "grade",
+        "karartma",
+        "source-label"
+      ],
+      "gecis": [
+        "karartma"
+      ],
+      "altyazi_adet": 1,
+      "tipografi": [],
+      "ses": "",
+      "j_cut": false,
+      "l_cut": false,
+      "islev": "sonuc"
+    }
+  ],
+  "maliyet_usd": 0.0,
+  "kare_sha256_gerileme": {
+    "karsilastirilan": "editorv2_lawn_i44.mp4",
+    "ortak_an": 11,
+    "birebir_ayni": 11,
+    "gerileme_yok": true
+  },
+  "i45_kapi": {
+    "isaretlenen": [],
+    "kapsam_disi": [
+      {
+        "indeks": 1,
+        "beat_id": "b002",
+        "uzamsal_enerji": 9.391,
+        "esik": 11.589,
+        "gezinme_hizi": 0.1025,
+        "kalibrasyon_hizi": 0.0577
+      },
+      {
+        "indeks": 4,
+        "beat_id": "b005",
+        "uzamsal_enerji": 10.469,
+        "esik": 11.589,
+        "gezinme_hizi": 0.0819,
+        "kalibrasyon_hizi": 0.0577
+      }
+    ],
+    "kalibrasyon_gezinme_hizi": 0.0577,
+    "enerji_esigi": 11.589
+  },
+  "kirpma_olcumu": {
+    "kare": [
+      1920.0,
+      1080.0
+    ],
+    "satirlar": [
+      {
+        "beat_id": "b001",
+        "kadraj": "tam",
+        "asset_id": "s01_5156581",
+        "kaynak": [
+          3204,
+          1952
+        ],
+        "tam_kare_enerji": 14.887,
+        "uclar": [
+          {
+            "t": 0.0,
+            "kirpma": {
+              "x": 0.0,
+              "y": 0.038358,
+              "w": 1.0,
+              "h": 0.923284,
+              "olcek": 1.0
+            },
+            "enerji": 15.004
+          },
+          {
+            "t": 1.0,
+            "kirpma": {
+              "x": 0.052372,
+              "y": 0.086713,
+              "w": 0.895255,
+              "h": 0.826575,
+              "olcek": 1.117
+            },
+            "enerji": 15.596
+          }
+        ],
+        "kirpma_enerjisi": 15.596,
+        "optik": 4.438
+      },
+      {
+        "beat_id": "b002",
+        "kadraj": "punch-1.35",
+        "asset_id": "s01y1_9559294",
+        "kaynak": [
+          3456,
+          2592
+        ],
+        "tam_kare_enerji": 7.557,
+        "uclar": [
+          {
+            "t": 0.0,
+            "kirpma": {
+              "x": 0.174097,
+              "y": 0.255573,
+              "w": 0.651806,
+              "h": 0.488854,
+              "olcek": 1.5342
+            },
+            "enerji": 9.391
+          },
+          {
+            "t": 1.0,
+            "kirpma": {
+              "x": 0.12963,
+              "y": 0.222222,
+              "w": 0.740741,
+              "h": 0.555556,
+              "olcek": 1.35
+            },
+            "enerji": 8.504
+          }
+        ],
+        "kirpma_enerjisi": 9.391,
+        "optik": 2.288
+      },
+      {
+        "beat_id": "b003",
+        "kadraj": "ust",
+        "asset_id": "s02_63708224",
+        "kaynak": [
+          5712,
+          4284
+        ],
+        "tam_kare_enerji": 15.792,
+        "uclar": [
+          {
+            "t": 0.0,
+            "kirpma": {
+              "x": 0.174258,
+              "y": 0.176329,
+              "w": 0.786164,
+              "h": 0.589623,
+              "olcek": 1.272
+            },
+            "enerji": 19.732
+          },
+          {
+            "t": 1.0,
+            "kirpma": {
+              "x": 0.039578,
+              "y": 0.176329,
+              "w": 0.786164,
+              "h": 0.589623,
+              "olcek": 1.272
+            },
+            "enerji": 19.962
+          }
+        ],
+        "kirpma_enerjisi": 19.962,
+        "optik": 7.485
+      },
+      {
+        "beat_id": "b004",
+        "kadraj": "punch-1.6",
+        "asset_id": "s03_745812",
+        "kaynak": [
+          4272,
+          2848
+        ],
+        "tam_kare_enerji": 18.083,
+        "uclar": [
+          {
+            "t": 0.0,
+            "kirpma": {
+              "x": 0.075899,
+              "y": 0.251253,
+              "w": 0.589623,
+              "h": 0.497494,
+              "olcek": 1.696
+            },
+            "enerji": 15.649
+          },
+          {
+            "t": 1.0,
+            "kirpma": {
+              "x": 0.334479,
+              "y": 0.251253,
+              "w": 0.589623,
+              "h": 0.497494,
+              "olcek": 1.696
+            },
+            "enerji": 17.347
+          }
+        ],
+        "kirpma_enerjisi": 17.347,
+        "optik": 16.431
+      },
+      {
+        "beat_id": "b005",
+        "kadraj": "alt",
+        "asset_id": "s04_86323697",
+        "kaynak": [
+          4000,
+          3000
+        ],
+        "tam_kare_enerji": 12.33,
+        "uclar": [
+          {
+            "t": 0.0,
+            "kirpma": {
+              "x": 0.083333,
+              "y": 0.23772,
+              "w": 0.833333,
+              "h": 0.625,
+              "olcek": 1.2
+            },
+            "enerji": 10.469
+          },
+          {
+            "t": 1.0,
+            "kirpma": {
+              "x": 0.186009,
+              "y": 0.314726,
+              "w": 0.627983,
+              "h": 0.470987,
+              "olcek": 1.5924
+            },
+            "enerji": 9.044
+          }
+        ],
+        "kirpma_enerjisi": 10.469,
+        "optik": 2.686
+      },
+      {
+        "beat_id": "b006",
+        "kadraj": "tam",
+        "asset_id": "s05_2732961",
+        "kaynak": [
+          5110,
+          3407
+        ],
+        "tam_kare_enerji": 13.867,
+        "uclar": [
+          {
+            "t": 0.0,
+            "kirpma": {
+              "x": 0.11721,
+              "y": 0.177053,
+              "w": 0.76558,
+              "h": 0.645895,
+              "olcek": 1.3062
+            },
+            "enerji": 11.998
+          },
+          {
+            "t": 1.0,
+            "kirpma": {
+              "x": 0.0,
+              "y": 0.078166,
+              "w": 1.0,
+              "h": 0.843667,
+              "olcek": 1.0
+            },
+            "enerji": 13.467
+          }
+        ],
+        "kirpma_enerjisi": 13.467,
+        "optik": 3.116
+      }
+    ]
+  },
+  "kabul": {
+    "plan_qa": "WARN",
+    "post_qa": "PASS",
+    "kabul_edilmis_mp4": false,
+    "gerekce": "Otomatik kapilarin hepsi PASS. Ancak b001/b002 gorselleri anlatimla SEMANTIK UYUMSUZ (gozle dogrulandi, I-39'dan beri acik b001/b002/b005 sinifi). Deploy YOK."
+  }
+}

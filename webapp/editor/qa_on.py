@@ -73,7 +73,12 @@ KALITE_KODLARI = ("KALITE-BASLIK-KIRPIK", "KALITE-BASLIK-TASMA",
                   # kapi RENDER'I BLOKLAMAZ, yalniz olculen riski GORUNUR
                   # kilar (render sonrasi `KALITE-OPTIK-DURGUN` zaten FAIL).
                   "KALITE-MEDYA-DUSUK-ENERJI",
-                  "KALITE-MEDYA-ENERJI-OLCULEMEDI")
+                  "KALITE-MEDYA-ENERJI-OLCULEMEDI",
+                  # ── Faz I-45: esigin KALIBRASYON ALANI disi ──
+                  # ⚠ Esik TEK bir kamera konfigurasyonunda (gezinme
+                  # 0.0577 /sn) olculdu. Daha hizli gezinen cekimde hukum
+                  # VERILMEZ; sessizce de gecilmez -> ayri bilgi kodu.
+                  "KALITE-MEDYA-ENERJI-KAPSAM-DISI")
 
 
 @dataclass
@@ -756,15 +761,60 @@ def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
                         else "image"))
         _s2["medya_turu"] = _tur2
         _s2["kadraj"] = getattr(c2, "kadraj", "")
+        # ── I-45: ENERJI EKRANA GELEN BOLGEDE OLCULUR ──
+        # ⚠ I-44 tum kareyi olcuyordu; renderer ise `kadraj`/`punch` ile
+        # kirpiyor. Gorunen bolge cekimin KENDI kamera spec'inden turetilir
+        # (`kalite_kapisi.kadraj_kirpma_bolgesi`, Kamera.tsx ile ayni
+        # aritmetik). Iki ucta (t=0, t=1) olculur.
+        _kirpma, _gezinme = None, None
+        _prm2 = {}
+        for _sp2 in (motion_specler or []):
+            if _sp2.get("beat_id") == _s2["beat_id"] and (
+                    _sp2.get("parametre") or {}).get("zoom"):
+                _prm2 = _sp2.get("parametre") or {}
+                break
+        if _prm2:
+            _z2 = _prm2.get("zoom") or [1.0, 1.0]
+            _uc = [kk.kadraj_kirpma_bolgesi(
+                olcek=_z2[0 if _t == 0.0 else -1],
+                pan_x=_prm2.get("pan_x") or (0.5, 0.5),
+                odak=_prm2.get("odak") or (0.5, 0.5),
+                guvenli_pay=_prm2.get("guvenli_pay") or 0.0,
+                kaynak_g=_ad2.get("genislik") or 0,
+                kaynak_y=_ad2.get("yukseklik") or 0,
+                kare_g=genislik, kare_y=(kare_olcu or (0, p.yukseklik))[1]
+                or p.yukseklik, t=_t) for _t in (0.0, 1.0)]
+            if all(u.get("olculdu") for u in _uc):
+                _s2["kirpma"] = [_uc[0], _uc[1]]
+                _gz2 = kk.kadraj_gezinme_hizi(_uc[0], _uc[1],
+                                              sure_sn=_s2["sure_sn"])
+                if _gz2.get("olculdu"):
+                    _gezinme = _gz2["hiz"]
+                    _s2["gezinme_hizi"] = _gezinme
+                    _s2["gezinme"] = _gz2
+                _kirpma = _uc
         if enerji_okuyucu:
             _yol2 = (_ad2.get("yerel_yol") or _ad2.get("medya_yolu") or "")
             if _yol2:
-                try:
-                    _e2 = enerji_okuyucu(_yol2)
-                except Exception:                                # noqa: BLE001
-                    _e2 = None
-                if _e2 is not None:
-                    _s2["uzamsal_enerji"] = float(_e2)
+                # ⚠ IKI UC DA olculur ve EN YUKSEK enerji alinir:
+                # `EMIN DEGILSEN ENGELLEME` yonunde muhafazakar — varliga
+                # EN ELVERISLI uc esas alinir, en dar/en genis degil.
+                _olculen = []
+                for _kb2 in (_kirpma or [None]):
+                    try:
+                        _e2 = enerji_okuyucu(_yol2, _kb2)
+                    except TypeError:  # eski sozlesmeli okuyucu (I-44)
+                        try:
+                            _e2 = enerji_okuyucu(_yol2)
+                        except Exception:                        # noqa: BLE001
+                            _e2 = None
+                    except Exception:                            # noqa: BLE001
+                        _e2 = None
+                    if _e2 is not None:
+                        _olculen.append(float(_e2))
+                if _olculen:
+                    _s2["uzamsal_enerji"] = max(_olculen)
+                    _s2["kadraj_enerjileri"] = [round(x, 3) for x in _olculen]
         mg_sahne.append(_s2)
     _gec = {}
     for sp in (motion_specler or []):
@@ -824,6 +874,17 @@ def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
                   "daha detayli (dokulu) bir lisansli aday sec ya da "
                   "kadraji dokunun yogun oldugu bolgeye getir",
                   beat_id=de["beat_id"])
+        # ── I-45: kalibrasyon alani disinda kalan cekimler ──
+        for kd in (mg.get("gezinme_kapsam_disi") or []):
+            _ekle("KALITE-MEDYA-ENERJI-KAPSAM-DISI", "bilgi",
+                  f"{kd['beat_id']}: gorunen kadrajin uzamsal enerjisi "
+                  f"{kd['uzamsal_enerji']} <= esik {kd['esik']} AMA kamera "
+                  f"{kd['gezinme_hizi']}/sn geziniyor — esik "
+                  f"{kd['kalibrasyon_hizi']}/sn konfigurasyonunda olculdu, "
+                  f"bu cekim OLCUM ALANININ DISINDA; hukum VERILMEDI",
+                  "bu gezinme hizinda enerji-optik iliskisini olcup "
+                  "kalibre et (esigi tasima)",
+                  beat_id=kd["beat_id"])
         if not mg.get("enerji_olculdu"):
             # ⚠ SESSIZ PASS YOK: olcemedigimizi soyleriz, "yeterli" demeyiz.
             _ekle("KALITE-MEDYA-ENERJI-OLCULEMEDI", "bilgi",

@@ -6412,6 +6412,187 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
         "KaynakEtiketi" in _GRAFIK_TSX
         and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
 
+blok("§39u I-45 — ENERJI GOSTERILMEYEN PIKSELLERDE OLCULUYORDU")
+
+# ⚠ I-44'TE OLCULEN KUSUR: enerji TUM KAREDE olculuyordu, oysa renderer
+# `kadraj`/`punch` ile KIRPIYOR — yani olculen piksellerin bir kismi EKRANA
+# HIC GELMIYOR. I-44 pilotunda b002 tam karede 7.557 olcup isaretlendi ama
+# GERCEK render'da optik 2.288 ile esigi GECTI (yanlis alarm).
+#
+# ⚠ GEOMETRI UYDURULMADI — `editorv2/Kamera.tsx`ten BIREBIR turetildi:
+#     Zemin: %100 x %100, objectFit: cover,
+#            transform: scale(S) translate(x%, y%), origin center
+#     CSS transform SAGDAN SOLA uygulanir, yuzde kayma ELEMANIN kendi
+#     olcusune goredir  ->  q = merkez + S * ((p - merkez) + (dx, dy))
+#     Tersi:  gorunen eleman dikdortgeni  W/S x H/S,
+#             merkez (W/2 - dx, H/2 - dy)
+#     `cover`: kapsama = max(W/sw, H/sh)  (`punch_buyutme_olcusu` ile AYNI
+#     aritmetik) -> KAYNAK piksel uzayinda normalize kirpma:
+#             w = W/(S*kapsama*sw)   cx = 0.5 - dx/(kapsama*sw)
+#             h = H/(S*kapsama*sh)   cy = 0.5 - dy/(kapsama*sh)
+#     Kamera.tsx: kaymaX = (pxT-0.5)*2*pay*100, kaymaY = (0.5-odakY)*2*pay*100
+#
+# ⚠ VE OLCUM HIPOTEZI CURUTTU: kirpmada olcmek yanlis alarmi AZALTMADI,
+# ARTIRDI. I-44 pilotunun ALTI cekimi gercek kadrajlariyla olculdu:
+#     beat  kadraj      tam kare  kirpma   optik    (esik 11.589 / 2.0)
+#     b001  tam           14.887  15.596    4.438   temiz
+#     b002  punch-1.35     7.557   9.391    2.288   HALA alarm (yanlis)
+#     b003  ust           15.792  19.962    7.485   temiz
+#     b004  punch-1.6     18.083  17.347   16.431   temiz
+#     b005  alt           12.330  10.469    2.686   YENI yanlis alarm
+#     b006  tam           13.867  13.467    3.116   temiz
+#
+# ⚠ KOK NEDEN OLCULDU — ESIGIN KALIBRASYON ALANI: `UZAMSAL_ENERJI_ESIGI`
+# (11.589) TEK bir kamera konfigurasyonunda olculmustu (VidrushVideo, oran
+# 0.045, 4.0 sn, pan=yok). O konfigurasyonun KENDI aritmetiginden gezinme
+# hizi turetilir: olcek 1.0349 -> 1.1800, ic ice dikdortgenlerde
+# IoU = (1.0349/1.18)^2 = 0.769 -> (1 - 0.769) / 4.0 sn = 0.0577 /sn.
+# editorv2 cekimleri 0.0527-0.1139 /sn araliginda geziniyor; b002 tam
+# 0.1025 /sn ile kalibrasyonun 1.78 KATI. Kalibrasyon ailesinde ~9.1
+# enerjide optik 1.294 olculmustu; 1.294 x 1.78 = 2.30 ~ olculen 2.288.
+# Yani esigi BASKA bir gezinme hizinda uygulamak I-43'un birim
+# uyusmazliginin AYNISIDIR.
+#
+# ⚠ BU YUZDEN FAIL'E YUKSELTILMEDI: olcum yeterince kesinlesmedi (kirpma
+# enerjisi tek basina b002'yi hala esigin altinda birakiyor). `warn` ve
+# `EMIN DEGILSEN ENGELLEME` korundu.
+
+kontrol("⭐ I-45 KIRMIZI: `kadraj_kirpma_bolgesi` VAR",
+        hasattr(_kk, "kadraj_kirpma_bolgesi"), "kirpma geometrisi yok")
+kontrol("⭐ I-45 KIRMIZI: `kadraj_gezinme_hizi` VAR",
+        hasattr(_kk, "kadraj_gezinme_hizi"), "gezinme olcumu yok")
+kontrol("⭐ I-45 KIRMIZI: `KALIBRASYON_GEZINME_HIZI` esigin ALANINI belgeliyor",
+        abs(getattr(_kk, "KALIBRASYON_GEZINME_HIZI", 0.0) - 0.0577) < 5e-4,
+        getattr(_kk, "KALIBRASYON_GEZINME_HIZI", None))
+
+# ── GERCEK PILOT PARAMETRELERI (uydurma yok; render_plan.json b002) ──
+_B002 = {"zoom": [1.5342, 1.35], "pan_x": [0.5, 0.5], "odak": [0.5, 0.5],
+         "guvenli_pay": 0.1567, "kaynak": [3456, 2592], "sure_sn": 2.201}
+
+if hasattr(_kk, "kadraj_kirpma_bolgesi"):
+    _kb1 = _kk.kadraj_kirpma_bolgesi(
+        olcek=_B002["zoom"][1], pan_x=_B002["pan_x"], odak=_B002["odak"],
+        guvenli_pay=_B002["guvenli_pay"], kaynak_g=_B002["kaynak"][0],
+        kaynak_y=_B002["kaynak"][1], kare_g=1920, kare_y=1080, t=1.0)
+    kontrol("⭐ I-45: kirpma GERCEK transformdan (b002 t=1: 0.7407x0.5556 orta)",
+            _kb1.get("olculdu") is True
+            and abs(_kb1["w"] - 0.7407) < 1e-3 and abs(_kb1["h"] - 0.5556) < 1e-3
+            and abs(_kb1["x"] - 0.1296) < 1e-3 and abs(_kb1["y"] - 0.2222) < 1e-3,
+            _kb1)
+    _kb0 = _kk.kadraj_kirpma_bolgesi(
+        olcek=_B002["zoom"][0], pan_x=_B002["pan_x"], odak=_B002["odak"],
+        guvenli_pay=_B002["guvenli_pay"], kaynak_g=_B002["kaynak"][0],
+        kaynak_y=_B002["kaynak"][1], kare_g=1920, kare_y=1080, t=0.0)
+    kontrol("⭐ I-45: pull-out ucu daha DAR (b002 t=0: 0.6518x0.4889)",
+            abs(_kb0["w"] - 0.6518) < 1e-3 and abs(_kb0["h"] - 0.4889) < 1e-3,
+            _kb0)
+    # ⚠ `scale(S) translate(x%)`: kamera SAGA panlarken kaynak kirpmasi SOLA gider
+    _kp = _kk.kadraj_kirpma_bolgesi(
+        olcek=1.272, pan_x=[0.15, 0.85], odak=[0.5, 0.5], guvenli_pay=0.107,
+        kaynak_g=5712, kaynak_y=4284, kare_g=1920, kare_y=1080, t=1.0)
+    _kp0 = _kk.kadraj_kirpma_bolgesi(
+        olcek=1.272, pan_x=[0.15, 0.85], odak=[0.5, 0.5], guvenli_pay=0.107,
+        kaynak_g=5712, kaynak_y=4284, kare_g=1920, kare_y=1080, t=0.0)
+    kontrol("⭐ I-45: pan yonu transformla TUTARLI (saga pan -> kirpma sola)",
+            _kp["x"] < _kp0["x"] and abs(_kp["w"] - _kp0["w"]) < 1e-9,
+            [_kp0["x"], _kp["x"]])
+    _ku = _kk.kadraj_kirpma_bolgesi(
+        olcek=1.2, pan_x=[0.5, 0.5], odak=[0.5, 0.3], guvenli_pay=0.0833,
+        kaynak_g=4000, kaynak_y=3000, kare_g=1920, kare_y=1080, t=0.0)
+    kontrol("⭐ I-45: `ust` odagi kirpmayi YUKARI tasiyor (odakY 0.3)",
+            _ku["y"] + _ku["h"] / 2 < 0.5, _ku)
+    kontrol("⭐ I-45: EMIN DEGILSEN ENGELLEME — olcu gecersizse `olculdu=False`",
+            _kk.kadraj_kirpma_bolgesi(
+                olcek=1.2, pan_x=[0.5, 0.5], odak=[0.5, 0.5], guvenli_pay=0.1,
+                kaynak_g=0, kaynak_y=0).get("olculdu") is False)
+    kontrol("I-45: kirpma kare SINIRLARI icinde kalir (0..1)",
+            all(0.0 <= _kb0[a] <= 1.0 for a in ("x", "y", "w", "h"))
+            and _kb0["x"] + _kb0["w"] <= 1.0 + 1e-9)
+
+if hasattr(_kk, "kadraj_gezinme_hizi"):
+    _gz = _kk.kadraj_gezinme_hizi(_kb0, _kb1, sure_sn=_B002["sure_sn"])
+    kontrol("⭐ I-45: b002 gezinme hizi OLCULDU (0.1025 /sn)",
+            _gz.get("olculdu") is True and abs(_gz["hiz"] - 0.1025) < 2e-3,
+            _gz)
+    kontrol("⭐ I-45 KIRMIZI: b002 esigin KALIBRASYON ALANI DISINDA",
+            _gz.get("kalibrasyon_icinde") is False, _gz)
+    kontrol("I-45: sure yoksa hukum YOK (`olculdu=False`)",
+            _kk.kadraj_gezinme_hizi(_kb0, _kb1, sure_sn=0).get("olculdu")
+            is False)
+
+# ── ORNEKLEYICI KIRPMAYI UYGULAR (ayni 64x36 gri sozlesme) ──
+try:
+    _gk = _kk.gorsel_ornek_komutu("/tmp/x.jpg",
+                                  kirpma={"x": 0.1296, "y": 0.2222,
+                                          "w": 0.7407, "h": 0.5556})
+except TypeError:
+    _gk = []
+_vf = " ".join(_gk)
+kontrol("⭐ I-45 KIRMIZI: ornekleyici KIRPMA uygulayabiliyor",
+        "crop=" in _vf, _gk)
+kontrol("⭐ I-45: kirpma SCALE'DEN ONCE (once kirp, sonra 64x36 ornekle)",
+        _vf.find("crop=") < _vf.find("scale=64:36"), _vf)
+kontrol("I-45 GERILEME YOK: kirpmasiz cagri ESKI komutu BIREBIR uretiyor",
+        _kk.gorsel_ornek_komutu("/tmp/x.jpg")
+        == ["ffmpeg", "-nostdin", "-v", "error", "-i", "/tmp/x.jpg", "-vf",
+            "scale=64:36,format=gray", "-frames:v", "1", "-f", "rawvideo", "-"],
+        _kk.gorsel_ornek_komutu("/tmp/x.jpg"))
+
+# ── MOTION GRAMMAR: ALAN DISINDA HUKUM YOK (yanlis alarm azaltma) ──
+_mg45 = _kk.motion_grammar_olcusu([
+    # b002: kirpma enerjisi 9.391 <= esik AMA gezinme 0.1025 > 0.0577
+    {"beat_id": "b002", "hareket": "pull-out", "islev": "hook", "sure_sn": 2.201,
+     "medya_turu": "image", "uzamsal_enerji": 9.391, "gezinme_hizi": 0.1025},
+    # kalibrasyon alani icinde ve DUSUK enerjili -> hukum VERILIR
+    {"beat_id": "bX", "hareket": "push-in", "islev": "aciklama", "sure_sn": 4.0,
+     "medya_turu": "image", "uzamsal_enerji": 7.557, "gezinme_hizi": 0.0577}])
+kontrol("⭐ I-45 KIRMIZI: kalibrasyon ALANI DISINDAKI cekim isaretlenmiyor",
+        [d["beat_id"] for d in (_mg45.get("dusuk_enerji") or [])] == ["bX"],
+        _mg45.get("dusuk_enerji"))
+kontrol("⭐ I-45: alan disi cekim SESSIZCE gecilmiyor, AYRICA raporlaniyor",
+        [d["beat_id"] for d in (_mg45.get("gezinme_kapsam_disi") or [])]
+        == ["b002"], _mg45.get("gezinme_kapsam_disi"))
+kontrol("I-45 GERILEME YOK: gezinme verilmezse I-44 davranisi AYNEN "
+        "(hukum verilir)",
+        [d["beat_id"] for d in (_kk.motion_grammar_olcusu(
+            [{"beat_id": "b1", "hareket": "push-in", "islev": "hook",
+              "sure_sn": 4.0, "medya_turu": "image",
+              "uzamsal_enerji": 7.557}]).get("dusuk_enerji") or [])] == ["b1"])
+
+# ── PRE-QA ──
+_QON45 = oku(KOK, "editor/qa_on.py")
+kontrol("⭐ I-45 KIRMIZI: PRE-QA enerjiyi GOSTERILEN bolgede olcuyor",
+        "kadraj_kirpma_bolgesi" in _QON45, "kirpma PRE-QA'ya baglanmadi")
+kontrol("⭐ I-45: kapsam disi icin AYRI bilgi kodu (sessiz pass yok)",
+        "KALITE-MEDYA-ENERJI-KAPSAM-DISI" in _qon.KALITE_KODLARI
+        and "KALITE-MEDYA-ENERJI-KAPSAM-DISI" not in _qon.FAIL_KODLARI)
+kontrol("⭐ I-45: dusuk enerji kodu HALA `warn` (olcum kesinlesmedi)",
+        "KALITE-MEDYA-DUSUK-ENERJI" in _qon.KALITE_KODLARI
+        and "KALITE-MEDYA-DUSUK-ENERJI" not in _qon.FAIL_KODLARI)
+kontrol("I-45: PRE-QA modulu HALA GORSEL ACMAZ (olcer disaridan)",
+        "subprocess" not in _QON45)
+
+# ── GERILEME YOK ──
+kontrol("⭐ I-45: ESIKLER GEVSETILMEDI (optik 2.0 / enerji 11.589)",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0
+        and abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9)
+_V45 = oku(os.path.dirname(KOK), "app", "render-studio", "src", "Video.tsx")
+kontrol("⭐ I-45: ZOOM KOVASI YUKSELTILMEDI (I-43 tabani 0.045)",
+        "OPTIK_TABAN_ORANI = 0.045" in _V45)
+kontrol("I-45: kadraj olcekleri TEK KAYNAK (motion.py <-> Kamera.tsx)",
+        all(f'"{a}": {b}' in oku(KOK, "editor/motion.py")
+            for a, b in (("tam", 1.0), ("punch-1.35", 1.35),
+                         ("punch-1.6", 1.6))))
+kontrol("I-45 GERILEME YOK: lisans/provenance ve tekrar kapilari DURUYOR",
+        "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI
+        and "KALITE-MEDYA-TEKRAR" in _qon.FAIL_KODLARI)
+kontrol("I-45 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("I-45: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in _V45
+        and "pan: 'right' | 'left' | 'top' | 'bottom' | 'yok'" in _V45)
+
 blok("§39t I-44 — GORSELIN UZAMSAL ENERJISI HIC OLCULMUYORDU")
 
 # ⚠ I-43 PILOTUNDA OLCULEN KUSUR: kova tabani (0.045) hizalandiktan sonra
