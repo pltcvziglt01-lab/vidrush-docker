@@ -293,6 +293,16 @@ def benzerlik(a, b):
     return sum(1 for x, y in zip(ha, hb) if x == y) / len(ha)
 
 
+def kk_esik():
+    """Edinim ayirt-etme esigi QA esigiyle AYNI kaynaktan gelir.
+
+    ⚠ Ikinci bir sabit yazmak, edinimin QA'dan sessizce ayrisma riskini
+    dogurur (edinim 0.80'e gore secip QA 0.86'ya gore FAIL verebilirdi).
+    """
+    from editor import kalite_kapisi as kk
+    return kk.BENZERLIK_ESIGI
+
+
 def medya_edin(sahne_aday_adedi=None):
     """Sahne basina medyayi SAGLAYICI ZINCIRINDEN edin (devre kesicili).
 
@@ -311,7 +321,11 @@ def medya_edin(sahne_aday_adedi=None):
         "atlanan_saglayicilar": [
             {"ad": "pexels", "sebep": "mevcut anahtar GECERSIZ (HTTP 401) — "
                                       "yeni anahtar ALINMADI"}],
-        "en_az_genislik": 1920, "sahneler": []}
+        "en_az_genislik": 1920,
+        # ⚠ I-23: 16:9 cikti icin EN-BOY ORANI UYUMLULUK KAPISI.
+        "hedef_oran": round(edinim.HEDEF_ORAN_16_9, 4),
+        "oran_en_az_korunan": edinim.ORAN_EN_AZ_KORUNAN,
+        "oran_reddi": [], "ayirt_reddi": [], "sahneler": []}
     for _si, tanim in enumerate(SAHNE_TANIMI):
         _istenen = ((sahne_aday_adedi or {}).get(tanim["kimlik"])
                     or ADAY_ADEDI)
@@ -324,6 +338,15 @@ def medya_edin(sahne_aday_adedi=None):
         kunye_yolu = hedef + ".kunye.json"
         onbellekte = (os.path.exists(hedef) and os.path.getsize(hedef) > 10000
                       and os.path.exists(kunye_yolu))
+        # ⚠ I-23: ONBELLEK, ORAN KAPISINI BAYPAS EDEMEZ. Onbellekteki dosya
+        # 16:9'a guvenle uymuyorsa bu bir onbellek ISABETI SAYILMAZ; normal
+        # edinim yoluna dusulur ve AYNI arama listesinden uygun aday aranir.
+        if onbellekte:
+            _obk = edinim.oran_karari(*_olcu_oku(hedef))
+            if not _obk.get("uygun", True):
+                rapor["oran_reddi"].append(
+                    dict(_obk, kimlik=tanim["kimlik"], kaynak="ONBELLEK"))
+                onbellekte = False
         if onbellekte:
             try:
                 with open(kunye_yolu, encoding="utf-8") as f:
@@ -340,13 +363,24 @@ def medya_edin(sahne_aday_adedi=None):
             son = edinim.edin(
                 tanim["sorgu"], hedef, en_az_genislik=1920, kesici=kesici,
                 onbellek=onbellek, adet=_istenen,
+                hedef_oran=edinim.HEDEF_ORAN_16_9,
+                benzerlik_okuyucu=benzerlik,
+                benzerlik_esigi=kk_esik(),
                 saglayicilar=[
                     {"ad": "commons", "modul": commons,
                      "sorgu": tanim["sorgu"] + " Iceland"},
                     {"ad": "nasa", "modul": nasa, "sorgu": tanim["sorgu"]}],
                 olcu_okuyucu=_olcu_oku)
+        # ⚠ I-23: OLCULEN oran + HEDEF oran + RED NEDENI raporda GORUNUR.
+        for _rd in ((son.get("oran_kapisi") or {}).get("reddedilen") or []):
+            rapor["oran_reddi"].append(
+                dict(_rd, kimlik=tanim["kimlik"], kaynak="EDINIM"))
+        for _rd in ((son.get("ayirt_kapisi") or {}).get("reddedilen") or []):
+            rapor["ayirt_reddi"].append(
+                dict(_rd, kimlik=tanim["kimlik"], kaynak="EDINIM"))
         kayit = {"kimlik": tanim["kimlik"], "sorgu": tanim["sorgu"],
                  "istenen_aday": _istenen,
+                 "oran_kapisi": son.get("oran_kapisi"),
                  "saglayici": son.get("kullanilan_saglayici"),
                  "failover_sn": son.get("failover_sn"),
                  "metadata_bulundu": son.get("metadata_bulundu"),
@@ -388,6 +422,7 @@ def medya_edin(sahne_aday_adedi=None):
                       "lisans": aday.get("lisans"),
                       "eser_sahibi": aday.get("eser_sahibi"),
                       "olcu": list(olcu), "detay_std": aday["detay_std"],
+                      "oran": edinim.oran_karari(*olcu),
                       "orijinal_url": aday.get("orijinal_url"),
                       "dayanak": "cumle bu varligin KENDI basligini betimliyor"})
         if aday["detay_std"] < DETAY_ESIGI:
@@ -410,6 +445,19 @@ def medya_edin(sahne_aday_adedi=None):
         kayit["yedek_aday"] = len(aday["yedekler"])
         rapor["sahneler"].append(kayit)
         secilen.append(aday)
+    # ⚠ I-23 KANITI: kabul edilen HER varlik oran kapisini gecmis olmali.
+    rapor["oran_kapisi_ozeti"] = {
+        "hedef_oran": round(edinim.HEDEF_ORAN_16_9, 4),
+        "en_az_korunan": edinim.ORAN_EN_AZ_KORUNAN,
+        "reddedilen": len(rapor["oran_reddi"]),
+        "ayirt_esigi": kk_esik(),
+        "ayirt_reddedilen": len(rapor["ayirt_reddi"]),
+        "kabul_edilen_oranlar": [
+            (k.get("oran") or {}).get("olculen_oran")
+            for k in rapor["sahneler"] if k.get("durum") == "OK"],
+        "hepsi_uygun": all(
+            (k.get("oran") or {}).get("uygun", True)
+            for k in rapor["sahneler"] if k.get("durum") == "OK")}
     rapor["basarili"] = sum(1 for s in secilen if s)
     rapor["dort_k_uygun"] = bool(
         secilen and all(s and s["genislik"] >= 3840 for s in secilen))
@@ -1197,7 +1245,17 @@ def main() -> int:
     print("\n" + "=" * 72)
     print(f"SONUC: on-render QA={qa['durum']} · render sonrasi QA={pd['durum']}"
           f" -> {'KAPI GECILDI' if pass_mi else 'KAPI GECILEMEDI'}")
-    print("⚠ Medya WEB'DEN BULUNMADI — yerel Apollo fixture'i kullanildi.")
+    # ⚠ I-23'TE BULUNAN YANLIS BEYAN: burada KOSULSUZ olarak "Medya WEB'DEN
+    # BULUNMADI — yerel Apollo fixture'i kullanildi" yaziyordu. I-19'dan beri
+    # DOGRU DEGIL: medya gercek saglayici zincirinden iniyor. Bu dosyanin kendi
+    # kurali "SAHTE KANIT YOK" oldugu icin satir OLCUMDEN turetiliyor.
+    _kaynaklar = sorted({str(s.get("saglayici") or "?")
+                         for s in (medya_rapor.get("sahneler") or [])
+                         if s.get("durum") == "OK"})
+    print(f"MEDYA: {medya_rapor.get('basarili')}/"
+          f"{len(medya_rapor.get('sahneler') or [])} sahne GERCEK saglayicidan "
+          f"({', '.join(_kaynaklar) or 'YOK'}) · fixture KULLANILMADI · "
+          f"maliyet ${medya_rapor.get('maliyet_usd', 0.0):.2f}")
     print("=" * 72)
     return 0 if pass_mi else 8
 

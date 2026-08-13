@@ -44,6 +44,50 @@ BEKLENEBILIR_TAVAN_SN = 30.0
 # Kalici sayilan HTTP kodlari (gecici ag hatasi degil, sunucu reddi).
 KALICI_KODLAR = (401, 403, 429, 451, 500, 502, 503, 504)
 
+# ═════════════ EN-BOY ORANI UYUMLULUK KAPISI (Faz I-23) ═════════════
+#
+# ⚠ I-22'DE KALAN TEK FAIL'IN **OLCULEN** KOK NEDENI — devralinan aciklama
+# YANLISTI ve burada duzeltiliyor:
+#
+#   Devralinan iddia : "s02 kaynagi 2048x3072 DIKEY; 16:9 karede PILLARBOX
+#                       (yan siyah bant) veriyor."
+#   OLCULEN GERCEK   : POST-KENAR-SIYAH'in 6/68 ihlalinin 6'si da
+#                       **b002**'de (1.00-2.25 sn). b002'nin varligi s01'in
+#                       YEDEGI `s01_..._1.jpg` = **2832x3603** (oran 0.786).
+#                       s02 (2048x3072) b003'u besliyor ve **SIFIR** ihlal
+#                       uretmis. Yani hem varlik hem mekanizma yanlis
+#                       atfedilmisti.
+#
+# MEKANIZMA PILLARBOX **DEGIL**. `Kamera.tsx > Zemin` `objectFit: 'cover'`
+# kullanir; kare TAMAMEN doludur. Olculdu: ihlal karesinde 0-200. sutunlar
+# ort 8.2 / std 1.24 / min 6 / max 13 — yani GERCEK (koyu) fotograf icerigi.
+# Sentetik bir bant SABIT olurdu (std 0), 8.2 degil 0 okunurdu.
+#
+# GERCEK MEKANIZMA — ASIRI COVER-CROP. 16:9'u 0.786 oranli bir kaynaktan
+# `cover` ile doldurmak kaynagin yuksekliginin yalnizca %44'unu birakir;
+# uzerine `punch-1.35` binince gorulen alan kaynagin ~%33'une duser. Geriye
+# kalan dar dilim temsili olmayan bir golge koridoruydu: sol serit 8.2 <
+# esik 16 -> POST-KENAR-SIYAH.
+#
+# ESIK NEREDEN GELIYOR (uydurma degil, AYNI render'dan olculdu):
+#   korunan_oran = min(r/R, R/r)   (cover ile kaynaktan geriye kalan pay)
+#     1.480 (4192x2832) -> 0.832  temiz, 0 ihlal
+#     1.333 (3000x2250) -> 0.750  temiz, 0 ihlal   <- en DAR temiz olcum
+#     1.332 (4986x3744) -> 0.750  temiz, 0 ihlal
+#     0.786 (2832x3603) -> 0.442  IHLAL URETEN
+#     0.667 (2048x3072) -> 0.375  (bu render'da ihlal uretmedi ama ayni
+#                                  sinifta: kaynagin %62'si atiliyor)
+# Sinir (0.442, 0.750] araliginda olmak zorunda. 0.70 secildi: en dar TEMIZ
+# olcumun (0.750) hemen altinda, ihlal uretenin (0.442) cok uzerinde.
+# 4:3 — kamu mali fotografin baskin formati — gecer; kare (0.562) ve
+# dikey (0.442/0.375) gecmez.
+#
+# ⚠ DURUST SINIR: 5:4 (1.25 -> 0.703) bu esigi KIL PAYI geciyor ve
+# olculmedi. Cok genis panorama da ayni formulle elenir (3:1 -> 0.593):
+# yatayda %41 atmak da temsili olmayan bir dilim birakir.
+HEDEF_ORAN_16_9 = 16.0 / 9.0
+ORAN_EN_AZ_KORUNAN = 0.70
+
 
 class DevreKesici:
     """Host bazli devre kesici. Saat DISARIDAN verilebilir (test icin)."""
@@ -151,6 +195,92 @@ def _olcu_yeter(yol: str, aday: dict, en_az_genislik: int,
     return g >= int(en_az_genislik)
 
 
+def oran_karari(genislik, yukseklik, *,
+                hedef_oran: float = HEDEF_ORAN_16_9,
+                en_az_korunan: float = ORAN_EN_AZ_KORUNAN) -> dict:
+    """Kaynak, hedef karede GUVENLE kullanilabilir mi? (saf fonksiyon)
+
+    Olcut "oran farki" degil **cover ile kaynaktan geriye kalan pay**tir:
+    `korunan = min(r/R, R/r)`. Cunku kusuru ureten sey oran sayisinin
+    kendisi degil, kirpmanin kaynagin ne kadarini ATTIGIDIR.
+
+    Ag/dosya KULLANMAZ; yalnizca olculmus iki sayiyi degerlendirir.
+    """
+    try:
+        g, y = float(genislik), float(yukseklik)
+    except (TypeError, ValueError):
+        return {"olculdu": False, "sebep": "OLCU-OKUNAMADI", "uygun": True}
+    try:
+        hedef = float(hedef_oran)
+    except (TypeError, ValueError):
+        hedef = HEDEF_ORAN_16_9
+    if g <= 0 or y <= 0 or hedef <= 0:
+        # ⚠ EMIN DEGILSEN ENGELLEME — cozunurluk kapisiyla ayni sozlesme.
+        return {"olculdu": False, "sebep": "OLCU-GECERSIZ", "uygun": True}
+    try:
+        taban = float(en_az_korunan)
+    except (TypeError, ValueError):
+        taban = ORAN_EN_AZ_KORUNAN
+    oran = g / y
+    korunan = min(oran / hedef, hedef / oran)
+    if oran > hedef * 1.005:
+        yon = "asiri-genis"
+    elif oran >= hedef * 0.995:
+        yon = "hedefe-uygun"
+    elif oran < 0.95:
+        yon = "dikey"
+    elif oran < 1.05:
+        yon = "kare"
+    else:
+        yon = "dar-yatay"          # yatay ama 16:9'dan dar (or. 4:3)
+    uygun = korunan >= taban
+    return {
+        "olculdu": True,
+        "olculen_olcu": [int(g), int(y)],
+        "olculen_oran": round(oran, 4),
+        "hedef_oran": round(hedef, 4),
+        "korunan_oran": round(korunan, 4),
+        "en_az_korunan": round(taban, 4),
+        "atilan_oran": round(1.0 - korunan, 4),
+        "yon": yon,
+        "uygun": uygun,
+        "sebep": "" if uygun else (
+            f"ORAN-UYUMSUZ ({yon}): olculen {oran:.3f} vs hedef {hedef:.3f}; "
+            f"cover kirpmasi kaynagin %{(1.0 - korunan) * 100:.0f}'ini atiyor "
+            f"(korunan {korunan:.3f} < en az {taban:.3f})"),
+    }
+
+
+def _oran_yeter(yol: str, aday: dict, hedef_oran: float,
+                en_az_korunan: float, okuyucu: Optional[Callable]) -> bool:
+    """Indirilen dosyanin GERCEK en-boy orani hedef kareye uyuyor mu?
+
+    ⚠ OLCUM PAYLASILIR: `_olcu_yeter` zaten olctuyse `olculen_olcu` doludur
+    ve IKINCI bir ffprobe CALISTIRILMAZ. Kapi kapaliysa (hedef_oran=0)
+    hicbir sey olculmez — geriye tam uyumlu.
+    """
+    if not hedef_oran:
+        return True
+    olcu = aday.get("olculen_olcu")
+    if not olcu:
+        if not callable(okuyucu):
+            return True
+        try:
+            olcu = list(okuyucu(yol) or ())
+        except Exception:                                         # noqa: BLE001
+            return True
+        if olcu:
+            aday["olculen_olcu"] = list(olcu)
+    try:
+        g, y = int(olcu[0]), int(olcu[1])
+    except (TypeError, ValueError, IndexError):
+        return True
+    karar = oran_karari(g, y, hedef_oran=hedef_oran,
+                        en_az_korunan=en_az_korunan)
+    aday["oran_karari"] = karar
+    return bool(karar.get("uygun", True))
+
+
 def _indir_tek(modul, aday: dict, hedef_yol: str) -> dict:
     """Saglayicidan TEK deneme iste — yeniden deneme politikasi BU MODULUN.
 
@@ -175,7 +305,11 @@ def edin(sorgu: str, hedef_yol: str, *, saglayicilar: list,
          en_az_genislik: int = 0, kesici: Optional[DevreKesici] = None,
          onbellek: Optional[dict] = None, uyu: Optional[Callable] = None,
          saat: Optional[Callable] = None, aday_secici: Optional[Callable] = None,
-         olcu_okuyucu: Optional[Callable] = None, adet: int = 1) -> dict:
+         olcu_okuyucu: Optional[Callable] = None, adet: int = 1,
+         hedef_oran: float = 0.0,
+         en_az_korunan: float = ORAN_EN_AZ_KORUNAN,
+         benzerlik_okuyucu: Optional[Callable] = None,
+         benzerlik_esigi: float = 0.0) -> dict:
     """Saglayici zincirini SIRAYLA dene; ilk GERCEK BAYT ile don.
 
     `saglayicilar`: [{"ad", "modul", "sorgu"?}] — `modul` `ara()`/`indir()`
@@ -195,7 +329,75 @@ def edin(sorgu: str, hedef_yol: str, *, saglayicilar: list,
              "kullanilan_saglayici": "", "denemeler": [],
              "metadata_bulundu": 0, "bayt_indirildi": 0,
              "onbellekten": False, "failover_sn": None,
-             "devre": None}
+             "devre": None,
+             # ⚠ I-23: OLCULEN oran, HEDEF oran ve RED NEDENI raporda GORUNUR.
+             "oran_kapisi": {"acik": bool(hedef_oran),
+                             "hedef_oran": round(float(hedef_oran or 0.0), 4),
+                             "en_az_korunan": round(float(en_az_korunan), 4),
+                             "reddedilen": [], "kabul_edilen": []},
+             # ⚠ I-23b: ORAN KAPISI, AYIRT EDILEBILIRLIGI BOZABILIYOR.
+             # Olculdu: dikey aday elenince s01'in siradaki adayi BIRINCININ
+             # neredeyse ayni karesi cikti (dHash 0.875 >= 0.86) ve
+             # KALITE-MEDYA-TEKRAR FAIL verdi. Iki kisit AYNI anda saglanmali;
+             # aksi halde birini greedy secmek digerini kiriyor.
+             "ayirt_kapisi": {"acik": bool(benzerlik_okuyucu
+                                           and benzerlik_esigi),
+                              "esik": round(float(benzerlik_esigi or 0.0), 4),
+                              "reddedilen": []}}
+
+    def _kapilar(aday: dict, yol: str) -> dict:
+        """INDIRME SONRASI kapilar. Gecerse {}; gecemezse RED `son`u doner.
+
+        ⚠ ARAMA BEYANI ile GERCEK BAYT AYRI: bazi saglayicilar (NASA) arama
+        ucunda piksel olcusu VERMIYOR. "1920 istedim" demek yetmez; olcu
+        ancak INDIRDIKTEN sonra bilinir. Upscale ya da pillarbox/blur ile
+        doldurma YAPILMAZ — uymayan aday REDDEDILIR ve AYNI mevcut arama
+        listesindeki SIRADAKI lisansli adaya gecilir (EK AG CAGRISI YOK).
+
+        ⚠ I-23'TE BULUNAN BOSLUK: bu iki kapi eskiden yalnizca ILK indirme
+        denemesine uygulaniyordu; `Retry-After` sonrasi yeniden deneme
+        BASARILI olursa aday HIC OLCULMEDEN kabul ediliyordu. Artik iki yol
+        da buradan gecer.
+        """
+        if not _olcu_yeter(yol, aday, en_az_genislik, olcu_okuyucu):
+            return {"ok": False, "sebep": "COZUNURLUK-YETERSIZ",
+                    "olculen": aday.get("olculen_olcu")}
+        if not _oran_yeter(yol, aday, hedef_oran, en_az_korunan, olcu_okuyucu):
+            k = dict(aday.get("oran_karari") or {})
+            k["baslik"] = str(aday.get("baslik") or "")[:80]
+            rapor["oran_kapisi"]["reddedilen"].append(k)
+            return {"ok": False, "sebep": k.get("sebep") or "ORAN-UYUMSUZ",
+                    "oran": k}
+        # ── AYIRT EDILEBILIRLIK ──
+        # ⚠ Bu modul dHash HESAPLAMAZ; olcer DISARIDAN verilir (tipki
+        # `kalite_kapisi.medya_tekrari` gibi). Edinim icerik-agnostik kalir.
+        # Olcer yoksa ya da "olcemedim" (<0) derse ENGELLENMEZ.
+        if benzerlik_okuyucu and benzerlik_esigi:
+            for _onceki in toplanan:
+                _oy = str(_onceki.get("yol") or "")
+                if not _oy:
+                    continue
+                try:
+                    _b = float(benzerlik_okuyucu(yol, _oy))
+                except Exception:                                 # noqa: BLE001
+                    continue
+                if _b < 0 or _b < float(benzerlik_esigi):
+                    continue
+                k = {"benzerlik": round(_b, 4),
+                     "esik": round(float(benzerlik_esigi), 4),
+                     "benzedigi": os.path.basename(_oy),
+                     "baslik": str(aday.get("baslik") or "")[:80],
+                     "sebep": (f"AYIRT-EDILEMEZ: benzerlik {_b:.3f} >= esik "
+                               f"{float(benzerlik_esigi):.3f}")}
+                rapor["ayirt_kapisi"]["reddedilen"].append(k)
+                return {"ok": False, "sebep": k["sebep"], "ayirt": k}
+        kabul = aday.get("oran_karari")
+        if kabul:
+            rapor["oran_kapisi"]["kabul_edilen"].append(
+                {a: kabul.get(a) for a in
+                 ("olculen_olcu", "olculen_oran", "hedef_oran",
+                  "korunan_oran", "yon")})
+        return {}
 
     for sag in (saglayicilar or []):
         ad = str((sag or {}).get("ad") or "")
@@ -277,15 +479,11 @@ def edin(sorgu: str, hedef_yol: str, *, saglayicilar: list,
                 son = {"ok": False, "sebep": "PROVENANCE-EKSIK"}
                 continue
             son = _indir_tek(modul, aday, _yol)
-            if son.get("ok") and not _olcu_yeter(
-                    _yol, aday, en_az_genislik, olcu_okuyucu):
-                # ⚠ ARAMA BEYANI ile GERCEK BAYT AYRI: bazi saglayicilar
-                # (NASA) arama ucunda piksel olcusu VERMIYOR. "1920 istedim"
-                # demek yetmez; olcu ancak INDIRDIKTEN sonra bilinir ve
-                # yetersizse aday REDDEDILIR. Upscale YAPILMAZ.
-                son = {"ok": False, "sebep": "COZUNURLUK-YETERSIZ",
-                       "olculen": aday.get("olculen_olcu")}
-                continue
+            if son.get("ok"):
+                _red = _kapilar(aday, _yol)
+                if _red:
+                    son = _red
+                    continue
             if son.get("ok"):
                 onbellek[url] = _yol
                 kesici.basari(ad)
@@ -308,6 +506,11 @@ def edin(sorgu: str, hedef_yol: str, *, saglayicilar: list,
             if karar["karar"] == "BEKLE":
                 bekle(karar["bekleme_sn"])
                 son = _indir_tek(modul, aday, _yol)
+                if son.get("ok"):
+                    _red = _kapilar(aday, _yol)
+                    if _red:
+                        son = _red
+                        continue
                 if son.get("ok"):
                     onbellek[url] = _yol
                     kesici.basari(ad)
@@ -359,7 +562,15 @@ def kapsam_ozeti() -> dict:
         "kalici_kod": list(KALICI_KODLAR),
         "saglayici_gomulu_mu": False,
         "ayri_sayilan": ["metadata_bulundu", "bayt_indirildi"],
+        "hedef_oran_16_9": round(HEDEF_ORAN_16_9, 4),
+        "oran_en_az_korunan": ORAN_EN_AZ_KORUNAN,
+        "indirme_sonrasi_kapilar": ["COZUNURLUK-YETERSIZ", "ORAN-UYUMSUZ",
+                                    "AYIRT-EDILEMEZ"],
+        "olcerler_disaridan": ["olcu_okuyucu", "benzerlik_okuyucu"],
         "kapsam_disi": ["youtube ve izinsiz kaynaklar",
                         "odemeli saglayicilar",
-                        "kare-bakan icerik dogrulamasi"],
+                        "kare-bakan icerik dogrulamasi",
+                        # ⚠ I-23 DURUST SINIR: kapi kaynagi REDDEDER, kareyi
+                        # DUZELTMEZ. Blur/pillarbox/sentetik doldurma YOK.
+                        "uymayan kaynagi kirparak KURTARMA"],
     }

@@ -54,16 +54,16 @@
     "asiri_esigi": 45.0,
     "warn_sn": 1.5,
     "fail_sn": 3.0,
-    "genel_ortalama": 14.787,
+    "genel_ortalama": 14.503,
     "sahneler": [
       {
         "ad": "b001 push-in",
         "bas_sn": 0.0,
         "sure_sn": 0.862,
         "ornek": 3,
-        "ortalama": 41.012,
-        "en_dusuk": 4.994,
-        "en_yuksek": 108.643,
+        "ortalama": 40.911,
+        "en_dusuk": 4.987,
+        "en_yuksek": 108.349,
         "durgun_sn": 0.0,
         "durgun": false,
         "asiri": false
@@ -73,9 +73,9 @@
         "bas_sn": 0.862,
         "sure_sn": 1.725,
         "ornek": 3,
-        "ortalama": 5.754,
-        "en_dusuk": 5.283,
-        "en_yuksek": 6.483,
+        "ortalama": 5.359,
+        "en_dusuk": 4.884,
+        "en_yuksek": 6.14,
         "durgun_sn": 0.0,
         "durgun": false,
         "asiri": false
@@ -85,9 +85,9 @@
         "bas_sn": 2.587,
         "sure_sn": 4.738,
         "ornek": 15,
-        "ortalama": 3.791,
-        "en_dusuk": 3.191,
-        "en_yuksek": 4.439,
+        "ortalama": 3.682,
+        "en_dusuk": 3.069,
+        "en_yuksek": 4.309,
         "durgun_sn": 0.0,
         "durgun": false,
         "asiri": false
@@ -123,9 +123,9 @@
       "bas_sn": 2.587,
       "sure_sn": 4.738,
       "ornek": 15,
-      "ortalama": 3.791,
-      "en_dusuk": 3.191,
-      "en_yuksek": 4.439,
+      "ortalama": 3.682,
+      "en_dusuk": 3.069,
+      "en_yuksek": 4.309,
       "durgun_sn": 0.0,
       "durgun": false,
       "asiri": false
@@ -137,31 +137,12 @@
     "kare": 68,
     "serit_sutun": 2,
     "siyah_esigi": 16.0,
-    "ihlal_kare": 6,
-    "ihlal_orani": 0.0882,
-    "ornek_ihlal": [
-      {
-        "kare": 4,
-        "sol": 8.26,
-        "sag": 25.18,
-        "genel": 66.58
-      },
-      {
-        "kare": 5,
-        "sol": 8.28,
-        "sag": 33.57,
-        "genel": 66.0
-      },
-      {
-        "kare": 6,
-        "sol": 8.26,
-        "sag": 40.69,
-        "genel": 65.11
-      }
-    ],
-    "en_koyu_sol": 8.26,
-    "en_koyu_sag": 25.18,
-    "temiz": false
+    "ihlal_kare": 0,
+    "ihlal_orani": 0.0,
+    "ornek_ihlal": [],
+    "en_koyu_sol": 39.44,
+    "en_koyu_sag": 42.54,
+    "temiz": true
   },
   "motion_grammar": {
     "olculdu": true,
@@ -188,8 +169,8 @@
     "benzersiz_gecis": 3,
     "gecis_dagilimi": {
       "flash": 1,
-      "karartma": 1,
-      "hard-cut": 3
+      "hard-cut": 3,
+      "karartma": 1
     },
     "acilis_hareketi": "push-in",
     "kapanis_hareketi": "push-in",
@@ -306,8 +287,8 @@
         "sure": 0.407
       },
       {
-        "bas": 1.6,
-        "sure": 1.347
+        "bas": 1.58,
+        "sure": 1.367
       },
       {
         "bas": 6.307,
@@ -322,7 +303,7 @@
         "sure": 1.082
       }
     ],
-    "anlatim_master_sessiz_pct": 33.2,
+    "anlatim_master_sessiz_pct": 33.3,
     "cumle_arasi_bosluklar_sn": [
       -0.051,
       0.001,
@@ -417,7 +398,7 @@
       },
       {
         "ad": "source-label",
-        "metin": "Wade Sisler / NASA-PUBLIC",
+        "metin": "Dominic Hart / NASA-PUBLIC",
         "y_orani": 0.755,
         "bas_sn": 2.987,
         "sure_sn": 3.0,
@@ -536,13 +517,109 @@
       }
     ],
     "en_az_genislik": 1920,
+    "hedef_oran": 1.7778,
+    "oran_en_az_korunan": 0.7,
+    "oran_reddi": [
+      {
+        "olculdu": true,
+        "olculen_olcu": [
+          2832,
+          3603
+        ],
+        "olculen_oran": 0.786,
+        "hedef_oran": 1.7778,
+        "korunan_oran": 0.4421,
+        "en_az_korunan": 0.7,
+        "atilan_oran": 0.5579,
+        "yon": "dikey",
+        "uygun": false,
+        "sebep": "ORAN-UYUMSUZ (dikey): olculen 0.786 vs hedef 1.778; cover kirpmasi kaynagin %56'ini atiyor (korunan 0.442 < en az 0.700)",
+        "baslik": "ARC-2008-ACD08-0272-003",
+        "kimlik": "s01",
+        "kaynak": "EDINIM"
+      },
+      {
+        "olculdu": true,
+        "olculen_olcu": [
+          2048,
+          3072
+        ],
+        "olculen_oran": 0.6667,
+        "hedef_oran": 1.7778,
+        "korunan_oran": 0.375,
+        "en_az_korunan": 0.7,
+        "atilan_oran": 0.625,
+        "yon": "dikey",
+        "uygun": false,
+        "sebep": "ORAN-UYUMSUZ (dikey): olculen 0.667 vs hedef 1.778; cover kirpmasi kaynagin %62'ini atiyor (korunan 0.375 < en az 0.700)",
+        "baslik": "ARC-1988-AC88-0514-42",
+        "kimlik": "s02",
+        "kaynak": "EDINIM"
+      }
+    ],
+    "ayirt_reddi": [
+      {
+        "benzerlik": 0.875,
+        "esik": 0.86,
+        "benzedigi": "s01_Pleiades_supercomputer.jpg",
+        "baslik": "ARC-2008-ACD08-0272-006",
+        "sebep": "AYIRT-EDILEMEZ: benzerlik 0.875 >= esik 0.860",
+        "kimlik": "s01",
+        "kaynak": "EDINIM"
+      }
+    ],
     "sahneler": [
       {
         "kimlik": "s01",
         "sorgu": "Pleiades supercomputer",
         "istenen_aday": 2,
+        "oran_kapisi": {
+          "acik": true,
+          "hedef_oran": 1.7778,
+          "en_az_korunan": 0.7,
+          "reddedilen": [
+            {
+              "olculdu": true,
+              "olculen_olcu": [
+                2832,
+                3603
+              ],
+              "olculen_oran": 0.786,
+              "hedef_oran": 1.7778,
+              "korunan_oran": 0.4421,
+              "en_az_korunan": 0.7,
+              "atilan_oran": 0.5579,
+              "yon": "dikey",
+              "uygun": false,
+              "sebep": "ORAN-UYUMSUZ (dikey): olculen 0.786 vs hedef 1.778; cover kirpmasi kaynagin %56'ini atiyor (korunan 0.442 < en az 0.700)",
+              "baslik": "ARC-2008-ACD08-0272-003"
+            }
+          ],
+          "kabul_edilen": [
+            {
+              "olculen_olcu": [
+                4192,
+                2832
+              ],
+              "olculen_oran": 1.4802,
+              "hedef_oran": 1.7778,
+              "korunan_oran": 0.8326,
+              "yon": "dar-yatay"
+            },
+            {
+              "olculen_olcu": [
+                4134,
+                2832
+              ],
+              "olculen_oran": 1.4597,
+              "hedef_oran": 1.7778,
+              "korunan_oran": 0.8211,
+              "yon": "dar-yatay"
+            }
+          ]
+        },
         "saglayici": "nasa",
-        "failover_sn": 4.361,
+        "failover_sn": 6.44,
         "metadata_bulundu": 6,
         "bayt_indirildi": 2,
         "onbellekten": false,
@@ -553,7 +630,7 @@
             "elenen": 0,
             "durum": "ADAY-YOK",
             "sebep": "lisans/provenance duvarini gecen aday yok",
-            "sn": 0.632
+            "sn": 0.678
           },
           {
             "saglayici": "nasa",
@@ -561,7 +638,7 @@
             "elenen": 0,
             "durum": "OK",
             "sebep": "",
-            "sn": 3.73
+            "sn": 5.762
           }
         ],
         "devre": {
@@ -571,7 +648,7 @@
           "acik_devreler": []
         },
         "durum": "OK",
-        "asset_id": "s01_44756653",
+        "asset_id": "s01_86005280",
         "baslik": "ARC-2008-ACD08-0272-005",
         "lisans": "nasa-public",
         "eser_sahibi": "Dominic Hart",
@@ -580,6 +657,21 @@
           2832
         ],
         "detay_std": 52.3,
+        "oran": {
+          "olculdu": true,
+          "olculen_olcu": [
+            4192,
+            2832
+          ],
+          "olculen_oran": 1.4802,
+          "hedef_oran": 1.7778,
+          "korunan_oran": 0.8326,
+          "en_az_korunan": 0.7,
+          "atilan_oran": 0.1674,
+          "yon": "dar-yatay",
+          "uygun": true,
+          "sebep": ""
+        },
         "orijinal_url": "https://images.nasa.gov/details-ARC-2008-ACD08-0272-005",
         "dayanak": "cumle bu varligin KENDI basligini betimliyor",
         "yedek_aday": 1
@@ -588,8 +680,43 @@
         "kimlik": "s02",
         "sorgu": "supercomputer facility",
         "istenen_aday": 1,
+        "oran_kapisi": {
+          "acik": true,
+          "hedef_oran": 1.7778,
+          "en_az_korunan": 0.7,
+          "reddedilen": [
+            {
+              "olculdu": true,
+              "olculen_olcu": [
+                2048,
+                3072
+              ],
+              "olculen_oran": 0.6667,
+              "hedef_oran": 1.7778,
+              "korunan_oran": 0.375,
+              "en_az_korunan": 0.7,
+              "atilan_oran": 0.625,
+              "yon": "dikey",
+              "uygun": false,
+              "sebep": "ORAN-UYUMSUZ (dikey): olculen 0.667 vs hedef 1.778; cover kirpmasi kaynagin %62'ini atiyor (korunan 0.375 < en az 0.700)",
+              "baslik": "ARC-1988-AC88-0514-42"
+            }
+          ],
+          "kabul_edilen": [
+            {
+              "olculen_olcu": [
+                3000,
+                2000
+              ],
+              "olculen_oran": 1.5,
+              "hedef_oran": 1.7778,
+              "korunan_oran": 0.8438,
+              "yon": "dar-yatay"
+            }
+          ]
+        },
         "saglayici": "nasa",
-        "failover_sn": 3.371,
+        "failover_sn": 4.252,
         "metadata_bulundu": 6,
         "bayt_indirildi": 1,
         "onbellekten": false,
@@ -600,7 +727,7 @@
             "elenen": 0,
             "durum": "ADAY-YOK",
             "sebep": "lisans/provenance duvarini gecen aday yok",
-            "sn": 0.631
+            "sn": 0.634
           },
           {
             "saglayici": "nasa",
@@ -608,7 +735,7 @@
             "elenen": 0,
             "durum": "OK",
             "sebep": "",
-            "sn": 2.74
+            "sn": 3.618
           }
         ],
         "devre": {
@@ -618,16 +745,31 @@
           "acik_devreler": []
         },
         "durum": "OK",
-        "asset_id": "s02_92060661",
-        "baslik": "ARC-1988-AC88-0514-42",
+        "asset_id": "s02_79122633",
+        "baslik": "ACD15-0062-004",
         "lisans": "nasa-public",
-        "eser_sahibi": "Wade Sisler",
+        "eser_sahibi": "Dominic Hart",
         "olcu": [
-          2048,
-          3072
+          3000,
+          2000
         ],
-        "detay_std": 88.5,
-        "orijinal_url": "https://images.nasa.gov/details-ARC-1988-AC88-0514-42",
+        "detay_std": 45.1,
+        "oran": {
+          "olculdu": true,
+          "olculen_olcu": [
+            3000,
+            2000
+          ],
+          "olculen_oran": 1.5,
+          "hedef_oran": 1.7778,
+          "korunan_oran": 0.8438,
+          "en_az_korunan": 0.7,
+          "atilan_oran": 0.1562,
+          "yon": "dar-yatay",
+          "uygun": true,
+          "sebep": ""
+        },
+        "orijinal_url": "https://images.nasa.gov/details-ACD15-0062-004",
         "dayanak": "cumle bu varligin KENDI basligini betimliyor",
         "yedek_aday": 0
       },
@@ -635,8 +777,26 @@
         "kimlik": "s03",
         "sorgu": "Silicon Carbide Integrated Circuit Chip",
         "istenen_aday": 1,
+        "oran_kapisi": {
+          "acik": true,
+          "hedef_oran": 1.7778,
+          "en_az_korunan": 0.7,
+          "reddedilen": [],
+          "kabul_edilen": [
+            {
+              "olculen_olcu": [
+                3000,
+                2250
+              ],
+              "olculen_oran": 1.3333,
+              "hedef_oran": 1.7778,
+              "korunan_oran": 0.75,
+              "yon": "dar-yatay"
+            }
+          ]
+        },
         "saglayici": "nasa",
-        "failover_sn": 2.064,
+        "failover_sn": 2.065,
         "metadata_bulundu": 1,
         "bayt_indirildi": 1,
         "onbellekten": false,
@@ -647,7 +807,7 @@
             "elenen": 0,
             "durum": "ADAY-YOK",
             "sebep": "lisans/provenance duvarini gecen aday yok",
-            "sn": 0.705
+            "sn": 0.721
           },
           {
             "saglayici": "nasa",
@@ -655,7 +815,7 @@
             "elenen": 0,
             "durum": "OK",
             "sebep": "",
-            "sn": 1.359
+            "sn": 1.344
           }
         ],
         "devre": {
@@ -665,7 +825,7 @@
           "acik_devreler": []
         },
         "durum": "OK",
-        "asset_id": "s03_99569378",
+        "asset_id": "s03_93533642",
         "baslik": "Silicon Carbide Integrated Circuit Chip",
         "lisans": "nasa-public",
         "eser_sahibi": "GRC",
@@ -674,6 +834,21 @@
           2250
         ],
         "detay_std": 63.2,
+        "oran": {
+          "olculdu": true,
+          "olculen_olcu": [
+            3000,
+            2250
+          ],
+          "olculen_oran": 1.3333,
+          "hedef_oran": 1.7778,
+          "korunan_oran": 0.75,
+          "en_az_korunan": 0.7,
+          "atilan_oran": 0.25,
+          "yon": "dar-yatay",
+          "uygun": true,
+          "sebep": ""
+        },
         "orijinal_url": "https://images.nasa.gov/details-GRC-2015-C-00595",
         "dayanak": "cumle bu varligin KENDI basligini betimliyor",
         "yedek_aday": 0
@@ -682,8 +857,26 @@
         "kimlik": "s04",
         "sorgu": "solar array power",
         "istenen_aday": 1,
+        "oran_kapisi": {
+          "acik": true,
+          "hedef_oran": 1.7778,
+          "en_az_korunan": 0.7,
+          "reddedilen": [],
+          "kabul_edilen": [
+            {
+              "olculen_olcu": [
+                4986,
+                3744
+              ],
+              "olculen_oran": 1.3317,
+              "hedef_oran": 1.7778,
+              "korunan_oran": 0.7491,
+              "yon": "dar-yatay"
+            }
+          ]
+        },
         "saglayici": "nasa",
-        "failover_sn": 4.953,
+        "failover_sn": 4.663,
         "metadata_bulundu": 6,
         "bayt_indirildi": 1,
         "onbellekten": false,
@@ -694,7 +887,7 @@
             "elenen": 0,
             "durum": "ADAY-YOK",
             "sebep": "lisans/provenance duvarini gecen aday yok",
-            "sn": 0.646
+            "sn": 0.614
           },
           {
             "saglayici": "nasa",
@@ -702,7 +895,7 @@
             "elenen": 0,
             "durum": "OK",
             "sebep": "",
-            "sn": 4.307
+            "sn": 4.049
           }
         ],
         "devre": {
@@ -712,7 +905,7 @@
           "acik_devreler": []
         },
         "durum": "OK",
-        "asset_id": "s04_84691041",
+        "asset_id": "s04_92087437",
         "baslik": "Juno Solar Panel Deployment Test",
         "lisans": "nasa-public",
         "eser_sahibi": "NASA/JPL-Caltech/Lockheed Martin",
@@ -721,14 +914,43 @@
           3744
         ],
         "detay_std": 60.9,
+        "oran": {
+          "olculdu": true,
+          "olculen_olcu": [
+            4986,
+            3744
+          ],
+          "olculen_oran": 1.3317,
+          "hedef_oran": 1.7778,
+          "korunan_oran": 0.7491,
+          "en_az_korunan": 0.7,
+          "atilan_oran": 0.2509,
+          "yon": "dar-yatay",
+          "uygun": true,
+          "sebep": ""
+        },
         "orijinal_url": "https://images.nasa.gov/details-PIA13925",
         "dayanak": "cumle bu varligin KENDI basligini betimliyor",
         "yedek_aday": 0
       }
     ],
+    "oran_kapisi_ozeti": {
+      "hedef_oran": 1.7778,
+      "en_az_korunan": 0.7,
+      "reddedilen": 2,
+      "ayirt_esigi": 0.86,
+      "ayirt_reddedilen": 1,
+      "kabul_edilen_oranlar": [
+        1.4802,
+        1.5,
+        1.3333,
+        1.3317
+      ],
+      "hepsi_uygun": true
+    },
     "basarili": 4,
     "dort_k_uygun": false,
-    "en_hizli_failover_sn": 2.064,
+    "en_hizli_failover_sn": 2.065,
     "devre_ozeti": {
       "esik": 2,
       "soguma_sn": 900.0,
@@ -942,60 +1164,60 @@
     "esik_degistirildi_mi": false,
     "ciftler": [
       {
-        "a": "s01_44756653",
-        "b": "s02_92060661",
+        "a": "s01_86005280",
+        "b": "s02_79122633",
         "bitisik": true,
-        "benzerlik": 0.5156
+        "benzerlik": 0.5
       },
       {
-        "a": "s01_44756653",
-        "b": "s03_99569378",
+        "a": "s01_86005280",
+        "b": "s03_93533642",
         "bitisik": false,
         "benzerlik": 0.4531
       },
       {
-        "a": "s01_44756653",
-        "b": "s04_84691041",
+        "a": "s01_86005280",
+        "b": "s04_92087437",
         "bitisik": false,
         "benzerlik": 0.5625
       },
       {
-        "a": "s02_92060661",
-        "b": "s03_99569378",
+        "a": "s02_79122633",
+        "b": "s03_93533642",
         "bitisik": true,
-        "benzerlik": 0.4688
+        "benzerlik": 0.4844
       },
       {
-        "a": "s02_92060661",
-        "b": "s04_84691041",
+        "a": "s02_79122633",
+        "b": "s04_92087437",
         "bitisik": false,
-        "benzerlik": 0.6094
+        "benzerlik": 0.5625
       },
       {
-        "a": "s03_99569378",
-        "b": "s04_84691041",
+        "a": "s03_93533642",
+        "b": "s04_92087437",
         "bitisik": true,
         "benzerlik": 0.4531
       }
     ],
-    "en_yuksek": 0.6094,
-    "en_yuksek_bitisik": 0.5156,
+    "en_yuksek": 0.5625,
+    "en_yuksek_bitisik": 0.5,
     "esigi_asan": [],
     "siralama": {
       "once_sira": [
-        "s01_44756653",
-        "s02_92060661",
-        "s03_99569378",
-        "s04_84691041"
+        "s01_86005280",
+        "s02_79122633",
+        "s03_93533642",
+        "s04_92087437"
       ],
-      "once_komsu_maks": 0.5156,
+      "once_komsu_maks": 0.5,
       "sonra_sira": [
-        "s01_44756653",
-        "s02_92060661",
-        "s03_99569378",
-        "s04_84691041"
+        "s01_86005280",
+        "s02_79122633",
+        "s03_93533642",
+        "s04_92087437"
       ],
-      "sonra_komsu_maks": 0.5156,
+      "sonra_komsu_maks": 0.5,
       "not": "yalnizca SIRA degisti; kume ve esikler ayni. Havuzun en cesitli 4'lusu zaten seciliydi (olculdu)."
     }
   },
@@ -1003,27 +1225,27 @@
     "esik_std": 20.0,
     "olcumler": [
       {
-        "asset_id": "s01_44756653",
+        "asset_id": "s01_86005280",
         "detay_std": 52.3
       },
       {
-        "asset_id": "s02_92060661",
-        "detay_std": 88.5
+        "asset_id": "s02_79122633",
+        "detay_std": 45.1
       },
       {
-        "asset_id": "s03_99569378",
+        "asset_id": "s03_93533642",
         "detay_std": 63.2
       },
       {
-        "asset_id": "s04_84691041",
+        "asset_id": "s04_92087437",
         "detay_std": 60.9
       }
     ],
     "secilen": [
-      "s01_44756653",
-      "s02_92060661",
-      "s03_99569378",
-      "s04_84691041"
+      "s01_86005280",
+      "s02_79122633",
+      "s03_93533642",
+      "s04_92087437"
     ]
   },
   "anlatici_ses": {
@@ -1037,7 +1259,7 @@
         "kanal": 1,
         "sure_sn": 16.752,
         "lufs": -17.38,
-        "tepe_dbtp": -2.97,
+        "tepe_dbtp": -2.96,
         "lra": 3.9,
         "sessizlikler": [
           {
@@ -1093,7 +1315,7 @@
             "sure": 0.996
           }
         ],
-        "sessiz_sn": 4.273,
+        "sessiz_sn": 4.272,
         "sessiz_pct": 28.0,
         "kirpma_var": false,
         "ses": "tr-TR-EmelNeural",
@@ -1114,8 +1336,8 @@
           "sure": 0.407
         },
         {
-          "bas": 1.6,
-          "sure": 1.347
+          "bas": 1.58,
+          "sure": 1.367
         },
         {
           "bas": 6.307,
@@ -1130,8 +1352,8 @@
           "sure": 1.082
         }
       ],
-      "sessiz_sn": 5.567,
-      "sessiz_pct": 33.2,
+      "sessiz_sn": 5.586,
+      "sessiz_pct": 33.3,
       "kirpma_var": false,
       "ses": "tr-TR-AhmetNeural",
       "anlatim_bitis_sn": 16.7,
@@ -1384,8 +1606,8 @@
             "benzersiz_gecis": 3,
             "gecis_dagilimi": {
               "flash": 1,
-              "karartma": 1,
-              "hard-cut": 3
+              "hard-cut": 3,
+              "karartma": 1
             },
             "acilis_hareketi": "push-in",
             "kapanis_hareketi": "push-in",
@@ -1488,7 +1710,7 @@
       "beat_id": "b001",
       "scene_id": "s001",
       "fact_id": "s01",
-      "asset_id": "s01_44756653",
+      "asset_id": "s01_86005280",
       "saglayici": "nasa",
       "lisans": "nasa-public",
       "sure_sn": 0.862,
@@ -1521,7 +1743,7 @@
       "beat_id": "b002",
       "scene_id": "s001",
       "fact_id": "s01",
-      "asset_id": "s01y1_48759258",
+      "asset_id": "s01y1_64459454",
       "saglayici": "nasa",
       "lisans": "nasa-public",
       "sure_sn": 1.725,
@@ -1551,7 +1773,7 @@
       "beat_id": "b003",
       "scene_id": "s002",
       "fact_id": "s02",
-      "asset_id": "s02_92060661",
+      "asset_id": "s02_79122633",
       "saglayici": "nasa",
       "lisans": "nasa-public",
       "sure_sn": 4.738,
@@ -1581,7 +1803,7 @@
       "beat_id": "b004",
       "scene_id": "s003",
       "fact_id": "s03",
-      "asset_id": "s03_99569378",
+      "asset_id": "s03_93533642",
       "saglayici": "nasa",
       "lisans": "nasa-public",
       "sure_sn": 4.9,
@@ -1611,7 +1833,7 @@
       "beat_id": "b005",
       "scene_id": "s004",
       "fact_id": "s04",
-      "asset_id": "s04_84691041",
+      "asset_id": "s04_92087437",
       "saglayici": "nasa",
       "lisans": "nasa-public",
       "sure_sn": 4.825,
@@ -1662,8 +1884,8 @@
     ],
     "format": {
       "duration": "17.109333",
-      "size": "45155989",
-      "bit_rate": "21114085"
+      "size": "45064450",
+      "bit_rate": "21071283"
     }
   },
   "video_ses_olcumu": {
@@ -1708,7 +1930,7 @@
     ]
   },
   "post_qa": {
-    "durum": "FAIL",
+    "durum": "PASS",
     "olcumler": {
       "video": {
         "genislik": 1920,
@@ -1716,7 +1938,7 @@
         "fps": 30.0,
         "codec": "h264",
         "sure_sn": 17.109333,
-        "boyut_bayt": 45155989
+        "boyut_bayt": 45064450
       },
       "ses_akisi": {
         "codec": "aac",
@@ -1786,16 +2008,16 @@
           "asiri_esigi": 45.0,
           "warn_sn": 1.5,
           "fail_sn": 3.0,
-          "genel_ortalama": 14.787,
+          "genel_ortalama": 14.503,
           "sahneler": [
             {
               "ad": "b001 push-in",
               "bas_sn": 0.0,
               "sure_sn": 0.862,
               "ornek": 3,
-              "ortalama": 41.012,
-              "en_dusuk": 4.994,
-              "en_yuksek": 108.643,
+              "ortalama": 40.911,
+              "en_dusuk": 4.987,
+              "en_yuksek": 108.349,
               "durgun_sn": 0.0,
               "durgun": false,
               "asiri": false
@@ -1805,9 +2027,9 @@
               "bas_sn": 0.862,
               "sure_sn": 1.725,
               "ornek": 3,
-              "ortalama": 5.754,
-              "en_dusuk": 5.283,
-              "en_yuksek": 6.483,
+              "ortalama": 5.359,
+              "en_dusuk": 4.884,
+              "en_yuksek": 6.14,
               "durgun_sn": 0.0,
               "durgun": false,
               "asiri": false
@@ -1817,9 +2039,9 @@
               "bas_sn": 2.587,
               "sure_sn": 4.738,
               "ornek": 15,
-              "ortalama": 3.791,
-              "en_dusuk": 3.191,
-              "en_yuksek": 4.439,
+              "ortalama": 3.682,
+              "en_dusuk": 3.069,
+              "en_yuksek": 4.309,
               "durgun_sn": 0.0,
               "durgun": false,
               "asiri": false
@@ -1855,9 +2077,9 @@
             "bas_sn": 2.587,
             "sure_sn": 4.738,
             "ornek": 15,
-            "ortalama": 3.791,
-            "en_dusuk": 3.191,
-            "en_yuksek": 4.439,
+            "ortalama": 3.682,
+            "en_dusuk": 3.069,
+            "en_yuksek": 4.309,
             "durgun_sn": 0.0,
             "durgun": false,
             "asiri": false
@@ -1869,42 +2091,16 @@
           "kare": 68,
           "serit_sutun": 2,
           "siyah_esigi": 16.0,
-          "ihlal_kare": 6,
-          "ihlal_orani": 0.0882,
-          "ornek_ihlal": [
-            {
-              "kare": 4,
-              "sol": 8.26,
-              "sag": 25.18,
-              "genel": 66.58
-            },
-            {
-              "kare": 5,
-              "sol": 8.28,
-              "sag": 33.57,
-              "genel": 66.0
-            },
-            {
-              "kare": 6,
-              "sol": 8.26,
-              "sag": 40.69,
-              "genel": 65.11
-            }
-          ],
-          "en_koyu_sol": 8.26,
-          "en_koyu_sag": 25.18,
-          "temiz": false
+          "ihlal_kare": 0,
+          "ihlal_orani": 0.0,
+          "ornek_ihlal": [],
+          "en_koyu_sol": 39.44,
+          "en_koyu_sag": 42.54,
+          "temiz": true
         }
       }
     },
-    "sorunlar": [
-      {
-        "kod": "POST-KENAR-SIYAH",
-        "seviye": "fail",
-        "detay": "6/68 karede kenarda siyah bant (en koyu sol 8.26, sag 25.18, esik 16.0) — kamera kadrajdan tasiyor",
-        "oneri": "motion._guvenli_pay hesabini kontrol et; pan payi (S-1)/(2S) sinirini asmamali"
-      }
-    ],
+    "sorunlar": [],
     "komutlar": [
       {
         "ad": "ffprobe",
@@ -1952,27 +2148,27 @@
     {
       "an_sn": 1.2,
       "dosya": "outputs/sample/i20_kare_1_2s.png",
-      "bayt": 2537058
+      "bayt": 3063770
     },
     {
       "an_sn": 1.71,
       "dosya": "outputs/sample/i20_kare_1_71s.png",
-      "bayt": 2510224
+      "bayt": 3104663
     },
     {
       "an_sn": 3.76,
       "dosya": "outputs/sample/i20_kare_3_76s.png",
-      "bayt": 2198933
+      "bayt": 2056430
     },
     {
       "an_sn": 4.96,
       "dosya": "outputs/sample/i20_kare_4_96s.png",
-      "bayt": 2195191
+      "bayt": 2043513
     },
     {
       "an_sn": 5.99,
       "dosya": "outputs/sample/i20_kare_5_99s.png",
-      "bayt": 2231095
+      "bayt": 2093679
     },
     {
       "an_sn": 8.21,

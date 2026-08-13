@@ -5601,6 +5601,235 @@ with _tf19.TemporaryDirectory() as _d19:
                          "onIki", [_aday("https://n.test/n.jpg")],
                          {"ok": True})}])["ok"] is True)
 
+    # ══════════ I-23: EN-BOY ORANI UYUMLULUK KAPISI ══════════
+    # ⚠ Bu blogun esigi UYDURULMADI. I-22 render'inda OLCULEN varliklardan
+    # turetildi: POST-KENAR-SIYAH'in 6/68 ihlalinin 6'si da b002'de cikti ve
+    # b002'nin varligi 2832x3603 (oran 0.786) idi. Ayni render'da 1.480 /
+    # 1.333 / 1.332 oranli varliklar SIFIR ihlal uretti.
+    _OLCULEN_VARLIK = [
+        ("s01  4192x2832", 4192, 2832, False),   # olculdu: temiz
+        ("s03  3000x2250", 3000, 2250, False),   # olculdu: temiz (en DAR temiz)
+        ("s04  4986x3744", 4986, 3744, False),   # olculdu: temiz
+        ("s01y1 2832x3603", 2832, 3603, True),   # olculdu: 6 ihlalin KAYNAGI
+        ("s02  2048x3072", 2048, 3072, True),    # ayni sinif: %62'si atiliyor
+    ]
+    for _ad3, _g3, _y3, _red in _OLCULEN_VARLIK:
+        _k3 = _ed.oran_karari(_g3, _y3)
+        kontrol(f"oran kapisi {_ad3} -> {'RED' if _red else 'KABUL'}",
+                _k3["uygun"] is (not _red),
+                f"oran={_k3['olculen_oran']} korunan={_k3['korunan_oran']}")
+    kontrol("oran esigi OLCULEN aralikta (0.442 < esik <= 0.750)",
+            0.442 < _ed.ORAN_EN_AZ_KORUNAN <= 0.750,
+            _ed.ORAN_EN_AZ_KORUNAN)
+    kontrol("tam 16:9 kaynakta hicbir sey ATILMIYOR (korunan=1.0)",
+            _ed.oran_karari(1920, 1080)["korunan_oran"] == 1.0)
+    kontrol("KARE kaynak REDDEDILIR (dikeyin aynasi degil, ayni kusur)",
+            _ed.oran_karari(1000, 1000)["uygun"] is False)
+    kontrol("ASIRI GENIS panorama da REDDEDILIR (yatayda %41 atiyor)",
+            _ed.oran_karari(3000, 1000)["uygun"] is False
+            and _ed.oran_karari(3000, 1000)["yon"] == "asiri-genis")
+    kontrol("oran karari AG/DOSYA kullanmaz (saf fonksiyon, olcu -> karar)",
+            _ed.oran_karari(2832, 3603)["sebep"].startswith("ORAN-UYUMSUZ"))
+    for _bozuk in ((None, None), (0, 0), ("a", "b"), (100, 0)):
+        kontrol(f"olcu gecersiz {_bozuk} -> ENGELLEMEZ (emin degilsen gecir)",
+                _ed.oran_karari(*_bozuk)["uygun"] is True)
+
+    def _harita_okuyucu(harita, sayac):
+        """Yola gore olcu donduren sahte ffprobe — cagri sayisi SAYILIR."""
+        def _oku(yol):
+            sayac.append(yol)
+            for _ek, _o in harita.items():
+                if yol.endswith(_ek):
+                    return _o
+            return (3840, 2160)
+        return _oku
+
+    # ── KAPI KAPALIYKEN HUKUM DEGISMEZ (geriye tam uyumlu) ──
+    _s23a = _SahteSaglayici("kapali", [_aday("https://d1.test/d.jpg")],
+                            {"ok": True})
+    _r23a = _ed.edin("q", _h, en_az_genislik=1920, saat=_saat,
+                     olcu_okuyucu=lambda y: (2832, 3603),
+                     saglayicilar=[{"ad": "kapali", "modul": _s23a}])
+    kontrol("oran kapisi KAPALIYKEN (varsayilan) dikey aday KABUL EDILIR",
+            _r23a["ok"] is True
+            and _r23a["oran_kapisi"]["acik"] is False)
+
+    # ── KAPI ACIK: dikey REDDEDILIR, AYNI listedeki SIRADAKINE gecilir ──
+    _cag23 = []
+    _s23b = _SahteSaglayici("acik", [_aday("https://e1.test/e.jpg"),
+                                     _aday("https://e2.test/e.jpg")],
+                            {"ok": True})
+    _r23b = _ed.edin("q", _h, en_az_genislik=1920, saat=_saat,
+                     hedef_oran=_ed.HEDEF_ORAN_16_9,
+                     olcu_okuyucu=_harita_okuyucu(
+                         {"_1.jpg": (3840, 2160), "a.jpg": (2832, 3603)},
+                         _cag23),
+                     saglayicilar=[{"ad": "acik", "modul": _s23b}])
+    kontrol("oran kapisi ACIK: dikey aday REDDEDILIR, SIRADAKI kabul edilir",
+            _r23b["ok"] is True
+            and str(_r23b["aday"]["yol"]).endswith("_1.jpg"),
+            _r23b["aday"].get("yol"))
+    kontrol("SIRADAKI aday AYNI arama listesinden — EK AG CAGRISI YOK",
+            _s23b.ara_sayisi == 1 and _s23b.indir_sayisi == 2)
+    _red23 = _r23b["oran_kapisi"]["reddedilen"]
+    kontrol("raporda OLCULEN oran, HEDEF oran ve RED NEDENI gorunur",
+            len(_red23) == 1
+            and _red23[0]["olculen_oran"] == 0.786
+            and _red23[0]["korunan_oran"] == 0.4421
+            and _red23[0]["hedef_oran"] == 1.7778
+            and "ORAN-UYUMSUZ" in _red23[0]["sebep"]
+            and _red23[0]["olculen_olcu"] == [2832, 3603],
+            _red23)
+    kontrol("raporda KABUL EDILEN adayin orani da gorunur",
+            len(_r23b["oran_kapisi"]["kabul_edilen"]) == 1
+            and _r23b["oran_kapisi"]["kabul_edilen"][0]["korunan_oran"] == 1.0)
+    kontrol("olcum PAYLASILIR: aday basina TEK olcum (ikinci ffprobe YOK)",
+            len(_cag23) == 2, _cag23)
+
+    # ── UYGUN ALTERNATIF YOKSA: sahte aday URETILMEZ, ok=False ──
+    _s23c = _SahteSaglayici("hepsi-dikey",
+                            [_aday("https://f1.test/f.jpg"),
+                             _aday("https://f2.test/f.jpg"),
+                             _aday("https://f3.test/f.jpg")], {"ok": True})
+    _r23c = _ed.edin("q", _h, en_az_genislik=1920, saat=_saat,
+                     hedef_oran=_ed.HEDEF_ORAN_16_9,
+                     olcu_okuyucu=lambda y: (2048, 3072),
+                     saglayicilar=[{"ad": "hepsi-dikey", "modul": _s23c}])
+    kontrol("TUM adaylar uymuyorsa ok=False (kirpip KURTARMA YOK)",
+            _r23c["ok"] is False and _r23c["aday"] is None
+            and len(_r23c["oran_kapisi"]["reddedilen"]) == 3)
+    kontrol("tum adaylar elendiginde RED NEDENI denemede de gorunur",
+            "ORAN-UYUMSUZ" in str(_r23c["denemeler"][0].get("sebep")))
+
+    # ── LISANS/PROVENANCE oran kapisindan ONCE gelir (indirme bile YOK) ──
+    _s23d = _SahteSaglayici("prov", [_aday("https://g1.test/g.jpg", lisans="")],
+                            {"ok": True})
+    _r23d = _ed.edin("q", _h, en_az_genislik=1920, saat=_saat,
+                     hedef_oran=_ed.HEDEF_ORAN_16_9,
+                     olcu_okuyucu=lambda y: (3840, 2160),
+                     saglayicilar=[{"ad": "prov", "modul": _s23d}])
+    kontrol("PROVENANCE eksikse oran kapisina VARILMADAN reddedilir",
+            _r23d["ok"] is False and _s23d.indir_sayisi == 0)
+
+    # ── BEKLE (Retry-After) YOLUNDA DA KAPI ISLER — I-23'te bulunan bosluk ──
+    class _SahteBekleyen:
+        """Tek sayili denemede 429+Retry-After, cift sayilida BASARILI.
+
+        ⚠ Bu yol I-23'e kadar KAPISIZDI: bekledikten sonra basarili olan
+        aday HIC OLCULMEDEN kabul ediliyordu.
+        """
+
+        def __init__(self, adaylar):
+            self._a = adaylar
+            self.ara_sayisi = 0
+            self.indir_sayisi = 0
+
+        def ara(self, sorgu, adet=6, en_az_genislik=0):
+            self.ara_sayisi += 1
+            return {"ok": True, "adaylar": list(self._a), "elenen": [],
+                    "hata": ""}
+
+        def indir(self, aday, hedef, deneme=1):
+            self.indir_sayisi += 1
+            if self.indir_sayisi % 2 == 1:
+                return {"ok": False, "http": 429, "retry_after": 1.0}
+            with open(hedef, "wb") as f:
+                f.write(b"x" * 20000)
+            return {"ok": True}
+
+    # ══ I-23b: ORAN KAPISI AYIRT EDILEBILIRLIGI BOZMASIN ══
+    # ⚠ OLCULEN ETKILESIM: dikey aday elenince s01'in siradaki adayi
+    # birincinin neredeyse ayni karesi cikti (dHash 0.875 >= 0.86) ve
+    # KALITE-MEDYA-TEKRAR FAIL verdi. Iki kisit AYNI anda saglanmali.
+    _cagb = []
+
+    def _sahte_benzerlik(harita):
+        def _olc(a, b):
+            _cagb.append((os.path.basename(a), os.path.basename(b)))
+            return harita.get(os.path.basename(a), 0.0)
+        return _olc
+
+    _s23f = _SahteSaglayici("ayirt", [_aday("https://j1.test/j.jpg"),
+                                      _aday("https://j2.test/j.jpg"),
+                                      _aday("https://j3.test/j.jpg")],
+                            {"ok": True})
+    _r23f = _ed.edin("q", _h, en_az_genislik=1920, saat=_saat, adet=2,
+                     hedef_oran=_ed.HEDEF_ORAN_16_9,
+                     olcu_okuyucu=lambda y: (3840, 2160),
+                     benzerlik_okuyucu=_sahte_benzerlik({"a_1.jpg": 0.875,
+                                                         "a_2.jpg": 0.41}),
+                     benzerlik_esigi=0.86,
+                     saglayicilar=[{"ad": "ayirt", "modul": _s23f}])
+    kontrol("AYIRT EDILEMEZ aday (0.875>=0.86) REDDEDILIR, siradakine gecilir",
+            _r23f["ok"] is True and len(_r23f["adaylar"]) == 2
+            and str(_r23f["adaylar"][1]["yol"]).endswith("_2.jpg"),
+            [a.get("yol") for a in _r23f["adaylar"]])
+    kontrol("ayirt reddi raporda: benzerlik, esik ve NEDEN gorunur",
+            len(_r23f["ayirt_kapisi"]["reddedilen"]) == 1
+            and _r23f["ayirt_kapisi"]["reddedilen"][0]["benzerlik"] == 0.875
+            and _r23f["ayirt_kapisi"]["reddedilen"][0]["esik"] == 0.86
+            and "AYIRT-EDILEMEZ" in
+            _r23f["ayirt_kapisi"]["reddedilen"][0]["sebep"])
+    kontrol("ayirt kapisi AYNI arama listesinden calisir (EK AG CAGRISI YOK)",
+            _s23f.ara_sayisi == 1)
+    kontrol("edinim dHash HESAPLAMAZ — olcer DISARIDAN verilir",
+            "dhash" not in _kod_yalniz(oku(KOK, "medya/edinim.py")).lower()
+            and "benzerlik_okuyucu" in _kod_yalniz(oku(KOK, "medya/edinim.py")))
+    kontrol("ayirt kapisi KAPALIYKEN (varsayilan) hukum DEGISMEZ",
+            _ed.edin("q", _h, en_az_genislik=1920, saat=_saat, adet=2,
+                     olcu_okuyucu=lambda y: (3840, 2160),
+                     saglayicilar=[{"ad": "kapali2", "modul": _SahteSaglayici(
+                         "kapali2", [_aday("https://k1.test/k.jpg"),
+                                     _aday("https://k2.test/k.jpg")],
+                         {"ok": True})}])["ayirt_kapisi"]["acik"] is False)
+    kontrol("benzerlik OLCULEMEDI (-1) ise ENGELLENMEZ",
+            len(_ed.edin("q", _h, en_az_genislik=1920, saat=_saat, adet=2,
+                         olcu_okuyucu=lambda y: (3840, 2160),
+                         benzerlik_okuyucu=lambda a, b: -1.0,
+                         benzerlik_esigi=0.86,
+                         saglayicilar=[{"ad": "olcemez",
+                                        "modul": _SahteSaglayici(
+                                            "olcemez",
+                                            [_aday("https://l1.test/l.jpg"),
+                                             _aday("https://l2.test/l.jpg")],
+                                            {"ok": True})}])["adaylar"]) == 2)
+    kontrol("benzerlik olcer PATLARSA edinim COKMEZ (engellemez)",
+            _ed.edin("q", _h, en_az_genislik=1920, saat=_saat, adet=2,
+                     olcu_okuyucu=lambda y: (3840, 2160),
+                     benzerlik_okuyucu=lambda a, b: 1 / 0,
+                     benzerlik_esigi=0.86,
+                     saglayicilar=[{"ad": "patlak", "modul": _SahteSaglayici(
+                         "patlak", [_aday("https://m1.test/m.jpg"),
+                                    _aday("https://m2.test/m.jpg")],
+                         {"ok": True})}])["ok"] is True)
+    _sm23 = oku(KOK, "testler/smoke_konsept3_teknoloji_i20.py")
+    kontrol("smoke edinim ayirt esigini QA ESIGINDEN aliyor (ikinci sabit YOK)",
+            "kk.BENZERLIK_ESIGI" in _sm23
+            and "benzerlik_esigi=kk_esik()" in _sikistir(_sm23))
+    kontrol("smoke ORAN kapisini edinime BAGLIYOR",
+            "hedef_oran=edinim.HEDEF_ORAN_16_9" in _sikistir(_sm23))
+    kontrol("ONBELLEK oran kapisini BAYPAS EDEMEZ",
+            "edinim.oran_karari(*_olcu_oku(hedef))" in _sikistir(_sm23))
+
+    _s23e = _SahteBekleyen([_aday("https://h1.test/h.jpg"),
+                           _aday("https://h2.test/h.jpg")])
+    _r23e = _ed.edin("q", _h, en_az_genislik=1920, saat=_saat,
+                     uyu=lambda s: None, hedef_oran=_ed.HEDEF_ORAN_16_9,
+                     olcu_okuyucu=_harita_okuyucu(
+                         {"_1.jpg": (3840, 2160), "a.jpg": (2048, 3072)}, []),
+                     saglayicilar=[{"ad": "bekleyen", "modul": _s23e}])
+    kontrol("BEKLE sonrasi basarili indirme de ORAN KAPISINDAN gecer",
+            _r23e["ok"] is True
+            and str(_r23e["aday"]["yol"]).endswith("_1.jpg")
+            and len(_r23e["oran_kapisi"]["reddedilen"]) == 1,
+            _r23e["oran_kapisi"])
+    kontrol("BEKLE sonrasi COZUNURLUK kapisi da islerde (ayni bosluk)",
+            _ed.edin("q", _h, en_az_genislik=1920, saat=_saat,
+                     uyu=lambda s: None,
+                     olcu_okuyucu=lambda y: (640, 480),
+                     saglayicilar=[{"ad": "bek2", "modul": _SahteBekleyen(
+                         [_aday("https://i1.test/i.jpg")])}])["ok"] is False)
+
 kontrol("edinim modulunde SAGLAYICI ADRESI GOMULU DEGIL",
         not re.search(r"https?://", _kod_yalniz(oku(KOK, "medya/edinim.py"))))
 # ⚠ Ham tarama modulun KENDI dokumantasyonuna ("YOUTUBE ... YOK") takiliyor;
@@ -5611,6 +5840,12 @@ kontrol("YOUTUBE ya da izinsiz kaynak YOK",
 kontrol("edinim kendi indiricisini YAZMIYOR",
         "urlopen" not in _kod_yalniz(oku(KOK, "medya/edinim.py"))
         and "requests" not in _kod_yalniz(oku(KOK, "medya/edinim.py")))
+kontrol("oran kapisi kaynagi KURTARMIYOR (pad/blur/pillarbox ISLEMI YOK)",
+        not re.search(r"(boxblur|pad\s*=|pillarbox|letterbox|force_original)",
+                      _kod_yalniz(oku(KOK, "medya/edinim.py")), re.I))
+kontrol("oran esigi SABIT RAKAM olarak gomulu degil (adlandirilmis sabit)",
+        "ORAN_EN_AZ_KORUNAN" in _kod_yalniz(oku(KOK, "medya/edinim.py"))
+        and "HEDEF_ORAN_16_9" in _kod_yalniz(oku(KOK, "medya/edinim.py")))
 kontrol("kapsam ozeti sayilabilir",
         _ed.kapsam_ozeti()["saglayici_gomulu_mu"] is False
         and _ed.kapsam_ozeti()["ayri_sayilan"] == ["metadata_bulundu",
@@ -5915,18 +6150,55 @@ else:
             and _bm.get("kuru_plan_beat") == len(_z20), _bm)
     kontrol("⭐ PRE-QA artik FAIL DEGIL (I-20'de FAIL'di)",
             _R20["plan"]["qa"]["fail"] == 0, _R20["plan"]["qa"])
+    # ── I-23: EN-BOY ORANI KAPISI GERCEK RENDER'DA CALISTI MI ──
+    _me20 = _R20.get("medya_edinim") or {}
+    _oz23 = _me20.get("oran_kapisi_ozeti") or {}
+    kontrol("⭐ I-23: KABUL EDILEN HER varlik oran kapisini gecti",
+            _oz23.get("hepsi_uygun") is True
+            and len(_oz23.get("kabul_edilen_oranlar") or []) == 4, _oz23)
+    kontrol("⭐ I-23: DIKEY kaynak GERCEKTEN reddedildi (>=1 red)",
+            (_oz23.get("reddedilen") or 0) >= 1
+            and any(x.get("yon") == "dikey"
+                    for x in (_me20.get("oran_reddi") or [])),
+            _me20.get("oran_reddi"))
+    kontrol("⭐ I-23: red kaydinda OLCULEN oran + HEDEF oran + NEDEN var",
+            all(x.get("olculen_oran") and x.get("hedef_oran")
+                and "ORAN-UYUMSUZ" in str(x.get("sebep"))
+                for x in (_me20.get("oran_reddi") or [])),
+            _me20.get("oran_reddi"))
+    kontrol("I-23: kabul edilenlerin HICBIRI dikey/kare DEGIL",
+            all(o >= 1.244 for o in (_oz23.get("kabul_edilen_oranlar") or [])),
+            _oz23.get("kabul_edilen_oranlar"))
+    kontrol("I-23: hedef oran 16:9 ve esik ADLANDIRILMIS sabitten",
+            _oz23.get("hedef_oran") == 1.7778
+            and _oz23.get("en_az_korunan") == _ed.ORAN_EN_AZ_KORUNAN)
+    kontrol("⭐ I-23b: ayirt-etme kapisi ayni akista calisti",
+            _oz23.get("ayirt_esigi") == 0.86
+            and (_oz23.get("ayirt_reddedilen") or 0) >= 1,
+            _oz23)
+    kontrol("I-23: medya GERCEK saglayicidan, fixture DEGIL",
+            all(str(s.get("saglayici") or "").lower() in ("nasa", "commons")
+                for s in (_me20.get("sahneler") or [])
+                if s.get("durum") == "OK"))
+    kontrol("I-23: maliyet $0.00 KALDI",
+            float(_me20.get("maliyet_usd", 1)) == 0.0
+            and float(_R20.get("maliyet_usd", 1)) == 0.0)
     # ⚠ POST-QA FAIL ise SESSIZCE GECILMEZ — BLOKE yazilir.
     if _R20["post_qa"]["durum"] == "FAIL":
         _nedenler = [s["kod"] for s in _R20["post_qa"]["sorunlar"]
                      if s["seviye"] == "fail"]
-        bloke_yaz("I-22 teknoloji pilotu POST-QA",
+        bloke_yaz("I-23 teknoloji pilotu POST-QA",
                   f"render TAMAMLANDI ama POST-QA FAIL: {_nedenler}. "
-                  f"⚠ MEDYASIZ BEAT kusuru COZULDU (5/5 beat medyali, "
-                  f"POST-OPTIK-DURGUN ve POST-SIYAH-KARE GITTI); kalan tek "
-                  f"kusur DIKEY kaynak (2048x3072) 16:9 karede pillarbox "
-                  f"veriyor. Kapi dogru calisti; MP4 KABUL EDILMIS SAYILMAZ.")
+                  f"MP4 KABUL EDILMIS SAYILMAZ.")
     else:
-        kontrol("POST-QA FAIL degil", True)
+        kontrol("⭐ I-23: POST-QA TAMAMEN PASS (I-22'de KENAR-SIYAH FAIL'di)",
+                _R20["post_qa"]["durum"] == "PASS"
+                and not [s for s in (_R20["post_qa"].get("sorunlar") or [])
+                         if s.get("seviye") == "fail"])
+        kontrol("⭐ I-23: POST-KENAR-SIYAH 6/68 -> 0 ihlal",
+                (_R20.get("kenar_siyahligi") or {}).get("ihlal_kare") == 0
+                and (_R20.get("kenar_siyahligi") or {}).get("temiz") is True,
+                _R20.get("kenar_siyahligi"))
 
 
 print(f"\n{'=' * 60}")

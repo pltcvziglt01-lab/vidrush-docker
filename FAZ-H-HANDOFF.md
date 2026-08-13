@@ -3521,3 +3521,162 @@ Tek kalan engel: **dikey/kare kaynak 16:9'a pillarbox veriyor.** Doğru
 (16:9'a yakın olmayan kaynağı reddet — çözünürlük kapısıyla aynı desen), ya
 da (b) render tarafında dikey kaynağı **güvenli crop** ile doldurmak.
 (a) daha küçük ve mevcut desenle birebir.
+
+---
+
+## 41. FAZ I-23 — EN-BOY ORANI UYUMLULUK KAPISI (dar atom, 13 Ağu)
+
+> **Durum: yerel yeşil, POST-QA TAMAMEN PASS, push edildi. Deploy YOK.
+> Maliyet $0.00.**
+> Değişen: `webapp/medya/edinim.py`,
+> `webapp/testler/smoke_konsept3_teknoloji_i20.py`,
+> `webapp/testler/test_faz_i.py`, `outputs/sample/teknoloji_i20_rapor.json`
+> (+ handoff).
+> **Yeni sağlayıcı/mimari YOK.** `pipeline.py`, `server.py`, arayüz, 22 alan,
+> `deploy.sh`, `medya/lisans.py`, `medya/guvenlik.py`, `medya/indirme.py`,
+> `medya/nasa.py`, `medya/commons.py`, `editor/qa_on.py`, `editor/qa_son.py`,
+> `editor/kalite_kapisi.py`, `editor/motion.py`, kalite eşikleri
+> **dokunulmadı** (git ile doğrulandı).
+
+### ⚠ ÖNCE: BÖLÜM 40'IN KÖK NEDENİ YANLIŞTI — ÖLÇÜLDÜ ve DÜZELTİLDİ
+
+Bölüm 40 kalan tek FAIL için şunu yazıyordu:
+
+> "Kök neden ölçüldü: s02 kaynağı **2048×3072 — DİKEY**. 16:9 karede
+> **pillarbox** (yan siyah bant) veriyor."
+
+**Bu iddia iki yerden birden yanlış.** I-22 çıktısı üzerinde ölçüldü:
+
+| Ölçüm | Bölüm 40'ın iddiası | **Ölçülen gerçek** |
+|---|---|---|
+| İhlal eden beat | s02 → b003 | **6/68 ihlalin 6'sı da b002** (1.00–2.25 sn) |
+| İhlal eden varlık | s02 `2048×3072` | **s01 yedeği `2832×3603`** (oran 0.786) |
+| s02'nin ürettiği ihlal | (kök neden) | **0 (sıfır)** |
+| Mekanizma | pillarbox | **pillarbox DEĞİL** |
+
+**Mekanizma neden pillarbox değil:** `Kamera.tsx > Zemin` `objectFit:'cover'`
+kullanır, yani kare **tamamen doludur**. İhlal karesinde 0–200. sütunlar
+ölçüldü: **ort 8.2 / std 1.24 / min 6 / max 13** — yani gerçek (koyu) fotoğraf
+içeriği. Sentetik bir bant **sabit** olurdu (std 0) ve 8.2 değil **0** okunurdu.
+
+**Gerçek mekanizma — AŞIRI COVER-CROP.** 16:9'u 0.786 oranlı kaynaktan `cover`
+ile doldurmak kaynağın yüksekliğinin yalnızca **%44'ünü** bırakır; üstüne
+`punch-1.35` binince görülen alan kaynağın **~%33'üne** düşer. Geriye kalan dar
+dilim temsili olmayan bir **gölge koridoruydu**: sol şerit 8.2 < eşik 16.
+
+Atom yine de doğru atomdu — dikey kaynağı edinimde reddetmek kusuru kaldırıyor
+— ama **gerekçe düzeltildi**. Kapı "oran farkına" değil **kırpmanın kaynağın ne
+kadarını attığına** bakıyor.
+
+### Eşik uydurma değil — AYNI render'dan türetildi
+
+`korunan_oran = min(r/R, R/r)` (cover sonrası kaynaktan geriye kalan pay):
+
+| Kaynak | oran | korunan | I-22'de ölçülen |
+|---|---|---|---|
+| 4192×2832 | 1.480 | 0.832 | temiz, 0 ihlal |
+| 3000×2250 | 1.333 | **0.750** | temiz, 0 ihlal — **en dar TEMİZ** |
+| 4986×3744 | 1.332 | 0.749 | temiz, 0 ihlal |
+| **2832×3603** | **0.786** | **0.442** | **6 ihlalin kaynağı** |
+| 2048×3072 | 0.667 | 0.375 | aynı sınıf |
+
+Sınır **(0.442, 0.750]** aralığında olmak zorunda. **0.70** seçildi: en dar
+temiz ölçümün hemen altında, ihlal üretenin çok üstünde. 4:3 (kamu malı
+fotoğrafın baskın formatı) geçer; kare (0.562) ve dikey geçmez.
+⚠ **Dürüst sınır:** 5:4 (0.703) eşiği **kıl payı** geçiyor ve ölçülmedi.
+
+### İki parçalı çözüm (ikincisi ölçümle zorunlu oldu)
+
+**1. `ORAN-UYUMSUZ` kapısı.** İndirme sonrası ölç → uymuyorsa reddet → **aynı
+mevcut arama listesindeki** sıradaki lisanslı/provenance'lı adaya geç.
+Çözünürlük kapısıyla **birebir aynı desen**. Ölçülen oran, hedef oran ve red
+nedeni raporda görünür. Kapı `hedef_oran=0` ile **varsayılan kapalı** — geriye
+tam uyumlu.
+
+**2. `AYIRT-EDILEMEZ` kapısı — ölçüm bunu ZORUNLU kıldı.** Oran kapısı s01'in
+dikey adayını eleyince sıradaki aday birincinin **neredeyse aynı karesi** çıktı
+(dHash **0.875 ≥ 0.86**) ve `KALITE-MEDYA-TEKRAR` **FAIL** verdi. İki kısıt
+**aynı anda** sağlanmak zorunda; birini greedy seçmek diğerini kırıyor.
+⚠ Edinim **dHash HESAPLAMAZ**; ölçer dışarıdan verilir — tıpkı
+`kalite_kapisi.medya_tekrari` gibi. Eşik **QA eşiğinin kendisinden** okunur
+(`kk.BENZERLIK_ESIGI`), ikinci bir sabit yazılmadı.
+
+### Bulunan ve kapatılan iki boşluk
+
+1. **BEKLE yolu kapısızdı.** `Retry-After` sonrası başarılı olan aday **hiç
+   ölçülmeden** kabul ediliyordu — yani çözünürlük kapısı da atlanıyordu.
+   Artık iki yol da aynı kapılardan geçer.
+2. **Önbellek oran kapısını baypas ediyordu.** Önbellekteki dosya 16:9'a
+   uymuyorsa artık **isabet sayılmaz**, normal edinim yoluna düşülür.
+
+### Kendi bulduğum yanlış beyan
+
+Smoke'un son satırı **koşulsuz** olarak "Medya WEB'DEN BULUNMADI — yerel Apollo
+fixture'i kullanildi" yazıyordu. I-19'dan beri **doğru değil**; medya gerçek
+sağlayıcı zincirinden iniyor. Dosyanın kendi kuralı "SAHTE KANIT YOK" olduğu
+için satır **ölçümden türetildi**: `MEDYA: 4/4 sahne GERCEK saglayicidan
+(nasa) · fixture KULLANILMADI · maliyet $0.00`.
+
+### Üç kapı da gerçek render'da doğru adayda ateşledi
+
+| Sahne | aday | ölçü | sonuç |
+|---|---|---|---|
+| s01 | idx0 | 4192×2832 (1.480) | **kabul** |
+| s01 | idx1 | 2832×3603 (0.786) | **ORAN-UYUMSUZ** |
+| s01 | idx2 | 4256×2832 | **AYIRT-EDILEMEZ** (0.875) |
+| s01 | idx3 | 4134×2832 | **kabul** |
+| s02 | idx0 | 2048×3072 (0.667) | **ORAN-UYUMSUZ** |
+| s02 | idx1 | 3000×2000 (1.500) | **kabul** |
+| s04 | idx0 | 1431×820 | **COZUNURLUK-YETERSIZ** |
+| s04 | idx1 | 4986×3744 | **kabul** |
+
+**Ağ çağrısı artmadı** (testle kilitli: `ara()` yine **1 kez**). Sağlayıcı
+kotası değişmedi. Yeni sağlayıcı yok. Ücretli API yok.
+
+### ✅ PİLOT YENİDEN RENDER — POST-QA TAMAMEN PASS
+
+Gerçek NASA kamu malı medyası + Türkçe ses, 4/4 sahne `nasa`, fixture yok.
+
+| Ölçüm | I-22 | **I-23** |
+|---|---|---|
+| `POST-KENAR-SIYAH` | **FAIL** 6/68 | ✅ **0/68, temiz** |
+| en koyu sol / sağ | 8.26 / 25.18 | **39.44 / 42.54** |
+| POST-QA | **FAIL** | ✅ **PASS (0 sorun)** |
+| Faz I BLOKE | **1** | ✅ **0** |
+| Dikey kaynak sayısı | 2 | **0** |
+
+**ffprobe:** h264 **1920×1080** @30fps + aac 48 kHz/2ch, **17.109 sn**, 45.06 MB.
+**Ses:** LUFS **−14.36**, TP **−4.09**, LRA 3.6, sessizlik **%0**, ölü final 0.0 sn.
+**Kesmeler:** 7. **Siyah/donmuş aralık:** yok. **Optik:** genel 14.503, durgun ihlal 0.
+**Kareler:** **11 adet** (≥9) incelendi — hepsi tam kare, siyah bant yok.
+**Semantik uygunluk:** b003 "binlerce işlemci sıra sıra" → SGI ICE X rafları;
+b004 "silikon üzerindeki devreler" → silisyum karbür çip; b005 "faturası
+enerjiyle" → Juno güneş paneli testi. **Tekrar:** 0 (en yüksek ikili 0.5625).
+**Tipografi:** güvenli alan ✅, çakışma ✅, altyazı ✅, Türkçe aksanlar doğru.
+**Kaynak künyesi:** sahneye özgü 4 ayrı atıf (Dominic Hart / GRC /
+NASA-JPL-Caltech-Lockheed Martin). **Motion:** 4 benzersiz hareket, ardışık
+tekrar 0. **İzleyici kalite puanı:** 80.0/100 (I-22 ile aynı — regresyon yok).
+
+### Ölçülen test sonucu
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1489** | **2903** |
+
+0 hata. Faz I 1442 → **1489** (+47). **Faz I BLOKE 1 → 0.**
+Kalan tek BLOKE Faz H'deki `QA_TEST_VIDEO` (opsiyonel, I-22'den beri aynı).
+
+### ⚠ BİLİNEN SINIR (I-23 kapsamı dışı, I-22'den devralındı)
+
+Önbellek dolu ikinci koşumda `edin()` çağrılmadığı için **yedek aday
+taşınmıyor**; bölünen sahne medyasız kalır ve PRE-QA doğru şekilde **render'ı
+durdurur**. Pilotu yeniden üretmek için `cikti/_i20_medya` **silinmeli**.
+Bu bir kusur değil kapının doğru davranışı, ama sonraki oturum bilmeli.
+
+### SONRAKİ ATOM (I-24 adayları)
+
+Kapılar temiz; kalan iki **kalite** açığı (ikisi de FAIL değil, WARN/puan):
+- `motion_cesitlilik` **0.0/20** — açılış ve kapanış ikisi de `push-in`;
+  ritim ailesi çeşitlenmeli (I-17 gramerinde dar atom).
+- `SAGLAYICI-TEKEL` WARN — tek sağlayıcı %100 (`nasa`); Commons lisans
+  duvarını geçen aday döndürmüyor, sebep **ölçülmeli**.
