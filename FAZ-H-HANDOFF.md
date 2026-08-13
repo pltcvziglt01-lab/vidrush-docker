@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 14 Ağu | **I-57 b001/b002 seçim zinciri geriye izlendi (tanısal)** | `PENDING` | ✅ **push edildi**, üretimin kendi kayıtlarından: s001 cümlesi **ikiye kesilmiş**, b002 sahnenin **2. adayı** (puan 90→80) ve **kendi beat metniyle hiç aranmamış**; ⚠ ölçüldü ki `semantik_puan` varlık çıkmayınca **altı adayda da tam 50.0** (sıfır bilgi) ve `alaka_kapisi` bu korpusta **ters** çalışıyor — **3 yanlış adayın 3'ünü geçiriyor, 3 doğrudan 2'sini reddediyor**; b002'yi ayıran tek sinyal **yapısal** (aynı sahnenin rank≥2 adayı) ama **yanlış pozitif payı ölçülemez** (örnek büyüklüğü 1) → **üretime konmadı**; ⚠ b002 varlığı **yağmurlama değil** (Kanapou-Kahoolawe erozyon sahası; yağmurlama b004 ve **doğru**); üretim/render değişmedi, deploy YOK |
 | 14 Ağu | **I-56 bağımsız kenar ölçüm hattı üretime alındı** | `ae438bd` | ✅ **push edildi**, I-54 yapılandırması + I-55 eşiği **uygulandı**: `kenar_ornek_komutu` (384×216 @ **8 fps**, optik 64×36@4fps sözleşmesinden **bağımsız**) + `kenar_dis_olcusu` (**dört yön**, en dış sütun/satır, eşik **6.234**); POST-QA'ya **geriye uyumlu** bağlandı (`kenar_dis` alanı + `POST-KENAR-DIS` fail kodu; eski `kenar`/`POST-KENAR-SIYAH` **aynen** duruyor); kabul ölçütü sağlandı: I-52 karşı-örneği **FAIL**, **17 temiz videonun 17'si PASS** → **kaçırma 0, yanlış pozitif 0**; 25.2 sn 1080p pilot **POST-QA PASS**, 11/11 kare SHA-256 aynı, **kabul edilmiş MP4 DEĞİL** (b001/b002 semantik), deploy YOK |
 | 14 Ağu | **I-55 kenar eşiği türetildi (train→formül, held-out tek bakış)** | `e9f90c8` | ✅ **push edildi**, I-54'ün **ön-kayıtlı** bölünmesi değiştirilmeden okundu; eşik **yalnız TRAIN**'den açık formülle (`eşik = temiz_alt / 2` = **6.234**) türetildi ve TRAIN bandının içinde olduğu doğrulandı; **held-out'a tek bakış**: 4 kusurlu örneğin **4'ü yakalandı**, 7 temiz örneğin **7'si temiz** → **kaçırma 0, yanlış pozitif 0**; duyarlılık: güvenlik katı ~1.25–2494 aralığında sonuç değişmiyor; ⚠ ölçüm betiğinde pencere hatası bulunup düzeltildi (kusur 20.431→0.046, render değişmedi); **üretim kodu değişmedi** (eşik uygulanmadı, `KENAR_SIYAH_ESIGI` 16 duruyor), geçici varlıklar (345 MB) temizlendi, deploy YOK |
 | 14 Ağu | **I-54 kenar kapısı korpusu genişletildi, ayrım payı ölçüldü** | `61ecca8` | ✅ **push edildi**, korpus **gerçek render**la genişletildi (4 yön kusurlu + 15 gerçek temiz pilot), train/held-out **ölçümden önce** sabitlendi; dört eksen **ayrı** raporlandı: tek yön **hiç** ayırmıyor (dört yön zorunlu), mevcut `şerit_ort` agregasyonu **negatif**, 64/128 çözünürlük **hiç**, **4 fps hiçbir çözünürlükte** ayırmıyor; ayrım iki eksene birden bağlı (256 ≥15 fps, **384 ≥8 fps**); ölçülen band **kusur ≤0.02 / temiz ≥9.96** — **örtüşme yok**; ⚠ I-53'ün "kusur ≤2.9" iddiası **doğrulandı**, "temiz ≥15.0" **yanlış** (gerçek taban **10.01**, `onizleme_lawn_i40`); **eşik seçilmedi**, üretim kodu **değişmedi**, geçici varlıklar (345 MB) temizlendi, deploy YOK |
@@ -5669,6 +5670,113 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 75. FAZ I-57 — b001/b002 SEÇİM ZİNCİRİ GERİYE İZLENDİ (yalnız tanısal, 14 Ağu)
+
+> **Durum: iki yanlış adayın NEDEN seçildiği üretimin KENDİ kayıtlarından
+> ölçüldü. Kök neden semantik değil **YAPISAL** çıktı; ayrıca iki üretim
+> sinyalinin (semantik skor + alaka kapısı) bu korpusta **atıl/ters**
+> olduğu ölçüldü. Üretim davranışı **DEĞİŞMEDİ**. A–I yeşil (3565, 0 hata,
+> 1 BLOKE — I-33). Rerender YOK, deploy YOK, kabul edilmiş MP4 YOK. $0.00.**
+> Değişen: **yalnızca** `webapp/testler/test_faz_i.py` (+175 satır) ve
+> handoff. `medya/*`, `medya_kapisi.py`, `editor/*`, `Video.tsx`,
+> `deploy.sh`, **eşikler**, **22 alan sözleşmesi** ve I-23/I-24/I-25/I-38
+> kapıları **dokunulmadı**. I-23…I-56 **korundu**.
+
+### ⚠ Önce bir düzeltme (ölçüldü)
+
+Devir notunda *"b002 yağmurlama görselleri"* deniyordu; **b002'nin varlığı
+yağmurlama değildir**: `Starr-101229-6113-**Heteropogon contortus** …
+**Kanapou-Kahoolawe**` (kızıl toprak erozyon sahası). Yağmurlama **b004/s03**
+adayıdır ve o eşleşme **doğrudur**.
+
+### Zincir — üretimin kendi kayıtlarından
+
+`edit_manifest.json` + `render_plan.json`:
+
+| beat | beat metni | asset | gerekçe |
+|---|---|---|---|
+| **b001** | *"There is a bag of grass"* | `s01_5156581` | **puan 90** (1. aday) |
+| **b002** | *"seed on my garage shelf right now."* | `s01y1_9559294` | **puan 80** (2. aday) |
+
+- s001 cümlesi **ikiye kesilmiş**; iki beat de **aynı sahne (s001)** ve
+  **aynı olguya (s01)** bağlı.
+- **b002 kendi beat metniyle hiç aranmadı/puanlanmadı**: sahnenin aynı
+  sorgusundan gelen **ikinci aday**, ayırt edilebilirlik kuralı (I-21/I-22)
+  gereği ikinci beat'e atandı.
+- b002'nin metni (*"seed on my garage shelf right now."*) **tek başına
+  aranabilir bir iddia bile değil**.
+
+### Ölçüm 1 — semantik skor YAPISAL OLARAK ATIL
+
+`siralama.semantik_puan`, varlık listesi boşken her bacağı nötr değerine
+düşürüyor: **17 (yer) + 7 (kişi) + 6 (kurum) + 7 (tarih) + 13 (konu) = 50.0**.
+Altı adayın **altısı da tam 50.0** aldı → skor **sıfır bilgi** taşıyor.
+Doğru aday (yağmurlama) ile yanlış aday **aynı puanı** alıyor.
+
+### Ölçüm 2 — alaka kapısı bu korpusta TERS çalışıyor
+
+| beat | sınıf | `alaka_kapisi` | global örtüşme (tüm anlatım) |
+|---|---|---|---|
+| b001 | NEG | **True** | 2 — `['and','grass']` |
+| b002 | NEG | **True** | 2 — `['bag','seed']` |
+| b003 | POZ | True | 3 — `['lawn','patchy','the']` |
+| **b004** | **POZ** | **False** ⛔ | **0** |
+| b005 | NEG | **True** | 1 — `['seedling']` |
+| **b006** | **POZ** | **False** ⛔ | **0** |
+
+Kapı **üç yanlış adayın üçünü de geçiriyor**, **üç doğru adaydan ikisini
+reddediyor**. Global (tüm anlatım) örtüşmesi de aynı yönde ters.
+
+⚠ Kapı **bozuk değil**: Faz E'de archive.org çöpünü (*MAJESTIC 12 Files*)
+elemek için ölçülerek kondu ve **orada çalışıyor**. Bu korpusta atıl/ters,
+çünkü **doğru görselin künyesi anlatımın kelimelerini tekrarlamıyor**.
+(I-48'de ölçülen "kelime örtüşmesi ters" bulgusu, artık **üretim kapısının
+kendisinde** gösterildi.)
+
+### Ölçüm 3 — b002'yi ayıran tek sinyal YAPISAL
+
+İçerik tabanlı sinyaller ayırmıyor (yukarıdaki tablo; ayrıca I-48 biyom/yer
+ve I-49 tür/takson **elendi**). Ayıran tek sinyal:
+
+> **S1 = "aynı sahnenin ikinci (rank ≥ 2) adayı"** → yalnız **b002**
+> işaretleniyor; b001/b003/b004/b005/b006 temiz.
+
+⚠ **Yanlış pozitif payı ÖLÇÜLEMEZ**: bu korpusta rank ≥ 2 olan **tek** aday
+b002'dir (**örnek büyüklüğü 1**). I-34'ün dersi gereği bu **genellenebilir
+bir sonuç değildir** ve **üretime konmadı**.
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **2151** | **3565** |
+
+0 hata. Faz I 2130 → **2151** (+21). **1 BLOKE** — I-33 kaydı sürüyor.
+
+### ⛔ Kabul durumu değişmedi
+
+Pilot MP4 **kabul edilmiş değildir**; b001/b002 semantik uyumsuzluğu sürüyor.
+I-47 yalnız b001'i otomatik işaretliyor.
+
+### SONRAKİ ATOM — ölçüm ne diyor
+
+Bu atom kök nedeni **semantik zekâdan yapısal tasarıma** kaydırdı. Ölçülen
+üç ayrı, dar ve **ağsız** aday:
+
+1. **Beat bölme ↔ sorgu bağı**: bir cümle iki beat'e bölündüğünde ikinci
+   beat, **kendi metniyle hiç aranmayan** bir adayı alıyor. Ölçülebilir
+   atom: ikinci beat için **ayrı sorgu** mu, yoksa **aynı adayın farklı
+   kadrajı** mı? (İkincisi ağ/kota **artırmaz**.)
+2. **Semantik skorun atıl hâli**: varlık çıkmayınca 50.0 sabit. Ölçülebilir
+   atom: varlık çıkmadığında skorun **"ölçülemedi"** diye raporlanması
+   (şu an sessizce nötr puan veriyor — `EMIN DEGILSEN ENGELLEME` ihlali).
+3. **Alaka kapısının kapsamı**: hangi korpusta çalışıp hangisinde ters
+   çalıştığı ölçülebilir; kapının **kendi kapsamını raporlaması** dar bir
+   atom olur.
+
+⚠ Diğer açık borçlar: önizlemede altyazı çizilmemesi (I-40), model
+d > 1.31 ölçülmemiş (I-51), kenar hattının PRE-QA karşılığı yok (I-56).
 
 ---
 

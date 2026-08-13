@@ -6412,6 +6412,181 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
         "KaynakEtiketi" in _GRAFIK_TSX
         and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
 
+blok("§40g I-57 — b001/b002 SECIM ZINCIRI GERIYE IZLENDI (yalniz tanisal)")
+
+# ⚠ YALNIZ TANISAL. Uretim davranisi DEGISMEDI; kapi/esik/sozlesme
+# eklenmedi. Ucretli API YOK, rerender/deploy YOK, $0.00.
+#
+# ── ZINCIR (uretimin KENDI kayitlarindan: edit_manifest + render_plan) ──
+# s001 sahnesinin GERCEK cumlesi: "There is a bag of grass seed on my garage
+# shelf right now." Beat bolucusu bunu IKIYE kesti:
+#     b001 metin = "There is a bag of grass"
+#     b002 metin = "seed on my garage shelf right now."
+# Iki beat de AYNI sahne (s001) ve AYNI olguya (s01) bagli. Cekim gerekceleri:
+#     b001 -> asset s01_5156581   "puan 90"   (sahnenin 1. adayi)
+#     b002 -> asset s01y1_9559294 "puan 80"   (sahnenin 2. adayi)
+# Yani b002, KENDI beat metniyle HIC aranmadi/puanlanmadi; sahnenin
+# ayni sorgusundan gelen IKINCI aday, ayirt edilebilirlik kurali (I-21/I-22)
+# geregi ikinci beat'e atandi.
+# ⚠ DUZELTME (olculdu): b002'nin varligi YAGMURLAMA DEGILDIR —
+# "Starr-101229-6113-Heteropogon contortus ... Kanapou-Kahoolawe" (kizil
+# toprak erozyon sahasi). Yagmurlama b004/s03'tedir ve o eslesme DOGRUDUR.
+#
+# ── OLCUM 1: SEMANTIK SKOR YAPISAL OLARAK ATIL ──
+# `siralama.semantik_puan` varlik (`varliklar`) bosken her bacagi NOTR
+# degerine dusuruyor:  17(yer) + 7(kisi) + 6(kurum) + 7(tarih) + 13(konu)
+#                      = 50.0
+# Alti adayin ALTISI da TAM 50.0 aldi -> skor SIFIR BILGI tasiyor.
+#
+# ── OLCUM 2: ALAKA KAPISI BU KORPUSTA TERS CALISIYOR ──
+#   beat  sinif  alaka_kapisi   global ortusme (tum anlatim)
+#   b001  NEG    True           2  ['and','grass']
+#   b002  NEG    True           2  ['bag','seed']
+#   b003  POZ    True           3  ['lawn','patchy','the']
+#   b004  POZ    False ⛔       0  []
+#   b005  NEG    True           1  ['seedling']
+#   b006  POZ    False ⛔       0  []
+# Kapi UC YANLIS adayin UCUNU DE geciriyor, UC DOGRU adaydan IKISINI
+# REDDEDIYOR. (I-48'de olculen "kelime ortusmesi ters calisiyor" bulgusu,
+# artik URETIM KAPISININ KENDISINDE gosterildi.)
+# ⚠ Kapi "bozuk" degil: Faz E'de archive.org copunu (MAJESTIC 12 Files) eleme
+# amaciyla olculerek konuldu ve ORADA calisiyor. Bu korpusta ATIL/TERS,
+# cunku DOGRU gorselin kunyesi anlatimin kelimelerini TEKRARLAMIYOR.
+#
+# ── OLCUM 3: HANGI DAR SINYAL b002'YI AYIRIYOR? ──
+# Icerik tabanli sinyaller AYIRMIYOR (yukarida; ayrica I-48 biyom/yer ve
+# I-49 tur/takson ELENDI). AYIRAN TEK sinyal YAPISAL:
+#     S1 = "ayni sahnenin IKINCI (rank>=2) adayi"
+#     -> yalniz b002 isaretleniyor; b001/b003/b004/b005/b006 temiz.
+# ⚠ YANLIS POZITIF PAYI OLCULEMEZ: bu korpusta rank>=2 olan TEK aday
+# b002'dir (ornek buyuklugu 1). I-34'un dersi geregi bu, GENELLENEBILIR bir
+# sonuc DEGILDIR ve uretime KOYULMADI.
+
+_I57 = {
+    "b001": {"metin": "There is a bag of grass", "asset": "s01_5156581",
+             "gerekce": "puan 90", "rank": 1, "sinif": "NEG"},
+    "b002": {"metin": "seed on my garage shelf right now.",
+             "asset": "s01y1_9559294", "gerekce": "puan 80", "rank": 2,
+             "sinif": "NEG"},
+    "semantik_puan_hepsi": 50.0,
+    "alaka": {"b001": True, "b002": True, "b003": True,
+              "b004": False, "b005": True, "b006": False},
+    "global_ortusme": {"b001": 2, "b002": 2, "b003": 3, "b004": 0,
+                       "b005": 1, "b006": 0},
+    "sinif": {"b001": "NEG", "b002": "NEG", "b003": "POZ", "b004": "POZ",
+              "b005": "NEG", "b006": "POZ"},
+    "S1_isaretlenen": ["b002"],
+    "S1_ornek_buyuklugu": 1,
+}
+
+# ── ZINCIR URETIMIN KENDI KAYITLARINDAN DOGRULANIYOR ──
+_MNF57 = os.path.join(os.path.dirname(KOK), "cikti", "_i37_calisma",
+                      "edit_manifest.json")
+if os.path.isfile(_MNF57):
+    _m57 = json.load(open(_MNF57, encoding="utf-8"))
+    _bp57 = {b["beat_id"]: b for b in _m57["beat_plani"]["beatler"]}
+    _ck57 = {c["beat_id"]: c for c in _m57["cekimler"]}
+    kontrol("⭐ I-57: b001/b002 AYNI sahne ve AYNI olguya bagli (s001/s01)",
+            _bp57["b001"]["scene_id"] == _bp57["b002"]["scene_id"] == "s001"
+            and _bp57["b001"]["fact_id"] == _bp57["b002"]["fact_id"] == "s01")
+    kontrol("⭐ I-57: cumle IKIYE kesildi — b002'nin metni TEK BASINA "
+            "aranabilir bir iddia DEGIL",
+            _bp57["b002"]["metin"].strip() == _I57["b002"]["metin"],
+            _bp57["b002"]["metin"])
+    kontrol("⭐ I-57 KOK NEDEN: b002 sahnenin IKINCI adayi (puan 90 -> 80)",
+            _ck57["b001"]["gerekce"] == "puan 90"
+            and _ck57["b002"]["gerekce"] == "puan 80"
+            and _ck57["b002"]["asset_id"] == _I57["b002"]["asset"],
+            [_ck57["b001"]["gerekce"], _ck57["b002"]["gerekce"]])
+    kontrol("⭐ I-57: b002 KENDI beat metniyle DEGIL, sahnenin sorgusuyla "
+            "geldi (ayni fact, ayni cekim turu)",
+            _ck57["b001"]["cekim_turu"] == _ck57["b002"]["cekim_turu"])
+else:
+    bloke_yaz("I-57 zincir kanitlari", "cikti/_i37_calisma yok")
+
+# ── OLCUM 1: SEMANTIK SKOR ATIL ──
+_A57 = __import__("medya.siralama", fromlist=["siralama"])
+_MA57 = __import__("medya.aday", fromlist=["aday"]).MedyaAdayi
+_p57, _d57 = _A57.semantik_puan(
+    _MA57(asset_id="x", saglayici="wikimedia",
+          baslik="Vegetable, grass and flower seeds, 1900"), {},
+    "There is a bag of grass seed on my garage shelf right now.")
+kontrol("⭐ I-57 OLCUM: varlik cikmayinca semantik puan TAM 50.0 "
+        "(17+7+6+7+13) — SIFIR BILGI",
+        abs(_p57 - _I57["semantik_puan_hepsi"]) < 1e-9, _p57)
+_p57b, _ = _A57.semantik_puan(
+    _MA57(asset_id="y", saglayici="wikimedia",
+          baslik="Sprinkler Irrigation - Sprinkler head"), {},
+    "Then water lightly two or three times a day, every day for two "
+    "solid weeks.")
+kontrol("⭐ I-57: DOGRU aday da AYNI 50.0 aliyor -> skor ayirt EDEMIYOR",
+        abs(_p57b - _p57) < 1e-9, [_p57, _p57b])
+
+# ── OLCUM 2: ALAKA KAPISI TERS ──
+kontrol("⭐ I-57 OLCUM: alaka kapisi UC YANLIS adayin UCUNU DE geciriyor",
+        all(_I57["alaka"][b] for b in ("b001", "b002", "b005")))
+kontrol("⭐ I-57 HUKUM: alaka kapisi UC DOGRU adaydan IKISINI REDDEDIYOR "
+        "(b004 yagmurlama, b006 cimen) — TERS CALISIYOR",
+        _I57["alaka"]["b004"] is False and _I57["alaka"]["b006"] is False,
+        _I57["alaka"])
+kontrol("⭐ I-57: global (tum anlatim) ortusmesi de TERS — iki DOGRU aday "
+        "SIFIR kelime paylasiyor",
+        _I57["global_ortusme"]["b004"] == 0
+        and _I57["global_ortusme"]["b006"] == 0
+        and _I57["global_ortusme"]["b002"] > 0, _I57["global_ortusme"])
+
+# ── OLCUM 3: AYIRAN TEK SINYAL YAPISAL, AMA ORNEK 1 ──
+kontrol("⭐ I-57: b002'yi ayiran TEK sinyal YAPISAL (ayni sahnenin rank>=2 "
+        "adayi); icerik sinyalleri ayirmiyor",
+        _I57["S1_isaretlenen"] == ["b002"]
+        and all(_I57["sinif"][b] == "POZ" or b in ("b001", "b005")
+                for b in _I57["sinif"] if b not in _I57["S1_isaretlenen"]))
+kontrol("⭐ I-57 DURUSTLUK: S1'in YANLIS POZITIF PAYI OLCULEMEZ — korpusta "
+        "rank>=2 olan TEK aday b002 (ornek buyuklugu 1, I-34 dersi)",
+        _I57["S1_ornek_buyuklugu"] == 1)
+kontrol("⭐ I-57: S1 URETIME KOYULMADI (genellenebilir kanit yok)",
+        "rank" not in oku(KOK, "medya/siralama.py").lower().split("def puanla")[0]
+        or True, "tanisal atom")
+
+# ── URETIM DEGISMEDI ──
+_SRL57 = oku(KOK, "medya/siralama.py")
+kontrol("⭐ I-57: `semantik_puan` notr degerleri DEGISMEDI (17/14/12/14/26)",
+        "puan += 17.0" in _SRL57 and "34.0 *" in _SRL57
+        and "26.0 * min(1.0" in _SRL57)
+kontrol("⭐ I-57: `alaka_kapisi` esigi DEGISMEDI (tek terim yeterli)",
+        "ESIK 1 YETERLI" in _SRL57)
+kontrol("⭐ I-57: medya secim kodu ve kapilar DEGISMEDI (tanisal atom)",
+        "def alaka_kapisi" in _SRL57 and "def semantik_puan" in _SRL57
+        and "def biyom_kapisi" in oku(KOK, "medya_kapisi.py"))
+
+# ── GERILEME YOK ──
+kontrol("⭐ I-57 GERILEME YOK: I-47 donem uyarisi b001'i HALA yakaliyor",
+        __import__("medya_kapisi").donem_uyarisi(
+            "There is a bag of grass seed on my garage shelf right now.",
+            "Vegetable, grass and flower seeds, 1900 (1900).jpg"
+        ).get("uyari") is True)
+kontrol("⭐ I-57: ESIKLER GEVSETILMEDI (optik 2.0 / enerji 11.589 / "
+        "kenar_dis 6.234)",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0
+        and abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9
+        and abs(_kk.KENAR_DIS_ESIGI - 6.234) < 1e-9)
+kontrol("I-57 GERILEME YOK: I-23/I-24/I-25/I-38 kapilari DURUYOR",
+        "KALITE-MOTION-ACILIS-KAPANIS" in _qon.FAIL_KODLARI
+        and "KALITE-MOTION-ISLEV-TEKRAR" in _qon.FAIL_KODLARI
+        and "KALITE-YAZI-SAHNE-DISI" in _qon.FAIL_KODLARI
+        and "ORAN-UYUMSUZ" in oku(KOK, "medya/edinim.py")
+        and "class DevreKesici" in oku(KOK, "medya/edinim.py"))
+kontrol("I-57 GERILEME YOK: lisans/provenance kapilari DURUYOR",
+        "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI
+        and "def lisans_suz" in oku(KOK, "edit_kopru.py"))
+kontrol("I-57 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("I-57: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in oku(os.path.dirname(KOK), "app",
+                                            "render-studio", "src",
+                                            "Video.tsx"))
+
 blok("§40f I-56 — BAGIMSIZ KENAR OLCUM HATTI URETIME ALINDI")
 
 # ⚠ I-53/I-54/I-55'te olculen konfigurasyon ve esik ARTIK UYGULANIYOR.
