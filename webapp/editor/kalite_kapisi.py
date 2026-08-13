@@ -1349,6 +1349,99 @@ def optik_hareket_olcusu(farklar, *, ornek_fps: int = OPTIK_ORNEK_FPS,
     }
 
 
+# ═══════════ 7c) GORSELIN UZAMSAL ENERJISI (Faz I-44) ═══════════════════
+#
+# ⚠ NEDEN VAR — I-43'TE OLCULEN KUSUR:
+# I-43 zoom kovalarini optik olcum birimiyle hizaladi (taban %4.5/sn) ve
+# pilotta esigi gecen sahne 2/6 -> 5/6 oldu. Kalan tek sahnenin kok nedeni
+# UC RENDERLE ayristirildi ve KOVA DEGILDI:
+#     ayni sure + ayni etkin hiz, KALIBRE gorsel   -> optik 3.690  ✅
+#     ayni sure + ayni etkin hiz, s1'in gorseli    -> optik 1.457  ⛔
+#     sure UZATILIP etkin hiz ARTIRILDI, s1 gorseli-> optik 1.643  ⛔
+# Yani DUZ (dusuk uzamsal detayli) bir varlik STATIK FOTOGRAF olarak
+# kullanildiginda kamera ne yaparsa yapsin ekranda hareket URETMIYOR.
+# Optik kapi bunu ancak RENDER'DAN SONRA gorebiliyordu; medya secimi ve
+# plan tarafinda gorselin uzamsal enerjisi HIC OLCULMUYORDU.
+#
+# ⚠ OLCUM SOZLESMESI OPTIKLE BIREBIR AYNI (ikinci aritmetik YOK): gorsel
+# `OPTIK_ORNEK_OLCU` (64x36) griye indirgenir; enerji = KOMSU PIKSELLER
+# ARASI ORTALAMA MUTLAK FARK (yatay + dikey), 0-255 olceginde. Ornekleyici
+# bu modulde DEGIL (saf kalsin diye) — komutu `gorsel_ornek_komutu()` uretir.
+GORSEL_ORNEK_OLCU = OPTIK_ORNEK_OLCU
+
+# ⚠ ESIK GERCEK RENDER'DAN TURETILDI, TAHMIN EDILMEDI.
+# NEDENSEL AILE: TEK gorselin efektif cozunurlugu kademeli dusuruldu
+# (scale W -> geri 1920, DUZGUN yeniden ornekleme; `neighbor` blok kenari
+# uretip enerjiyi YAPAY yuksek tuttugu icin elendi — olculdu). Icerik ve
+# kompozisyon AYNI; degisen TEK sey uzamsal enerji. Her uye URETIM TABANI
+# oraniyla (0.045), 4.0 sn, EN KOTU kamera birlesimiyle (`pan: yok`) 1080p
+# render edilip `optik_hareket_olcusu` ile olculdu:
+#     enerji   optik   pay     en uzun duragan seri
+#      5.866   0.719   x0.36     3.0 sn   ⛔ esigin ALTINDA
+#      7.590   1.011   x0.51     3.0 sn   ⛔
+#      9.092   1.294   x0.65     3.0 sn   ⛔
+#     10.249   1.522   x0.76     3.0 sn   ⛔
+#     11.589   1.841   x0.92     1.0 sn   ⛔ <- OLCULEN EN YUKSEK KALAN
+#     12.589   2.172   x1.09     0.5 sn   ✅ <- OLCULEN EN DUSUK GECEN
+#     15.789   2.819   x1.41     0.0 sn   ✅
+# DOGAL KONTROL (6 gercek onbellek gorseli): 7.557 / 12.330 / 13.867 /
+# 14.887 / 15.792 / 18.083 — I-43 pilotunda optigi esigin ALTINDA kalan TEK
+# gorsel 7.557 olandi. Nedensel aile ve dogal kontrol AYNI yeri isaret ediyor.
+#
+# Esik OLCULEN KUSURLU tarafa konuldu (11.589 = optigi esigin altinda oldugu
+# olculen EN YUKSEK enerji) ki kapi, GECTIGI OLCULEN hicbir varligi
+# (en dusuk gecen 12.589) reddetmesin.
+UZAMSAL_ENERJI_ESIGI = 11.589
+
+
+def gorsel_ornek_komutu(gorsel_yolu: str, *,
+                        olcu: tuple = GORSEL_ORNEK_OLCU) -> list:
+    """Ornekleme komutunu URETIR — bu modul onu CALISTIRMAZ.
+
+    ⚠ `optik_ornek_komutu` ile AYNI olcu ve AYNI gri bicim; tek fark tek
+    kare alinmasi. Iki taraf ayrisirsa esik anlamini yitirir.
+    """
+    g, y = int(olcu[0]), int(olcu[1])
+    return ["ffmpeg", "-nostdin", "-v", "error", "-i", gorsel_yolu, "-vf",
+            f"scale={g}:{y},format=gray", "-frames:v", "1",
+            "-f", "rawvideo", "-"]
+
+
+def uzamsal_enerji_olcusu(ham, *, olcu: tuple = GORSEL_ORNEK_OLCU,
+                          esik: float = UZAMSAL_ENERJI_ESIGI) -> dict:
+    """Gorselin UZAMSAL DETAYI: komsu pikseller arasi ort. mutlak fark.
+
+    Saf hesap: dosya acmaz, komut kosturmaz. `ham` disaridan verilir.
+
+    ⚠ OLCEMEDIYSE "yeterli" DEMEZ: `olculdu=False` doner ve `yeterli`
+    anahtari HIC yazilmaz (sessiz pass yok).
+    """
+    try:
+        g, y = int(olcu[0]), int(olcu[1])
+    except (TypeError, ValueError, IndexError):
+        return {"olculdu": False, "neden": "OLCU-YOK"}
+    n = g * y
+    if not ham or n <= 0 or len(ham) < n:
+        return {"olculdu": False, "neden": "ORNEK-YOK"}
+    px = ham[:n]
+    toplam, adet = 0, 0
+    for satir in range(y):                       # yatay komsuluk
+        bas = satir * g
+        for x in range(g - 1):
+            toplam += abs(px[bas + x + 1] - px[bas + x])
+            adet += 1
+    for satir in range(y - 1):                   # dikey komsuluk
+        bas = satir * g
+        for x in range(g):
+            toplam += abs(px[bas + g + x] - px[bas + x])
+            adet += 1
+    enerji = round(toplam / max(1, adet), 3)
+    return {"olculdu": True, "enerji": enerji, "esik": _sayi(esik,
+                                                             UZAMSAL_ENERJI_ESIGI),
+            "olcu": [g, y], "ornek_piksel": n,
+            "yeterli": bool(enerji > _sayi(esik, UZAMSAL_ENERJI_ESIGI))}
+
+
 # ═══════════ 8) MOTION GRAMMAR (Faz I-17) ═══════════════════════════════
 
 # Ardisik olmayan tekrari da yakalamak icin bakilan pencere. I-16'da
@@ -1357,10 +1450,19 @@ def optik_hareket_olcusu(farklar, *, ornek_fps: int = OPTIK_ORNEK_FPS,
 HAREKET_PENCERESI = 3
 
 
-def motion_grammar_olcusu(sahneler, *, pencere: int = HAREKET_PENCERESI) -> dict:
+def motion_grammar_olcusu(sahneler, *, pencere: int = HAREKET_PENCERESI,
+                          enerji_esigi: float = UZAMSAL_ENERJI_ESIGI) -> dict:
     """Kamera hareketi ve gecis CESITLILIGI — plan uzerinden olcum.
 
-    `sahneler`: [{"beat_id","hareket","gecis","islev","sure_sn"} ...]
+    `sahneler`: [{"beat_id","hareket","gecis","islev","sure_sn",
+                  "medya_turu"?,"uzamsal_enerji"?} ...]
+
+    ⚠ FAZ I-44: hareket CESITLILIGI tek basina yetmiyor — DUZ bir gorsel
+    STATIK FOTOGRAF olarak kullanildiginda kamera ne yaparsa yapsin ekranda
+    hareket uretmiyor (I-43'te uc renderle ayristirildi). `uzamsal_enerji`
+    verilirse bu bacak da olculur; VERILMEZSE `enerji_olculdu=False` yazilir
+    ve "temiz" DENMEZ. Olcum yalniz STATIK FOTOGRAFA uygulanir: video
+    klibin KENDI hareketi vardir, hukum ona verilmez.
     """
     try:
         liste = [s for s in (sahneler or []) if isinstance(s, dict)]
@@ -1409,12 +1511,34 @@ def motion_grammar_olcusu(sahneler, *, pencere: int = HAREKET_PENCERESI) -> dict
         else:
             onceki[h] = i
 
+    # ── UZAMSAL ENERJI BACAGI (Faz I-44) ──
+    # ⚠ Yalniz STATIK FOTOGRAF: `medya_turu` "video" ise atlanir.
+    _esik = _sayi(enerji_esigi, UZAMSAL_ENERJI_ESIGI)
+    dusuk_enerji, enerji_olculdu = [], False
+    for i, s in enumerate(liste):
+        ham = s.get("uzamsal_enerji")
+        if ham is None:
+            continue
+        enerji_olculdu = True
+        if str(s.get("medya_turu") or "image").lower() == "video":
+            continue
+        e = _sayi(ham, -1.0)
+        if 0 <= e <= _esik:
+            dusuk_enerji.append({
+                "indeks": i, "beat_id": str(s.get("beat_id") or ""),
+                "hareket": hareketler[i], "uzamsal_enerji": round(e, 3),
+                "esik": _esik})
+
     return {
         "olculdu": True,
         "sahne": len(liste),
         "hareketler": hareketler,
         "islevler": islevler,
         "islev_tekrari": islev_tekrari,
+        # ⚠ SESSIZ PASS YOK: olcemedigimizde `enerji_olculdu=False`.
+        "enerji_olculdu": enerji_olculdu,
+        "enerji_esigi": _esik,
+        "dusuk_enerji": dusuk_enerji,
         "benzersiz_hareket": len({h for h in hareketler if h}),
         "ardisik_tekrar": ardisik_tekrar,
         "pencere_tekrari": pencere_tekrar,

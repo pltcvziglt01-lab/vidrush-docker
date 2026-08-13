@@ -383,6 +383,7 @@ def uret(*, cumleler: list, medya_manifest: dict,
          kare_olcu: Optional[tuple] = None,
          anlatim_bitis_sn: Optional[float] = None,
          benzerlik_okuyucu=None,
+         enerji_okuyucu=None,
          altyazi_kupleri: Optional[list] = None,
          kalite_kapisi: bool = False) -> dict:
     """Tum Faz C zincirini kosur ve dort dosyayi yazar.
@@ -428,6 +429,7 @@ def uret(*, cumleler: list, medya_manifest: dict,
                       kare_olcu=kare_olcu,
                       anlatim_bitis_sn=anlatim_bitis_sn,
                       benzerlik_okuyucu=benzerlik_okuyucu,
+                      enerji_okuyucu=enerji_okuyucu,
                       altyazi_kupleri=altyazi_kupleri,
                       kunye_kararlari=kunye_kararlari,
                       kalite_kapisi=kalite_kapisi)

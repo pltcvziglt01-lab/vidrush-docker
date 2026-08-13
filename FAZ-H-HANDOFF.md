@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 13 Ağu | **I-44 görselin uzamsal enerjisi ölçülüyor** | `PENDING` | ✅ **push edildi**, düz görselin statik fotoğraf olarak hareket üretemediği I-43'te ölçülmüştü ama **hiçbir kapı ölçmüyordu** → `uzamsal_enerji_olcusu` + PRE-QA kapısı (**ölçülen eşik 11.589**); 25.2 sn editorv2 pilotunda kapı **doğru varlığı** işaretledi (b002, enerji 7.557), diğer 5 varlık (12.33–18.08) işaretlenmedi; render **11/11 kare SHA-256 aynı** (gerileme yok), POST-QA **PASS** ama **kabul edilmiş MP4 DEĞİL** (b001/b002 semantik, gözle doğrulandı), deploy YOK |
 | 13 Ağu | **I-43 zoom kovaları optik ölçüm birimiyle hizalandı** | `ac3ef27` | ✅ **push edildi**, kovalar referans kanal birimindeydi (%/sn zoom), kapı ekran farkını ölçüyordu → **ölçülen taban 0.045**; 25.2 sn pilotta eşiği geçen sahne **2/6 → 5/6** (aynı props ile karşı-olgu render'ı), eşik gevşetilmedi, kova tablosu/aritmetik/22 alan dokunulmadı; POST-QA **WARN** (s1 — kök neden ölçüldü: **görsel enerjisi**, |grad| 4.21 vs 10.9–15.2), **kabul edilmiş MP4 DEĞİL**, deploy YOK |
 
 ---
@@ -5656,6 +5657,152 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 62. FAZ I-44 — GÖRSELİN UZAMSAL ENERJİSİ HİÇ ÖLÇÜLMÜYORDU (kalite atomu, 13 Ağu)
+
+> **Durum: ölçülen kusur ARTIK ÖLÇÜLÜYOR ve GERÇEK PİLOTTA doğru varlığı
+> işaretledi (b002, enerji 7.557 ≤ eşik 11.589; diğer 5 varlık 12.33–18.08
+> işaretlenmedi). A–I yeşil (3279, 0 hata). Render **11/11 kare SHA-256
+> aynı** — gerileme yok. POST-QA **PASS**, ama MP4 **kabul edilmedi**
+> (b001/b002 semantik, gözle doğrulandı). Deploy YOK. Maliyet $0.00.**
+> Değişen: `webapp/editor/kalite_kapisi.py` (1 ölçüm + 1 komut üretici +
+> motion grammar enerji bacağı), `webapp/editor/qa_on.py` (2 kod + kablolama),
+> `webapp/editor/plan.py` ve `webapp/edit_kopru.py` (yalnız parametre taşıma),
+> `webapp/testler/test_faz_i.py`.
+> `Video.tsx`, `pipeline.py`, `medya/*`, `medya_kapisi.py`, `server.py`,
+> `deploy.sh` ve **22 alan sözleşmesi** **dokunulmadı**. I-23…I-43 **korundu**.
+
+### ⛔ Ölçülen kök neden
+
+I-43, kalan tek optik bulgunun kök nedenini üç renderle ayrıştırmıştı: **süre
+de kova da değil, görselin kendisi**. Aynı süre + aynı etkin hızda kalibre
+görsel **3.690**, düz görsel **1.457**; süre uzatılıp etkin hız artırılınca
+bile **1.643**. Yani düz bir varlık statik fotoğraf olarak kullanıldığında
+kamera ne yaparsa yapsın ekranda hareket üretmiyor — **ama hiçbir kapı
+görselin uzamsal enerjisini ölçmüyordu**; kusur ancak render sonrası
+`KALITE-OPTIK-DURGUN` ile görülebiliyordu.
+
+### Kalibrasyon — değer TAHMİN EDİLMEDİ, ÖLÇÜLDÜ
+
+**Nedensel aile**: tek görselin efektif çözünürlüğü kademeli düşürüldü
+(scale W → geri 1920, **düzgün** yeniden örnekleme). ⚠ İlk deneme
+`flags=neighbor` ile yapıldı ve **başarısız oldu** — blok kenarları enerjiyi
+yapay yüksek tuttu (15.79 → 15.03, aralık açılmadı); ölçülüp elendi.
+İçerik/kompozisyon aynı, değişen tek şey uzamsal enerji. Her üye **üretim
+tabanı oranıyla (0.045)**, 4.0 sn, **en kötü kamera birleşimiyle (`pan: yok`)**
+1080p render edilip ölçüldü:
+
+| enerji | optik | pay | en uzun durağan seri | sonuç |
+|---|---|---|---|---|
+| 5.866 | 0.719 | ×0.36 | 3.0 sn | ⛔ eşiğin altında |
+| 7.590 | 1.011 | ×0.51 | 3.0 sn | ⛔ |
+| 9.092 | 1.294 | ×0.65 | 3.0 sn | ⛔ |
+| 10.249 | 1.522 | ×0.76 | 3.0 sn | ⛔ |
+| **11.589** | **1.841** | ×0.92 | 1.0 sn | ⛔ **ölçülen en yüksek kalan** |
+| **12.589** | **2.172** | ×1.09 | 0.5 sn | ✅ **ölçülen en düşük geçen** |
+| 15.789 | 2.819 | ×1.41 | 0.0 sn | ✅ |
+
+**Doğal kontrol** (6 gerçek önbellek görseli): 7.557 / 12.330 / 13.867 /
+14.887 / 15.792 / 18.083 — I-43 pilotunda optiği eşiğin **altında** kalan tek
+görsel 7.557 olandı. Nedensel aile ve doğal kontrol **aynı yeri** işaret
+ediyor.
+
+⚠ **Eşik ölçülen KUSURLU tarafa konuldu**: `UZAMSAL_ENERJI_ESIGI = 11.589` —
+optiği eşiğin altında olduğu **ölçülen en yüksek** enerji. Böylece kapı,
+**geçtiği ölçülen** hiçbir varlığı (en düşük geçen 12.589) reddetmez.
+
+### Düzeltme (en küçük)
+
+- `kalite_kapisi.uzamsal_enerji_olcusu(ham)` — **saf**: dosya açmaz, komut
+  koşturmaz. Enerji = komşu pikseller arası ortalama mutlak fark (yatay+dikey).
+- `kalite_kapisi.gorsel_ornek_komutu(yol)` — örnekleme komutunu **üretir**.
+  ⚠ Optikle **birebir aynı** sözleşme (64×36 gri) — ikinci aritmetik yok.
+- `motion_grammar_olcusu` enerji bacağı: yalnız **statik fotoğrafa** uygulanır
+  (video klibin kendi hareketi vardır); enerji verilmezse `enerji_olculdu=False`
+  yazılır, **"temiz" denmez**.
+- PRE-QA: `KALITE-MEDYA-DUSUK-ENERJI` (**warn**) + `KALITE-MEDYA-ENERJI-OLCULEMEDI`
+  (bilgi). Ölçer `enerji_okuyucu` ile **dışarıdan** verilir
+  (`benzerlik_okuyucu` ile aynı sözleşme) — modül görsel açmaz.
+
+⚠ **SEVİYE `warn`, FAIL DEĞİL** — `EMIN DEGILSEN ENGELLEME` sözleşmesi
+(`edinim.py` ile aynı): enerji **tüm karede** ölçülür, oysa editorv2
+`kadraj`/`punch` ile kaynağı **kırpabilir**. Bu karar pilotta **ölçülerek
+doğrulandı** (aşağıya bakınız): FAIL olsaydı gerçekte PASS eden bir render
+haksız yere bloke edilecekti.
+
+⚠ **OPTİK EŞİK GEVŞETİLMEDİ** (2.0 / 1.5 / 3.0) ve **ZOOM KOVASI
+YÜKSELTİLMEDİ** (I-43 tabanı 0.045, tablo aynı) — test ikisini de kilitler.
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1865** | **3279** |
+
+0 hata. Faz I 1838 → **1865** (+27). Red-first: 20 kontrolün **10'u XX**.
+
+### 1080p pilot — `editorv2_lawn_i44.mp4` (25.2 sn)
+
+Üretim hattının **kendi yolu** koşuldu: `edit_kopru.plan_kur` → PRE-QA →
+`remotion_v2` → POST-QA. Medya/ses önbellekten, **$0.00**.
+Sadakat kapısı: **beat eşit=True, varlık eşit=True** (I-38/I-41 ile aynı) —
+ölçüm I-44 değişikliğine atfedilebilir.
+
+**Kapının kararı — atomun iddiası:**
+
+| varlık | ölçülen enerji | kapı |
+|---|---|---|
+| **s01_grass_seed_bag_1** (b002) | **7.557** | ⚠ **KALITE-MEDYA-DUSUK-ENERJI** |
+| s04_grass_seedling | 12.330 | temiz |
+| s05_green_lawn_grass | 13.867 | temiz |
+| s01_grass_seed_bag | 14.887 | temiz |
+| s02_patchy_lawn | 15.792 | temiz |
+| s03_sprinkler | 18.083 | temiz |
+
+Kapı **yalnız** I-43'te 0.955 ölçen varlığı işaretledi; **aşırı engelleme yok**.
+
+- **1920×1080 @ 30**, aac 48 kHz/2ch, 25.259 sn · **8 kesme** · **11 kare** (6 beat kapsandı)
+- LUFS **−14.27** (remaster sonrası) / TP **−3.10** · **sessizlik %0.0** · kırpma yok
+- kenar siyahlığı **0/101** · medya tekrarı: 6 benzersiz varlık, benzerlik **ölçüldü**, benzer çift yok
+- motion grammar: 4 farklı hareket, ardışık/işlev tekrarı yok, açılış≠kapanış
+- tipografi: güvenli alan / yatay / nefes / çakışma **temiz**; künye **5 sahnede** çiziliyor
+- PRE-QA **WARN** (fail=0): PERDE-EKSIK, SAGLAYICI-TEKEL, GECIS-ASIRI (üçü de I-44 öncesinden) + **yeni** KALITE-MEDYA-DUSUK-ENERJI
+- **POST-QA: PASS** (sorun yok)
+
+**Gerileme yok — ölçülerek:** I-41 render'ıyla **11 karenin 11'i de SHA-256
+birebir aynı**. I-44 render'a dokunmaz; bu kanıtla doğrulandı.
+
+### ⚠ `warn` kararı pilotta ÖLÇÜLEREK doğrulandı
+
+Aynı düşük enerjili varlık (7.557) **editorv2 yolunda optik 2.288 ölçtü ve
+eşiği GEÇTİ** — çünkü editorv2 `kadraj`/`punch` ile kırpıyor ve kırpılan
+bölgenin enerjisi tüm karenin enerjisinden farklı. Aynı varlık
+`VidrushVideo` yolunda (kırpma yok) **0.955** ölçmüştü. Yani:
+
+- kapının işaretlediği risk **gerçek** (bir renderer'da ölçüldü),
+- ama **her yolda gerçekleşmiyor** → `fail` olsaydı **PASS eden bir render
+  haksız yere bloke edilecekti**. `EMIN DEGILSEN ENGELLEME` doğru karardı.
+
+### ⛔ Kabul durumu
+
+**Otomatik kapıların hepsi PASS.** Buna rağmen **kabul edilmiş MP4 değildir**,
+mutlak yol verilmedi, deploy yok: **gözle doğrulandı** ki b001 (1900 tarihli
+atlı pulluk fotoğrafı) ve b002 (kızıl toprak erozyon sahası) anlatımla
+(*"There is a bag of grass seed on my garage shelf right now."*) **semantik
+olarak uyumsuz** — I-39'dan beri bilinen ve hâlâ açık olan b001/b002/b005
+sınıfı.
+
+### SONRAKİ ATOM (I-45) — yalnız ölçülen kusurdan
+
+1. **Enerji TÜM karede ölçülüyor, oysa render KIRPIYOR** (ölçüldü: aynı
+   varlık kırpmasız yolda 0.955, `punch` kırpmalı yolda 2.288). Doğru atom:
+   enerjiyi **çekimin gerçek kadraj bölgesinde** ölçmek — böylece kapı hem
+   yanlış alarm vermez hem de gerçek riski FAIL seviyesine çıkarabilir.
+2. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — bu pilotta
+   üçüncü kez gözle doğrulandı; **kabul engelinin tek kalan nedeni budur**.
+3. **Kısa sahnede zoom yolunun çoğunu pan taşma payı yiyor** (I-43'te ölçüldü:
+   2.201 sn'de istenen %4.5/sn ekranda %2.91/sn).
+4. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 
 ---
 

@@ -63,7 +63,17 @@ KALITE_KODLARI = ("KALITE-BASLIK-KIRPIK", "KALITE-BASLIK-TASMA",
                   "KALITE-MOTION-ISLEV-TEKRAR",
                   "KALITE-PUNCH-BUYUTME", "KALITE-KUNYE-EKSIK",
                   "KALITE-BAG-KOPUK", "KALITE-YAZI-SAHNE-DISI",
-                  "KALITE-YAZI-NEFES-YOK")
+                  "KALITE-YAZI-NEFES-YOK",
+                  # ── Faz I-44: gorselin UZAMSAL ENERJISI ──
+                  # ⚠ FAIL_KODLARI'na BILEREK girmiyor: `EMIN DEGILSEN
+                  # ENGELLEME` (edinim.py ile ayni sozlesme). Enerji TUM
+                  # karede olculur, oysa `kadraj`/`punch` kaynagi KIRPABILIR
+                  # ve kirpilan bolgenin enerjisi farkli olabilir. Kirpma
+                  # bolgesinde olcmek AYRI ve OLCULMEMIS bir atomdur -> bu
+                  # kapi RENDER'I BLOKLAMAZ, yalniz olculen riski GORUNUR
+                  # kilar (render sonrasi `KALITE-OPTIK-DURGUN` zaten FAIL).
+                  "KALITE-MEDYA-DUSUK-ENERJI",
+                  "KALITE-MEDYA-ENERJI-OLCULEMEDI")
 
 
 @dataclass
@@ -116,6 +126,7 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
             kare_olcu: Optional[tuple] = None,
             anlatim_bitis_sn: Optional[float] = None,
             benzerlik_okuyucu=None,
+            enerji_okuyucu=None,
             altyazi_kupleri: Optional[list] = None,
             kunye_kararlari: Optional[list] = None,
             kalite_kapisi: bool = False) -> QaSonucu:
@@ -129,6 +140,11 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
       `anlatim_bitis_sn` : anlatim sesinin bittigi an (olu final olcumu icin).
       `benzerlik_okuyucu`: (yolA, yolB) -> 0..1. Verilmezse gorsel benzerlik
                            `olculemedi` yazilir; "benzer medya yok" DENMEZ.
+      `enerji_okuyucu`   : (yol) -> uzamsal enerji (0-255) ya da None.
+                           ⚠ FAZ I-44: bu modul GORSEL ACMAZ; olcer
+                           DISARIDAN verilir (`benzerlik_okuyucu` ile ayni
+                           sozlesme). Verilmezse enerji `olculemedi` yazilir;
+                           "enerjisi yeterli" DENMEZ.
       `altyazi_kupleri`  : mutlak zamanli altyazi kupleri. Verilirse altyazi
                            bandi REZERVE sayilir, okunabilirlik olculur ve
                            kunye/baslik ile cakismasi denetlenir.
@@ -363,6 +379,7 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
                     adaylar_index=adaylar_index, p=p, kare_olcu=kare_olcu,
                     anlatim_bitis_sn=anlatim_bitis_sn, toplam=toplam,
                     benzerlik_okuyucu=benzerlik_okuyucu,
+                    enerji_okuyucu=enerji_okuyucu,
                     altyazi_kupleri=altyazi_kupleri,
                     motion_specler=motion_specler,
                     kunye_kararlari=kunye_kararlari, acik=kalite_kapisi)
@@ -373,6 +390,7 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
 def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
                     adaylar_index, p, kare_olcu, anlatim_bitis_sn, toplam,
                     benzerlik_okuyucu, acik: bool,
+                    enerji_okuyucu=None,
                     altyazi_kupleri=None, motion_specler=None,
                     kunye_kararlari=None) -> None:
     """I-14 olcumlerini kos ve (kapi acikken) sorun uret. ASLA COKMEZ."""
@@ -724,11 +742,30 @@ def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
     # ── (5) MOTION GRAMMAR (I-17) — plan uzerinden, render'a bakmadan ──
     mg_sahne = []
     for c2, b2 in zip(cekimler, beatler):
-        mg_sahne.append({
+        _s2 = {
             "beat_id": getattr(b2, "beat_id", ""),
             "hareket": getattr(c2, "hareket", ""),
             "islev": getattr(b2, "islev", ""),
-            "sure_sn": getattr(b2, "sure_sn", 0.0)})
+            "sure_sn": getattr(b2, "sure_sn", 0.0)}
+        # ── I-44: gorselin UZAMSAL ENERJISI (olcer DISARIDAN) ──
+        # ⚠ Bu modul GORSEL ACMAZ. Okuyucu yoksa alan HIC yazilmaz ->
+        # `motion_grammar_olcusu` "olculemedi" der, "yeterli" DEMEZ.
+        _ad2 = adaylar_index.get(getattr(c2, "asset_id", "") or "") or {}
+        _tur2 = str(_ad2.get("medya_turu")
+                    or ("video" if "video" in str(_ad2.get("mime") or "")
+                        else "image"))
+        _s2["medya_turu"] = _tur2
+        _s2["kadraj"] = getattr(c2, "kadraj", "")
+        if enerji_okuyucu:
+            _yol2 = (_ad2.get("yerel_yol") or _ad2.get("medya_yolu") or "")
+            if _yol2:
+                try:
+                    _e2 = enerji_okuyucu(_yol2)
+                except Exception:                                # noqa: BLE001
+                    _e2 = None
+                if _e2 is not None:
+                    _s2["uzamsal_enerji"] = float(_e2)
+        mg_sahne.append(_s2)
     _gec = {}
     for sp in (motion_specler or []):
         tur = (sp.get("parametre") or {}).get("tur")
@@ -768,6 +805,32 @@ def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
                   f"(sahne {tk['ilk_indeks']} ve {tk['indeks']})",
                   "ayni islevdeki cekimlere farkli hareket ata; "
                   "islev pencereye takilmaz, videonun her yerine dagilir")
+        # ── I-44: DUZ GORSEL, STATIK FOTOGRAF OLARAK HAREKET URETMEZ ──
+        # ⚠ I-43'te uc renderle ayristirildi: ayni sure + ayni etkin hizda
+        # kalibre gorsel 3.690 verirken duz gorsel 1.457 verdi; sure
+        # uzatilip etkin hiz artirilinca bile 1.643'te kaldi. Yani kusur
+        # kovada ya da surede DEGIL, gorselin kendisinde.
+        # ⚠ SEVIYE `warn`, FAIL DEGIL — `EMIN DEGILSEN ENGELLEME`: enerji TUM
+        # karede olculur, `kadraj`/`punch` ise kaynagi KIRPABILIR ve kirpilan
+        # bolgenin enerjisi farkli olabilir (AYRI ve OLCULMEMIS atom).
+        for de in (mg.get("dusuk_enerji") or []):
+            _kdr = (mg_sahne[de["indeks"]].get("kadraj") or "tam")
+            _ekle("KALITE-MEDYA-DUSUK-ENERJI", "warn",
+                  f"{de['beat_id']}: gorselin uzamsal enerjisi "
+                  f"{de['uzamsal_enerji']} <= esik {de['esik']} — statik "
+                  f"fotograf olarak kamera hareketi ('{de['hareket']}', "
+                  f"kadraj '{_kdr}') ekranda hareket URETMEYEBILIR "
+                  f"(render sonrasi KALITE-OPTIK-DURGUN riski)",
+                  "daha detayli (dokulu) bir lisansli aday sec ya da "
+                  "kadraji dokunun yogun oldugu bolgeye getir",
+                  beat_id=de["beat_id"])
+        if not mg.get("enerji_olculdu"):
+            # ⚠ SESSIZ PASS YOK: olcemedigimizi soyleriz, "yeterli" demeyiz.
+            _ekle("KALITE-MEDYA-ENERJI-OLCULEMEDI", "bilgi",
+                  "gorsellerin uzamsal enerjisi OLCULEMEDI (okuyucu "
+                  "verilmedi); statik fotograf hareket yeterliligi "
+                  "yalniz RENDER SONRASI gorulebilir",
+                  "enerji_okuyucu enjekte et")
         if len(mg_sahne) >= 3 and mg.get("benzersiz_gecis", 0) < 2:
             _ekle("KALITE-GECIS-TEKDUZE", "warn",
                   f"tek gecis ailesi kullanildi: {mg.get('gecis_dagilimi')} "

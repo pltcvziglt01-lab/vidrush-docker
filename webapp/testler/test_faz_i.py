@@ -6412,6 +6412,164 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
         "KaynakEtiketi" in _GRAFIK_TSX
         and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
 
+blok("§39t I-44 — GORSELIN UZAMSAL ENERJISI HIC OLCULMUYORDU")
+
+# ⚠ I-43 PILOTUNDA OLCULEN KUSUR: kova tabani (0.045) hizalandiktan sonra
+# bile s1 sahnesi 0.955 olctu. Kok neden UC RENDERLE ayristirildi: sure de
+# kova da degil, GORSELIN KENDISI. Ayni sure + ayni etkin hizda kalibre
+# gorsel 3.69 verirken s1'in gorseli 1.457 verdi; sure uzatilip etkin hiz
+# artirilinca bile 1.643'te kaldi. Yani DUZ (dusuk uzamsal detayli) bir
+# varlik STATIK FOTOGRAF olarak kullanildiginda kamera ne yaparsa yapsin
+# ekranda hareket URETMIYOR — ama hicbir kapi bunu OLCMUYORDU.
+#
+# ⚠ I-44 KALIBRASYONU — DEGER TAHMIN EDILMEDI, GERCEK RENDER'DA OLCULDU.
+# NEDENSEL AILE: TEK gorselin efektif cozunurlugu kademeli dusuruldu
+# (scale W -> geri 1920, DUZGUN yeniden ornekleme; `neighbor` blok kenari
+# uretip enerjiyi YAPAY yuksek tuttugu icin elendi — ilk denemede olculdu).
+# Icerik/kompozisyon AYNI, degisen TEK sey uzamsal enerji. Her uye URETIM
+# TABANI oraniyla (0.045), 4.0 sn, EN KOTU kamera birlesimiyle (`pan: yok`)
+# 1080p render edilip `kalite_kapisi` ile olculdu:
+#
+#   enerji   optik   pay     duragan seri   sonuc
+#    5.866   0.719   x0.36     3.0 sn       ⛔ esigin ALTINDA
+#    7.590   1.011   x0.51     3.0 sn       ⛔ esigin ALTINDA
+#    9.092   1.294   x0.65     3.0 sn       ⛔ esigin ALTINDA
+#   10.249   1.522   x0.76     3.0 sn       ⛔ esigin ALTINDA
+#   11.589   1.841   x0.92     1.0 sn       ⛔ esigin ALTINDA  <- EN YUKSEK KALAN
+#   12.589   2.172   x1.09     0.5 sn       ✅ esigi GECER     <- EN DUSUK GECEN
+#   15.789   2.819   x1.41     0.0 sn       ✅ esigi GECER
+#
+# DOGAL KONTROL (onbellekteki 6 gercek gorsel): 7.557 / 12.330 / 13.867 /
+# 14.887 / 15.792 / 18.083. I-43 pilotunda optigi eSigin ALTINDA kalan TEK
+# gorsel 7.557 olandi; digerlerinin hepsi gecti. Nedensel aile ile dogal
+# kontrol AYNI yeri isaret ediyor.
+#
+# ⚠ ESIK, OLCULEN KUSURLU TARAFA konuldu: `11.589` = optigi esigin ALTINDA
+# oldugu OLCULEN EN YUKSEK enerji. Boylece kapi, gectigi OLCULEN hicbir
+# varligi (en dusuk gecen 12.589) reddetmez.
+# ⚠ SEVIYE `warn` — `EMIN DEGILSEN ENGELLEME` sozlesmesi (edinim.py ile ayni):
+# enerji TUM karede olculur, oysa editorv2 `kadraj`/`punch` ile KIRPABILIR ve
+# kirpilan bolgenin enerjisi farkli olabilir. Kirpma bolgesinde olcmek AYRI
+# ve OLCULMEMIS bir atomdur -> bu kapi RENDER'I BLOKLAMAZ.
+# ⚠ OPTIK ESIK GEVSETILMEDI, ZOOM KOVASI YUKSELTILMEDI.
+
+kontrol("⭐ I-44 KIRMIZI: `uzamsal_enerji_olcusu` VAR",
+        hasattr(_kk, "uzamsal_enerji_olcusu"), "olcum fonksiyonu yok")
+kontrol("⭐ I-44 KIRMIZI: `gorsel_ornek_komutu` VAR (modul KOMUT uretir, kosturmaz)",
+        hasattr(_kk, "gorsel_ornek_komutu"), "ornekleyici komutu yok")
+kontrol("⭐ I-44 KIRMIZI: `UZAMSAL_ENERJI_ESIGI` OLCULEN degerdir (11.589)",
+        abs(getattr(_kk, "UZAMSAL_ENERJI_ESIGI", 0.0) - 11.589) < 1e-9,
+        getattr(_kk, "UZAMSAL_ENERJI_ESIGI", None))
+
+if hasattr(_kk, "gorsel_ornek_komutu"):
+    _ge_komut = _kk.gorsel_ornek_komutu("/tmp/x.jpg")
+    # ⚠ IKINCI ARITMETIK YOK: ornekleme optikle BIREBIR ayni sozlesme.
+    kontrol("⭐ I-44: ornekleme optikle AYNI sozlesme (64x36 gri, tek kare)",
+            "scale=64:36" in " ".join(_ge_komut)
+            and "format=gray" in " ".join(_ge_komut)
+            and "rawvideo" in _ge_komut, _ge_komut)
+    kontrol("I-44: komut AG KULLANMAZ ve alt surec CALISTIRMAZ (saf liste)",
+            isinstance(_ge_komut, list) and _ge_komut[0] == "ffmpeg")
+
+if hasattr(_kk, "uzamsal_enerji_olcusu"):
+    _duz = bytes([128]) * (64 * 36)              # tamamen DUZ kare
+    _e_duz = _kk.uzamsal_enerji_olcusu(_duz)
+    kontrol("⭐ I-44: DUZ karenin uzamsal enerjisi 0 (ve yetersiz)",
+            _e_duz.get("olculdu") is True and _e_duz.get("enerji") == 0.0
+            and _e_duz.get("yeterli") is False, _e_duz)
+    # Satranc tahtasi: her komsu 0<->255 -> gradyan en yuksek
+    _sat = bytes([0 if (i // 64 + i % 64) % 2 == 0 else 255
+                  for i in range(64 * 36)])
+    _e_sat = _kk.uzamsal_enerji_olcusu(_sat)
+    kontrol("⭐ I-44: en yuksek detayli karede enerji 255'e yakin ve yeterli",
+            _e_sat.get("enerji", 0) > 250 and _e_sat.get("yeterli") is True,
+            _e_sat)
+    kontrol("I-44: olcum DETERMINISTIK (ayni girdi -> ayni sonuc)",
+            _kk.uzamsal_enerji_olcusu(_sat) == _e_sat)
+    kontrol("⭐ I-44: SESSIZ PASS YOK — ornek yoksa `olculdu=False`, "
+            "'yeterli' DENMEZ",
+            _kk.uzamsal_enerji_olcusu(b"").get("olculdu") is False
+            and "yeterli" not in _kk.uzamsal_enerji_olcusu(b""),
+            _kk.uzamsal_enerji_olcusu(b""))
+    kontrol("I-44: bozuk girdi ISTISNA FIRLATMAZ",
+            _kk.uzamsal_enerji_olcusu(None).get("olculdu") is False)
+
+# ── MOTION GRAMMAR BACAGI: statik fotograf + dusuk enerji = YETERSIZ ──
+_mg_dusuk = _kk.motion_grammar_olcusu([
+    {"beat_id": "b001", "hareket": "push-in", "islev": "hook", "sure_sn": 4.0,
+     "medya_turu": "image", "uzamsal_enerji": 7.557},
+    {"beat_id": "b002", "hareket": "pan-right", "islev": "aciklama",
+     "sure_sn": 4.0, "medya_turu": "image", "uzamsal_enerji": 15.792}])
+kontrol("⭐ I-44 KIRMIZI: motion grammar DUSUK ENERJILI statik fotografi "
+        "yetersiz sayiyor",
+        [d.get("beat_id") for d in (_mg_dusuk.get("dusuk_enerji") or [])]
+        == ["b001"], _mg_dusuk.get("dusuk_enerji"))
+kontrol("⭐ I-44: enerji verilmediginde 'temiz' DENMEZ (olculemedi yazilir)",
+        _kk.motion_grammar_olcusu(
+            [{"beat_id": "b001", "hareket": "push-in", "islev": "hook",
+              "sure_sn": 4.0}]).get("enerji_olculdu") is False)
+kontrol("I-44: enerji olculduyse bunu RAPOR EDER",
+        _mg_dusuk.get("enerji_olculdu") is True
+        and abs(_mg_dusuk.get("enerji_esigi", 0) - 11.589) < 1e-9,
+        _mg_dusuk.get("enerji_esigi"))
+# ⚠ VIDEO klip statik fotograf DEGILDIR: kendi hareketi vardir, kapi ona
+# hukum vermez (olcum yanlis yere uygulanmasin).
+kontrol("⭐ I-44: VIDEO klibe uygulanmaz (yalniz statik fotograf)",
+        not (_kk.motion_grammar_olcusu(
+            [{"beat_id": "b001", "hareket": "push-in", "islev": "hook",
+              "sure_sn": 4.0, "medya_turu": "video",
+              "uzamsal_enerji": 3.0}]).get("dusuk_enerji") or []))
+
+# ── PRE-QA KAPISI ──
+kontrol("⭐ I-44 KIRMIZI: `KALITE-MEDYA-DUSUK-ENERJI` kalite kodlarinda",
+        "KALITE-MEDYA-DUSUK-ENERJI" in _qon.KALITE_KODLARI,
+        "kod yok")
+kontrol("⭐ I-44: kod FAIL kodlarinda DEGIL (EMIN DEGILSEN ENGELLEME)",
+        "KALITE-MEDYA-DUSUK-ENERJI" not in _qon.FAIL_KODLARI)
+kontrol("⭐ I-44: olcemedigimizde SESSIZ PASS YOK — ayri bilgi kodu",
+        "KALITE-MEDYA-ENERJI-OLCULEMEDI" in _qon.KALITE_KODLARI
+        and "KALITE-MEDYA-ENERJI-OLCULEMEDI" not in _qon.FAIL_KODLARI)
+_QON43 = oku(KOK, "editor/qa_on.py")
+kontrol("⭐ I-44 KIRMIZI: `enerji_okuyucu` PRE-QA'ya enjekte ediliyor",
+        "enerji_okuyucu" in _QON43
+        and "def denetle(" in _QON43
+        and "enerji_okuyucu" in _QON43[_QON43.find("def denetle("):
+                                       _QON43.find("def denetle(") + 1400],
+        "denetle imzasinda enerji_okuyucu yok")
+kontrol("⭐ I-44 KIRMIZI: okuyucu URETIM HATTINDA bagli (kopru -> plan -> QA)",
+        all("enerji_okuyucu" in oku(*p) for p in
+            ((KOK, "edit_kopru.py"), (KOK, "editor/plan.py"))),
+        "enerji_okuyucu uretim hattinda tasinmiyor")
+kontrol("I-44: PRE-QA modulu GORSEL ACMAZ (olcer DISARIDAN verilir)",
+        "gorsel_ornek_komutu" not in _QON43
+        and "subprocess" not in _QON43)
+
+# ── GERILEME YOK: I-43 ve onceki kapilar AYNEN ──
+kontrol("⭐ I-44: OPTIK ESIK GEVSETILMEDI (2.0 / 1.5 / 3.0)",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0 and _kk.OPTIK_DURGUN_WARN_SN == 1.5
+        and _kk.OPTIK_DURGUN_FAIL_SN == 3.0)
+_V44 = oku(os.path.dirname(KOK), "app", "render-studio", "src", "Video.tsx")
+kontrol("⭐ I-44: ZOOM KOVASI YUKSELTILMEDI (I-43 tabani 0.045, tablo ayni)",
+        "OPTIK_TABAN_ORANI = 0.045" in _V44
+        and all(f"oran: {o}" in _V44
+                for o in (0.004, 0.014, 0.032, 0.062)))
+kontrol("I-44 GERILEME YOK: lisans duvari ve provenance kapisi DURUYOR",
+        "def lisans_suz" in oku(KOK, "edit_kopru.py")
+        and "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI)
+kontrol("I-44 GERILEME YOK: cozunurluk/oran/tekrar kapilari DURUYOR",
+        "COZUNURLUK-YETERSIZ" in oku(KOK, "medya/edinim.py")
+        and "ORAN-UYUMSUZ" in oku(KOK, "medya/edinim.py")
+        and "KALITE-MEDYA-TEKRAR" in _qon.FAIL_KODLARI)
+kontrol("I-44 GERILEME YOK: semantik kapilar (biyom/donem) DURUYOR",
+        "def biyom_kapisi" in oku(KOK, "medya_kapisi.py")
+        and "def donem_kapisi" in oku(KOK, "medya_kapisi.py"))
+kontrol("I-44 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("I-44: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in _V44
+        and "pan: 'right' | 'left' | 'top' | 'bottom' | 'yok'" in _V44)
+
 blok("§39s I-43 — ZOOM KOVALARI OPTIK OLCUM BIRIMIYLE HIZALANMAMISTI")
 
 # ⚠ I-42 PILOTUNDA OLCULEN KUSUR (acilis DUZELDI, sinif DUZELMEDI):
