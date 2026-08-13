@@ -5654,3 +5654,107 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 60. FAZ I-42 — AÇILIŞ ÇEKİMİ HER VİDEODA EN DURAĞAN OLANDI (kalite atomu, 13 Ağu)
+
+> **Durum: ölçülen kusur ÇÖZÜLDÜ ve GERÇEK RENDER'DA doğrulandı
+> (açılış optik ortalaması **1.421 → 4.016**, durağan seri **3.0 sn → 0.0**).
+> A–I yeşil (3232, 0 hata). ⛔ Pilotun POST-QA'sı **FAIL** — kalan iki bulgu
+> **kapsam dışı bırakılan** sahneler (s1/s2). Eşik GEVŞETİLMEDİ.
+> Deploy YOK. Maliyet $0.00.**
+> Değişen: `app/render-studio/src/Video.tsx` (1 sabit + 1 dallanma),
+> `webapp/testler/test_faz_i.py`. `pipeline.py`, `hizli_render.py`,
+> `editor/*`, `medya/*`, `server.py`, `deploy.sh` ve **22 alan sözleşmesi**
+> **dokunulmadı**. I-23…I-41 **korundu**.
+
+### ⛔ Ölçülen kök neden
+
+`VidrushVideo` zoom hızını sahne indeksinden deterministik seçiyor:
+`r = ((indeks * 2749) % 1000) / 1000`. **indeks 0 için r daima 0.000** →
+**daima ilk kova: %0.4/sn ("ihmal edilebilir")**. Yani **açılış/hook çekimi
+her üretimde dağılımın en durağan ucuna sabitleniyordu** — bu bir tercih
+değil, indeks aritmetiğinin yan etkisiydi. I-41 pilotunda ölçüldü:
+`s0` optik ortalama **1.421** < eşik **2.0**, en uzun durağan seri **3.0 sn**.
+
+### Kalibrasyon — değer TAHMİN EDİLMEDİ, ÖLÇÜLDÜ
+
+Dağılımın **kendi kovaları** aday alındı; her biri için 4 sn'lik tek sahnelik
+gerçek 1080p `VidrushVideo` render edilip `kalite_kapisi` ile ölçüldü:
+
+| aday kova | optik ortalama | durağan sn | eşik 2.0 |
+|---|---|---|---|
+| 0.014 "sakin" | **1.45** | 3.0 | ⛔ kalır |
+| 0.032 "belirgin" | **2.005** | 0.75 | ✅ geçer — **pay yalnız 0.005** |
+| 0.062 "agresif" | **4.103** | 0.0 | ✅ geçer |
+
+**0.032 seçilmedi**: 0.005'lik pay bıçak sırtıdır ve başka bir görselde
+düşer (I-38'de `POST-KENAR-SIYAH` 15.99 vs 16.0 tam olarak bu yüzden FAIL
+sayılmıştı). **`ACILIS_ZOOM_ORANI = 0.062`** — uydurma sayı değil, ölçülen
+dağılımın kendi kovası; hook çekimi referans videolarda da güçlü hareketin
+olduğu yerdir.
+
+### Düzeltme (en küçük)
+
+`zoomOrani`ye tek dallanma: `if (indeks === 0) return ACILIS_ZOOM_ORANI;`.
+Kova tablosu, `2749 % 1000` aritmetiği ve **indeks 1…8 oranları bit-bit
+aynı** (test kilitliyor: `[0.032, 0.014, 0.004, 0.062, 0.032, 0.014, 0.004,
+0.062]`). Kullanıcının `zoom`/`pan` seçimleri ve 22 alan sözleşmesi
+**dokunulmadı**.
+
+⚠ **EŞİK GEVŞETİLMEDİ**: `OPTIK_DURGUN_ESIGI` 2.0, WARN 1.5 sn, FAIL 3.0 sn
+aynen duruyor — test bunu ayrıca kilitliyor.
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1818** | **3232** |
+
+0 hata. Faz I 1806 → **1818** (+12). Red-first: 12 kontrolün **4'ü XX**.
+
+### 1080p pilot — `vidrushvideo_acilis_i42.mp4`
+
+I-41 pilotuyla **aynı şekil** (elma-elmaya). Medya/ses önbellekten, **$0.00**.
+
+- **1920×1080 @ 30**, aac 48 kHz/2ch, 12.05 sn, 59.6 MB · **3 kesme** · **11 kare**
+- LUFS **−14.13** / TP −4.45 · **sessizlik 0 aralık** · kenar siyahlığı **0/48**
+- Künye (I-41) **çizilmeye devam ediyor**; künyesiz sahnede alan yok
+
+**Açılış sahnesi — atomun iddiası, ölçülerek:**
+
+| ölçüm | I-41 pilotu | I-42 pilotu |
+|---|---|---|
+| `s0` optik ortalama | **1.421** (fail) | **4.016** ✅ |
+| `s0` en uzun durağan seri | **3.0 sn** | **0.0 sn** ✅ |
+| genel optik ortalama | 3.971 | **4.762** |
+
+⚠ **PİLOT DÜZENEĞİ DÜZELTİLDİ, ürün değil**: I-41 pilotundaki
+`POST-SESSIZ-ORAN` (%16) ve `POST-LUFS` (−15.02) bulguları çıplak anlatım
+dilimlerinden geliyordu. Üretim hattı ambiyans yatağı serer ve mastering
+yapar; pilot da artık aynısını yapıyor → **sessizlik 0, LUFS −14.13**.
+Hiçbir eşik/kapı değiştirilmedi.
+
+⛔ **POST-QA: FAIL — kabul edilmiş MP4 DEĞİLDİR.** Kalan iki bulgu
+**bu atomun kapsamı dışında bırakılan** sahnelerdir (talimat: yalnız açılış):
+
+| bulgu | oran | durum |
+|---|---|---|
+| `POST-OPTIK-DURGUN` s1 | 0.032 "belirgin" | ort **1.915** < 2.0 |
+| `POST-OPTIK-DURGUN` s2 | 0.014 "sakin" | ort **1.214**, durağan seri 3.0 sn |
+
+Yani **kusur sınıfı açılışla sınırlı değil**: kalibrasyonda ölçüldüğü gibi
+"sakin" kova bu görsel sınıfında eşiği **hiç** geçmiyor ve "belirgin" kova
+bıçak sırtında. Bu, I-42'nin çözdüğü şeyin **daha büyük bir kusurun
+en keskin ucu** olduğunu gösteriyor. Eşik gevşetilmedi, pilot geçsin diye
+ayarlanmadı, mutlak yol verilmedi, deploy yok.
+
+### SONRAKİ ATOM (I-43) — yalnız ölçülen kusurdan
+
+1. **`ZOOM_KOVA` "sakin" (%1.4/sn) ve "belirgin" (%3.2/sn) kovaları da
+   optik eşiği geçmiyor** (ölçüldü: 1.45 ve 2.005). Kovalar referans
+   dağılımından geliyor ama optik ölçüm eşiği **editorv2 için** kalibre
+   edilmişti. Doğru atom: iki tarafı **aynı ölçüm birimiyle** hizalamak —
+   ya kovaları ölçülen eşiğe göre yeniden türet ya da `VidrushVideo` için
+   eşiği **ölçerek** ayrı kalibre et. ⚠ Körlemesine eşik düşürmek YANLIŞ.
+2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
+3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005).

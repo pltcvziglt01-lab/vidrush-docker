@@ -478,8 +478,24 @@ const ZOOM_KOVA: {oran: number; pay: number}[] = [
   {oran: 0.062, pay: 0.13},   // agresif
 ];
 
+// ── ACILIS CEKIMI KOVAYA BIRAKILAMAZ (Faz I-42) ──
+// ⚠ OLCULEN KUSUR: asagidaki dagitim `r = ((indeks * 2749) % 1000) / 1000`
+// ile calisiyor ve indeks 0 icin r HER ZAMAN 0.000 -> DAIMA ilk kova
+// (%0.4/sn, "ihmal edilebilir"). Yani ACILIS/HOOK cekimi her uretimde
+// dagilimin EN DURAGAN ucuna sabitleniyordu. Bu bir tercih degil, indeks
+// aritmetiginin yan etkisiydi.
+// Gercek 1080p render'da olculdu (`vidrushvideo_kunye_i41.mp4`):
+//   s0 optik ortalama 1.421 < esik 2.0, en uzun duragan seri 3.0 sn -> FAIL
+// ⚠ ESIK GEVSETILMEDI (`kalite_kapisi.OPTIK_DURGUN_ESIGI` = 2.0 duruyor);
+// degisen yalniz acilis sahnesinin hareketi.
+// ⚠ UYDURMA SAYI YOK: deger dagilimin KENDI kovalarindan secildi ve gercek
+// render'da OLCULEREK dogrulandi (bkz. FAZ-H-HANDOFF I-42 kalibrasyonu).
+// Diger sahneler icin dagitim BIT-BIT aynidir.
+const ACILIS_ZOOM_ORANI = 0.062;
+
 /** Sahne indeksine gore zoom hizi kovasi (deterministik, her uretimde ayni). */
 const zoomOrani = (indeks: number): number => {
+  if (indeks === 0) return ACILIS_ZOOM_ORANI;
   const r = ((indeks * 2749) % 1000) / 1000;
   let birikim = 0;
   for (const k of ZOOM_KOVA) {

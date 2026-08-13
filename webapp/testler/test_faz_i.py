@@ -6412,6 +6412,82 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
         "KaynakEtiketi" in _GRAFIK_TSX
         and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
 
+blok("§39r I-42 — ACILIS SAHNESI HER VIDEODA EN DURAGAN OLANDI")
+
+# ⚠ I-41 PILOTUNDA OLCULEN KUSUR: `VidrushVideo` zoom hizini sahne
+# INDEKSINDEN deterministik seciyor:  r = ((indeks * 2749) % 1000) / 1000
+# indeks 0 icin r = 0.000 -> DAIMA ilk kova: **0.004 (%0.4/sn, "ihmal
+# edilebilir")**. Yani ACILIS/HOOK cekimi HER URETIMDE en duragan olani.
+# Gercek 1080p render'da olculdu (vidrushvideo_kunye_i41.mp4):
+#     s0 (oran 0.004) optik ortalama **1.421** < esik 2.0 -> POST-OPTIK-DURGUN
+#     en uzun duragan seri 3.0 sn (4 sn'lik sahnede) -> FAIL
+# Referans olcumu (Video.tsx'in kendi belgesi) medyan **%1.57/sn** diyor ve
+# dagilimin "ihmal edilebilir" kovasi TUM cekimler icin gecerli; acilis
+# cekimini oraya SABITLEMEK olcumden gelmiyor, indeks aritmetiginin YAN
+# ETKISI. Hook, izleyicinin kaldigi ya da dustugu tek karedir.
+# ⚠ ESIK GEVSETILMEDI: `OPTIK_DURGUN_ESIGI` 2.0 olarak DURUYOR; degisen
+# yalniz acilis sahnesinin HAREKETI.
+
+_V42 = oku(os.path.dirname(KOK), "app", "render-studio", "src", "Video.tsx")
+_KOVA42 = [(0.004, 0.34), (0.014, 0.39), (0.032, 0.14), (0.062, 0.13)]
+
+
+def _zoom_orani42(indeks):
+    """Video.tsx `zoomOrani` aritmetiginin AYNISI (test tarafi ayna).
+
+    ⚠ Ayna oldugu icin ASIL kaynak TSX; asagidaki kontroller hem formulu hem
+    kova sayilarini TSX'te KILITLIYOR. Ikisi ayrisirsa test kirmizi olur."""
+    r = ((indeks * 2749) % 1000) / 1000
+    b = 0.0
+    for o, p in _KOVA42:
+        b += p
+        if r < b:
+            return o
+    return _KOVA42[1][0]
+
+
+kontrol("⭐ I-42 KIRMIZI: acilis sahnesi ICIN AYRI ve OLCULEN oran VAR",
+        "ACILIS_ZOOM_ORANI" in _V42, "Video.tsx'te acilis orani yok")
+_m42 = re.search(r"ACILIS_ZOOM_ORANI\s*=\s*([\d.]+)", _V42)
+_acilis42 = float(_m42.group(1)) if _m42 else 0.0
+kontrol("⭐ I-42 KIRMIZI: acilis orani IHMAL EDILEBILIR kovadan BUYUK",
+        _acilis42 > _KOVA42[0][0], _acilis42)
+kontrol("⭐ I-42: acilis orani UYDURMA DEGIL — olculen dagilimin bir kovasi",
+        _acilis42 in [o for o, _ in _KOVA42], _acilis42)
+kontrol("⭐ I-42 KIRMIZI: `zoomOrani` indeks 0'i acilis oranina baglıyor",
+        re.search(r"indeks\s*===\s*0", _V42) is not None
+        and "ACILIS_ZOOM_ORANI" in _V42[_V42.find("const zoomOrani"):
+                                        _V42.find("const SURE_ZOOM")],
+        "indeks 0 dallanmasi yok")
+
+# ── DIGER SAHNELER DEGISMEDI (indeks aritmetigi ve kovalar AYNEN) ──
+kontrol("I-42 GERILEME YOK: kova tablosu DEGISMEDI (4 kova, ayni sayilar)",
+        all(f"oran: {o}" in _V42 and f"pay: {p}" in _V42
+            for o, p in _KOVA42), _KOVA42)
+kontrol("I-42 GERILEME YOK: indeks aritmetigi DEGISMEDI (2749 / 1000)",
+        "indeks * 2749" in _V42 and "% 1000" in _V42)
+kontrol("⭐ I-42: indeks 1..8 oranlari BIT-BIT ayni (yalniz acilis degisti)",
+        [_zoom_orani42(i) for i in range(1, 9)]
+        == [0.032, 0.014, 0.004, 0.062, 0.032, 0.014, 0.004, 0.062],
+        [_zoom_orani42(i) for i in range(1, 9)])
+
+# ── ESIK GEVSETILMEDI ──
+kontrol("⭐ I-42: `OPTIK_DURGUN_ESIGI` GEVSETILMEDI (2.0)",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0, _kk.OPTIK_DURGUN_ESIGI)
+kontrol("I-42: durgun WARN/FAIL sureleri de DEGISMEDI (1.5 / 3.0)",
+        _kk.OPTIK_DURGUN_WARN_SN == 1.5 and _kk.OPTIK_DURGUN_FAIL_SN == 3.0)
+
+# ── SOZLESMELER VE ONCEKI ATOMLAR ──
+kontrol("I-42 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("I-42 GERILEME YOK: I-41 kunyesi ve I-39 konumu DURUYOR",
+        "const KaynakYazi" in _V42 and "KUNYE_Y_ORANI = 0.075" in _V42
+        and abs(_etipo.KAYNAK_ETIKETI_ALTYAZILI - 0.075) < 1e-9)
+kontrol("I-42: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in _V42
+        and "pan: 'right' | 'left' | 'top' | 'bottom' | 'yok'" in _V42)
+
 blok("§39q I-41 — kaynakYazi URETIM HATTINDA DUSUYORDU (lisans gorunurlugu)")
 
 # ⚠ I-38'DEN DEVIR, I-41'DE OLCULEN GERCEK KOK NEDEN:
