@@ -204,6 +204,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-35 s01 sorgu daraltması: ELENDİ** | `7709ae1` | ✅ **push edildi**, 10 sorgu ölçüldü: vitrini eleyen her daraltma NASA'yı boşaltıyor, sorgu DEĞİŞMEDİ, rerender/deploy YOK |
 | 13 Ağu | **I-36 sağlayıcı tutarsızlığı düzeltildi** | `6bab9f9` | ✅ **push edildi**, başarılı geçmiş 429 ile ezilmiyor, sağlayıcı seçilen varlıktan türüyor, rerender/deploy YOK |
 | 13 Ağu | **I-37 beat→scene→asset bağı kopamaz** | `3ccc73c` | ✅ **push edildi**, çapraz sahne kayması ÇÖZÜLDÜ + PRE-QA kapısı; lawn MP4 **KABUL EDİLMEDİ** (s01 tek varlık), deploy YOK |
+| 13 Ağu | **I-38 yazı spec'i sahneye göreli** | `bf1b0c8` | ✅ **push edildi**, ekran künyesi artık ÇİZİLİYOR (4 CC sahne) + PRE-QA kapısı; lawn MP4 **KABUL EDİLMEDİ** (POST-KENAR-SIYAH + semantik), deploy YOK |
 
 ---
 
