@@ -293,7 +293,7 @@ def benzerlik(a, b):
     return sum(1 for x, y in zip(ha, hb) if x == y) / len(ha)
 
 
-def medya_edin():
+def medya_edin(sahne_aday_adedi=None):
     """Sahne basina medyayi SAGLAYICI ZINCIRINDEN edin (devre kesicili).
 
     ⚠ I-19: tek saglayici yerine sirali zincir. Wikimedia 429 verirse
@@ -312,7 +312,9 @@ def medya_edin():
             {"ad": "pexels", "sebep": "mevcut anahtar GECERSIZ (HTTP 401) — "
                                       "yeni anahtar ALINMADI"}],
         "en_az_genislik": 1920, "sahneler": []}
-    for tanim in SAHNE_TANIMI:
+    for _si, tanim in enumerate(SAHNE_TANIMI):
+        _istenen = ((sahne_aday_adedi or {}).get(tanim["kimlik"])
+                    or ADAY_ADEDI)
         ad = re.sub(r"[^a-zA-Z0-9_.-]", "_", tanim["sorgu"])[:50]
         hedef = os.path.join(MEDYA_ONBELLEK, f"{tanim['kimlik']}_{ad}.jpg")
         # ⚠ ONBELLEK PROVENANCE'I DA SAKLAR. Ilk surumde yalniz DOSYA
@@ -337,13 +339,14 @@ def medya_edin():
         else:
             son = edinim.edin(
                 tanim["sorgu"], hedef, en_az_genislik=1920, kesici=kesici,
-                onbellek=onbellek, adet=ADAY_ADEDI,
+                onbellek=onbellek, adet=_istenen,
                 saglayicilar=[
                     {"ad": "commons", "modul": commons,
                      "sorgu": tanim["sorgu"] + " Iceland"},
                     {"ad": "nasa", "modul": nasa, "sorgu": tanim["sorgu"]}],
                 olcu_okuyucu=_olcu_oku)
         kayit = {"kimlik": tanim["kimlik"], "sorgu": tanim["sorgu"],
+                 "istenen_aday": _istenen,
                  "saglayici": son.get("kullanilan_saglayici"),
                  "failover_sn": son.get("failover_sn"),
                  "metadata_bulundu": son.get("metadata_bulundu"),
@@ -366,13 +369,19 @@ def medya_edin():
             secilen.append(None)
             continue
         if not onbellekte:
+            kunye_yolu = aday["yol"] + ".kunye.json"
             with open(kunye_yolu, "w", encoding="utf-8") as f:
                 json.dump({k2: v for k2, v in aday.items()
                            if k2 != "yol"}, f, ensure_ascii=False)
         aday["asset_id"] = f"{tanim['kimlik']}_{abs(hash(aday.get('orijinal_url') or hedef)) % 10**8}"
-        aday["yol"] = hedef
-        aday["detay_std"] = gorsel_detay(hedef)
-        olcu = _olcu_oku(hedef)
+        # ⚠ I-22 KUSURU: `hedef` INDEKS-0 dosya yoludur. Cozunurluk kapisi
+        # ilk adayi reddedip ikinciye gecerse kabul edilen dosya `_1` ekli
+        # yolda olur; `hedef` okumak REDDEDILEN dosyayi olcer. s04'te tam bu
+        # oldu (1431x820 reddedilmisti ama rapor onu gosteriyordu) ve kamera
+        # kucuk goruntude kadrajdan tasip POST-KENAR-SIYAH uretti.
+        aday["yol"] = aday.get("yol") or hedef
+        aday["detay_std"] = gorsel_detay(aday["yol"])
+        olcu = _olcu_oku(aday["yol"])
         aday["genislik"], aday["yukseklik"] = olcu
         kayit.update({"durum": "OK", "asset_id": aday["asset_id"],
                       "baslik": aday.get("baslik"),
@@ -633,6 +642,39 @@ def main() -> int:
               f"  {s['metin'][:46]}")
 
     # ── [2/7] GORSEL ──
+    # ── [1b] KURU PLAN: GERCEK beat sayisini medyadan ONCE ogren ──
+    # ⚠ I-21'DE OLCULEN KUSUR: bolunme 5 beat uretti, saglayici kotasi 4'tu
+    # ve b005 MEDYASIZ kalip statik fallback karta dustu (POST-SIYAH-KARE +
+    # POST-OPTIK-DURGUN + POST-KENAR-SIYAH). Yani kusur RENDER SONRASI
+    # yakalaniyordu. Cozum: plani BIR KEZ kuru kosup beat sayisini ogrenmek
+    # ve medya adedini + kotayi ona DETERMINISTIK esleştirmek.
+    # ⚠ Kuru kosum BEDAVA: `beat.plan_yap` ag/medya/dosya KULLANMAZ.
+    from editor import beat as _beat
+    from editor import profil as _profil
+    _kuru_cumleler = []
+    for _i in range(len(SAHNE_METINLERI)):
+        _bas = 0.0 if _i == 0 else sinirlar[_i]["bas"]
+        _son = (sinirlar[_i + 1]["bas"] if _i + 1 < len(sinirlar)
+                else ses_kalite["kesim_sn"])
+        _kuru_cumleler.append({
+            "scene_id": f"s{_i + 1:03d}", "fact_id": SAHNE_METINLERI[_i][0],
+            "sure_sn": round(_son - _bas, 3),
+            "metin": SAHNE_METINLERI[_i][1]})
+    _kuru = _beat.plan_yap(_kuru_cumleler,
+                           profil_=_profil.profil(edit_profili))
+    _sahne_beat = {}
+    for _b in _kuru.beatler:
+        _sahne_beat[_b.scene_id] = _sahne_beat.get(_b.scene_id, 0) + 1
+    BEAT_SAYISI = len(_kuru.beatler)
+    _sahne_aday = {SAHNE_TANIMI[_i]["kimlik"]:
+                   _sahne_beat.get(f"s{_i + 1:03d}", 1)
+                   for _i in range(len(SAHNE_TANIMI))}
+    print(f"\n[1b] KURU PLAN: {len(_kuru_cumleler)} sahne -> "
+          f"{BEAT_SAYISI} beat (profil {edit_profili})")
+    for _k, _v in _sahne_aday.items():
+        print(f"      {_k}: {_v} beat -> {_v} aday istenecek")
+    print(f"      saglayici kotasi PLANA ESITLENECEK: {BEAT_SAYISI}")
+
     # ── HAREKETLI VIDEO B-ROLL: var mi? Yoksa DURUSTCE BLOKE ──
     broll = video_broll_ara()
     if broll["durum"] == "BLOKE":
@@ -643,7 +685,7 @@ def main() -> int:
     else:
         print(f"\n[B-ROLL] {len(broll['aday'])} aday: {broll['aday'][:3]}")
 
-    secilen, medya_rapor = medya_edin()
+    secilen, medya_rapor = medya_edin(_sahne_aday)
     eksik = [s for s in secilen if s is None]
     print(f"\n[2/7] MEDYA EDINIMI (Wikimedia Commons, anahtarsiz, $0.00)")
     print(f"      mimari: {medya_rapor['mimari']}")
@@ -753,7 +795,11 @@ def main() -> int:
         ambience=ambans, kare_olcu=OLCU,
         anlatim_bitis_sn=ses_kalite["anlatim_bitis_sn"],
         benzerlik_okuyucu=benzerlik,
-        altyazi_kupleri=altyazi["kupler"])
+        altyazi_kupleri=altyazi["kupler"],
+        # ⚠ KEYFI ARTIRMA DEGIL, DETERMINISTIK ESLEME: kota planin GERCEK
+        # beat sayisina esitlenir. Tek saglayicili bir iste sabit 4 tavani,
+        # 4'ten fazla beat olustugunda fazlasini GARANTILI medyasiz birakir.
+        saglayici_tavani=BEAT_SAYISI)
     if not sonuc["ok"]:
         print(f"BLOKE: plan kurulamadi -> {sonuc['neden']}")
         return 4
@@ -1082,6 +1128,13 @@ def main() -> int:
                            .get("yazi_cakismasi")),
         "video_broll": broll,
         "medya_edinim": medya_rapor,
+        "beat_medya_eslemesi": {
+            "kuru_plan_beat": BEAT_SAYISI,
+            "sahne_beat": _sahne_beat,
+            "sahne_istenen_aday": _sahne_aday,
+            "saglayici_tavani": BEAT_SAYISI,
+            "not": ("plan BIR KEZ kuru kosuldu (ag/medya yok); medya adedi ve "
+                    "saglayici kotasi GERCEK beat sayisina esitlendi")},
         "auto_siniflandirma": {
             "konu_metni": KONU_METNI,
             "tur_elle_verildi_mi": False,

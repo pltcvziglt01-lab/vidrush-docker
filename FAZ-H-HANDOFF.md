@@ -188,6 +188,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-19 edinim dayanıklılığı — I-18'in BLOKE'si açıldı** | `888063e` | ✅ **origin'e push edildi**, deploy YOK |
 | 12 Ağu | **I-20 üçüncü konsept: motor sınandı, render BLOKE** | `beaee8f` | ⚠ **push edildi**, MP4 YOK, deploy YOK |
 | 12 Ağu | **I-21 bölünen beat ayrı varlık alır (dar atom)** | `efbf111` | ⚠ **push edildi**, POST-QA FAIL, MP4 teslim YOK |
+| 12 Ağu | **I-22 medyasız beat kusuru çözüldü** | `PENDING` | ⚠ **push edildi**, POST-QA FAIL (dikey kaynak), MP4 teslim YOK |
 
 ---
 
@@ -3435,3 +3436,88 @@ Tek kalan engel net: **beat sayısı sağlayıcı kotasını aşabiliyor.** Doğ
 çözüm kotayı yükseltmek değil, ya (a) bölünmeyi plan aşamasında sahne
 sayısına göre sınırlamak, ya da (b) `medya_edin`i **beat sayısına** göre
 aday getirmek (plan bir kez koşulup beat sayısı öğrenildikten sonra).
+
+---
+
+## 40. FAZ I-22 — MEDYASIZ BEAT KUSURU ÇÖZÜLDÜ (dar atom, 12 Ağu)
+
+> **Durum: yerel yeşil, push edildi. Deploy YOK. Maliyet $0.00.**
+> Değişen: `webapp/editor/qa_on.py`, `webapp/edit_kopru.py`,
+> `webapp/testler/smoke_konsept3_teknoloji_i20.py`,
+> `webapp/testler/test_faz_i.py` (+ handoff).
+> **Yeni sağlayıcı/mimari YOK.** `pipeline.py`, `server.py`, arayüz, 22 alan,
+> `deploy.sh`, `medya/lisans.py`, `medya/guvenlik.py`, `medya/indirme.py`,
+> kalite eşikleri **dokunulmadı**.
+
+### ✅ Hedeflenen kusur ÇÖZÜLDÜ
+
+I-21'de ölçülen zincir: bölünme **5 beat** üretti, sağlayıcı kotası **4**'tü,
+**b005 medyasız** kalıp statik fallback karta düştü →
+`POST-SIYAH-KARE` + `POST-OPTIK-DURGUN` + `POST-KENAR-SIYAH`.
+
+| Ölçüm | I-21 | **I-22** |
+|---|---|---|
+| b005 varlığı | **(YOK)** → fallback kart | **`s04_…`** |
+| Medyasız beat | **1/5** | **0/5** |
+| b005 optik hareket | **0.178** (3.75 sn donuk) | **4.705** |
+| `POST-SIYAH-KARE` | FAIL | ✅ **gitti** |
+| `POST-OPTIK-DURGUN` | FAIL | ✅ **gitti** |
+| Ardışık aynı medya | yok (I-21) | yok — 5 beat **5 ayrı varlık** |
+
+### İki parçalı, en küçük geriye uyumlu çözüm
+
+**1. Zorunlu PRE-QA kapısı — `KALITE-MEDYASIZ-BEAT` (fail).**
+Herhangi bir beat `kaynak_turu != "medya"` ise render **durur**. Bu kusur
+I-21'e kadar **render sonrası** yakalanıyordu — yani 40 sn render
+harcandıktan sonra. Plan üzerinde **bedava** yakalanıyor artık.
+⚠ Kapı `kalite_kapisi` bayrağına bağlı; kapalı yolda hüküm değişmez.
+
+**2. Deterministik beat↔medya eşlemesi.** İki seçenek ölçüldü:
+- *(a) bölünmeyi medya kapasitesine göre sınırla* — `beat.py`'ye motor
+  değişikliği gerektirir, geriye uyumlu değil;
+- *(b) planı bir kez kuru koşup gerçek beat sayısını öğren* — **seçildi.**
+
+`beat.plan_yap` **ağ/medya/dosya kullanmaz**, yani kuru koşum bedava.
+Öğrenilen beat sayısı iki yere birden bağlandı: sahne başına istenen aday
+adedi **ve** `saglayici_tavani`.
+
+⚠ **Bu keyfi kota artırımı DEĞİL.** Sabit 4 tavanı **çok sağlayıcılı**
+durum için bir çeşitlilik güvencesidir; tek sağlayıcılı bir işte 4'ten
+fazla beat oluşursa fazlası **garantili** medyasız kalır. Kota artık sabit
+bir sayıya değil **ölçülen beat sayısına** bağlı (testle kilitli:
+`saglayici_tavani=BEAT_SAYISI`, sabit rakam yasak). Kalite eşiklerinin
+hiçbiri değişmedi.
+
+### Bulunan ve düzeltilen kendi hatam
+
+Çözünürlük kapısı ilk adayı reddedip ikinciye geçtiğinde kabul edilen dosya
+`…_1.jpg` yolunda oluyor, ama smoke **indeks-0 yolunu** okuyordu. Sonuç:
+s04 raporda **1431×820** (reddedilen dosya) görünüyordu ve kamera küçük
+görüntüde kadrajdan taşıyordu. Düzeltmeden sonra s04 **4986×3744**.
+
+### ⛔ MP4 KABUL EDİLMİŞ SAYILMIYOR — kalan tek FAIL
+
+`POST-KENAR-SIYAH`: 6/68 karede kenarda siyah bant.
+**Kök neden ölçüldü:** s02 kaynağı **2048×3072 — DİKEY**. 16:9 karede
+pillarbox (yan siyah bant) veriyor; kamera taşması değil, **en-boy oranı
+uyuşmazlığı**. Kapı bunu doğru yakaladı.
+
+Render tamamlandı (17.109 sn, 1920×1080, LUFS −14.36, TP −4.09, sessizlik
+%0, 7 kesme) ama **POST-QA FAIL olduğu için MP4 teslim edilmiyor** ve
+testte **BLOKE** olarak duruyor.
+
+### Ölçülen test sonucu
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **257** | **1442** | **2856** |
+
+0 hata. Faz I 1436 → **1442**. **1 BLOKE** (I-22 POST-QA) — PASS sayılmadı.
+
+### SONRAKİ ATOM (I-23)
+
+Tek kalan engel: **dikey/kare kaynak 16:9'a pillarbox veriyor.** Doğru
+çözüm eşiği gevşetmek değil; ya (a) edinim tarafında **en-boy oranı kapısı**
+(16:9'a yakın olmayan kaynağı reddet — çözünürlük kapısıyla aynı desen), ya
+da (b) render tarafında dikey kaynağı **güvenli crop** ile doldurmak.
+(a) daha küçük ve mevcut desenle birebir.

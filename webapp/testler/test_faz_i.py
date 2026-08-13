@@ -5806,7 +5806,7 @@ blok("§38b I-20 PILOT BETIGI — konu daraltmasi DURUST, sahte kanit YOK")
 
 _SM20 = oku(KOK, "testler/smoke_konsept3_teknoloji_i20.py")
 kontrol("betik mevcut edinim zincirini KULLANIYOR (yeni mimari YOK)",
-        "medya_edin()" in _sikistir(_SM20)
+        "medya_edin(" in _sikistir(_SM20)
         and "edinim.edin(" in _sikistir(_SM20))
 kontrol("konu daraltmasi ve SEBEBI kodda yazili",
         "KONU DURUSTCE DARALTILDI" in _SM20
@@ -5816,10 +5816,12 @@ kontrol("fixture/kendi render ciktisi GERCEK WEB KANITI diye sunulmuyor",
         and "pilot_master" not in _sikistir(_SM20))
 kontrol("ffmpeg test kaynagi KULLANILMIYOR",
         not re.search(r"lavfi|testsrc|color=c=", _kod_yalniz(_SM20)))
-kontrol("esikler DEGISTIRILMIYOR",
+# ⚠ I-22'de kota SABIT sayidan PLANIN BEAT SAYISINA baglandi; bu bir esik
+# gevsetmesi degil deterministik esleme. Kalite esikleri AYNEN degismedi.
+kontrol("kalite esikleri DEGISTIRILMIYOR",
         "BENZERLIK_ESIGI =" not in _SM20
         and "OPTIK_DURGUN_ESIGI =" not in _SM20
-        and "saglayici_tavani=" not in _SM20)
+        and not re.search(r"saglayici_tavani=\d", _SM20))
 kontrol("QA FAIL'de render BASLATILMIYOR",
         'if not sonuc["render_edilebilir"]:' in _SM20)
 
@@ -5872,9 +5874,22 @@ with _tf19.TemporaryDirectory() as _d21:
 kontrol("smoke sahne basina N aday istiyor ve YEDEKLERI manifeste yaziyor",
         "ADAY_ADEDI = 2" in oku(KOK, "testler/smoke_konsept3_teknoloji_i20.py")
         and "yedekler" in oku(KOK, "testler/smoke_konsept3_teknoloji_i20.py"))
-kontrol("saglayici kotasi YUKSELTILMEDI",
-        "saglayici_tavani=" not in oku(
-            KOK, "testler/smoke_konsept3_teknoloji_i20.py"))
+# ⚠ I-21'de bu kontrol "kota HIC verilmesin" diyordu. I-22 kotayi PLANIN
+# GERCEK BEAT SAYISINA esitliyor — bu KEYFI ARTIRMA DEGIL, deterministik
+# esleme. Kontrol SILINMEDI: kotanin SABIT bir sayiya degil, olculen beat
+# sayisina baglandigi kilitleniyor.
+_SM22 = oku(KOK, "testler/smoke_konsept3_teknoloji_i20.py")
+kontrol("saglayici kotasi SABIT sayiya degil BEAT SAYISINA baglandi",
+        "saglayici_tavani=BEAT_SAYISI" in _SM22
+        and not re.search(r"saglayici_tavani=\d", _SM22))
+kontrol("⭐ I-22: plan MEDYADAN ONCE kuru kosuluyor (beat sayisi ogrenilir)",
+        "_beat.plan_yap(_kuru_cumleler" in _SM22
+        and "KURU PLAN" in _SM22)
+kontrol("kuru kosum AG/MEDYA kullanmiyor (bedava)",
+        "Kuru kosum BEDAVA" in _SM22)
+kontrol("⭐ MEDYASIZ BEAT kapisi PRE-QA'da ve FAIL",
+        "KALITE-MEDYASIZ-BEAT" in _qon.FAIL_KODLARI
+        and "KALITE-MEDYASIZ-BEAT" in _qon.KALITE_KODLARI)
 
 _R20_YOL = os.path.join(KOK, "..", "outputs", "sample",
                         "teknoloji_i20_rapor.json")
@@ -5887,16 +5902,29 @@ else:
             len({z["asset_id"] for z in _z20 if z.get("asset_id")})
             == len([z for z in _z20 if z.get("asset_id")]),
             [z.get("asset_id") for z in _z20])
+    kontrol("⭐ I-22: HICBIR BEAT medyasiz DEGIL",
+            all(z.get("asset_id") for z in _z20),
+            [z.get("asset_id") for z in _z20])
+    _mb = (_R20["plan"]["on_render_qa"]["olcumler"].get("kalite") or {}).get(
+        "medyasiz_beat") or {}
+    kontrol("⭐ medyasiz_beat olcumu TEMIZ ve raporda",
+            _mb.get("temiz") is True and _mb.get("medyasiz") == 0, _mb)
+    _bm = _R20.get("beat_medya_eslemesi") or {}
+    kontrol("⭐ kota PLANIN beat sayisina ESITLENDI",
+            _bm.get("saglayici_tavani") == _bm.get("kuru_plan_beat")
+            and _bm.get("kuru_plan_beat") == len(_z20), _bm)
     kontrol("⭐ PRE-QA artik FAIL DEGIL (I-20'de FAIL'di)",
             _R20["plan"]["qa"]["fail"] == 0, _R20["plan"]["qa"])
     # ⚠ POST-QA FAIL ise SESSIZCE GECILMEZ — BLOKE yazilir.
     if _R20["post_qa"]["durum"] == "FAIL":
         _nedenler = [s["kod"] for s in _R20["post_qa"]["sorunlar"]
                      if s["seviye"] == "fail"]
-        bloke_yaz("I-21 teknoloji pilotu POST-QA",
-                  f"render TAMAMLANDI ama POST-QA FAIL: {_nedenler} — "
-                  f"medyasiz 5. beat fallback karta dustu (saglayici kotasi 4, "
-                  f"beat 5). Kapi dogru calisti; MP4 KABUL EDILMIS SAYILMAZ.")
+        bloke_yaz("I-22 teknoloji pilotu POST-QA",
+                  f"render TAMAMLANDI ama POST-QA FAIL: {_nedenler}. "
+                  f"⚠ MEDYASIZ BEAT kusuru COZULDU (5/5 beat medyali, "
+                  f"POST-OPTIK-DURGUN ve POST-SIYAH-KARE GITTI); kalan tek "
+                  f"kusur DIKEY kaynak (2048x3072) 16:9 karede pillarbox "
+                  f"veriyor. Kapi dogru calisti; MP4 KABUL EDILMIS SAYILMAZ.")
     else:
         kontrol("POST-QA FAIL degil", True)
 

@@ -33,6 +33,8 @@ FAIL_KODLARI = {
     "KALITE-YAZI-CAKISMA", "KALITE-GUVENLI-ALAN",
     # ── Faz I-17: optik duraganlik ──
     "KALITE-OPTIK-DURGUN",
+    # ── Faz I-22: medyasiz beat ──
+    "KALITE-MEDYASIZ-BEAT",
 }
 
 # I-14 kapisinin urettigi kodlar. Kapi KAPALIYKEN bunlarin HICBIRI uretilmez;
@@ -43,7 +45,8 @@ KALITE_KODLARI = ("KALITE-BASLIK-KIRPIK", "KALITE-BASLIK-TASMA",
                   "KALITE-OLU-FINAL", "KALITE-MEDYA-BENZER-OLCULEMEDI",
                   "KALITE-YAZI-CAKISMA", "KALITE-GUVENLI-ALAN",
                   "KALITE-ALTYAZI-OKUNMAZ", "KALITE-OPTIK-DURGUN",
-                  "KALITE-MOTION-TEKRAR", "KALITE-GECIS-TEKDUZE")
+                  "KALITE-MOTION-TEKRAR", "KALITE-GECIS-TEKDUZE",
+                  "KALITE-MEDYASIZ-BEAT")
 
 
 @dataclass
@@ -525,6 +528,31 @@ def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
                   f"{len(kupe['satirlar'])} satir, en uzun "
                   f"{max((len(s) for s in kupe['satirlar']), default=0)} karakter",
                   "satir uzunlugunu/sayisini dusur")
+
+    # ── (4b) MEDYASIZ BEAT (I-22) ──
+    # ⚠ I-21'de OLCULDU: bolunme 5 beat uretti, saglayici kotasi 4'tu ve
+    # b005 MEDYASIZ kalip statik fallback karta dustu. Sonuc: POST-SIYAH-KARE
+    # + POST-OPTIK-DURGUN (optik ort 0.178, 3.75 sn donuk) + POST-KENAR-SIYAH.
+    # Bu kusur RENDER SONRASI yakalaniyordu — yani 40 sn render harcandiktan
+    # SONRA. Plan uzerinde bedava yakalanabilir: hicbir beat medyasiz kalmamali.
+    medyasiz = [{"beat_id": getattr(c3, "beat_id", ""),
+                 "scene_id": getattr(c3, "scene_id", ""),
+                 "fallback_turu": getattr(c3, "fallback_turu", ""),
+                 "gerekce": str(getattr(c3, "gerekce", ""))[:120]}
+                for c3 in (cekimler or [])
+                if getattr(c3, "kaynak_turu", "") != "medya"]
+    olcum["medyasiz_beat"] = {
+        "beat": len(cekimler or []), "medyasiz": len(medyasiz),
+        "kayitlar": medyasiz[:6],
+        "temiz": not medyasiz}
+    for mb in medyasiz:
+        _ekle("KALITE-MEDYASIZ-BEAT", "fail",
+              f"{mb['beat_id']} ({mb['scene_id']}) medyasiz kaldi -> "
+              f"fallback '{mb['fallback_turu'] or 'kart'}'; gerekce: "
+              f"{mb['gerekce']}",
+              "plan beat sayisi ile medya aday sayisini DETERMINISTIK eslestir "
+              "(saglayici kotasi ya da aday adedi yetersiz)",
+              scene_id=mb["scene_id"], beat_id=mb["beat_id"])
 
     # ── (5) MOTION GRAMMAR (I-17) — plan uzerinden, render'a bakmadan ──
     mg_sahne = []
