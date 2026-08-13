@@ -172,6 +172,61 @@ def donem_kapisi(sahne_metni: str, aday_metni: str,
     return True, "donem uyumlu"
 
 
+def donem_uyarisi(sahne_metni: str, aday_metni: str,
+                  video_baglami: str = "") -> dict:
+    """TERS YON: TARIHSEL aday, GUNCEL sahnede. (saf fonksiyon, ag YOK)
+
+    ⚠ NEDEN VAR — I-47'DE OLCULEN KUSUR: `donem_kapisi` yalnizca SAHNE
+    tarihselse adayi denetler; `tarihsel_mi(sahne)` False ise HEMEN True
+    doner. Yani "guncel anlatim + arsiv fotografi" celiskisi HIC
+    gorulmuyordu. Lawn pilotunun GERCEK ciftlerinde olculdu:
+        anlatim : "...a bag of grass seed on my garage shelf RIGHT NOW."
+        aday    : "Vegetable, grass and flower seeds, 1900 (1900).jpg"
+    Iki kapi da (biyom + donem) bu cifti GECIRIYORDU; kusur yalnizca gorsel
+    incelemede goruluyordu (I-39'dan beri dort kez).
+
+    ⚠ SECIMI DEGISTIRMEZ: bu fonksiyon `kapi()` zincirinde DEGILDIR, aday
+    ELENMEZ. I-35'te olculdu ki nadir bir kalite kusurunu sik bir TAM
+    BASARISIZLIKLA (`KALITE-MEDYASIZ-BEAT`) takas etmek yanlis muhendislik.
+    Cikti PRE-QA'da `warn` olarak GORUNUR kilinir.
+
+    ⚠ DURUST KAPSAM: yalnizca DONEM celiskisini gorur. Yer/ozne uyusmazligi
+    (b002) ve tur/tur-adi uyusmazligi (b005) BU SINYALLE ULASILAMAZ; olculdu
+    ve "temiz" DIYE SUNULMUYOR (`kapsam` alani bunu acikca yazar).
+    ⚠ Yeni saglayici / ikinci ag cagrisi / ucretli API / embedding YOK —
+    yalnizca ZATEN VAR OLAN metadata metni okunur.
+    """
+    sahne = str(sahne_metni or "").strip()
+    aday = str(aday_metni or "").strip()
+    if not sahne or not aday:
+        # ⚠ EMIN DEGILSEN ENGELLEME: olcemedigimizde hukum vermeyiz.
+        return {"olculdu": False, "neden": "METIN-YOK",
+                "kapsam": "yalniz-donem"}
+    if not ACIK:
+        return {"olculdu": False, "neden": "KAPI-KAPALI",
+                "kapsam": "yalniz-donem"}
+    aday_tarihsel = tarihsel_mi(aday)
+    sahne_tarihsel = tarihsel_mi(sahne) or tarihsel_mi(video_baglami)
+    uyari = bool(aday_tarihsel and not sahne_tarihsel)
+    isaretler = []
+    if aday_tarihsel:
+        d = " " + aday.lower() + " "
+        isaretler = ([m.group(0) for m in _YIL.finditer(d)]
+                     + [i for i in _ESKI_ISARET if _gecer_mi(i, d)])
+    return {
+        "olculdu": True, "uyari": uyari,
+        "yon": "aday-tarihsel" if uyari else "",
+        "aday_tarihsel": aday_tarihsel, "sahne_tarihsel": sahne_tarihsel,
+        "isaretler": isaretler[:4],
+        # ⚠ Kapsamin kendisi RAPORLANIR: bu sinyal yalniz DONEM gorur.
+        "kapsam": "yalniz-donem",
+        "gerekce": (f"DONEM UYUSMAZLIGI: aday tarihsel isaret tasiyor "
+                    f"{isaretler[:3]} ama sahne guncel" if uyari else
+                    ("aday tarihsel degil" if not aday_tarihsel
+                     else "sahne de tarihsel — uyumlu")),
+    }
+
+
 def kapi(sahne_metni: str, aday_metni: str, video_baglami: str = "") -> tuple:
     """Tum kapilari sirayla uygula. Ilk red kazanir. (ok, gerekce)."""
     for fn in (biyom_kapisi, donem_kapisi):

@@ -6412,6 +6412,149 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
         "KaynakEtiketi" in _GRAFIK_TSX
         and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
 
+blok("§39w I-47 — DONEM KAPISI TEK YONLUYDU (semantik kabul engeli)")
+
+# ⚠ KABUL ENGELI: lawn pilotu I-39'dan beri "otomatik kapilarin HEPSI PASS"
+# olmasina ragmen KABUL EDILMIYOR; tek neden b001/b002/b005 semantik
+# uyusmazligi (dort kez GOZLE dogrulandi).
+#
+# ⚠ ONCE ELENENLER TEKRARLANMADI:
+#   · I-34 kare-bakan sinyaller (metin yogunlugu / kenar / duz-parlak /
+#     specular): 28 olcumde AYIRAN ESIK YOK, en iyi precision 0.25 -> ELENDI.
+#   · I-35 sorgu daraltmasi: vitrini eleyen her daraltma NASA'yi bosaltiyor,
+#     NASA'yi koruyan her daraltma vitrini birakiyor -> ELENDI.
+#     (`-display` gibi negatif terim I-29'da olculdu: recall %0, 7 isaretin
+#     5'i yanlis pozitif.)
+# Bu atom YENI SAGLAYICI, IKINCI AG CAGRISI, UCRETLI API ya da sahte
+# embedding/LLM KULLANMAZ; yalnizca ZATEN VAR OLAN metadata metnini okur.
+#
+# ⚠ OLCULEN KUSUR — KAPI TEK YONLU: `donem_kapisi` yalnizca SAHNE tarihselse
+# adayi denetler (`tarihsel_mi(sahne)` False ise HEMEN True doner). Ters yon
+# — TARIHSEL ADAY, GUNCEL SAHNEDE — hic denetlenmiyor. Pilotun GERCEK
+# ciftlerinde olculdu (alti ciftin ALTISI da mevcut kapilardan geciyor):
+#   beat  aday basligi                                   tarihsel(aday)
+#   b001  "Vegetable, grass and flower seeds, 1900 (1900)"      EVET  <- kusur
+#   b002  "Starr-101229-...-Kanapou-Kahoolawe"                  hayir
+#   b003  "2025-04-07 ... A patchy lawn in spring ..."          hayir
+#   b004  "Sprinkler Irrigation - Sprinkler head"               hayir
+#   b005  "Ricinus communis seedling NC2"                       hayir
+#   b006  "Dulmen, Muhlenwegfriedhof -- 2012 -- 8083"           hayir
+# Anlatim ("...on my garage shelf RIGHT NOW") guncel; aday 1900 tarihli bir
+# tohum katalogu fotografi -> GOZLE dogrulanan uyusmazligin ta kendisi.
+#
+# ⚠ YANLIS ALARM ORANI GERCEK KUMEDE OLCULDU: onbellekteki 17 GERCEK aday
+# kunyesinin YALNIZ 1'i "tarihsel" isaretleniyor ve o da b001'in kendisi
+# (16 temiz aday isaretlenmedi).
+#
+# ⚠ DURUST SINIR: b002 (yer/ozne uyusmazligi) ve b005 (Ricinus communis —
+# cim degil) bu sinyalle ULASILAMAZ; olculdu ve ASLA "temiz" DIYE
+# SUNULMUYOR. Uc negatiften BIRI yakalaniyor.
+# ⚠ SEVIYE `warn` ve SECIM DEGISMIYOR: `kapi()` BIT-BIT ayni kalir (aday
+# ELENMEZ). I-35'te olculdu ki nadir bir kalite kusurunu sik bir TAM
+# BASARISIZLIKLA (MEDYASIZ-BEAT) takas etmek yanlis muhendisliktir.
+
+_MK47 = __import__("medya_kapisi")
+_B001_METIN = "There is a bag of grass seed on my garage shelf right now."
+_CIFTLER47 = [
+    ("b001", "Vegetable, grass and flower seeds, 1900 (1900) "
+             "(20532148836).jpg", _B001_METIN, True),
+    ("b002", "Starr-101229-6113-Heteropogon contortus-habitat seed ball "
+             "paper bag mulch piles-Kanapou-Kahoolawe (25059536945).jpg",
+     _B001_METIN, False),
+    ("b003", "2025-04-07 15 59 57 A patchy lawn in spring within Ann M. "
+             "Banchoff Park in the Mountainview section of Ewing Township, "
+             "Mercer County, New Jersey.jpg",
+     "By the middle of October, he was standing in the same thin, patchy "
+     "lawn he started with.", False),
+    ("b004", "Sprinkler Irrigation - Sprinkler head.JPG",
+     "Then water lightly two or three times a day, every day for two solid "
+     "weeks.", False),
+    ("b005", "Ricinus communis seedling NC2.jpg",
+     "Warm soil to germinate, and cool air so the seedling does not cook "
+     "once it comes up.", False),
+    ("b006", "Dülmen, Mühlenwegfriedhof -- 2012 -- 8083.jpg",
+     "Soil is still loaded with summer heat, so germination is fast.", False),
+]
+
+kontrol("⭐ I-47 KIRMIZI: `donem_uyarisi` VAR (ters yon denetleniyor)",
+        hasattr(_MK47, "donem_uyarisi"), "ters yon denetimi yok")
+
+if hasattr(_MK47, "donem_uyarisi"):
+    _sonuc47 = {b: _MK47.donem_uyarisi(m, t) for b, t, m, _ in _CIFTLER47}
+    kontrol("⭐ I-47 KIRMIZI: b001 (1900 tarihli aday, guncel sahne) UYARILIYOR",
+            _sonuc47["b001"].get("uyari") is True
+            and _sonuc47["b001"].get("yon") == "aday-tarihsel",
+            _sonuc47["b001"])
+    kontrol("⭐ I-47: BES kontrol cifti UYARILMIYOR (yanlis alarm yok)",
+            [b for b, *_ in _CIFTLER47 if _sonuc47[b].get("uyari")] == ["b001"],
+            [b for b, *_ in _CIFTLER47 if _sonuc47[b].get("uyari")])
+    kontrol("⭐ I-47 DURUST SINIR: b002/b005 bu sinyalle ULASILAMAZ "
+            "(yakalanmiyor ve 'temiz' DIYE SUNULMUYOR)",
+            _sonuc47["b002"].get("uyari") is False
+            and _sonuc47["b005"].get("uyari") is False
+            and _sonuc47["b002"].get("kapsam") == "yalniz-donem",
+            [_sonuc47["b002"], _sonuc47["b005"]])
+    kontrol("⭐ I-47: TARIHSEL sahnede tarihsel aday UYARILMAZ (uyumlu)",
+            _MK47.donem_uyarisi(
+                "In 1903 the brothers hauled the seed by wagon.",
+                "Vegetable, grass and flower seeds, 1900.jpg"
+            ).get("uyari") is False)
+    kontrol("I-47: aday tarihsel DEGILSE uyari YOK",
+            _MK47.donem_uyarisi(_B001_METIN,
+                                "Sprinkler head.JPG").get("uyari") is False)
+    kontrol("⭐ I-47: EMIN DEGILSEN ENGELLEME — metin yoksa hukum YOK",
+            _MK47.donem_uyarisi("", "").get("olculdu") is False
+            and "uyari" not in _MK47.donem_uyarisi("", ""))
+    kontrol("I-47: uyari GEREKCELI (hangi isaret, hangi yon)",
+            bool(_sonuc47["b001"].get("gerekce"))
+            and "1900" in _sonuc47["b001"]["gerekce"],
+            _sonuc47["b001"].get("gerekce"))
+
+# ── SECIM DAVRANISI DEGISMEDI: aday ELENMEZ ──
+kontrol("⭐ I-47: `kapi()` BIT-BIT ayni — b001 adayi HALA ELENMIYOR",
+        _MK47.kapi(_B001_METIN, _CIFTLER47[0][1])[0] is True)
+kontrol("⭐ I-47 GERILEME YOK: eski YON hala calisiyor "
+        "(tarihsel sahne + modern aday REDDEDILIR)",
+        _MK47.kapi("The 1890 expedition camped here.",
+                   "man using a smartphone")[0] is False)
+kontrol("I-47 GERILEME YOK: biyom kapisi DURUYOR",
+        _MK47.kapi("The desert dunes stretch for miles.",
+                   "polar bear on arctic sea ice")[0] is False)
+
+# ── PRE-QA: DURUST WARN ──
+kontrol("⭐ I-47 KIRMIZI: `KALITE-SEMANTIK-DONEM` kodu VAR",
+        "KALITE-SEMANTIK-DONEM" in _qon.KALITE_KODLARI)
+kontrol("⭐ I-47: kod FAIL kodlarinda DEGIL (EMIN DEGILSEN ENGELLEME)",
+        "KALITE-SEMANTIK-DONEM" not in _qon.FAIL_KODLARI)
+_QON47 = oku(KOK, "editor/qa_on.py")
+kontrol("⭐ I-47 KIRMIZI: PRE-QA anlatim x aday basligini denetliyor",
+        "donem_uyarisi" in _QON47, "PRE-QA'ya baglanmadi")
+
+# ── AG/KOTA BUTCESI DEGISMEDI ──
+_MKS47 = oku(KOK, "medya_kapisi.py")
+kontrol("⭐ I-47: yeni saglayici/ag cagrisi YOK (saf metin, yerel)",
+        not any(x in _MKS47 for x in ("requests", "urllib", "http",
+                                      "subprocess", "socket")), "ag izi var")
+kontrol("I-47 GERILEME YOK: edinim sozlesmesi ve 429 devre kesici DURUYOR",
+        "class DevreKesici" in oku(KOK, "medya/edinim.py")
+        and "COZUNURLUK-YETERSIZ" in oku(KOK, "medya/edinim.py")
+        and "ORAN-UYUMSUZ" in oku(KOK, "medya/edinim.py"))
+kontrol("I-47 GERILEME YOK: lisans/provenance ve tekrar kapilari DURUYOR",
+        "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI
+        and "KALITE-MEDYA-TEKRAR" in _qon.FAIL_KODLARI
+        and "def lisans_suz" in oku(KOK, "edit_kopru.py"))
+kontrol("⭐ I-47: ESIKLER GEVSETILMEDI (optik 2.0 / enerji 11.589)",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0
+        and abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9
+        and abs(_kk.MODEL_K - 0.8877) < 1e-4)
+kontrol("I-47 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+_V47 = oku(os.path.dirname(KOK), "app", "render-studio", "src", "Video.tsx")
+kontrol("I-47: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in _V47
+        and "pan: 'right' | 'left' | 'top' | 'bottom' | 'yok'" in _V47)
+
 blok("§39v I-46 — RISK OPTIK BIRIMDE IFADE EDILMIYORDU (enerji x yer degistirme)")
 
 # ⚠ I-45'TE OLCULEN KUSUR: enerji-optik iliskisi TEK bir gezinme hizinda

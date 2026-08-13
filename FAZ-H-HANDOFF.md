@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 13 Ağu | **I-47 dönem kapısı çift yönlü: ilk otomatik semantik işaret** | `PENDING` | ✅ **push edildi**, `donem_kapisi` yalnız **sahne tarihselse** adayı denetliyordu; ters yön (**tarihsel aday, güncel sahne**) hiç görülmüyordu → `donem_uyarisi` (saf metin, **yeni sağlayıcı/ağ/API yok**); pilotun gerçek 6 çiftinde **yalnız b001** işaretlendi (17 gerçek adayda **1** işaret, yanlış alarm **0**), gözle doğrulandı (1900 arşiv fotoğrafı vs "right now"); **seçim değişmedi** (aday elenmez, 11/11 kare SHA-256 aynı), kod **warn** (`EMIN DEGILSEN ENGELLEME`); ⚠ b002/b005 bu sinyalle **ulaşılamaz** — kabul engeli **sürüyor**, deploy YOK |
 | 13 Ağu | **I-46 risk optik birimde ifade ediliyor (enerji × yer değiştirme)** | `9a7438d` | ✅ **push edildi**, I-45 tek gezinme hızında kalibre olduğu için b002/b005'te **hüküm veremiyordu**; model **türetildi** (|ΔI| ≈ |∇I|·d) ve pan (öteleme) ile zoom (ölçek) alanları **ayrıldı**; 12 kontrollü nokta ile **k=0.8877** ölçüldü, **tutulan 6 gerçek çekimde** ort. hata **%10.8** / en kötü **%22.9**; risk artık **optik birimde** (eşik 2.0 aynen) ve fail yalnız `beklenen×1.229 < 2.0` iken → **kapsam dışı 2 → 0**, yanlış alarm **0**, `KALITE-OPTIK-DURGUN-BEKLENEN` **FAIL** seviyesine çıkarıldı (12+6 noktada yanlış fail yok); render **11/11 kare SHA-256 aynı**, POST-QA **PASS**, **kabul edilmiş MP4 DEĞİL** (b001/b002 semantik), deploy YOK |
 | 13 Ağu | **I-45 enerji gösterilen kadraj bölgesinde ölçülüyor** | `79422de` | ✅ **push edildi**, I-44 enerjiyi **ekrana hiç gelmeyen** piksellerde de ölçüyordu → gösterilen bölge `Kamera.tsx` transformundan **birebir türetildi**; ⚠ **ölçüm hipotezi çürüttü** (kırpmada ölçmek yanlış alarmı azaltmadı, b005 ile **artırdı**) → gerçek kök neden ölçüldü: eşik **tek bir kamera konfigürasyonunda** (gezinme **0.0577/sn**) kalibre edilmişti; artık **kalibrasyon alanı dışında hüküm verilmiyor** → pilotta yanlış alarm **1 → 0** (PRE-QA warn 4→3), b002/b005 **bilgi** olarak raporlanıyor; fail'e **yükseltilmedi** (ölçüm kesinleşmedi), render **11/11 kare SHA-256 aynı**, POST-QA **PASS** ama **kabul edilmiş MP4 DEĞİL** (b001/b002 semantik), deploy YOK |
 | 13 Ağu | **I-44 görselin uzamsal enerjisi ölçülüyor** | `5911e1c` | ✅ **push edildi**, düz görselin statik fotoğraf olarak hareket üretemediği I-43'te ölçülmüştü ama **hiçbir kapı ölçmüyordu** → `uzamsal_enerji_olcusu` + PRE-QA kapısı (**ölçülen eşik 11.589**); 25.2 sn editorv2 pilotunda kapı **doğru varlığı** işaretledi (b002, enerji 7.557), diğer 5 varlık (12.33–18.08) işaretlenmedi; render **11/11 kare SHA-256 aynı** (gerileme yok), POST-QA **PASS** ama **kabul edilmiş MP4 DEĞİL** (b001/b002 semantik, gözle doğrulandı), deploy YOK |
@@ -5659,6 +5660,114 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 65. FAZ I-47 — DÖNEM KAPISI TEK YÖNLÜYDÜ (ilk otomatik semantik işaret, 13 Ağu)
+
+> **Durum: kabul engelinin ÜÇ negatifinden BİRİ (b001) artık OTOMATİK
+> işaretleniyor — bu, semantik uyuşmazlığın pipeline'da ilk kez görünür
+> olmasıdır. ⚠ b002/b005 bu sinyalle ULAŞILAMAZ (ölçüldü) → **kabul engeli
+> SÜRÜYOR**. A–I yeşil (3355, 0 hata). Seçim DEĞİŞMEDİ: **11/11 kare
+> SHA-256 aynı**, POST-QA **PASS**. Deploy YOK. Maliyet $0.00.**
+> Değişen: `webapp/medya_kapisi.py` (1 saf fonksiyon — `kapi()` zincirine
+> GİRMEZ), `webapp/editor/qa_on.py` (1 kod + ölçüm), `test_faz_i.py`.
+> `medya/*`, `edinim.py`, `siralama.py`, `Video.tsx`, `Kamera.tsx`,
+> **eşikler** ve **22 alan sözleşmesi** **dokunulmadı**. I-23…I-46 **korundu**.
+
+### ⚠ Önce ELENENLER tekrarlanmadı
+
+- **I-34** kare-bakan sinyaller (metin yoğunluğu / kenar / düz-parlak /
+  specular): 28 ölçümde **ayıran eşik yok**, en iyi precision 0.25 → elendi.
+- **I-35** sorgu daraltması: vitrini eleyen her daraltma NASA'yı boşaltıyor,
+  koruyan her daraltma vitrini bırakıyor → elendi. (`-display` gibi negatif
+  terim I-29'da ölçüldü: recall %0, 7 işaretin 5'i yanlış pozitif.)
+- Bu atom **yeni sağlayıcı, ikinci ağ çağrısı, ücretli API, sahte
+  embedding/LLM** kullanmaz; yalnızca **zaten var olan** metadata metnini
+  okur. `ara()` sayısı, kota ve 429 devre kesici **aynen**.
+
+### ⛔ Ölçülen kusur — KAPI TEK YÖNLÜ
+
+`donem_kapisi` yalnızca **sahne** tarihselse adayı denetliyor; `tarihsel_mi
+(sahne)` False ise **hemen True** dönüyor. Ters yön — **tarihsel aday,
+güncel sahnede** — hiç denetlenmiyordu. Pilotun **gerçek** çiftlerinde
+ölçüldü (altı çiftin **altısı da** mevcut kapılardan geçiyor):
+
+| beat | aday başlığı | tarihsel(aday) | gözle |
+|---|---|---|---|
+| **b001** | *"Vegetable, grass and flower seeds, **1900** (1900)"* | **EVET** | ⛔ 1900 atlı pulluk |
+| b002 | *"Starr-101229-…-Kanapou-Kahoolawe"* | hayır | ⛔ kızıl toprak erozyon sahası |
+| b003 | *"2025-04-07 … A patchy lawn in spring …"* | hayır | ✅ |
+| b004 | *"Sprinkler Irrigation - Sprinkler head"* | hayır | ✅ |
+| b005 | *"Ricinus communis seedling NC2"* | hayır | ⛔ cim değil (kene otu) |
+| b006 | *"Dülmen, Mühlenwegfriedhof -- 2012 -- 8083"* | hayır | ✅ |
+
+Anlatım *"…on my garage shelf **right now**"* güncel; aday 1900 tarihli bir
+tohum kataloğu fotoğrafı — **gözle doğrulanan uyuşmazlığın ta kendisi**.
+
+### Yanlış alarm oranı GERÇEK kümede ölçüldü
+
+Önbellekteki **17 gerçek aday künyesinin yalnız 1'i** "tarihsel"
+işaretleniyor — ve o da **b001'in kendisi**. 16 temiz aday işaretlenmedi.
+
+### Düzeltme (en küçük)
+
+`medya_kapisi.donem_uyarisi(sahne, aday)` — **saf**, ağsız. Uyarı yalnızca
+**aday tarihsel VE sahne tarihsel değil** iken. Dönen kayıt hangi işaretin
+(`['1900','1900']`) ve hangi yönün tetiklediğini yazar.
+
+⚠ **SEÇİMİ DEĞİŞTİRMEZ**: `kapi()` zincirine **girmez**, aday **elenmez** —
+`kapi()` bit-bit aynı (test kilitler). I-35'te ölçüldü ki nadir bir kalite
+kusurunu sık bir **tam başarısızlıkla** (`KALITE-MEDYASIZ-BEAT`) takas etmek
+yanlış mühendisliktir. PRE-QA'da `KALITE-SEMANTIK-DONEM` (**warn**,
+FAIL_KODLARI'nda **değil**) olarak görünür kılınır.
+
+⚠ **DÜRÜST KAPSAM RAPORLANIYOR**: dönen kayıt `kapsam: "yalniz-donem"`
+taşır. b002 (yer/özne uyuşmazlığı) ve b005 (Ricinus communis — çim değil)
+**bu sinyalle ulaşılamaz**; ölçüldü ve **asla "temiz" diye sunulmuyor**.
+Üç negatiften **biri** yakalanıyor.
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1941** | **3355** |
+
+0 hata. Faz I 1921 → **1941** (+20). Red-first: 3 XX (7 kontrol hasattr
+korumasında bekliyordu).
+
+### 1080p pilot — `editorv2_lawn_i47.mp4` (25.2 sn)
+
+Sadakat kapısı **beat eşit=True, varlık eşit=True**.
+
+- **Kapı yalnız b001'i işaretledi**; b002–b006 temiz → PRE-QA warn 3 → **4**
+  (yeni olan `KALITE-SEMANTIK-DONEM`, fail=0)
+- **Gözle doğrulandı**: b001 karesi sepya/arşiv, atlı pulluk; altyazı
+  *"There is a bag of grass seed on my garage shelf right now."* → işaret
+  **doğru pozitif**
+- **1920×1080 @ 30**, 25.259 sn · 8 kesme · **11 kare** (6 beat)
+- LUFS **−14.27** / TP −3.10 · sessizlik %0.0 · kenar **0/101**
+- medya tekrarı 6 benzersiz · motion 4 hareket, tekrar yok · tipografi dört
+  ölçümde temiz · künye 5 sahnede · optik risk **yok**
+- **POST-QA: PASS** · **Seçim/render değişmedi**: I-46 ile **11/11 kare
+  SHA-256 birebir aynı**
+
+### ⛔ Kabul durumu — ENGEL SÜRÜYOR
+
+**Kabul edilmiş MP4 değildir**, mutlak yol verilmedi, deploy yok. Üç semantik
+negatiften biri artık otomatik işaretleniyor; **b002 ve b005 hâlâ gözle
+uyumsuz ve otomatik kapılarla ulaşılamıyor**.
+
+### SONRAKİ ATOM (I-48) — yalnız ölçülen kusurdan
+
+1. **b002 — yer/özne uyuşmazlığı**: aday başlığı bir YER adı taşıyor
+   (*Kanapou-Kahoolawe*) ve anlatımın yeriyle ilgisi yok. `medya_kapisi`
+   zaten **biyom** sözlüğü taşıyor; yer adı → biyom eşlemesi **ölçülerek**
+   sınanabilir (ağsız, sözlük tabanlı). ⚠ I-34'ün dersi: ayıran eşik yoksa
+   **elenmeli**, zorlanmamalı.
+2. **b005 — tür/tür-adı uyuşmazlığı** (*Ricinus communis* ≠ çim): taksonomik
+   bilgi ister; mevcut yerel bağımlılıklarla **ulaşılamaz** görünüyor —
+   ölçülmeden yeni yetenek önerilmemeli.
+3. **Model büyük yer değiştirmede doygunlaşıyor** (I-46'da ölçüldü: %22.9).
+4. **Önizlemede altyazı hiç çizilmiyor** (I-40).
 
 ---
 

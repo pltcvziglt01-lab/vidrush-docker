@@ -19,6 +19,11 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from . import gramer, kalite_kapisi, motion, tipografi
+
+try:                          # ⚠ I-47: paket disi modul; yoksa kapi SESSIZ
+    import medya_kapisi as medya_kapisi_modulu
+except Exception:             # noqa: BLE001
+    medya_kapisi_modulu = None
 from .profil import OLCULEN, EditProfili, VARSAYILAN
 
 # ── Sorun kodlari ve seviyeleri ──
@@ -86,7 +91,13 @@ KALITE_KODLARI = ("KALITE-BASLIK-KIRPIK", "KALITE-BASLIK-TASMA",
                   # VERILMEZ; sessizce de gecilmez -> ayri bilgi kodu.
                   "KALITE-MEDYA-ENERJI-KAPSAM-DISI",
                   # ── Faz I-46: risk OPTIK BIRIMDE ──
-                  "KALITE-OPTIK-DURGUN-BEKLENEN")
+                  "KALITE-OPTIK-DURGUN-BEKLENEN",
+                  # ── Faz I-47: donem uyusmazligi (TERS YON) ──
+                  # ⚠ FAIL_KODLARI'na BILEREK girmiyor: sinyal yalniz DONEM
+                  # celiskisini gorur (yer/ozne/tur uyusmazligi ULASILAMAZ)
+                  # ve aday ELENMEZ — I-35'te olculdu ki nadir bir kalite
+                  # kusurunu sik bir MEDYASIZ-BEAT ile takas etmek yanlis.
+                  "KALITE-SEMANTIK-DONEM")
 
 
 @dataclass
@@ -591,6 +602,29 @@ def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
                   "gorsel benzerlik OLCULEMEDI (okuyucu verilmedi); "
                   "yalniz ayni asset_id kontrolu yapildi",
                   "benzerlik_okuyucu enjekte et")
+
+    # ── (2b) I-47: DONEM UYUSMAZLIGI (TERS YON) ──
+    # ⚠ Anlatim GUNCEL ama aday TARIHSEL isaret tasiyorsa gorunur kilinir.
+    # Saf metin; ag/saglayici cagrisi YOK. Aday ELENMEZ (secim degismez).
+    donem_olcum = []
+    for c3, b3 in zip(cekimler, beatler):
+        _ad3 = adaylar_index.get(getattr(c3, "asset_id", "") or "") or {}
+        _bas3 = str(_ad3.get("baslik") or "")
+        _mtn3 = str(getattr(b3, "metin", "") or "")
+        _du = medya_kapisi_modulu.donem_uyarisi(_mtn3, _bas3) if (
+            medya_kapisi_modulu is not None) else {"olculdu": False}
+        _du = dict(_du, beat_id=getattr(b3, "beat_id", ""),
+                   scene_id=getattr(b3, "scene_id", ""))
+        donem_olcum.append(_du)
+        if _du.get("uyari"):
+            _ekle("KALITE-SEMANTIK-DONEM", "warn",
+                  f"{_du['beat_id']}: aday TARIHSEL isaret tasiyor "
+                  f"{_du.get('isaretler')} ama anlatim GUNCEL — "
+                  f"'{_bas3[:70]}'",
+                  "guncel bir lisansli aday sec ya da anlatimi donemle "
+                  "uyumlu hale getir (aday ELENMEDI, yalnizca isaretlendi)",
+                  scene_id=_du["scene_id"], beat_id=_du["beat_id"])
+    olcum["donem_uyusmazligi"] = donem_olcum
 
     # ── (3) RITIM: sabit blok + olu final ──
     plan_sahneleri = [{"sure_sn": getattr(b, "sure_sn", 0),
