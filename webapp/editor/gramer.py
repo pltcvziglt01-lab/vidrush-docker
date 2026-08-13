@@ -115,9 +115,52 @@ HAREKET_PENCERESI = 3
 # zorla enjekte edilmez.
 RITIM_TERCIHI = {"hook": "push-in", "sonuc": "pull-out"}
 
+# ═════════ MEDYA GEOMETRISI -> HAREKET AILESI (Faz I-24) ═════════
+#
+# ⚠ NEDEN: `Kamera.tsx > Zemin` `objectFit:'cover'` kullanir. Kaynak 16:9'dan
+# GENISSE cover FAZLA GENISLIGI kirpar — yani goruntude YATAY pay vardir ve
+# yatay pan kaynagin GERCEKTEN daha fazlasini gosterir. Kaynak 16:9'dan
+# DARSA (or. 4:3) kirpma DIKEY olur; yatay pan ayni kirpimi kaydirmaktan
+# ibarettir, yeni bilgi getirmez — o kaynakta iceri/disari hareket daha
+# durusttur.
+#
+# ⚠ DURUST SINIR: bu bir YASAK DEGIL, DETERMINISTIK SIRALAMADIR. Havuzu
+# asla bosaltmaz; yalnizca esit gecerli adaylar arasinda hangisinin once
+# denenecegini belirler. Boylece mevcut gramer ve kullanici secimleri
+# bozulmaz, yalnizca beraberlik geometriyle cozulur.
+GEOMETRI_HAREKET = {
+    "genis": ("pan-right", "pan-left", "slow-drift"),
+    "dar":   ("push-in", "pull-out", "slow-drift"),
+}
+# 16:9'a bu bagil yakinlikta olan kaynak "notr" sayilir (siralama yapilmaz).
+GEOMETRI_NOTR_BANDI = 0.02
+
+
+def geometri_sinifi(genislik=None, yukseklik=None,
+                    hedef_oran: float = 16.0 / 9.0) -> str:
+    """Kaynagin hedef kareye gore YATAY mi DIKEY mi payi var? (saf fonksiyon)
+
+    Doner: "genis" | "dar" | "notr" (olculemezse "notr" — emin degilsen
+    siralamaya karisma).
+    """
+    try:
+        g, y = float(genislik), float(yukseklik)
+    except (TypeError, ValueError):
+        return "notr"
+    if g <= 0 or y <= 0 or hedef_oran <= 0:
+        return "notr"
+    oran = g / y
+    if oran > hedef_oran * (1.0 + GEOMETRI_NOTR_BANDI):
+        return "genis"
+    if oran < hedef_oran * (1.0 - GEOMETRI_NOTR_BANDI):
+        return "dar"
+    return "notr"
+
 
 def _hareket_sec(cekim_turu: str, indeks: int, yasak: str = "",
-                 sure_sn=None, son_hareketler=(), islev: str = "") -> str:
+                 sure_sn=None, son_hareketler=(), islev: str = "",
+                 acilis_hareketi: str = "", islev_hareketleri=(),
+                 genislik=None, yukseklik=None) -> str:
     """Kamera hareketi sec.
 
     Faz I-17 ek parametreleri (hepsi OPSIYONEL — verilmezse eski davranis):
@@ -126,11 +169,30 @@ def _hareket_sec(cekim_turu: str, indeks: int, yasak: str = "",
       `son_hareketler` : son kullanilan hareketler (pencere). Icindekiler
                          SON TERCIH edilir; tumu doluysa eski davraniga duser.
       `islev`          : `hook`/`sonuc` icin acilis-kapanis ritmi tercihi.
+
+    Faz I-24 ek parametreleri (hepsi OPSIYONEL — verilmezse eski davranis):
+      `acilis_hareketi`   : KAPANIS cekiminde verilir; acilisin hareketi
+                            havuzdan CIKARILIR (havuz bosalmadigi surece).
+      `islev_hareketleri` : AYNI anlati islevinde daha once kullanilan
+                            hareketler; CIKARILIR.
+      `genislik/yukseklik`: kaynak olcusu — esit adaylar arasinda
+                            DETERMINISTIK siralama icin (yasak degil).
     """
     taban = list(CEKIM_HAREKET.get(cekim_turu, ("static",)))
     adaylar = [h for h in taban if h != yasak]
     if not adaylar:
         adaylar = list(taban)
+
+    # 0) I-24 SERT KISITLAR — acilis/kapanis ve islev tekrari.
+    # ⚠ Havuzu ASLA bosaltmaz: filtre sonrasi bos kalirsa eski havuz korunur
+    # (kusuru gizlemek icin degil, secimi COKERTMEMEK icin; kapi zaten
+    # PRE-QA'da hukum veriyor ve gizli kalmiyor).
+    _sert = {h for h in (list(islev_hareketleri or []) +
+                         ([acilis_hareketi] if acilis_hareketi else [])) if h}
+    if _sert:
+        kalan = [h for h in adaylar if h not in _sert]
+        if kalan:
+            adaylar = kalan
 
     # 1) Uzun cekimde DURAGAN yasak (havuz tamamen bosalmadigi surece)
     if sure_sn is not None:
@@ -148,6 +210,15 @@ def _hareket_sec(cekim_turu: str, indeks: int, yasak: str = "",
         taze = [h for h in adaylar if h not in son_hareketler]
         if taze:
             adaylar = taze
+
+    # 2b) MEDYA GEOMETRISI — beraberligi DETERMINISTIK coz (I-24).
+    # Kararli siralama: tercih edilen aile basa alinir, geri kalan SIRASI
+    # KORUNARAK arkaya. Havuz kucultulmez, yalnizca yeniden siralanir.
+    _gsinif = geometri_sinifi(genislik, yukseklik)
+    if _gsinif != "notr" and len(adaylar) > 1:
+        _tercihli = GEOMETRI_HAREKET.get(_gsinif, ())
+        adaylar = ([h for h in adaylar if h in _tercihli]
+                   + [h for h in adaylar if h not in _tercihli])
 
     # 3) ACILIS/KAPANIS RITMI — ama CESITLILIGE TABI.
     # ⚠ Ilk surumde bu blok pencere kontrolunden ONCE donuyordu ve kapanis
@@ -212,8 +283,18 @@ def gramer_uygula(beatler: list, *, sahne_adaylari: dict,
     saglayici_sayaci: dict = {}
     son_saglayici, son_hareket, son_kadraj, son_asset = "", "", "", ""
     pencere: list = []          # Faz I-17: son hareketler penceresi
+    # ── Faz I-24 durumu ──
+    # `islev_kullanim`: anlati islevi -> o islevde KULLANILMIS hareketler.
+    # `son_indeks`    : kapanis cekimi; acilisin hareketini tekrar edemez.
+    islev_kullanim: dict = {}
+    son_indeks = len(beatler) - 1
 
     for i, b in enumerate(beatler):
+        _isl = str(getattr(b, "islev", "") or "")
+        _islev_yasak = tuple(islev_kullanim.get(_isl) or ())
+        # Acilis hareketi YALNIZCA kapanis cekiminde kisittir.
+        _acilis_yasak = (cikti[0].hareket
+                         if (i == son_indeks and i > 0 and cikti) else "")
         tercihler = ISLEV_CEKIM.get(b.islev, ("medium",))
         adaylar = sahne_adaylari.get(b.scene_id) or []
         bosluk = kapsam_bosluklari.get(b.scene_id)
@@ -232,7 +313,9 @@ def gramer_uygula(beatler: list, *, sahne_adaylari: dict,
             c.hareket = _hareket_sec(c.cekim_turu, i, son_hareket,
                                      sure_sn=b.sure_sn,
                                      son_hareketler=tuple(pencere),
-                                     islev=getattr(b, "islev", ""))
+                                     islev=_isl,
+                                     acilis_hareketi=_acilis_yasak,
+                                     islev_hareketleri=_islev_yasak)
             c.kadraj = "tam"
             c.gerekce = (f"coverage_gap -> {ftur}: "
                          f"{f.get('gerekce') or gerekce}")
@@ -251,7 +334,11 @@ def gramer_uygula(beatler: list, *, sahne_adaylari: dict,
             c.hareket = _hareket_sec(eslesen, i, son_hareket,
                                      sure_sn=b.sure_sn,
                                      son_hareketler=tuple(pencere),
-                                     islev=getattr(b, "islev", ""))
+                                     islev=_isl,
+                                     acilis_hareketi=_acilis_yasak,
+                                     islev_hareketleri=_islev_yasak,
+                                     genislik=sec.get("genislik"),
+                                     yukseklik=sec.get("yukseklik"))
             c.kadraj = _kadraj_sec(i, eslesen)
             c.kaynak_aralik = (0.0, round(min(b.sure_sn, 12.0), 2))
             c.gerekce = gerekce
@@ -264,14 +351,20 @@ def gramer_uygula(beatler: list, *, sahne_adaylari: dict,
             if c.kadraj == son_kadraj:
                 c.kadraj = _kadraj_sec(i + 1, c.cekim_turu)
             if c.hareket == son_hareket:
+                # ⚠ I-24: DUZELTME YOLLARI da ayni kisitlari tasimali; aksi
+                # halde burasi acilis/islev tekrarini GERI GETIREBILIR.
                 c.hareket = _hareket_sec(c.cekim_turu, i + 2, son_hareket,
                                          sure_sn=b.sure_sn,
-                                         son_hareketler=tuple(pencere))
+                                         son_hareketler=tuple(pencere),
+                                         acilis_hareketi=_acilis_yasak,
+                                         islev_hareketleri=_islev_yasak)
             c.uyarilar.append("ARDIL-AYNI-VARLIK: kadraj+hareket degistirildi")
         if c.hareket == son_hareket and c.hareket != "static":
             c.hareket = _hareket_sec(c.cekim_turu, i + 1, son_hareket,
                                      sure_sn=b.sure_sn,
-                                     son_hareketler=tuple(pencere))
+                                     son_hareketler=tuple(pencere),
+                                     acilis_hareketi=_acilis_yasak,
+                                     islev_hareketleri=_islev_yasak)
             c.uyarilar.append("ARDIL-AYNI-HAREKET: degistirildi")
         if c.kadraj == son_kadraj and c.kadraj != "tam":
             c.kadraj = _kadraj_sec(i + 3, c.cekim_turu)
@@ -282,6 +375,9 @@ def gramer_uygula(beatler: list, *, sahne_adaylari: dict,
         son_hareket, son_kadraj, son_asset = c.hareket, c.kadraj, c.asset_id
         pencere.append(c.hareket)
         del pencere[:-HAREKET_PENCERESI]
+        # I-24: bu islevde kullanilan hareketi KAYDET (pencereden bagimsiz).
+        if _isl and c.hareket:
+            islev_kullanim.setdefault(_isl, set()).add(c.hareket)
     return cikti
 
 

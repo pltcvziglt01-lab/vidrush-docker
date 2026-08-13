@@ -190,6 +190,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-21 bölünen beat ayrı varlık alır (dar atom)** | `efbf111` | ⚠ **push edildi**, POST-QA FAIL, MP4 teslim YOK |
 | 12 Ağu | **I-22 medyasız beat kusuru çözüldü** | `a220fcb` | ⚠ **push edildi**, POST-QA FAIL (dikey kaynak), MP4 teslim YOK |
 | 13 Ağu | **I-23 en-boy oranı uyumluluk kapısı (dar atom)** | `49c726e` | ✅ **push edildi**, POST-QA **TAMAMEN PASS**, Faz I BLOKE 0, deploy YOK |
+| 13 Ağu | **I-24 motion çeşitliliği ölçülebilir kapıya çevrildi** | `PENDING` | ✅ **push edildi**, POST-QA PASS, kalite puanı **100/100**, deploy YOK |
 
 ---
 
@@ -3681,3 +3682,125 @@ Kapılar temiz; kalan iki **kalite** açığı (ikisi de FAIL değil, WARN/puan)
   ritim ailesi çeşitlenmeli (I-17 gramerinde dar atom).
 - `SAGLAYICI-TEKEL` WARN — tek sağlayıcı %100 (`nasa`); Commons lisans
   duvarını geçen aday döndürmüyor, sebep **ölçülmeli**.
+
+---
+
+## 42. FAZ I-24 — MOTION ÇEŞİTLİLİĞİ ÖLÇÜLEBİLİR KAPIYA ÇEVRİLDİ (dar atom, 13 Ağu)
+
+> **Durum: yerel yeşil, POST-QA TAMAMEN PASS, kalite puanı 100/100,
+> push edildi. Deploy YOK. Maliyet $0.00.**
+> Değişen: `webapp/editor/gramer.py`, `webapp/editor/kalite_kapisi.py`,
+> `webapp/editor/qa_on.py`, `webapp/testler/test_faz_i.py`,
+> `outputs/sample/teknoloji_i20_rapor.json` (+ handoff).
+> **Yeni sağlayıcı/ağ çağrısı/ücretli API YOK. Rastgelelik YOK.**
+> `pipeline.py`, `server.py`, `deploy.sh`, `medya/*`, `editor/motion.py`,
+> `editor/plan.py`, `editor/beat.py` ve **smoke betiği** dokunulmadı
+> (git ile doğrulandı) — düzeltme tamamen **motorda**.
+
+### ✅ BAĞIMSIZ DOĞRULANAN KÖK NEDEN
+
+`motion_cesitlilik` puanı **hepsi-ya-hiçbiri**. Dört koşuldan **üçü yeşildi**:
+
+| Koşul | Ölçülen |
+|---|---|
+| `ardisik_tekrar` yok | ✅ 0 |
+| `pencere_tekrari` yok | ✅ 0 |
+| `benzersiz_gecis >= 2` | ✅ 3 |
+| **`acilis_kapanis_ayri`** | ❌ **False** — b001 `push-in`, b005 `push-in` |
+
+**Tek kırmızı buydu.** Mekanizma da ölçüldü: b005 `islev=sonuc` →
+`RITIM_TERCIHI` **"pull-out"** ister; ama **pencere filtresi**
+(b002–b004 = `pull-out`/`slow-drift`/`pan-right`) `pull-out`'u havuzdan
+**çıkarıyor**, tercih düşüyor ve fallback `adaylar[indeks % len]`
+**`push-in`**'e — yani açılışın aynısına — iniyordu.
+Kodda **açılış ≠ kapanış kontrolü hiç yoktu**; `gramer.py`'deki
+"acilis ile kapanisin FARKLI olmasi zaten korunuyor" yorumu **yanlıştı**.
+
+### ⚠ İKİNCİ BULGU — KUSURU GİZLEYEN RAPORLAMA
+
+Puanın `gerekce` metni yalnızca **geçen** üç koşulu yazıyordu:
+`"benzersiz hareket 4, benzersiz gecis 3, pencere tekrari 0"` — hepsi yeşil.
+**Düşen koşulun adı hiçbir yerde yoktu.** 0/20 bu yüzden açıklanamaz
+görünüyordu. Artık gerekçe düşen koşulu **adıyla** söylüyor ve bileşen
+`kosullar` + `dusen_kosullar` alanlarını taşıyor.
+
+### Üç parçalı çözüm
+
+**1. ÖLÇÜM — `islev_tekrari` (yeni).** `islev` bu ölçüme I-17'den beri
+**geliyordu ama hiç kullanılmıyordu**. Aynı anlatı işlevindeki
+(hook/açıklama/sonuç) iki beat aynı hareketi alırsa izleyici aynı "cümleyi"
+iki kez duyar. **Pencere bunu yakalayamaz**: pencere yalnızca son N çekime
+bakar, işlev ise videonun her yerine dağılabilir.
+
+**2. KAPI — iki yeni FAIL kodu (PRE-QA, plan üzerinde bedava).**
+- `KALITE-MOTION-ACILIS-KAPANIS` — açılış ve kapanış aynı hareket.
+- `KALITE-MOTION-ISLEV-TEKRAR` — aynı işlevde aynı hareket.
+
+Bu kusur I-24'e kadar **hiç hüküm üretmiyordu**; yalnızca puanı düşürüyordu.
+⚠ İkisi de `kalite_kapisi` bayrağına bağlı (`_ekle` → `if acik`); **kapalı
+yolda hüküm değişmez** — I-14'ten beri süren sözleşme korundu.
+
+**3. SEÇİM — deterministik, işlev + medya geometrisi.**
+- `acilis_hareketi`: **yalnızca kapanış** çekiminde kısıt.
+- `islev_hareketleri`: aynı işlevde kullanılmışlar çıkarılır.
+- `genislik/yukseklik`: **geometri sıralaması**.
+
+**Geometri neden anlamlı:** `Zemin` `objectFit:'cover'` kullanır. Kaynak
+16:9'dan **genişse** cover fazla genişliği kırpar → yatay pay vardır, yatay
+pan kaynağın **gerçekten daha fazlasını** gösterir. Kaynak **darsa** (4:3)
+kırpma dikeydir; yatay pan aynı kırpımı kaydırmaktan ibarettir, yeni bilgi
+getirmez — orada içeri/dışarı hareket dürüsttür.
+
+⚠ **DÜRÜST SINIR:** geometri bir **yasak değil, deterministik sıralamadır**.
+Havuzu asla boşaltmaz; yalnızca eşit geçerli adaylar arasında sırayı belirler.
+Sert kısıtlar da havuzu boşaltmaz (boşalırsa eski havuz korunur) — kusur
+gizlenmez, kapı zaten PRE-QA'da hüküm verir.
+⚠ Düzeltme yolları (`ARDIL-AYNI-VARLIK`, `ARDIL-AYNI-HAREKET`) da aynı
+kısıtları taşır; aksi halde tekrarı **geri getirebilirlerdi**.
+
+### ✅ ÖLÇÜLEN ÖNCE → SONRA
+
+| Ölçüm | I-23 | **I-24** |
+|---|---|---|
+| Hareketler | push-in, pull-out, slow-drift, pan-right, **push-in** | push-in, pull-out, pan-right, pan-left, **slow-drift** |
+| Benzersiz hareket | 4 / 5 beat | ✅ **5 / 5 beat** |
+| `acilis_kapanis_ayri` | **False** | ✅ **True** |
+| `islev_tekrari` | (ölçülmüyordu) | ✅ **0** |
+| `motion_cesitlilik` | **0.0 / 20** | ✅ **20.0 / 20** |
+| **İzleyici kalite puanı** | 80.0 / 100 | ✅ **100.0 / 100** |
+
+### ✅ PİLOT YENİDEN RENDER — POST-QA TAMAMEN PASS
+
+Gerçek NASA kamu malı medyası + Türkçe ses; 4/4 sahne `nasa`, fixture yok.
+
+**ffprobe:** h264 **1920×1080** @30fps + aac 48 kHz/2ch, **17.109 sn**, 39.88 MB.
+**Ses:** LUFS **−14.36**, TP **−4.09**, LRA 3.6, sessizlik **%0** (ince tarama
+da boş), ölü final 0.0 sn. **Kesmeler:** 7. **Siyah/donmuş aralık:** yok.
+**Kenar siyahlığı:** **0/68**, temiz. **Optik:** genel 15.901, durgun ihlal 0
+— beş beat de hareketli (40.9 / 5.4 / 8.2 / 18.6 / 4.0).
+**Kareler:** **11 adet** (≥11) incelendi; ayrıca hepsinde **tam çözünürlükte
+dört kenar** ayrı ölçüldü — en koyu kenar 24.93 (gerçek görüntü içeriği,
+siyah eşiği 16'nın üstünde). Yeni `pan-right`/`pan-left` hareketleri
+**taşma üretmedi**. **Tipografi:** güvenli alan ✅, çakışma ✅, altyazı ✅,
+Türkçe aksanlar doğru. **Künye:** sahneye özgü 4 ayrı atıf. **Tekrar:** 0.
+
+### Ölçülen test sonucu
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1525** | **2939** |
+
+0 hata. Faz I 1489 → **1525** (+36). **Faz I BLOKE 0.**
+Kalan tek BLOKE Faz H'deki `QA_TEST_VIDEO` (opsiyonel, I-22'den beri aynı).
+
+### ⚠ BİLİNEN SINIR (değişmedi)
+
+Pilotu yeniden üretmek için `cikti/_i20_medya` **silinmeli** (dolu önbellekte
+yedek aday taşınmıyor; PRE-QA doğru şekilde render'ı durdurur).
+
+### SONRAKİ ATOM (I-25 adayı)
+
+Kalite puanı 100/100; kapılar temiz. Kalan tek WARN:
+`SAGLAYICI-TEKEL` — tek sağlayıcı %100 (`nasa`), tavan %40. Commons her
+sorguda `ADAY-YOK` dönüyor; **sebebi ölçülmeli** (lisans duvarı mı, sorgu
+biçimi mi) — dar atom olarak Commons'ın eleme gerekçesini raporlamak.

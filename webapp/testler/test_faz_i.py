@@ -6126,6 +6126,171 @@ kontrol("⭐ MEDYASIZ BEAT kapisi PRE-QA'da ve FAIL",
         "KALITE-MEDYASIZ-BEAT" in _qon.FAIL_KODLARI
         and "KALITE-MEDYASIZ-BEAT" in _qon.KALITE_KODLARI)
 
+blok("§39a I-24 — MOTION CESITLILIGI OLCULEBILIR KAPIYA CEVRILDI")
+
+# ⚠ BAGIMSIZ DOGRULANAN KOK NEDEN: teknoloji pilotunda `motion_cesitlilik`
+# 0/20 idi. Puan HEPSI-YA-HICBIRI. Dort kosuldan UCU YESILDI
+# (ardisik_tekrar 0, pencere_tekrari 0, benzersiz_gecis 3); TEK KIRMIZI
+# `acilis_kapanis_ayri` = False idi (b001 push-in, b005 push-in).
+# Mekanizma: b005 islev=sonuc -> RITIM_TERCIHI "pull-out", ama PENCERE
+# filtresi (b002-b004 = pull-out/slow-drift/pan-right) pull-out'u havuzdan
+# CIKARIYOR, tercih dusuyor ve fallback `push-in`e — acilisin AYNISINA —
+# iniyordu. Kodda acilis!=kapanis kontrolu HIC YOKTU.
+
+kontrol("geometri sinifi: 16:9'dan DAR kaynak -> 'dar'",
+        _gr.geometri_sinifi(3000, 2250) == "dar"
+        and _gr.geometri_sinifi(4192, 2832) == "dar")
+kontrol("geometri sinifi: 16:9'dan GENIS kaynak -> 'genis'",
+        _gr.geometri_sinifi(3000, 1000) == "genis")
+kontrol("geometri sinifi: 16:9 kaynak -> 'notr'",
+        _gr.geometri_sinifi(1920, 1080) == "notr")
+for _bg in ((None, None), (0, 0), ("a", "b"), (100, 0)):
+    kontrol(f"geometri olculemez {_bg} -> 'notr' (siralamaya karisma)",
+            _gr.geometri_sinifi(*_bg) == "notr")
+
+# ── ISLEV TEKRARI OLCUMU (pencere yakalayamaz) ──
+_MG24 = _kk.motion_grammar_olcusu([
+    {"hareket": "push-in", "islev": "hook"},
+    {"hareket": "pan-left", "islev": "aciklama"},
+    {"hareket": "slow-drift", "islev": "aciklama"},
+    {"hareket": "pull-out", "islev": "aciklama"},
+    {"hareket": "push-in", "islev": "hook"}])
+kontrol("⭐ AYNI ISLEVDE ayni hareket YAKALANIYOR (pencere disinda bile)",
+        len(_MG24["islev_tekrari"]) == 1
+        and _MG24["islev_tekrari"][0]["islev"] == "hook"
+        and _MG24["islev_tekrari"][0]["hareket"] == "push-in"
+        and _MG24["islev_tekrari"][0]["ilk_indeks"] == 0,
+        _MG24["islev_tekrari"])
+kontrol("FARKLI islevde ayni hareket ISLEV TEKRARI SAYILMAZ",
+        not _kk.motion_grammar_olcusu([
+            {"hareket": "push-in", "islev": "hook"},
+            {"hareket": "pan-left", "islev": "aciklama"},
+            {"hareket": "push-in", "islev": "sonuc"}])["islev_tekrari"])
+kontrol("islev YOKSA olcum COKMEZ (geriye uyumlu)",
+        _kk.motion_grammar_olcusu([{"hareket": "push-in"},
+                                   {"hareket": "pan-left"}])["islev_tekrari"]
+        == [])
+
+# ── KAPI: acilis==kapanis ve islev tekrari FAIL ──
+kontrol("⭐ qa_on I-24 kodlari FAIL_KODLARI'nda",
+        "KALITE-MOTION-ACILIS-KAPANIS" in _qon.FAIL_KODLARI
+        and "KALITE-MOTION-ISLEV-TEKRAR" in _qon.FAIL_KODLARI)
+kontrol("I-24 kodlari KALITE_KODLARI'nda (kapali yolda hukum YOK)",
+        "KALITE-MOTION-ACILIS-KAPANIS" in _qon.KALITE_KODLARI
+        and "KALITE-MOTION-ISLEV-TEKRAR" in _qon.KALITE_KODLARI)
+
+# ── SECIM: kapanis acilisi TEKRAR EDEMEZ ──
+_h24 = _gr._hareket_sec("establishing", 0, sure_sn=4.0,
+                        son_hareketler=("pull-out", "slow-drift", "pan-right"),
+                        islev="sonuc", acilis_hareketi="push-in")
+kontrol("⭐ kapanis, acilisin hareketini SECMIYOR (kok neden kapandi)",
+        _h24 != "push-in", _h24)
+kontrol("acilis kisiti VERILMEZSE eski davranis (geriye uyumlu)",
+        _gr._hareket_sec("establishing", 0, sure_sn=4.0,
+                         son_hareketler=("pull-out", "slow-drift",
+                                         "pan-right"),
+                         islev="sonuc") == "push-in")
+_h24b = _gr._hareket_sec("medium", 0, sure_sn=4.0,
+                         islev_hareketleri=("push-in",))
+kontrol("⭐ ayni islevde kullanilmis hareket SECILMIYOR",
+        _h24b != "push-in", _h24b)
+kontrol("kisitlar havuzu BOSALTMAZ (secim cokmez)",
+        _gr._hareket_sec("document", 0, sure_sn=4.0,
+                         acilis_hareketi="document-scan",
+                         islev_hareketleri=("push-in",))
+        in _gr.CEKIM_HAREKET["document"])
+
+# ── GEOMETRI: gozlemlenebilir ve DETERMINISTIK ──
+_g_dar = _gr._hareket_sec("establishing", 0, sure_sn=4.0,
+                          genislik=3000, yukseklik=2250)
+_g_genis = _gr._hareket_sec("establishing", 0, sure_sn=4.0,
+                            genislik=3000, yukseklik=1000)
+kontrol("⭐ geometri secimi GERCEKTEN degistiriyor (dar != genis)",
+        _g_dar != _g_genis, f"dar={_g_dar} genis={_g_genis}")
+kontrol("DAR kaynakta iceri/disari hareket tercih ediliyor",
+        _g_dar in _gr.GEOMETRI_HAREKET["dar"], _g_dar)
+kontrol("GENIS kaynakta yatay hareket tercih ediliyor",
+        _g_genis in _gr.GEOMETRI_HAREKET["genis"], _g_genis)
+kontrol("geometri YASAK degil SIRALAMA (havuzu kucultmuyor)",
+        _gr._hareket_sec("document", 0, sure_sn=4.0,
+                         genislik=3000, yukseklik=1000)
+        in _gr.CEKIM_HAREKET["document"])
+kontrol("geometri olculemezse secim DEGISMEZ (notr)",
+        _gr._hareket_sec("establishing", 0, sure_sn=4.0)
+        == _gr._hareket_sec("establishing", 0, sure_sn=4.0,
+                            genislik=None, yukseklik=None))
+
+# ── DETERMINIZM: rastgelelik YOK ──
+kontrol("⭐ gramer modulunde RASTGELELIK YOK",
+        not re.search(r"\b(random|shuffle|uuid4|time\.time)\b",
+                      _kod_yalniz(oku(KOK, "editor/gramer.py"))))
+_det = [_gr._hareket_sec("establishing", 2, sure_sn=4.0, islev="sonuc",
+                         acilis_hareketi="push-in", genislik=3000,
+                         yukseklik=2250) for _ in range(5)]
+kontrol("ayni girdi -> AYNI cikti (5 kosum)", len(set(_det)) == 1, _det)
+
+# ── UCTAN UCA: pilotun GERCEK beat dizisi ──
+class _B24:
+    def __init__(self, i, islev, sure, sid):
+        self.beat_id = f"b{i:03d}"
+        self.scene_id = sid
+        self.fact_id = f"f{i}"
+        self.islev = islev
+        self.sure_sn = sure
+
+
+_beat24 = [_B24(1, "hook", 0.862, "s001"), _B24(2, "hook", 1.725, "s001"),
+           _B24(3, "aciklama", 4.738, "s002"), _B24(4, "aciklama", 4.9, "s003"),
+           _B24(5, "sonuc", 4.825, "s004")]
+_olcu24 = {"s001": (4192, 2832), "s002": (3000, 2000),
+           "s003": (3000, 2250), "s004": (4986, 3744)}
+_aday24: dict = {}
+for _sid, (_g24, _y24) in _olcu24.items():
+    for _k24 in range(2 if _sid == "s001" else 1):
+        _aday24.setdefault(_sid, []).append({
+            "asset_id": f"{_sid}_{_k24}", "scene_id": _sid,
+            "saglayici": "nasa", "render_kullanilabilir": True,
+            "genislik": _g24, "yukseklik": _y24,
+            "sahne_amaci": "manzara", "toplam_skor": 90 - _k24})
+_cek24 = _gr.gramer_uygula(_beat24, sahne_adaylari=_aday24,
+                           saglayici_tavani=5)
+_mg24 = _kk.motion_grammar_olcusu(
+    [{"beat_id": c.beat_id, "hareket": c.hareket, "islev": b.islev,
+      "sure_sn": b.sure_sn, "gecis": []}
+     for c, b in zip(_cek24, _beat24)])
+kontrol("⭐ UCTAN UCA: acilis != kapanis",
+        _mg24["acilis_kapanis_ayri"] is True,
+        f"{_mg24['acilis_hareketi']} vs {_mg24['kapanis_hareketi']}")
+kontrol("⭐ UCTAN UCA: islev tekrari YOK", not _mg24["islev_tekrari"])
+kontrol("⭐ UCTAN UCA: ardisik tekrar YOK", not _mg24["ardisik_tekrar"])
+kontrol("UCTAN UCA: pencere tekrari YOK", not _mg24["pencere_tekrari"])
+
+# ── PUAN GEREKCESI DUSEN KOSULU ADIYLA SOYLUYOR (I-24'te bulundu) ──
+_P24 = _kk.izleyici_kalite_puani(grammar={
+    "olculdu": True, "ardisik_tekrar": [], "pencere_tekrari": [],
+    "islev_tekrari": [], "benzersiz_gecis": 3, "acilis_kapanis_ayri": False,
+    "acilis_hareketi": "push-in", "kapanis_hareketi": "push-in",
+    "benzersiz_hareket": 4})["bilesenler"]["motion_cesitlilik"]
+kontrol("⭐ 0 puan alan bilesen DUSEN KOSULU adiyla yaziyor",
+        _P24["puan"] == 0.0
+        and "acilis_kapanis_ayri" in _P24["gerekce"]
+        and _P24["dusen_kosullar"] == ["acilis_kapanis_ayri"],
+        _P24["gerekce"])
+kontrol("tum kosullar gecince puan TAM ve dusen kosul YOK",
+        _kk.izleyici_kalite_puani(grammar={
+            "olculdu": True, "ardisik_tekrar": [], "pencere_tekrari": [],
+            "islev_tekrari": [], "benzersiz_gecis": 3,
+            "acilis_kapanis_ayri": True, "benzersiz_hareket": 5})
+        ["bilesenler"]["motion_cesitlilik"]["puan"] == 20.0)
+kontrol("islev tekrari da puani DUSURUYOR (yeni kosul baglandi)",
+        _kk.izleyici_kalite_puani(grammar={
+            "olculdu": True, "ardisik_tekrar": [], "pencere_tekrari": [],
+            "islev_tekrari": [{"indeks": 4, "islev": "hook",
+                               "hareket": "push-in", "ilk_indeks": 0}],
+            "benzersiz_gecis": 3, "acilis_kapanis_ayri": True,
+            "benzersiz_hareket": 4})
+        ["bilesenler"]["motion_cesitlilik"]["puan"] == 0.0)
+
 _R20_YOL = os.path.join(KOK, "..", "outputs", "sample",
                         "teknoloji_i20_rapor.json")
 if not os.path.exists(_R20_YOL):
@@ -6183,6 +6348,28 @@ else:
     kontrol("I-23: maliyet $0.00 KALDI",
             float(_me20.get("maliyet_usd", 1)) == 0.0
             and float(_R20.get("maliyet_usd", 1)) == 0.0)
+    # ── I-24: MOTION CESITLILIGI GERCEK RENDER'DA ──
+    _mgr = _R20.get("motion_grammar") or {}
+    _pm = ((_R20.get("izleyici_kalite_puani") or {}).get("bilesenler")
+           or {}).get("motion_cesitlilik") or {}
+    kontrol("⭐ I-24: acilis != kapanis (I-22/I-23'te ikisi de push-in'di)",
+            _mgr.get("acilis_kapanis_ayri") is True
+            and _mgr.get("acilis_hareketi") != _mgr.get("kapanis_hareketi"),
+            f"{_mgr.get('acilis_hareketi')} vs {_mgr.get('kapanis_hareketi')}")
+    kontrol("⭐ I-24: ayni ISLEVDE ayni hareket YOK",
+            _mgr.get("islev_tekrari") == [], _mgr.get("islev_tekrari"))
+    kontrol("I-24: ardisik ve pencere tekrari da YOK",
+            not _mgr.get("ardisik_tekrar") and not _mgr.get("pencere_tekrari"))
+    kontrol("⭐ I-24: motion_cesitlilik 0/20 -> 20/20",
+            _pm.get("puan") == 20.0 and _pm.get("dusen_kosullar") == [],
+            _pm.get("gerekce"))
+    kontrol("I-24: BES beat BES AYRI hareket",
+            _mgr.get("benzersiz_hareket") == len(_mgr.get("hareketler") or []),
+            _mgr.get("hareketler"))
+    kontrol("I-24: puan bileseni KOSULLARI tek tek raporluyor",
+            isinstance(_pm.get("kosullar"), dict)
+            and len(_pm["kosullar"]) == 5
+            and all(_pm["kosullar"].values()), _pm.get("kosullar"))
     # ⚠ POST-QA FAIL ise SESSIZCE GECILMEZ — BLOKE yazilir.
     if _R20["post_qa"]["durum"] == "FAIL":
         _nedenler = [s["kod"] for s in _R20["post_qa"]["sorunlar"]

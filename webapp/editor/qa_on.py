@@ -35,6 +35,8 @@ FAIL_KODLARI = {
     "KALITE-OPTIK-DURGUN",
     # ── Faz I-22: medyasiz beat ──
     "KALITE-MEDYASIZ-BEAT",
+    # ── Faz I-24: motion cesitliligi OLCULEBILIR KAPI ──
+    "KALITE-MOTION-ACILIS-KAPANIS", "KALITE-MOTION-ISLEV-TEKRAR",
 }
 
 # I-14 kapisinin urettigi kodlar. Kapi KAPALIYKEN bunlarin HICBIRI uretilmez;
@@ -46,7 +48,9 @@ KALITE_KODLARI = ("KALITE-BASLIK-KIRPIK", "KALITE-BASLIK-TASMA",
                   "KALITE-YAZI-CAKISMA", "KALITE-GUVENLI-ALAN",
                   "KALITE-ALTYAZI-OKUNMAZ", "KALITE-OPTIK-DURGUN",
                   "KALITE-MOTION-TEKRAR", "KALITE-GECIS-TEKDUZE",
-                  "KALITE-MEDYASIZ-BEAT")
+                  "KALITE-MEDYASIZ-BEAT",
+                  "KALITE-MOTION-ACILIS-KAPANIS",
+                  "KALITE-MOTION-ISLEV-TEKRAR")
 
 
 @dataclass
@@ -582,6 +586,25 @@ def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
                   f"son {tk['pencere']} cekimde ayni hareket tekrar etti: "
                   f"{tk['hareket']} (sahne {tk['indeks']})",
                   "hareket yonunu/siddetini cesitlendir")
+        # ── I-24: ACILIS ve KAPANIS AYNI HAREKET OLAMAZ ──
+        # ⚠ Bu, teknoloji pilotunda `motion_cesitlilik` puanini 0/20 yapan
+        # TEK kirmizi kosuldu ve RENDER SONRASI bile hukum uretmiyordu —
+        # yalnizca puani dusuruyordu. Artik PLAN uzerinde BEDAVA yakalanir.
+        if len(mg_sahne) >= 2 and not mg.get("acilis_kapanis_ayri"):
+            _ekle("KALITE-MOTION-ACILIS-KAPANIS", "fail",
+                  f"acilis ve kapanis AYNI kamera hareketi: "
+                  f"{mg.get('acilis_hareketi')} "
+                  f"(sahne 0 ve {len(mg_sahne) - 1})",
+                  "kapanis hareketini acilistan FARKLI sec "
+                  "(belgesel dilinde acilis iceri girer, kapanis geri cekilir)")
+        # ── I-24: AYNI ANLATI ISLEVINDE AYNI HAREKET OLAMAZ ──
+        for tk in (mg.get("islev_tekrari") or []):
+            _ekle("KALITE-MOTION-ISLEV-TEKRAR", "fail",
+                  f"'{tk['islev']}' islevindeki iki beat ayni hareketi "
+                  f"aliyor: {tk['hareket']} "
+                  f"(sahne {tk['ilk_indeks']} ve {tk['indeks']})",
+                  "ayni islevdeki cekimlere farkli hareket ata; "
+                  "islev pencereye takilmaz, videonun her yerine dagilir")
         if len(mg_sahne) >= 3 and mg.get("benzersiz_gecis", 0) < 2:
             _ekle("KALITE-GECIS-TEKDUZE", "warn",
                   f"tek gecis ailesi kullanildi: {mg.get('gecis_dagilimi')} "

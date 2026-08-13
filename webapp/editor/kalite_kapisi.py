@@ -1022,10 +1022,31 @@ def motion_grammar_olcusu(sahneler, *, pencere: int = HAREKET_PENCERESI) -> dict
     statik = [{"indeks": i, "sure_sn": _sayi(liste[i].get("sure_sn"))}
               for i, h in enumerate(hareketler) if h == "static"]
 
+    # ── ISLEV TEKRARI (Faz I-24) ──
+    # ⚠ `islev` bu olcume I-17'den beri GELIYORDU ama HIC KULLANILMIYORDU.
+    # Ayni anlati islevindeki (hook/aciklama/sonuc) iki beat ayni kamera
+    # hareketini alirsa, komsu olmasalar bile izleyici ayni "cumleyi" iki kez
+    # duyar. Ardisiklik ve pencere bunu YAKALAMAZ: pencere yalnizca SON N
+    # cekime bakar, islev ise videonun HER YERINE dagilabilir.
+    islevler = [str(s.get("islev") or "") for s in liste]
+    _islev_gorulen: dict = {}
+    islev_tekrari = []
+    for i, (isl, h) in enumerate(zip(islevler, hareketler)):
+        if not isl or not h:
+            continue
+        onceki = _islev_gorulen.setdefault(isl, {})
+        if h in onceki:
+            islev_tekrari.append({"indeks": i, "islev": isl, "hareket": h,
+                                  "ilk_indeks": onceki[h]})
+        else:
+            onceki[h] = i
+
     return {
         "olculdu": True,
         "sahne": len(liste),
         "hareketler": hareketler,
+        "islevler": islevler,
+        "islev_tekrari": islev_tekrari,
         "benzersiz_hareket": len({h for h in hareketler if h}),
         "ardisik_tekrar": ardisik_tekrar,
         "pencere_tekrari": pencere_tekrar,
@@ -1077,15 +1098,32 @@ def izleyici_kalite_puani(*, optik=None, grammar=None, ritim=None,
           f"duragan ihlal: {len((optik or {}).get('ihlaller') or [])}",
           olculdu=bool((optik or {}).get("olculdu")))
     g = grammar or {}
+    # ⚠ I-24'TE BULUNAN RAPORLAMA KUSURU: burasi yalnizca GECEN uc kosulu
+    # yaziyordu ve DUSEN kosuldan hic soz etmiyordu. Teknoloji pilotunda puan
+    # 0/20 iken gerekce "benzersiz hareket 4, benzersiz gecis 3, pencere
+    # tekrari 0" diyordu — hepsi YESIL. Tek kirmizi `acilis_kapanis_ayri`
+    # idi (acilis ve kapanis ikisi de push-in) ama GORUNMUYORDU. Puan
+    # hepsi-ya-hicbiri oldugu icin gorunmeyen kosul kusuru GIZLIYOR.
+    _kosullar = {
+        "ardisik_tekrar_yok": not g.get("ardisik_tekrar"),
+        "pencere_tekrari_yok": not g.get("pencere_tekrari"),
+        "islev_tekrari_yok": not g.get("islev_tekrari"),
+        "benzersiz_gecis>=2": g.get("benzersiz_gecis", 0) >= 2,
+        "acilis_kapanis_ayri": bool(g.get("acilis_kapanis_ayri")),
+    }
+    _dusen = [k for k, v in _kosullar.items() if not v]
     _ekle("motion_cesitlilik", KALITE_AGIRLIK["motion_cesitlilik"],
-          bool(g.get("olculdu") and not g.get("ardisik_tekrar")
-               and not g.get("pencere_tekrari")
-               and g.get("benzersiz_gecis", 0) >= 2
-               and g.get("acilis_kapanis_ayri")),
-          f"benzersiz hareket {g.get('benzersiz_hareket')}, "
-          f"benzersiz gecis {g.get('benzersiz_gecis')}, "
-          f"pencere tekrari {len(g.get('pencere_tekrari') or [])}",
+          bool(g.get("olculdu") and not _dusen),
+          (f"TUM KOSULLAR GECTI (benzersiz hareket "
+           f"{g.get('benzersiz_hareket')}, benzersiz gecis "
+           f"{g.get('benzersiz_gecis')})" if not _dusen else
+           f"DUSEN KOSUL: {', '.join(_dusen)} | acilis="
+           f"{g.get('acilis_hareketi')} kapanis={g.get('kapanis_hareketi')} "
+           f"| islev tekrari {len(g.get('islev_tekrari') or [])} "
+           f"| pencere tekrari {len(g.get('pencere_tekrari') or [])}"),
           olculdu=bool(g.get("olculdu")))
+    bilesenler["motion_cesitlilik"]["kosullar"] = _kosullar
+    bilesenler["motion_cesitlilik"]["dusen_kosullar"] = _dusen
     r = ritim or {}
     _ekle("ritim", KALITE_AGIRLIK["ritim"],
           bool(r.get("olculdu") and not r.get("sabit_blok")
