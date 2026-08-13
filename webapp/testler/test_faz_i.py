@@ -6281,6 +6281,75 @@ kontrol("elenen kaydi SEBEBIYLE birlikte duruyor",
             "x", adet=6, en_az_genislik=1920, acan=_sahte_acan([
                 _sahte_sayfa(1, 1, 800, 600, "kucuk.jpg")]))["elenen"]))
 
+blok("§39k I-35 — s01 SORGU DARALTMASI: ELENDI (olculdu)")
+
+# ⚠ I-34, en kucuk ve bedava secenek olarak "s01 sorgusunu daralt" onermisti.
+# I-35'te AYNI ara() butcesinde olculdu ve SECENEK CURUDU: vitrini eleyen HER
+# daraltma NASA'yi BOSALTIYOR; NASA'yi koruyan HER daraltma vitrini BIRAKIYOR.
+#
+# OLCULEN TABLO (esik 2443; CO=commons, NA=nasa; "ok" = tum kapilari gecen):
+_I35 = {
+    "Pleiades supercomputer":                (18, 5, True,  15, 6),
+    "Pleiades supercomputer racks":          (6,  0, False, 0,  0),
+    "Pleiades supercomputer rack":           (6,  0, False, 0,  0),
+    "Pleiades supercomputer system":         (6,  2, False, 0,  0),
+    "Pleiades supercomputer hardware":       (0,  0, False, 0,  0),
+    "Pleiades supercomputer aisle":          (0,  0, False, 0,  0),
+    "Pleiades supercomputer nodes":          (3,  1, True,  0,  0),
+    "Pleiades supercomputer Ames":           (18, 5, True,  5,  5),
+    "Pleiades supercomputer NAS":            (18, 5, True,  13, 6),
+    "NASA Advanced Supercomputing facility": (17, 6, False, 3,  3),
+}
+_MEVCUT35 = "Pleiades supercomputer"
+_VITRINSIZ = [q for q, v in _I35.items() if not v[2]]
+_NASA_DOLU = [q for q, v in _I35.items() if v[4] > 0]
+kontrol("⭐ I-35: MEVCUT sorgu iyi NASA havuzu veriyor ama VITRINI iceriyor",
+        _I35[_MEVCUT35][4] == 6 and _I35[_MEVCUT35][2] is True)
+kontrol("⭐ I-35: vitrini eleyen daraltmalarin HEPSI ya NASA'yi BOSALTIYOR "
+        "ya da SEMANTIK KAYIYOR",
+        all(_I35[q][4] == 0 for q in _VITRINSIZ
+            if q != "NASA Advanced Supercomputing facility"),
+        {q: _I35[q] for q in _VITRINSIZ})
+kontrol("⭐ I-35: NASA'yi koruyan daraltmalarin HEPSI vitrini BIRAKIYOR",
+        all(_I35[q][2] for q in _NASA_DOLU
+            if q != "NASA Advanced Supercomputing facility"),
+        {q: _I35[q] for q in _NASA_DOLU})
+kontrol("I-35: 'racks' daraltmasi IKI SAGLAYICIDA da SIFIR (I-26 asiri-darlik "
+        "tuzagi)",
+        _I35["Pleiades supercomputer racks"][1] == 0
+        and _I35["Pleiades supercomputer racks"][4] == 0)
+kontrol("I-35: 'system' vitrini eler AMA NASA 0 — Commons 429'da s01 "
+        "MEDYASIZ kalir",
+        _I35["Pleiades supercomputer system"][2] is False
+        and _I35["Pleiades supercomputer system"][4] == 0
+        and _I35["Pleiades supercomputer system"][1] == 2)
+# Tek "iki saglayicida da dolu + vitrinsiz" aday semantik olarak KAYIYOR ve
+# s02 ile CAKISIYOR (NASA'da 2/3 ayni varlik) -> I-22 tekrar kapisi riski.
+_I35_NAS_FACILITY = {"commons_ilk_uc": ["NASA Advanced Supercomputing Facility",
+                                        "NASA Advanced Supercomputing Modular",
+                                        "NASA New Virtual Airport"],
+                     "nasa_s02_cakisma": (2, 3)}
+kontrol("⭐ I-35: tek hayatta kalan aday SEMANTIK KAYIYOR (Virtual Airport) "
+        "ve s02 ile 2/3 CAKISIYOR",
+        "Virtual Airport" in " ".join(_I35_NAS_FACILITY["commons_ilk_uc"])
+        and _I35_NAS_FACILITY["nasa_s02_cakisma"] == (2, 3))
+import ast as _ast35                                              # noqa: E402
+_SM35 = oku(KOK, "testler/smoke_konsept3_teknoloji_i20.py")
+_ST35 = next((_ast35.literal_eval(_d.value)
+              for _d in _ast35.parse(_SM35).body
+              if isinstance(_d, _ast35.Assign)
+              and any(getattr(t, "id", "") == "SAHNE_TANIMI"
+                      for t in _d.targets)), [])
+kontrol("⭐ I-35: s01 sorgusu DEGISTIRILMEDI (olcum daraltmayi CURUTTU)",
+        next(x["sorgu"] for x in _ST35 if x["kimlik"] == "s01")
+        == _MEVCUT35)
+kontrol("I-35: NEGATIF terim (-display) KULLANILMADI — I-29'da anahtar "
+        "kelimenin guvenilmez oldugu olculmustu",
+        "-display" not in oku(KOK, "testler/smoke_konsept3_teknoloji_i20.py"))
+kontrol("I-35: OPERATOR ONAYI / SAGLAYICI SIRASI degisikligi YAPILMADI",
+        '"saglayici_sirasi": ["commons", "nasa"]' in oku(
+            KOK, "testler/smoke_konsept3_teknoloji_i20.py"))
+
 blok("§39j I-34 — VITRIN/PANO KARE-BAKAN SINYAL: ELENDI (olculdu)")
 
 # ⚠ I-33'te IKI KEZ dogrulanan kusur: b001'e dusen Commons varligi cam arkasi

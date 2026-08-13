@@ -201,6 +201,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-32 kare örnekleme her beat'i kapsıyor** | `7098f4b` | ✅ **push edildi**, b001 kör noktası çözüldü, rerender YOK (talimat), BLOKE kanıt olarak duruyor, deploy YOK |
 | 13 Ağu | **I-33 gerçek koşum doğrulaması** | `584dea6` | ⚠ **push edildi**, kare planı KANITLANDI (b001 kapsandı), otomatik kapılar PASS ama MP4 **KABUL EDİLMEDİ** (b001 vitrin/pano), deploy YOK |
 | 13 Ağu | **I-34 vitrin sinyali: ELENDİ** | `7c5884f` | ✅ **push edildi**, 4 sinyal x 28 ölçüm: ayıran eşik YOK (en iyi precision 0.25), üretim DEĞİŞMEDİ, rerender/deploy YOK |
+| 13 Ağu | **I-35 s01 sorgu daraltması: ELENDİ** | `PENDING` | ✅ **push edildi**, 10 sorgu ölçüldü: vitrini eleyen her daraltma NASA'yı boşaltıyor, sorgu DEĞİŞMEDİ, rerender/deploy YOK |
 
 ---
 
@@ -4913,3 +4914,96 @@ Kare-bakan basit sinyaller **elendi**; bu yolla otomatik vitrin tespiti
 ⚠ Yeni yetenek (gerçek görüntü sınıflandırma / VLM) **kapsam dışı** ve
 maliyet doğurur; bu atomun ölçümü onu **gerekçelendirmiyor** çünkü sorun
 sinyal seçimi değil, **basit sinyallerin bu ayrımı taşıyamaması**.
+
+---
+
+## 53. FAZ I-35 — s01 SORGU DARALTMASI: **ELENDİ** (ölçüldü, 13 Ağu)
+
+> **Durum: önerilen daraltma ÖLÇÜLDÜ ve UYGULANAMADI. Üretim kodu
+> DEĞİŞMEDİ; ölçüm ve gerekçe teste kilitlendi. Yerel yeşil (0 hata,
+> 1 BLOKE — I-33 kaydı sürüyor), push edildi. Rerender/deploy YOK.
+> Maliyet $0.00.**
+> Değişen: **yalnızca** `webapp/testler/test_faz_i.py` (+ handoff).
+> Smoke betiği, `medya/*`, `editor/*`, pilot raporu ve 22 alan sözleşmesi
+> **dokunulmadı** (git ile doğrulandı). I-23…I-34 **korundu**.
+> Operatör onayı ve sağlayıcı sırası **değiştirilmedi** (talimat gereği).
+> Ölçüm aynı `ara()` bütçesinde, aynı sağlayıcılarla, ücretli API'siz.
+
+### Ölçülen tablo (eşik 2443; "ok" = tüm kapıları geçen aday)
+
+| sorgu | CO ham | CO ok | **vitrin?** | NA ham | **NA ok** |
+|---|---|---|---|---|---|
+| `Pleiades supercomputer` **(mevcut)** | 18 | 5 | ⛔ **EVET** | 15 | ✅ **6** |
+| `…racks` | 6 | **0** | – | **0** | **0** |
+| `…rack` | 6 | **0** | – | **0** | **0** |
+| `…system` | 6 | 2 | – | **0** | **0** |
+| `…hardware` | 0 | 0 | – | 0 | 0 |
+| `…aisle` | 0 | 0 | – | 0 | 0 |
+| `…nodes` | 3 | 1 | ⛔ EVET | **0** | **0** |
+| `…Ames` | 18 | 5 | ⛔ EVET | 5 | 5 |
+| `…NAS` | 18 | 5 | ⛔ EVET | 13 | 6 |
+| `NASA Advanced Supercomputing facility` | 17 | 6 | – | 3 | 3 |
+
+### ⛔ Hüküm: karşılıklı dışlayan iki kısıt
+
+**Vitrini eleyen her daraltma NASA'yı boşaltıyor; NASA'yı koruyan her
+daraltma vitrini bırakıyor.** Sebep ölçüldü: vitrinin başlığı
+*"Pleiades supercomputer node **on display**…"* — yani `Pleiades supercomputer`
+terimlerini **tam olarak içeriyor**. CirrusSearch terimleri AND'lediği için
+onu dışarıda bırakmanın tek yolu ya **negatif terim** (`-display`) ya da
+aramayı o kadar daraltmak ki **hiçbir sağlayıcı sonuç veremiyor**.
+
+- `-display` **kullanılmadı**: I-29'da bu anahtar kelimenin güvenilmez olduğu
+  ölçülmüştü (gerçek kusurda recall %0, 7 işaretten 5'i yanlış pozitif) ve
+  talimat özel-case kara listeyi yasaklıyor.
+- `…racks` / `…rack` / `…hardware` / `…aisle`: **iki sağlayıcıda da sıfır** —
+  I-26'da ölçülen **aşırı-darlık tuzağının** aynısı.
+- `…system`: vitrini eliyor ama **NASA 0**, Commons yalnız 2. Commons bu
+  host'ta **kalıcı olarak 429** veriyor (I-25…I-33'te ölçüldü), dolayısıyla
+  s01 çoğu koşumda **medyasız** kalır → `KALITE-MEDYASIZ-BEAT` BLOKE.
+  ⚠ Talimat "uygun aday yoksa dürüst BLOKE" diyor; ama bu, **istisna değil
+  NORMAL sonuç** olurdu — nadir bir kalite kusurunu sık bir **tam
+  başarısızlıkla** takas etmek doğru mühendislik değil.
+- `NASA Advanced Supercomputing facility`: tek "iki sağlayıcıda da dolu +
+  vitrinsiz" aday, ama **semantik kayıyor** (Commons ilk üçü:
+  *NASA New Virtual Airport*, *Future Flight Central*, *Cray 2 Supercomputer*)
+  ve **NASA'da s02 ile 2/3 çakışıyor** → I-22 tekrar kapısı riski.
+
+Bu yüzden **s01 sorgusu değiştirilmedi**.
+
+### ⚠ Ölçüm sırasında bulunan AYRI kusur (rapor tutarsızlığı)
+
+I-33 raporunda s01 için Commons denemesi `durum: "BAYT-YOK", sebep: "HTTP 429"`
+yazıyor **ama kabul edilen b001 varlığı Commons'ın vitrini**
+(`s01_11066148`, `wikimedia`, `cc-by-sa`). Yani Commons'tan **bir bayt
+başarıyla indi**, sonra kalanlar 429 aldı ve `deneme["durum"]` son
+başarısızlığa göre yazıldı. Rapor ayrıca `saglayici: "nasa"` diyor.
+
+Sonuç: **sağlayıcı durumu ve `kullanilan_saglayici` yanıltıcı.** Bu, hangi
+sağlayıcının hangi varlığı verdiğini araştırırken üç atom boyunca kafa
+karışıklığı yarattı. Bu atomda **düzeltilmedi** (kapsam dışı), sonraki atom
+olarak öneriliyor.
+
+### Ölçülen test sonucu
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1710** | **3124** |
+
+0 hata. Faz I 1701 → **1710** (+9). **1 BLOKE** — I-33 görsel inceleme kaydı
+sürüyor; pilot hâlâ kabul edilmedi. **Rerender yapılmadı**: medya seçimi
+değişmedi (sorgu değişmedi).
+
+### SONRAKİ ATOM (I-36) — yalnız ölçülen kusurdan
+
+**Edinim raporundaki sağlayıcı durumu tutarsızlığını düzelt.** Ölçülen
+somut kusur: bir sağlayıcının adayı **kabul edildiği hâlde** o sağlayıcının
+denemesi `BAYT-YOK` yazıyor ve `kullanilan_saglayici` başka bir sağlayıcıyı
+gösteriyor. Dar, bedava, ağsız; `edinim.edin` içinde `toplanan` listesindeki
+varlıkların sağlayıcısı zaten biliniyor. Bu düzeltilmeden hangi sağlayıcının
+neyi verdiğine dair her teşhis şüpheli kalıyor.
+
+⚠ Vitrin kusurunun kendisi için ölçülen üç seçenekten **ikisi elendi**
+(I-34 kare-bakan sinyal, I-35 sorgu daraltması). Geriye **operatör onayı**
+ve **s01 için sağlayıcı sırası** kalıyor; ikisi de bu atomda açıkça
+yasaklanmıştı ve **kullanıcı kararıdır**.
