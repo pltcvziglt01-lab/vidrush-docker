@@ -566,6 +566,87 @@ def guvenli_alan_olcusu(katmanlar, *, kare_yukseklik: float,
 KUNYE_HARF_ARALIGI_EM = 0.04
 
 
+# ═══════════ 5c) EKRAN KUNYESI KISA BICIMI (Faz I-31) ══════════════════
+#
+# ⚠ POLITIKA (I-31, deterministik ve aciklanabilir):
+# EKRANDAKI kunye YALNIZCA "eser sahibi / LISANS KISA ADI" tasir.
+# TAM eser adi, kaynak URL, lisans URL ve provenance `lisans.atif_metni`
+# ciktisinda ve `attribution.txt`te EKSIKSIZ kalir — ekran kunyesi bir
+# OZET'tir, atfin YERINE GECMEZ.
+#
+# I-30'da olculen kusur: `eser_sahibi` uzun oldugunda satir yatay guvenli
+# alani asiyordu (olculen gercek vaka: 155 karakterlik Palomar/STScI bilim
+# ekibi kunyesi -> 2473.8px > 1792px).
+#
+# SIRALI ve DETERMINISTIK cozum (rastgelelik YOK):
+#   1. TAM bicim sigiyorsa AYNEN kullanilir (mevcut davranis korunur).
+#   2. Sigmiyorsa KURUM BICIMI: sahip alani ayraclardan (`,` `;` `/` `|`
+#      ` - ` ` — `) bolunur ve BIRINCI parca (birincil kurum/kisi) alinir.
+#      Bu bir UYDURMA DEGIL, metnin kendi ilk ogesidir.
+#   3. Hala sigmiyorsa kurum adi KELIME SINIRINDA kirpilir + "…".
+# ⚠ LISANS KISA ADI HICBIR ADIMDA KIRPILMAZ. Lisans tek basina bile
+# sigmiyorsa metin URETILMEZ ve karar cagirana birakilir (PRE-QA fail).
+# ⚠ SAHIP BOSSA UYDURULMAZ: `eksik=True` doner, PRE-QA durustce BLOKE eder.
+KUNYE_AYIRAC = re.compile(r"\s*[,;/|]\s*|\s+—\s+|\s+-\s+")
+KUNYE_BIRLESTIRICI = " / "
+
+
+def kunye_kisa_bicim(eser_sahibi, lisans_kisa, *, punto: float,
+                     kare_genislik: float, guvenli_kenar: float,
+                     em_orani: float = EM_BUYUK_HARF,
+                     harf_araligi_em: float = KUNYE_HARF_ARALIGI_EM) -> dict:
+    """Ekran kunyesinin KISA bicimi. Saf fonksiyon; ag/dosya KULLANMAZ."""
+    sahip = str(eser_sahibi or "").strip()
+    lis = str(lisans_kisa or "").strip().upper()
+    punto = _sayi(punto)
+    g = _sayi(kare_genislik)
+    kenar = _sayi(guvenli_kenar)
+    birim = punto * (_sayi(em_orani) + _sayi(harf_araligi_em))
+    temel = {"eser_sahibi": sahip, "lisans": lis, "punto": punto,
+             "kullanilabilir_px": round(g - 2 * kenar, 1)}
+    if not sahip:
+        return dict(temel, metin="", eksik=True, yontem="SAHIP-YOK",
+                    kisaltildi=False,
+                    sebep="atif zorunlu ama eser sahibi YOK — UYDURULMAZ")
+    if not lis:
+        return dict(temel, metin="", eksik=True, yontem="LISANS-YOK",
+                    kisaltildi=False,
+                    sebep="atif zorunlu ama lisans kisa adi YOK — UYDURULMAZ")
+    if punto <= 0 or g <= 0 or birim <= 0:
+        # Olculemez -> KISALTMA YAPMA, tam bicimi don (engelleme yok).
+        return dict(temel, metin=f"{sahip}{KUNYE_BIRLESTIRICI}{lis}",
+                    eksik=False, yontem="OLCULEMEDI", kisaltildi=False)
+    kullanilabilir = g - 2 * kenar
+    ek = f"{KUNYE_BIRLESTIRICI}{lis}"
+    ek_px = len(ek) * birim
+    sahip_butce = int((kullanilabilir - ek_px) // birim)
+    if sahip_butce <= 0:
+        # ⚠ LISANS TEK BASINA SIGMIYOR -> metin URETME; hukmu PRE-QA verir.
+        return dict(temel, metin="", eksik=True, yontem="LISANS-SIGMIYOR",
+                    kisaltildi=False, sahip_butce=sahip_butce,
+                    sebep=(f"lisans kisa adi tek basina yatay guvenli alana "
+                           f"sigmiyor (punto {punto}) — lisans KIRPILMAZ"))
+    if len(sahip) <= sahip_butce:
+        return dict(temel, metin=f"{sahip}{ek}", eksik=False,
+                    yontem="TAM", kisaltildi=False, sahip_butce=sahip_butce)
+    # 2) KURUM BICIMI — metnin KENDI ilk ogesi
+    kurum = (KUNYE_AYIRAC.split(sahip)[0] or "").strip()
+    if kurum and len(kurum) <= sahip_butce:
+        return dict(temel, metin=f"{kurum}{ek}", eksik=False,
+                    yontem="KURUM", kisaltildi=True, sahip_butce=sahip_butce,
+                    tam_sahip=sahip)
+    # 3) KELIME SINIRINDA KIRPMA (yalniz SAHIP alani)
+    ham = kurum or sahip
+    hedef = max(1, sahip_butce - 1)
+    kirpik = ham[:hedef]
+    if " " in kirpik and len(ham) > hedef:
+        kirpik = kirpik.rsplit(" ", 1)[0]
+    kirpik = kirpik.rstrip(" ,;/|-—")
+    return dict(temel, metin=f"{kirpik}…{ek}", eksik=False,
+                yontem="KIRPMA", kisaltildi=True, sahip_butce=sahip_butce,
+                tam_sahip=sahip)
+
+
 def yatay_guvenli_alan_olcusu(katmanlar, *, kare_genislik: float,
                               guvenli_kenar: float,
                               em_orani: float = EM_BUYUK_HARF,

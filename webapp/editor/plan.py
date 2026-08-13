@@ -59,6 +59,7 @@ def _yazi_katmanlari_kur(cekimler: list, beatler: list, adaylar_index: dict,
     YASAK BOLGE olarak bildirilir.
     """
     katmanlar = []
+    kunye_kararlari: list = []          # I-31: kunye politika kararlari
     baslik_siniri = kart_basligi_siniri(p, kare_genislik)
     kunye_y = tipografi.KAYNAK_ETIKETI_ALTYAZILI if altyazi_var else None
     yasak = tipografi.ALTYAZI_BANT if altyazi_var else None
@@ -83,13 +84,28 @@ def _yazi_katmanlari_kur(cekimler: list, beatler: list, adaylar_index: dict,
                 min(4.7, b.sure_sn), fact_id=b.fact_id, p=p))
         # Kaynak etiketi: gercek medya varliklarinda
         aday = adaylar_index.get(c.asset_id) if c.asset_id else None
-        if aday and aday.get("atif_gerekli") and aday.get("eser_sahibi"):
-            katmanlar.append(tipografi.katman_kur(
-                "source-label", f"{aday.get('eser_sahibi')} / "
-                                f"{aday.get('lisans', '').upper()}",
-                b.bas_sn + 0.4, min(3.0, b.sure_sn), fact_id=b.fact_id, p=p,
-                y_orani=kunye_y))
-    return tipografi.cakisma_coz(katmanlar, p=p, yasak_bant=yasak)
+        if aday and aday.get("atif_gerekli"):
+            # ⚠ I-31: EKRAN kunyesi = "sahip / LISANS" KISA bicimi. Uzun
+            # sahip alani yatay guvenli alani asiyordu (I-30'da olculdu).
+            # TAM eser adi + kaynak URL + lisans URL `atif_metni`de ve
+            # `attribution.txt`te EKSIKSIZ kalir — burasi OZET'tir.
+            # Sahip/lisans eksikse metin URETILMEZ (uydurma YOK); hukmu
+            # PRE-QA verir (`KALITE-KUNYE-EKSIK`).
+            _kb = kalite_kapisi.kunye_kisa_bicim(
+                aday.get("eser_sahibi"), aday.get("lisans", ""),
+                punto=p.tipografi.kaynak_etiketi,
+                kare_genislik=float(kare_genislik or p.genislik),
+                guvenli_kenar=p.tipografi.guvenli_kenar)
+            kunye_kararlari.append(dict(_kb, scene_id=c.scene_id,
+                                        beat_id=b.beat_id,
+                                        asset_id=c.asset_id))
+            if _kb.get("metin"):
+                katmanlar.append(tipografi.katman_kur(
+                    "source-label", _kb["metin"],
+                    b.bas_sn + 0.4, min(3.0, b.sure_sn), fact_id=b.fact_id,
+                    p=p, y_orani=kunye_y))
+    _kat, _rap = tipografi.cakisma_coz(katmanlar, p=p, yasak_bant=yasak)
+    return _kat, _rap, kunye_kararlari
 
 
 _SAYI_KALIP = re.compile(r"\b(\d[\d.,]*)\b")
@@ -385,7 +401,7 @@ def uret(*, cumleler: list, medya_manifest: dict,
                           adaylar_index=index, kare_olcu=kare_olcu)
     # 4) TIPOGRAFI
     _altyazi_var = bool(altyazi_kupleri)
-    katmanlar, tipo_rapor = _yazi_katmanlari_kur(
+    katmanlar, tipo_rapor, kunye_kararlari = _yazi_katmanlari_kur(
         cekimler, bplan.beatler, index, p, _kare_gen, _altyazi_var)
     # ⚠ Cozulmus yazi katmanlari MOTION SPEC'e cevrilir. Ilk surumde katmanlar
     # yalnizca edit_manifest'te duruyordu; render_plan'a girmedigi icin adapter
@@ -405,6 +421,7 @@ def uret(*, cumleler: list, medya_manifest: dict,
                       anlatim_bitis_sn=anlatim_bitis_sn,
                       benzerlik_okuyucu=benzerlik_okuyucu,
                       altyazi_kupleri=altyazi_kupleri,
+                      kunye_kararlari=kunye_kararlari,
                       kalite_kapisi=kalite_kapisi)
 
     # ── edit_manifest ──
@@ -417,6 +434,9 @@ def uret(*, cumleler: list, medya_manifest: dict,
         "cekimler": [c.__dict__ for c in cekimler],
         "yazi_katmanlari": [k.__dict__ for k in katmanlar],
         "tipografi_raporu": tipo_rapor,
+        # ⚠ I-31: EKRAN kunyesi kararlari IZLENEBILIR. Kisaltildiysa TAM
+        # sahip adi da burada durur; provenance `attribution.txt`te.
+        "kunye_kararlari": kunye_kararlari,
         "ses_plani": splan.sozluk(),
         "motion_spec_sayisi": len(specler),
     }

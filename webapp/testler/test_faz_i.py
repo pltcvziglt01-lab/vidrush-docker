@@ -6281,6 +6281,93 @@ kontrol("elenen kaydi SEBEBIYLE birlikte duruyor",
             "x", adet=6, en_az_genislik=1920, acan=_sahte_acan([
                 _sahte_sayfa(1, 1, 800, 600, "kucuk.jpg")]))["elenen"]))
 
+blok("§39h I-31 — EKRAN KUNYESI POLITIKASI: ATIF EKSILMEDEN SIGDIRMA")
+
+from medya import lisans as _lis                                  # noqa: E402
+
+# ⚠ I-30'un olctugu tasma: 155 karakterlik GERCEK atif -> 2473.8px > 1792px.
+# I-31 politikasi: EKRANDA yalniz "sahip / LISANS"; TAM eser adi, kaynak URL,
+# lisans URL ve provenance `lisans.atif_metni` + `attribution.txt`te KALIR.
+_U31 = ("NASA, ESA, AURA/Caltech, Palomar Observatory The science team "
+        "consists of: D. Soderblom and E. Nelan (STScI), F. Benedict "
+        "and B. Arthur (U. Texas), and B. Jones")
+kontrol("⭐ I-31 KIRMIZI (I-30 vakasi): ham 'sahip / LISANS' YATAY TASIYOR",
+        _kk.yatay_guvenli_alan_olcusu(
+            [{"ad": "source-label", "metin": f"{_U31} / PUBLIC-DOMAIN",
+              "punto": 21}],
+            kare_genislik=1920, guvenli_kenar=64)["temiz"] is False)
+_K31 = _kk.kunye_kisa_bicim(_U31, "public-domain", punto=21,
+                            kare_genislik=1920, guvenli_kenar=64)
+kontrol("⭐ I-31: politika KURUM BICIMINE dusuyor ve YATAY KAPI PASS",
+        _K31["yontem"] == "KURUM" and _K31["kisaltildi"] is True
+        and _kk.yatay_guvenli_alan_olcusu(
+            [{"ad": "source-label", "metin": _K31["metin"], "punto": 21}],
+            kare_genislik=1920, guvenli_kenar=64)["temiz"] is True,
+        _K31["metin"])
+kontrol("⭐ I-31: kurum adi metnin KENDI ilk ogesi (UYDURMA YOK)",
+        _U31.startswith(_K31["metin"].split(" / ")[0]))
+kontrol("⭐ I-31: LISANS KISA ADI KIRPILMADI",
+        _K31["metin"].endswith(" / PUBLIC-DOMAIN"))
+kontrol("I-31: kisaltilinca TAM sahip adi kararda SAKLANIYOR (izlenebilirlik)",
+        _K31.get("tam_sahip") == _U31)
+
+# ── GERCEK PILOT KUNYELERI DEGISMEDEN KALIR (kullanici secimi korunur) ──
+for _s31, _l31, _bek31 in [
+        ("Dominic Hart", "nasa-public", "Dominic Hart / NASA-PUBLIC"),
+        ("GRC", "nasa-public", "GRC / NASA-PUBLIC"),
+        ("NASA/JPL-Caltech/Lockheed Martin", "nasa-public",
+         "NASA/JPL-Caltech/Lockheed Martin / NASA-PUBLIC")]:
+    _r31 = _kk.kunye_kisa_bicim(_s31, _l31, punto=21, kare_genislik=1920,
+                                guvenli_kenar=64)
+    kontrol(f"⭐ I-31: pilot kunyesi AYNEN kaliyor — {_bek31[:30]}",
+            _r31["metin"] == _bek31 and _r31["yontem"] == "TAM"
+            and _r31["kisaltildi"] is False, _r31["metin"])
+
+# ── EKSIK ZORUNLU ALAN: UYDURMA YOK, DURUST BLOKE ──
+for _sh31, _li31, _yon31 in [("", "cc-by", "SAHIP-YOK"),
+                             ("Biri", "", "LISANS-YOK")]:
+    _e31 = _kk.kunye_kisa_bicim(_sh31, _li31, punto=21, kare_genislik=1920,
+                                guvenli_kenar=64)
+    kontrol(f"⭐ I-31: {_yon31} -> metin URETILMEZ, eksik=True",
+            _e31["metin"] == "" and _e31["eksik"] is True
+            and _e31["yontem"] == _yon31)
+kontrol("⭐ I-31: eksik kunye PRE-QA'da FAIL kodu",
+        "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI
+        and "KALITE-KUNYE-EKSIK" in _qon.KALITE_KODLARI)
+# ⚠ LISANS tek basina sigmiyorsa metin URETILMEZ — lisans ASLA kirpilmaz.
+kontrol("⭐ I-31: lisans tek basina sigmiyorsa KIRPILMAZ, metin URETILMEZ",
+        _kk.kunye_kisa_bicim("X", "CC-BY-SA-4.0", punto=400,
+                             kare_genislik=1920,
+                             guvenli_kenar=64)["yontem"] == "LISANS-SIGMIYOR")
+kontrol("I-31: olculemezse TAM bicim korunur (engelleme yok)",
+        _kk.kunye_kisa_bicim("Biri", "cc-by", punto=0, kare_genislik=1920,
+                             guvenli_kenar=64)["metin"] == "Biri / CC-BY")
+_det31 = [_kk.kunye_kisa_bicim(_U31, "public-domain", punto=21,
+                               kare_genislik=1920,
+                               guvenli_kenar=64)["metin"] for _ in range(5)]
+kontrol("I-31: ayni girdi -> AYNI kunye (rastgelelik YOK)",
+        len(set(_det31)) == 1, _det31)
+
+# ── TAM PROVENANCE EKSILMEDI ──
+# ⚠ `public-domain` ZATEN atif gerektirmiyor (lisans.LISANS_KURALLARI);
+# tam-atif kanitini atif GEREKTIREN bir lisansla kurmak gerekiyor.
+_AT31 = _lis.atif_metni("cc-by", _U31, "Pleiades large.jpg",
+                        "https://commons.wikimedia.org/wiki/File:X.jpg")
+_K31b = _kk.kunye_kisa_bicim(_U31, "cc-by", punto=21, kare_genislik=1920,
+                             guvenli_kenar=64)
+kontrol("⭐ I-31: TAM atif metni eser adi + sahip + lisans + URL TASIYOR",
+        "Pleiades large.jpg" in _AT31 and "https://" in _AT31
+        and "CC-BY" in _AT31.upper(), _AT31[:90])
+kontrol("⭐ I-31: ekran kunyesi KISALSA DA tam atif KISALMADI",
+        _K31b["kisaltildi"] is True and "Soderblom" in _AT31
+        and len(_AT31) > len(_K31b["metin"]))
+kontrol("⭐ I-31: attribution.txt adayin TAM `atif_metni`ni OLDUGU GIBI yazar",
+        'aday.get("atif_metni")' in oku(KOK, "editor/plan.py"))
+kontrol("I-31: plan TAM atfi YENIDEN URETMIYOR/KISALTMIYOR",
+        "lisans.atif_metni(" not in _kod_yalniz(oku(KOK, "editor/plan.py")))
+kontrol("I-31: plan kunye kararlarini manifeste YAZIYOR (izlenebilirlik)",
+        "kunye_kararlari" in _sikistir(oku(KOK, "editor/plan.py")))
+
 blok("§39g I-30 — YATAY GUVENLI ALAN: SAG/SOL TASMA OLCULMUYORDU")
 
 # ⚠ I-30'DA BULUNAN BOSLUK: `guvenli_alan_olcusu` YALNIZCA DIKEY olcuyordu.
@@ -7043,6 +7130,28 @@ else:
     kontrol("I-26: her beat icin ekran piksel orani olculdu",
             all(k.get("olculdu") for k in (_pb26.get("kayitlar") or [])),
             _pb26.get("kayitlar"))
+    # ── I-31: KARE ORNEKLEMESI HER BEAT'I KAPSIYOR MU? ──
+    # ⚠ I-31'DE BULUNDU: 11 kare b001'i (0-0.862 sn) HIC ORNEKLEMIYOR —
+    # ilk kare 1.2 sn. Yani ACILIS PLANI gorsel incelemenin KOR NOKTASINDA
+    # kaliyordu ve kusurlu acilis ancak ELLE kare cikararak yakalandi.
+    _kare31 = [float(k.get("an_sn") or 0)
+               for k in (_R20.get("kareler") or [])
+               if isinstance(k, dict)]
+    _kapsanan31 = []
+    for _z31 in (_R20.get("zincir") or []):
+        _b0 = float(_z31.get("bas_sn") or 0)
+        _b1 = _b0 + float(_z31.get("sure_sn") or 0)
+        if not any(_b0 <= t < _b1 for t in _kare31):
+            _kapsanan31.append(_z31.get("beat_id"))
+    kontrol("I-31: kare ornekleme kapsami OLCULDU",
+            isinstance(_kare31, list) and bool(_R20.get("zincir")))
+    if _kapsanan31:
+        bloke_yaz("I-31 kare ornekleme KOR NOKTASI",
+                  f"su beat(ler) hicbir kareyle ornekleNMEDI: "
+                  f"{_kapsanan31}. Gorsel/semantik inceleme bu beatleri "
+                  f"GORMUYOR; kusur ancak ELLE kare cikararak yakalanir.")
+    else:
+        kontrol("⭐ I-31: her beat en az bir kareyle ornekleniyor", True)
     # ⚠ OLCULEN KUSUR SESSIZCE GECILMEZ.
     if (_pb26.get("buyuten_beat") or 0) > 0:
         bloke_yaz(

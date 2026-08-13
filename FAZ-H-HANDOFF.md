@@ -197,6 +197,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-28 seçim sırası tanısı: KUSUR YOK** | `b61208d` | ✅ **push edildi**, öncül ölçümle çürüdü, üretim kodu DEĞİŞMEDİ, davranış kilitlendi, MP4 korundu, deploy YOK |
 | 13 Ağu | **I-29 afiş/pano sinyali: metadata GÜVENİLİR DEĞİL** | `015973e` | ✅ **push edildi**, recall %0 / hassasiyet %6 ölçüldü, üretim DEĞİŞMEDİ, MP4 korundu, deploy YOK |
 | 13 Ağu | **I-30 yatay güvenli alan kapısı eklendi** | `527cd28` | ✅ **push edildi**, sağ/sol taşma ölçülür oldu, pilotta ateşlemiyor, MP4 korundu, deploy YOK |
+| 13 Ağu | **I-31 ekran künyesi politikası** | `PENDING` | ⚠ **push edildi**, taşma çözüldü + tam atıf korundu, MP4 **KABUL EDİLMEDİ** (açılış vitrin planı), deploy YOK |
 
 ---
 
@@ -4512,3 +4513,109 @@ Kalan tek BLOKE Faz H'deki `QA_TEST_VIDEO` (opsiyonel, I-22'den beri aynı).
   biçimi) — **kullanıcı kararı**.
 - **Afiş/pano tespiti** (I-29): metadata ile çözülemez, kare-bakan sinyal
   gerekir; `medya.edinim`'in `kapsam_disi` listesinde açıkça kapsam dışı.
+
+---
+
+## 49. FAZ I-31 — EKRAN KÜNYESİ POLİTİKASI: ATIF EKSİLMEDEN SIĞDIRMA (13 Ağu)
+
+> **Durum: atom ÇÖZÜLDÜ ve yeşil, ama pilot MP4 ⛔ KABUL EDİLMİŞ SAYILMAZ.
+> Yerel yeşil (0 hata, 1 BLOKE), push edildi. Deploy YOK. Maliyet $0.00.**
+> Değişen: `webapp/editor/kalite_kapisi.py`, `webapp/editor/plan.py`,
+> `webapp/editor/qa_on.py`, `webapp/testler/test_faz_c.py`,
+> `webapp/testler/test_faz_i.py`, `outputs/sample/teknoloji_i20_rapor.json`
+> (+ handoff).
+> `medya/*`, `motion.py`, `gramer.py`, `pipeline.py`, `server.py`,
+> `deploy.sh`, `Grafikler.tsx`, smoke betiği ve 22 alan sözleşmesi
+> **dokunulmadı** (git ile doğrulandı). I-23…I-30 kapıları **korundu**.
+
+### Politika — deterministik ve açıklanabilir
+
+**Ekranda** yalnızca `eser sahibi / LİSANS KISA ADI`.
+**Tam eser adı, kaynak URL, lisans ve provenance** `lisans.atif_metni`
+çıktısında ve `attribution.txt`te **eksiksiz** kalır — ekran künyesi bir
+**özet**tir, atfın yerine geçmez.
+
+Sıralı çözüm (rastgelelik yok):
+1. **TAM** biçim sığıyorsa aynen kullanılır (kullanıcı seçimi korunur).
+2. **KURUM**: sahip alanı kendi ayraçlarından (`,` `;` `/` `|` ` - ` ` — `)
+   bölünür, **birinci** parça alınır. Uydurma değil, metnin kendi ilk öğesi.
+3. **KIRPMA**: kurum adı kelime sınırında kırpılır + `…`.
+
+⚠ **LİSANS KISA ADI HİÇBİR ADIMDA KIRPILMAZ.** Lisans tek başına bile
+sığmıyorsa metin **üretilmez** ve hükmü PRE-QA verir.
+⚠ **SAHİP/LİSANS BOŞSA UYDURULMAZ**: `eksik=True` döner, yeni
+`KALITE-KUNYE-EKSIK` (fail) kapısı **dürüstçe BLOKE** eder. Önceki davranış
+künyeyi **sessizce atlıyordu** — atıf yükümlülüğü görünmeden düşüyordu.
+
+### ✅ I-30'un 155 karakterlik taşması çözüldü
+
+| girdi | önce | **sonra** | yatay kapı |
+|---|---|---|---|
+| 155 karakterlik gerçek atıf | **2473.8 px > 1792 px** ⛔ | `NASA / PUBLIC-DOMAIN` (**KURUM**) | ✅ **PASS** |
+| `Dominic Hart` | — | aynen (**TAM**) | ✅ |
+| `GRC` | — | aynen (**TAM**) | ✅ |
+| `NASA/JPL-Caltech/Lockheed Martin` | — | aynen (**TAM**) | ✅ |
+
+Pilotun **hiçbir künyesi değişmedi** (`yontemler: ["TAM"]`, kısaltılan **0**)
+— politika yalnızca patolojik girdide devreye giriyor.
+
+### ✅ Tam provenance eksilmedi — ölçüldü
+
+`attribution.txt` her varlık için **tam eser adı + sahip + lisans + URL**
+taşımaya devam ediyor; ekran künyesi kısalsa da bu satır kısalmıyor.
+Künye kararları (`kunye_kararlari`) manifeste yazılıyor: kısaltıldıysa
+**tam sahip adı** da orada duruyor (izlenebilirlik).
+
+### ✅ Render doğrulaması — POST-QA PASS
+
+**ffprobe:** h264 **1920×1080** @30 + aac 48 kHz/2ch, **17.109 sn**, 39.62 MB.
+**Ses:** LUFS **−14.36**, TP **−4.09**, sessizlik **%0** (ince tarama da boş).
+**Kesmeler:** 6. **Siyah/donmuş:** yok. **Kenar:** 0/68. **Kareler:** 11.
+**Tipografi:** güvenli alan ✅, **yatay güvenli alan ✅**, çakışma ✅, altyazı ✅.
+**Künye→varlık eşlemesi doğru:** b001 Commons varlığını taşıyor ve künyesi
+`Oleg Alexandrov / CC-BY-SA` — yanlış atıf **yok**.
+**Kalite puanı:** 100/100.
+
+### ⛔ MP4 KABUL EDİLMİŞ SAYILMAZ — açılış planı kusurlu
+
+Medya kümesi yine kaydı (Commons bu koşumda servis etti) ve **b001'e**
+`Pleiades supercomputer node on display at NASA Ames visitor center`
+(3410×2634) seçildi. Bu **cam arkası bir müze vitrini**: İngilizce bilgi
+panoları, yansımalar. Türkçe *"Güç burada üretilir."* anlatımının altında
+**İngilizce açıklama panosu** duruyor. I-26/I-29'da tanımlanan sınıfın
+aynısı; 3410 px olduğu için I-27 eşiğine **takılmıyor**, I-29'da ölçüldüğü
+gibi metadata da yakalayamıyor.
+
+⚠ Bu **I-31'in ürettiği bir gerileme değil** — künye politikası yalnızca
+metni etkiler. Ama bu render'da olduğu için **kabul edilmiyor**.
+
+### ⚠ I-31'DE BULUNAN İKİNCİ KUSUR — kare örnekleme KÖR NOKTASI
+
+Kusurlu açılışı **11 kare göremedi**: ilk örnek **1.2 sn**, oysa **b001
+0–0.862 sn**. Yani zorunlu görsel/semantik inceleme **açılış planını hiç
+örneklemiyordu**; kusuru ancak **elle** kare çıkararak yakaladım.
+Teste **beat kapsama kontrolü** eklendi ve şu an **BLOKE** yazıyor:
+`ornekleNMEDI: ['b001']`.
+
+### Ölçülen test sonucu
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1662** | **3076** |
+
+0 hata. Faz I 1644 → **1662** (+18). **1 BLOKE** (kare örnekleme kör noktası).
+
+### Düzeltilen kendi hatalarım
+
+- `_yazi_katmanlari_kur` artık **üç** değer dönüyor; `test_faz_c.py`'deki
+  çağrı kırılmıştı (`too many values to unpack`) — güncellendi.
+- Test fikstürümde `public-domain` kullanmıştım; o lisans **zaten atıf
+  gerektirmiyor** (`LISANS_KURALLARI`), tam-atıf kanıtı `cc-by` ile kuruldu.
+
+### SONRAKİ ATOM (I-32 adayları)
+
+1. **Kare örnekleme her beat'i kapsamalı** — küçük, deterministik, bedava;
+   BLOKE'yi kapatır ve görsel incelemenin kör noktasını yok eder.
+2. **Vitrin/pano tespiti** hâlâ açık: I-29'da metadata ile çözülemeyeceği
+   ölçüldü; kare-bakan sinyal gerekir ve `medya.edinim`'de açıkça kapsam
+   dışı — **kullanıcı kararı**.

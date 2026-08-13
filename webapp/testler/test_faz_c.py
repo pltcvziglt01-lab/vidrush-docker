@@ -345,7 +345,10 @@ kontrol("SFX yogunlugu makul (<12/dk)",
 # ═════════════════ 6) PRE-RENDER QA ═════════════════
 blok("qa_on: PASS / WARN / FAIL")
 index = {a["asset_id"]: a for a in MEDYA_MANIFEST["adaylar"]}
-katmanlar, _ = plan._yazi_katmanlari_kur(cekimler, bplan.beatler, index, P)
+# ⚠ I-31: `_yazi_katmanlari_kur` artik UCUNCU deger olarak kunye politika
+# kararlarini da donuyor (ekran kunyesi kisaltildi mi, eksik mi).
+katmanlar, _, _kunye_k = plan._yazi_katmanlari_kur(
+    cekimler, bplan.beatler, index, P)
 specler = plan._motion_kur(cekimler, bplan.beatler, P)
 q = qa_on.denetle(beat_plani=bplan, cekimler=cekimler,
                   yazi_katmanlari=katmanlar, motion_specler=specler,

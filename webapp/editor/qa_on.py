@@ -37,6 +37,8 @@ FAIL_KODLARI = {
     "KALITE-MEDYASIZ-BEAT",
     # ── Faz I-24: motion cesitliligi OLCULEBILIR KAPI ──
     "KALITE-MOTION-ACILIS-KAPANIS", "KALITE-MOTION-ISLEV-TEKRAR",
+    # ── Faz I-31: gorunur kunye eksik olamaz ──
+    "KALITE-KUNYE-EKSIK",
     # ── Faz I-27: kamera punch'i kaynagi BUYUTEMEZ ──
     "KALITE-PUNCH-BUYUTME",
 }
@@ -53,7 +55,7 @@ KALITE_KODLARI = ("KALITE-BASLIK-KIRPIK", "KALITE-BASLIK-TASMA",
                   "KALITE-MEDYASIZ-BEAT",
                   "KALITE-MOTION-ACILIS-KAPANIS",
                   "KALITE-MOTION-ISLEV-TEKRAR",
-                  "KALITE-PUNCH-BUYUTME")
+                  "KALITE-PUNCH-BUYUTME", "KALITE-KUNYE-EKSIK")
 
 
 @dataclass
@@ -107,6 +109,7 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
             anlatim_bitis_sn: Optional[float] = None,
             benzerlik_okuyucu=None,
             altyazi_kupleri: Optional[list] = None,
+            kunye_kararlari: Optional[list] = None,
             kalite_kapisi: bool = False) -> QaSonucu:
     """Pre-render denetim.
 
@@ -353,7 +356,8 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
                     anlatim_bitis_sn=anlatim_bitis_sn, toplam=toplam,
                     benzerlik_okuyucu=benzerlik_okuyucu,
                     altyazi_kupleri=altyazi_kupleri,
-                    motion_specler=motion_specler, acik=kalite_kapisi)
+                    motion_specler=motion_specler,
+                    kunye_kararlari=kunye_kararlari, acik=kalite_kapisi)
 
     return q.sonuclandir()
 
@@ -361,7 +365,8 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
 def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
                     adaylar_index, p, kare_olcu, anlatim_bitis_sn, toplam,
                     benzerlik_okuyucu, acik: bool,
-                    altyazi_kupleri=None, motion_specler=None) -> None:
+                    altyazi_kupleri=None, motion_specler=None,
+                    kunye_kararlari=None) -> None:
     """I-14 olcumlerini kos ve (kapi acikken) sorun uret. ASLA COKMEZ."""
     kk = kalite_kapisi
     try:
@@ -517,6 +522,26 @@ def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
         _yatay_kutu, kare_genislik=genislik,
         guvenli_kenar=p.tipografi.guvenli_kenar)
     olcum["yatay_guvenli_alan"] = yg
+    # ── I-31: GORUNUR KUNYE EKSIK OLAMAZ ──
+    # ⚠ Atif zorunluyken sahip/lisans yoksa metin URETILMEZ (uydurma YOK)
+    # ve kusur SESSIZ KALMAZ: burasi durustce FAIL yazar.
+    _kk_eksik = [k for k in (kunye_kararlari or []) if k.get("eksik")]
+    olcum["kunye_politikasi"] = {
+        "karar": len(kunye_kararlari or []),
+        "kisaltilan": [k for k in (kunye_kararlari or [])
+                       if k.get("kisaltildi")],
+        "eksik": _kk_eksik,
+        "yontemler": sorted({str(k.get("yontem") or "")
+                             for k in (kunye_kararlari or [])}),
+        "temiz": not _kk_eksik}
+    for _ke in _kk_eksik:
+        _ekle("KALITE-KUNYE-EKSIK", "fail",
+              f"{_ke.get('asset_id') or '?'}: gorunur kunye URETILEMEDI "
+              f"({_ke.get('yontem')}) — {_ke.get('sebep') or ''}",
+              "eser sahibi/lisans alanini kaynagindan doldur; "
+              "UYDURULMAZ ve atif atlanamaz",
+              scene_id=str(_ke.get("scene_id") or ""),
+              beat_id=str(_ke.get("beat_id") or ""))
     for ih in (yg.get("ihlaller") or []):
         _ekle("KALITE-GUVENLI-ALAN", "fail",
               f"{ih['ad']}: YATAY tasma {ih['tasma_px']}px "
