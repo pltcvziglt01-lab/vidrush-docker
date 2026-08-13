@@ -6281,6 +6281,92 @@ kontrol("elenen kaydi SEBEBIYLE birlikte duruyor",
             "x", adet=6, en_az_genislik=1920, acan=_sahte_acan([
                 _sahte_sayfa(1, 1, 800, 600, "kucuk.jpg")]))["elenen"]))
 
+blok("§39f I-29 — AFIS/PANO SINYALI: METADATA GUVENILIR DEGIL (olculdu)")
+
+# ⚠ I-26'da GOZLE yakalanan kusur: s01'e secilen Commons varligi CAM ARKASI
+# BIR MUZE PANOSUNUN fotografiydi. I-29'da sorulan soru: bu, ADAY
+# METADATASINDAN (baslik/aciklama/kategori/provenance) DETERMINISTIK olarak
+# yakalanabilir mi? OLCUM: HAYIR.
+#
+# Asagidaki metinler Commons `extmetadata`sindan GERCEKTEN okundu
+# (ag YOK — olculen degerler fikstur olarak sabitlendi).
+_MD29_KUSURLU = {           # cam arkasi muze panosu — GORSEL OLARAK KUSURLU
+    "ObjectName": "Pleiades supercomputer racks 4",
+    "ImageDescription": "Pleiades supercomputer racks",
+    "Categories": "Taken with LG Ultimate 2|Pleiades supercomputer|"
+                  "Self-published work",
+    "genislik": 2240}
+_MD29_TEMIZ = [
+    {"ObjectName": "OSC's HP Intel Xeon Oakley Cluster",
+     "ImageDescription": "OSC's HP Intel Xeon Oakley Cluster provides clients "
+                         "with a total peak performance of 154 Teraflops.",
+     "Categories": "Self-published work|Supercomputers in the United States|"
+                   "Hewlett-Packard supercomputers", "genislik": 5184},
+    {"ObjectName": "NASA Pleiades Supercomputer (9616175099)",
+     "ImageDescription": "With 195 thousand cores, it can hit 2.9 petaflop/s.",
+     "Categories": "Pleiades supercomputer|Photographs by Steve Jurvetson",
+     "genislik": 4983},
+]
+# Yanlis pozitif kanitlari: METINDE anahtar kelime VAR ama varlik MESRU.
+_MD29_YANLIS_POZITIF = [
+    {"ObjectName": "NASA Advanced Supercomputing Facility with sign",
+     "ImageDescription": "", "Categories": "", "eslesen": "sign"},
+    {"ObjectName": "NASA's Roman Mission Gets Cosmic Sneak Peek",
+     "ImageDescription": "the telescope displays its first image",
+     "Categories": "", "eslesen": "displays"},
+    {"ObjectName": "Solar array, Guilford, Vermont",
+     "ImageDescription": "", "Categories": "Banner images", "eslesen": "Banner"},
+]
+_ANAHTAR29 = re.compile(
+    r"\b(display|displays|exhibit|exhibition|museum|poster|signage|sign|signs|"
+    r"placard|showcase|plaque|banner|kiosk|information board)\b", re.I)
+
+
+def _md29_metin(k):
+    return " ".join([str(k.get("ObjectName") or ""),
+                     str(k.get("ImageDescription") or ""),
+                     str(k.get("Categories") or "")])
+
+
+kontrol("⭐ I-29: GERCEK kusurlu varlik anahtar kelimeyle YAKALANMIYOR "
+        "(recall 0/1)",
+        _ANAHTAR29.search(_md29_metin(_MD29_KUSURLU)) is None,
+        _md29_metin(_MD29_KUSURLU))
+kontrol("I-29: kusurlu varligin metadatasi kendini KONU gibi tanitiyor",
+        "supercomputer racks" in _MD29_KUSURLU["ImageDescription"].lower())
+for _yp in _MD29_YANLIS_POZITIF:
+    kontrol(f"⭐ I-29 YANLIS POZITIF: mesru varlik '{_yp['eslesen']}' ile "
+            f"isaretlenirdi",
+            _ANAHTAR29.search(_md29_metin(_yp)) is not None,
+            _yp["ObjectName"][:44])
+kontrol("I-29: TEMIZ varliklar anahtar kelimeyle isaretlenmiyor",
+        all(_ANAHTAR29.search(_md29_metin(t)) is None for t in _MD29_TEMIZ))
+
+# ── "Taken with <cihaz>" sinyali: kusuru yakalar AMA hassasiyeti %6 ──
+_TAKEN29 = re.compile(r"\bTaken with\b", re.I)
+kontrol("I-29: 'Taken with' sinyali kusuru YAKALIYOR",
+        _TAKEN29.search(_MD29_KUSURLU["Categories"]) is not None)
+# Gercek havuzda olculdu: 18/56 aday bu kategoriyi tasiyor, 17'si TEMIZ.
+_TAKEN29_OLCUM = {"taranan": 56, "isaretlenen": 18, "gercek_kusur": 1}
+kontrol("⭐ I-29: 'Taken with' sinyalinin HASSASIYETI %6 — KAPI OLAMAZ",
+        round(100 * _TAKEN29_OLCUM["gercek_kusur"]
+              / _TAKEN29_OLCUM["isaretlenen"]) <= 6,
+        _TAKEN29_OLCUM)
+kontrol("I-29: bu sinyal 17 TEMIZ adayi elerdi (aralarinda SECILENLER var)",
+        _TAKEN29_OLCUM["isaretlenen"] - _TAKEN29_OLCUM["gercek_kusur"] == 17)
+
+# ── HUKUM: sinyal guvenilir DEGIL -> URETIM DAVRANISI DEGISMEDI ──
+for _dosya29 in ("medya/commons.py", "medya/edinim.py", "editor/qa_on.py",
+                 "editor/plan.py"):
+    kontrol(f"⭐ I-29: {_dosya29} anahtar-kelime AFIS KAPISI ICERMIYOR",
+            not re.search(r"\b(exhibit|museum|poster|signage|placard|showcase)\b",
+                          _kod_yalniz(oku(KOK, _dosya29)), re.I),
+            _dosya29)
+# ⚠ Kusur SINIFI yine de tesadufen degil, I-27 esigiyle KAPALI:
+kontrol("⭐ I-29: kusurlu varlik I-27 COZUNURLUK esigiyle ZATEN eleniyor",
+        _MD29_KUSURLU["genislik"] < _kk.en_az_kaynak_genisligi(1920),
+        f"{_MD29_KUSURLU['genislik']} < {_kk.en_az_kaynak_genisligi(1920)}")
+
 blok("§39e I-28 — SECIM SIRASI TANISI: KUSUR YOK, DAVRANIS KILITLENDI")
 
 # ⚠ I-28'IN ONCULU OLCUMLE CURUDU.

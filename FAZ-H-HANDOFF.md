@@ -195,6 +195,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-26 s03 aşırı dar sorgu çözüldü; pilot BLOKE** | `2928130` | ⚠ **push edildi**, Commons s03 0→2 aday, tekel %100→%60, MP4 **KABUL EDİLMEDİ** (punch büyütme), deploy YOK |
 | 13 Ağu | **I-27 kamera punch büyütmesi ÇÖZÜLDÜ** | `6ccb739` | ✅ **push edildi**, büyüten beat 2→0, POST-QA **TAM PASS**, puan 100/100, Faz I BLOKE 0, deploy YOK |
 | 13 Ağu | **I-28 seçim sırası tanısı: KUSUR YOK** | `b61208d` | ✅ **push edildi**, öncül ölçümle çürüdü, üretim kodu DEĞİŞMEDİ, davranış kilitlendi, MP4 korundu, deploy YOK |
+| 13 Ağu | **I-29 afiş/pano sinyali: metadata GÜVENİLİR DEĞİL** | `PENDING` | ✅ **push edildi**, recall %0 / hassasiyet %6 ölçüldü, üretim DEĞİŞMEDİ, MP4 korundu, deploy YOK |
 
 ---
 
@@ -4305,3 +4306,110 @@ Kalan tek BLOKE Faz H'deki `QA_TEST_VIDEO` (opsiyonel, I-22'den beri aynı).
 - **"Afiş/pano fotoğrafı"** için ölçülebilir eleme sinyali (metin yoğunluğu)
   — I-26'da gözle yakalandı, otomatik ölçümü hâlâ yok. Tek gerçek açık kalite
   kapısı bu.
+
+---
+
+## 47. FAZ I-29 — AFİŞ/PANO SİNYALİ: METADATA **GÜVENİLİR DEĞİL** (13 Ağu)
+
+> **Durum: ölçüm tamamlandı, sinyal ELENDİ. Üretim davranışı DEĞİŞMEDİ;
+> ölçüm ve gerekçe teste kilitlendi. Yerel yeşil (0 hata), push edildi.
+> Deploy YOK. Maliyet $0.00.**
+> Değişen: **yalnızca** `webapp/testler/test_faz_i.py` (+ handoff).
+> `medya/*`, `editor/*`, `pipeline.py`, `server.py`, `deploy.sh`, smoke
+> betiği ve 22 alan sözleşmesi **dokunulmadı** (git ile doğrulandı).
+> **Pilot yeniden üretilmedi**: medya/render davranışı değişmediği için
+> I-27'nin kabul edilmiş MP4'ü **korunuyor**.
+
+### Sorulan soru
+
+I-26'da **gözle** yakalanan kusur: s01'e seçilen Commons varlığı **cam
+arkası bir müze panosunun** fotoğrafıydı. I-29: bu, aday **metadatasından**
+(başlık / açıklama / kategori / provenance) deterministik yakalanabilir mi?
+
+⚠ Ölçüm **bedava**: `commons.ara` zaten `iiprop=…|extmetadata` istiyor, yani
+tüm alanlar **aynı çağrıda** geliyor; yalnızca 5'i çıkarılıyor. Ek ağ/kota
+çağrısı yapılmadı.
+
+### Ölçüm 1 — anahtar kelime sinyali: **recall 0/1**
+
+Kusurlu varlığın gerçek metadatası:
+
+| alan | değer |
+|---|---|
+| ObjectName | `Pleiades supercomputer racks 4` |
+| ImageDescription | `Pleiades supercomputer racks` |
+| Categories | `Taken with LG Ultimate 2 \| Pleiades supercomputer \| Self-published work` |
+
+**Hiçbir yerde** display / exhibit / museum / poster / signage geçmiyor.
+Yükleyici fotoğrafı **konunun kendisi** gibi tanıtmış. Yani sinyal, gerçek
+kusuru **hiç yakalamıyor**.
+
+Aynı desen 4 pilot sorgusunun **56 adayında** koşuldu:
+
+| ölçüm | sonuç |
+|---|---|
+| Taranan aday | 56 |
+| İşaretlenen | **7 (%12)** |
+| **Gerçek kusur yakalandı mı** | ❌ **HAYIR** |
+
+İşaretlenenler arasında net **yanlış pozitifler** var:
+- `NASA Advanced Supercomputing Facility **with sign**` — meşru tesis fotoğrafı
+- `NASA's Roman Mission… the telescope **displays** its first image` — fiil
+- `Solar array, Guilford, Vermont` — `**Banner** images` kategorisi
+
+⚠ İlk denememde desen `sign\b` idi ve **"design"i** yakalıyordu; bu **benim
+regex hatamdı**. Kelime sınırları düzeltilip yeniden ölçüldü — yukarıdaki
+sayılar düzeltilmiş desenin sonucudur.
+
+### Ölçüm 2 — `Taken with <cihaz>` sinyali: **hassasiyet %6**
+
+Kusurluda göze çarpan tek fark bu kategoriydi. Ölçüldü:
+
+| ölçüm | sonuç |
+|---|---|
+| Bu kategoriyi taşıyan aday | **18 / 56** |
+| Gerçek kusur yakalandı mı | ✅ evet |
+| Elenecek **temiz** aday | **17** |
+| **Hassasiyet** | **≈ %6** |
+
+Eleyeceği temiz adaylar arasında `Pleiades supercomputer.jpg` (3072 px —
+I-28 kanıtında **s01 için seçilen** adaylardan biri), `OHSupercomputer`
+(3488 px) ve `Pleiades supercomputer node on display at NASA Ames`
+(3410 px) var. Bu sinyal "pano fotoğrafı"nı değil **"telefonla çekilmiş"i**
+ölçüyor — kapı olamaz.
+
+### ⛔ HÜKÜM: sinyal güvenilir değil → üretim davranışı DEĞİŞMEDİ
+
+- Anahtar kelime: **%0 recall** (kusuru kaçırıyor) + meşru varlıkları eliyor.
+- Kamera kategorisi: **%6 hassasiyet** (17 temiz adayı eliyor).
+
+İkisi de kapıya dönüştürülemez. Kullanıcı talimatı gereği **üretim kodu
+değiştirilmedi**; ölçüm ve gerekçe teste kilitlendi. Ayrıca dört üretim
+dosyasına (`commons.py`, `edinim.py`, `qa_on.py`, `plan.py`) **böyle bir
+anahtar-kelime kapısı EKLENMEDİĞİNİ** doğrulayan koruma testi kondu — ileride
+kanıtsız eklenmesin.
+
+### ✅ Yan bulgu: kusur sınıfı zaten kapalı
+
+Kusurlu varlık **2240 px**; I-27'nin türetilmiş eşiği **2443 px**. Yani bu
+somut vaka **I-27 çözünürlük/geometri kapısıyla zaten eleniyor** — semantik
+sinyalle değil, ama ölçülebilir ve deterministik biçimde. Testte kilitlendi.
+
+### Ölçülen test sonucu
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1630** | **3044** |
+
+0 hata. Faz I 1616 → **1630** (+14). Faz I BLOKE **0**.
+Kalan tek BLOKE Faz H'deki `QA_TEST_VIDEO` (opsiyonel, I-22'den beri aynı).
+
+### SONRAKİ ATOM (I-30 adayları)
+
+- **Afiş/pano tespiti metadata ile ÇÖZÜLEMEZ** (ölçüldü). Gerçek çözüm
+  **kare-bakan** bir sinyal olurdu (ör. yüksek metin/kenar yoğunluğu, düz
+  dikdörtgen bölge sayımı) — bu, `medya.edinim`in `kapsam_disi` listesinde
+  açıkça **kapsam dışı** yazan "kare-bakan içerik doğrulaması"dır. Yeni bir
+  yetenek; **kullanıcı kararı**.
+- **Sağlayıcı tekeli** teknik olarak çözülmüş durumda değil ama **mühendislik
+  kusuru da değil**: Commons 429'u host/IP kaynaklı (I-28'de kanıtlandı).
