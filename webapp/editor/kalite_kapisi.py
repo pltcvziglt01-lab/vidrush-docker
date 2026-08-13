@@ -540,6 +540,102 @@ def guvenli_alan_olcusu(katmanlar, *, kare_yukseklik: float,
             "temiz": not ihlaller}
 
 
+# ═══════════ 5a2) ALTYAZI NEFES BOSLUGU (Faz I-39) ══════════════════════
+#
+# ⚠ NEDEN VAR — I-38'IN 1080p PILOTUNDA OLCULEN KUSUR:
+# I-38 ekran kunyesini GORUNUR yapti, ama kunye altyazi bandinin DIBINDE
+# duruyordu. Iki katman da bandin ICINE GIRMEDIGI icin `guvenli_alan_olcusu`,
+# `yazi_cakismasi` ve `bant_cakisiyor` UCU DE TEMIZ donuyordu:
+#     source-label  y=0.755 -> alt 842.7 px, bant ustu 874.8 px -> 32.1 px
+#     chapter-title y=0.70  -> alt 859.0 px                     -> 15.8 px
+# "Degmiyorsa sorun yok" YANLIS bir kabuldu: iki yazi kutusu birkac on piksel
+# arayla ust uste yigildiginda goz ikisini TEK BLOK okuyor ve altyazi da
+# kunye de okunmuyor. Bu yuzden AYRI bir olcum gerekiyor: BOSLUGUN KENDISI.
+#
+# ESIK — uydurma degil, TIPOGRAFIK: iki metin blogu arasinda en az BIR SATIR
+# yuksekligi bosluk kalmali. Altyazi satir yuksekligi = altyazi puntosu * 1.25
+# (38 punto -> 47.5 px). Carpan altyazi bileseninin kendi olcusune bagli, sabit
+# piksel DEGIL: punto degisirse esik de degisir.
+NEFES_CARPANI = 1.25
+# Grafikler.tsx:191 — `KaynakEtiketi` KENDI alt sinirini `punto * 1.3` ile
+# hesapliyor (`height - GUVENLI_KENAR - punto * 1.3`). Cizilen satir kutusunun
+# yuksekligi orada puntonun 1.3 kati sayiliyor; ayni oran bantli katmanlarin
+# satir kutusu icin de kullanilir. Render tarafi degisirse BURASI da degismeli.
+SATIR_KUTU_ORANI = 1.3
+# Bandin ICINDE olan katmanlar bu olcumun konusu DEGILDIR (onlari
+# `yazi_cakismasi` + `guvenli_alan_olcusu` zaten FAIL ediyor); yine de negatif
+# nefes olarak kayda gecer, gizlenmez.
+
+
+def yazi_alt_kenari_px(*, ad: str, y_orani, punto, bant: bool,
+                       kare_yukseklik: float,
+                       satir_orani: float = SATIR_KUTU_ORANI,
+                       dolgu_orani: float = DOLGU_ORANI) -> float:
+    """Katmanin EKRANDA CIZILEN alt kenari (px). Saf aritmetik.
+
+    ⚠ `tipografi.YUKSEKLIK` oranlari YERLESIM icin kaba bir rezervdir;
+    burada render'in KENDI geometrisi kullanilir:
+      · bantsiz katman (`source-label`): ust + punto * 1.3
+      · bantli katman (`chapter-title`, `lower-third`...): Grafikler.tsx
+        `top: yOrani*height - dolgu` + `padding: dolgu` ile ciziyor, yani
+        metin ust kenari `yOrani*height`te, bandin alti bir DOLGU asagida.
+    """
+    h = _sayi(kare_yukseklik)
+    p = _sayi(punto)
+    ust = _sayi(y_orani) * h
+    alt = ust + p * _sayi(satir_orani, SATIR_KUTU_ORANI)
+    if bant:
+        alt += round(p * _sayi(dolgu_orani, DOLGU_ORANI))
+    return alt
+
+
+def altyazi_nefes_olcusu(katmanlar, *, kare_yukseklik: float,
+                         bant_ust_orani, altyazi_punto,
+                         carpan: float = NEFES_CARPANI) -> dict:
+    """Yazi katmanlari ile altyazi bandi arasinda YETERLI BOSLUK var mi?
+
+    `katmanlar`: [{"ad","y_orani","punto","bant"} ...]
+    Doner: esik, bant ust kenari, her katmanin nefesi ve ihlal listesi.
+
+    ⚠ OLCEMEDIYSE "temiz" DEMEZ: altyazi yoksa/olculer bozuksa `olculdu`
+    False doner ve hukum verilmez (sessiz PASS yok).
+    """
+    try:
+        liste = [k for k in (katmanlar or []) if isinstance(k, dict)]
+    except TypeError:
+        return {"olculdu": False, "neden": "GIRDI-BOZUK"}
+    h = _sayi(kare_yukseklik)
+    ust_orani = _sayi(bant_ust_orani)
+    alt_punto = _sayi(altyazi_punto)
+    if h <= 0 or not 0 < ust_orani <= 1 or alt_punto <= 0:
+        return {"olculdu": False, "neden": "OLCU-YOK",
+                "kare_yukseklik": h, "altyazi_punto": alt_punto}
+    esik = alt_punto * _sayi(carpan, NEFES_CARPANI)
+    bant_ust_px = ust_orani * h
+    kayitlar, ihlaller = [], []
+    for k in liste:
+        ad = str(k.get("ad") or "")
+        if ad == "subtitle":          # altyazinin kendisi olculmez
+            continue
+        alt_px = yazi_alt_kenari_px(
+            ad=ad, y_orani=k.get("y_orani"), punto=k.get("punto"),
+            bant=bool(k.get("bant")), kare_yukseklik=h)
+        nefes = bant_ust_px - alt_px
+        kayit = {"ad": ad, "y_orani": _sayi(k.get("y_orani")),
+                 "punto": _sayi(k.get("punto")), "bant": bool(k.get("bant")),
+                 "alt_px": round(alt_px, 1), "nefes_px": round(nefes, 1),
+                 "yeterli": nefes >= esik - 1e-6}
+        kayitlar.append(kayit)
+        if not kayit["yeterli"]:
+            ihlaller.append(kayit)
+    return {"olculdu": True, "esik_px": round(esik, 3),
+            "carpan": _sayi(carpan, NEFES_CARPANI),
+            "altyazi_punto": alt_punto, "kare_yukseklik": h,
+            "bant_ust_px": round(bant_ust_px, 3), "katman": len(kayitlar),
+            "kayitlar": kayitlar, "ihlaller": ihlaller,
+            "temiz": not ihlaller}
+
+
 # ═══════════ 5b) YATAY GUVENLI ALAN (Faz I-30) ══════════════════════════
 #
 # ⚠ NEDEN VAR — I-30'DA OLCULEN BOSLUK:

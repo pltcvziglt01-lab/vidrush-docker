@@ -6412,6 +6412,167 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
         "KaynakEtiketi" in _GRAFIK_TSX
         and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
 
+blok("§39o I-39 — ALTYAZI NEFES BOSLUGU (olculen kusur)")
+
+# ⚠ I-38'IN 1080p PILOTUNDA OLCULEN KUSUR: ekran kunyesi ARTIK ciziliyor
+# (I-38 duzeltmesi) ama altyazi bandinin (`ALTYAZI_BANT[0]` = 0.81 ->
+# 874.8 px) DIBINDE duruyor. Iki yazi katmani da altyaziya "nefes" birakmiyor:
+#   source-label  y=0.755 -> alt kenar 815.4 + 21*1.3   = 842.7 px -> 32.1 px
+#   chapter-title y=0.70  -> alt kenar 756 + 60*1.3 + 25 = 859.0 px -> 15.8 px
+# Gerekli esik = altyazi puntosu * 1.25 = 38 * 1.25 = **47.5 px**.
+# ⚠ Handoff notu chapter-title bosluguna ~43.8 px diyordu; o sayi yalniz
+# METIN alt kenarini (y*H + punto*1.25) sayiyor, BANT DOLGUSUNU saymiyordu.
+# Burada olculen deger CIZILEN BANT KUTUSUDUR (dolgu dahil) — daha kati ve
+# ekranda gercekten kaplanan yer. Iki okuma da esigin ALTINDA, hukum ayni.
+# Hicbir kapi bunu gormuyordu: katmanlar banda GIRMEDIGI icin
+# `KALITE-YAZI-CAKISMA` ve `KALITE-GUVENLI-ALAN` temiz donuyordu.
+
+from editor import motion as _mo39                                # noqa: E402
+
+_ALT_BANT_UST_PX = _etipo.ALTYAZI_BANT[0] * 1080          # 874.8
+_NEFES_ESIK_PX = _eprofil.VARSAYILAN.tipografi.altyazi * 1.25   # 47.5
+
+kontrol("I-39: nefes esigi altyazi puntosundan TURETILIYOR (47.5 px)",
+        abs(_NEFES_ESIK_PX - 47.5) < 1e-9
+        and _eprofil.VARSAYILAN.tipografi.altyazi == 38, _NEFES_ESIK_PX)
+
+# ── KIRMIZI 1: KONUM SABITLERI (kusurlu geometri) ──
+kontrol("⭐ I-39 KIRMIZI: kunye altyazi varken SAG USTE tasindi (0.075)",
+        abs(_etipo.KAYNAK_ETIKETI_ALTYAZILI - 0.075) < 1e-9,
+        _etipo.KAYNAK_ETIKETI_ALTYAZILI)
+kontrol("⭐ I-39 KIRMIZI: bolum basligi 0.70 -> 0.60 tasindi",
+        abs(_etipo.KONUM["chapter-title"] - 0.60) < 1e-9,
+        _etipo.KONUM["chapter-title"])
+kontrol("⭐ I-39: motion spec varsayilani KONUM ile AYNI (iki aritmetik YOK)",
+        abs(_mo39.bolum_basligi_spec("X", 3.0).sozluk()["parametre"]["y_orani"]
+            - _etipo.KONUM["chapter-title"]) < 1e-9
+        and abs(_mo39.bolum_basligi_spec("X", 3.0)
+                .sozluk()["parametre"]["y_orani"] - 0.60) < 1e-9,
+        _mo39.bolum_basligi_spec("X", 3.0).sozluk()["parametre"]["y_orani"])
+
+# ── KIRMIZI 2: DETERMINISTIK OLCUM FONKSIYONU ──
+_nefes_fn = getattr(_kk, "altyazi_nefes_olcusu", None)
+kontrol("⭐ I-39 KIRMIZI: `altyazi_nefes_olcusu` OLCUMU VAR",
+        callable(_nefes_fn), type(_nefes_fn).__name__)
+
+
+def _nefes39(katmanlar):
+    """Gercek pilot katmanlariyla nefes olcumu (saf, agsiz)."""
+    if not callable(_nefes_fn):
+        return {}
+    return _nefes_fn(
+        [{"ad": k.ad, "y_orani": k.y_orani, "punto": k.punto, "bant": k.bant}
+         for k in katmanlar],
+        kare_yukseklik=1080, bant_ust_orani=_etipo.ALTYAZI_BANT[0],
+        altyazi_punto=_eprofil.VARSAYILAN.tipografi.altyazi)
+
+
+# I-38 pilotunun GERCEK katmanlari (edit_manifest.json'dan OLCULDU) — ESKI
+# geometri. Bu kurulum KALICI KIRMIZI KANITTIR: kapi bunu her zaman yakalar.
+_KAT39_ESKI = [
+    _etipo.katman_kur("chapter-title", "THERE IS A BAG OF GRASS", 0.2, 3.387,
+                      p=_P38, y_orani=0.70),
+    _etipo.katman_kur("source-label", "Famartin / CC-BY-SA", 4.488, 3.0,
+                      p=_P38, y_orani=0.755)]
+_N39_ESKI = _nefes39(_KAT39_ESKI)
+kontrol("⭐ I-39 KIRMIZI: ESKI geometride IKI katman da nefessiz",
+        _N39_ESKI.get("temiz") is False and len(_N39_ESKI.get("ihlaller") or []) == 2,
+        _N39_ESKI.get("ihlaller"))
+kontrol("⭐ I-39: kunye boslugu 32.1 px OLCULDU (esik 47.5)",
+        any(abs(i.get("nefes_px", 0) - 32.1) < 0.05
+            for i in (_N39_ESKI.get("ihlaller") or [])),
+        [(i.get("ad"), i.get("nefes_px")) for i in
+         (_N39_ESKI.get("ihlaller") or [])])
+kontrol("I-39: olcum esigi ve bant ust kenarini RAPORLUYOR",
+        abs(_N39_ESKI.get("esik_px", 0) - 47.5) < 1e-9
+        and abs(_N39_ESKI.get("bant_ust_px", 0) - 874.8) < 1e-6,
+        (_N39_ESKI.get("esik_px"), _N39_ESKI.get("bant_ust_px")))
+
+# ── YESIL: YENI geometri (uretim sabitleriyle) nefes birakiyor ──
+_KAT39_YENI = [
+    _etipo.katman_kur("chapter-title", "THERE IS A BAG OF GRASS", 0.2, 3.387,
+                      p=_P38),
+    _etipo.katman_kur("source-label", "Famartin / CC-BY-SA", 4.488, 3.0,
+                      p=_P38, y_orani=_etipo.KAYNAK_ETIKETI_ALTYAZILI)]
+_N39_YENI = _nefes39(_KAT39_YENI)
+kontrol("⭐ I-39 YESIL: URETIM sabitleriyle nefes IHLALI YOK",
+        _N39_YENI.get("temiz") is True and not _N39_YENI.get("ihlaller"),
+        [(k.get("ad"), k.get("nefes_px"))
+         for k in (_N39_YENI.get("kayitlar") or [])])
+kontrol("I-39: her katmanin nefesi esigin USTUNDE ve OLCULU",
+        all(k.get("nefes_px", -1) >= _NEFES_ESIK_PX
+            for k in (_N39_YENI.get("kayitlar") or []))
+        and len(_N39_YENI.get("kayitlar") or []) == 2,
+        [(k.get("ad"), k.get("nefes_px"))
+         for k in (_N39_YENI.get("kayitlar") or [])])
+
+# ── KIRMIZI 3: PRE-QA KAPISI ──
+
+
+def _qa39(katmanlar, kupler=True):
+    q = _qon.QaSonucu()
+    _qon._kalite_denetle(
+        q, beatler=[], cekimler=[], yazi_katmanlari=katmanlar,
+        adaylar_index={}, p=_qon.VARSAYILAN, kare_olcu=(1920, 1080),
+        anlatim_bitis_sn=None, toplam=25.2, benzerlik_okuyucu=None, acik=True,
+        altyazi_kupleri=([{"bas_sn": 0.1, "sure_sn": 25.0,
+                           "metin": "x", "satirlar": ["x"]}] if kupler else None))
+    return q
+
+
+_Q39K = _qa39(_KAT39_ESKI)
+kontrol("⭐ I-39 KIRMIZI: PRE-QA `KALITE-YAZI-NEFES-YOK` FAIL uretiyor",
+        any(x.kod == "KALITE-YAZI-NEFES-YOK" and x.seviye == "fail"
+            for x in _Q39K.sorunlar),
+        [x.kod for x in _Q39K.sorunlar])
+kontrol("⭐ I-39: olcum raporda GORUNUYOR (`altyazi_nefesi`)",
+        (_Q39K.olcumler.get("kalite") or {}).get("altyazi_nefesi", {})
+        .get("temiz") is False,
+        (_Q39K.olcumler.get("kalite") or {}).get("altyazi_nefesi"))
+_Q39Y = _qa39(_KAT39_YENI)
+kontrol("⭐ I-39 YESIL: yeni geometride NEFES-YOK sorunu YOK",
+        not [x for x in _Q39Y.sorunlar if x.kod == "KALITE-YAZI-NEFES-YOK"]
+        and (_Q39Y.olcumler.get("kalite") or {})
+        .get("altyazi_nefesi", {}).get("temiz") is True,
+        (_Q39Y.olcumler.get("kalite") or {}).get("altyazi_nefesi"))
+kontrol("⭐ I-39: kapi FAIL ve KALITE kodlarinda (bayraga bagli)",
+        "KALITE-YAZI-NEFES-YOK" in _qon.FAIL_KODLARI
+        and "KALITE-YAZI-NEFES-YOK" in _qon.KALITE_KODLARI)
+# ⚠ ALTYAZI YOKSA BANT DA YOK: kapi UYDURMA hukum vermez.
+_Q39N = _qa39(_KAT39_ESKI, kupler=False)
+kontrol("I-39: altyazi YOKKEN kapi hukum VERMIYOR (olculemedi, sessiz PASS degil)",
+        not [x for x in _Q39N.sorunlar if x.kod == "KALITE-YAZI-NEFES-YOK"]
+        and (_Q39N.olcumler.get("kalite") or {})
+        .get("altyazi_nefesi", {}).get("olculdu") is False,
+        (_Q39N.olcumler.get("kalite") or {}).get("altyazi_nefesi"))
+kontrol("I-39: olcum BOZUK girdide ISTISNA FIRLATMIYOR",
+        callable(_nefes_fn)
+        and _nefes_fn(None, kare_yukseklik=0, bant_ust_orani=None,
+                      altyazi_punto="x").get("olculdu") is False
+        and _nefes_fn([{"ad": None, "y_orani": "a", "punto": None}],
+                      kare_yukseklik=1080, bant_ust_orani=0.81,
+                      altyazi_punto=38).get("olculdu") is True)
+
+# ── GERILEME YOK: onceki kapilar ve sozlesmeler ──
+kontrol("I-39 GERILEME YOK: kunye HALA altyazi bandinin USTUNDE (I-16)",
+        _etipo.KAYNAK_ETIKETI_ALTYAZILI + _etipo.YUKSEKLIK["source-label"]
+        <= _etipo.ALTYAZI_BANT[0] + 1e-9,
+        _etipo.KAYNAK_ETIKETI_ALTYAZILI)
+kontrol("I-39 GERILEME YOK: iki katman da GUVENLI ALANDA (I-12)",
+        not [s for k in _KAT39_YENI
+             for s in _etipo.guvenli_alan_kontrol(k, p=_P38)],
+        [(k.ad, _etipo.guvenli_alan_kontrol(k, p=_P38)) for k in _KAT39_YENI])
+kontrol("I-39 GERILEME YOK: altyazisiz varsayilan konumlar DEGISMEDI",
+        _etipo.KONUM["source-label"] == 0.895
+        and _etipo.KONUM["subtitle"] == 0.855
+        and _etipo.ALTYAZI_BANT == (0.81, 0.94))
+kontrol("I-39 GERILEME YOK: I-38 spec zamani HALA SAHNEYE GORELI",
+        all(s["bas_sn"] < _sahne_suresi(s["beat_id"]) for s in _SP38))
+kontrol("I-39: kunye SAG UST (y ust kenari guvenli kenarin ICINDE)",
+        _etipo.KAYNAK_ETIKETI_ALTYAZILI * 1080
+        >= _P38.tipografi.guvenli_kenar,
+        _etipo.KAYNAK_ETIKETI_ALTYAZILI * 1080)
+
 blok("§39m I-37 — BEAT->SCENE->FACT->ASSET BAGI KOPAMAZ")
 
 # ⚠ I-37'DE OLCULEN KUSUR (lawn pilotu, gercek render):

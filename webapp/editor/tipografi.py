@@ -18,7 +18,12 @@ from .profil import EditProfili, VARSAYILAN
 
 # Yazi katmani turleri ve varsayilan dikey konumlari (0-1)
 KONUM = {
-    "chapter-title": 0.70,
+    # ⚠ I-39: 0.70 IDI. 1080p pilotunda OLCULDU — bant alt kenari
+    # 0.70*1080 + 60*1.3 + dolgu 25 = 859 px, altyazi bandi 874.8 px'te
+    # basliyor: arada 15.8 px kaliyordu. Gerekli nefes = altyazi puntosu
+    # * 1.25 = 47.5 px. 0.60 -> alt 751 px, nefes 123.8 px.
+    # (Sayi hesaplandi, "yeterince yukarida" varsayilmadi — I-12 dersi.)
+    "chapter-title": 0.60,
     "lower-third": 0.78,
     "quote-card": 0.42,
     "callout": 0.45,          # x/y spec'ten gelir
@@ -53,8 +58,14 @@ YUKSEKLIK = {
 #   ust = 0.81 -> iki satir 38 punto + dolgu icin 0.13 oran yeter
 ALTYAZI_BANT = (0.81, 0.94)
 # Altyazi varken kaynak kunyesi bandin USTUNE tasinir (varsayilan 0.895
-# bandin TAM ICINDE kalirdi).  0.755 + 0.045 = 0.80 -> bandin hemen ustu.
-KAYNAK_ETIKETI_ALTYAZILI = 0.755
+# bandin TAM ICINDE kalirdi).
+# ⚠ I-39: 0.755 IDI ve "bandin hemen ustu" YETMIYORDU. 1080p pilotunda
+# OLCULDU: kunye alt kenari 0.755*1080 + 21*1.3 = 842.7 px, bant 874.8 px'te
+# basliyor -> yalniz **32.1 px** bosluk. Gerekli nefes = altyazi puntosu
+# * 1.25 = **47.5 px**. Goz iki blogu tek yigin okuyordu; ikisi de okunmuyordu.
+# 0.075 -> SAG UST kose (ust kenar 81 px, guvenli kenar 64 px'in icinde),
+# altyazidan 766.5 px uzakta. Kunye HALA ekranda ve atif EKSILMIYOR.
+KAYNAK_ETIKETI_ALTYAZILI = 0.075
 
 
 def bant_cakisiyor(y_ust: float, yukseklik: float,

@@ -300,7 +300,11 @@ kontrol("satir bolme calisir",
 # Cakisma: ayni anda ust uste iki katman
 c1 = tipografi.katman_kur("chapter-title", "BASLIK", 1.0, 4.0, p=P)
 c2 = tipografi.katman_kur("lower-third", "TOKYO", 1.5, 4.0, p=P)
-c2.y_orani = 0.72          # basligin uzerine bindir
+# ⚠ I-39: burada SABIT `0.72` yaziyordu ve o sayi basligin ESKI konumuna
+# (0.70) gore secilmisti. Baslik 0.60'a tasininca fixture cakismayi kurmayi
+# BIRAKTI ve test cozucuyu bos kumeyle sinadi. Bindirme artik BASLIGIN KENDI
+# konumundan turetiliyor — sabit degistiginde sinama niyeti korunur.
+c2.y_orani = round(c1.y_orani + 0.02, 3)   # basligin uzerine bindir
 cozulmus, rapor = tipografi.cakisma_coz([c1, c2], p=P)
 kontrol("cakisma COZULDU (kaydirma/erteleme)",
         len(cozulmus) == 2 and rapor, str(rapor))

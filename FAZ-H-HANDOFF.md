@@ -5275,3 +5275,138 @@ kare, izleyici kalite puanı 100/100.
 3. **`kaynakYazi` `VidrushVideo` yolunda taşınmıyor** (`Video.tsx` `Sahne`
    tipinde alan yok; `adapter.REMOTION_ALANLARI` ise içeriyor). Bu hat
    (`pipeline.py`) I-38'de **ölçülmedi**; ayrı atom olarak doğrulanmalı.
+
+---
+
+## 57. FAZ I-39 — ALTYAZI NEFES BOŞLUĞU: YAZI ALTYAZIYA YAPIŞAMAZ (dar kalite atomu, 13 Ağu)
+
+> **Durum: ölçülen kusur ÇÖZÜLDÜ, kapı eklendi, A–I yeşil (3183, 0 hata).
+> 1080p pilot YENİDEN ÜRETİLDİ ve POST-QA **tam PASS**. Lawn pilotu yine de
+> KABUL EDİLMEDİ (ayrı, ölçülen semantik sebep). Deploy YOK. Maliyet $0.00.**
+> Değişen: `webapp/editor/tipografi.py` (2 sabit), `webapp/editor/motion.py`
+> (2 sabit), `webapp/editor/kalite_kapisi.py` (yeni ölçüm), `webapp/editor/qa_on.py`
+> (yeni kapı), `webapp/testler/test_faz_i.py`, `webapp/testler/test_faz_c.py`
+> (eski geometriyi kodlayan 1 fixture satırı).
+> `medya/*`, `plan.py`, `adapter.py`, `gramer.py`, `remotion_v2.py`, TSX'lerin
+> **hiçbiri**, `pipeline.py`, `server.py`, `deploy.sh` ve 22 alan sözleşmesi
+> **dokunulmadı** (git ile doğrulandı). I-22…I-38 **korundu**.
+
+### ⛔ Ölçülen kök neden
+
+I-38 ekran künyesini **görünür** yaptı, ama künye altyazı bandının **dibinde**
+duruyordu. Üç kapı da (`KALITE-GUVENLI-ALAN`, `KALITE-YAZI-CAKISMA`,
+`bant_cakisiyor`) **temiz** dönüyordu, çünkü hiçbir katman bandın **içine
+girmiyordu**. Ölçülen boşluklar (1080p, `ALTYAZI_BANT[0]` = 0.81 → 874.8 px):
+
+| katman | y | çizilen alt kenar | **nefes** | eşik |
+|---|---|---|---|---|
+| `source-label` | 0.755 | 815.4 + 21×1.3 = **842.7 px** | **32.1 px** | 47.5 |
+| `chapter-title` | 0.70 | 756 + 60×1.3 + dolgu 25 = **859.0 px** | **15.8 px** | 47.5 |
+
+"Değmiyorsa sorun yok" **yanlış bir kabuldü**: iki metin bloğu birkaç on piksel
+arayla yığılınca göz ikisini **tek blok** okuyor; ne künye ne altyazı okunuyor.
+
+⚠ Devir notu `chapter-title` için ~43.8 px diyordu; o sayı yalnız **metin** alt
+kenarını sayıyor, **bant dolgusunu** saymıyordu. Burada ölçülen değer
+**çizilen bant kutusudur** (dolgu dahil) — daha katı ve ekranda gerçekten
+kaplanan yer. İki okuma da eşiğin altında, **hüküm aynı**.
+
+### Düzeltme (en küçük güvenli)
+
+1. **`KAYNAK_ETIKETI_ALTYAZILI` 0.755 → 0.075** (sağ üst köşe). Üst kenar
+   81 px, güvenli kenar 64 px'in **içinde**; altyazıdan 766.5 px uzakta.
+2. **`KONUM["chapter-title"]` 0.70 → 0.60** ve `motion.bolum_basligi_spec`
+   varsayılanı da 0.60 — iki ayrı aritmetik bırakılmadı, test eşliği kilitliyor.
+3. **Yeni ölçüm `kalite_kapisi.altyazi_nefes_olcusu`** (saf, ağsız): katmanın
+   **çizilen** alt kenarını render'ın kendi geometrisinden türetir
+   (`SATIR_KUTU_ORANI = 1.3`, Grafikler.tsx:191; bantlı katmana `DOLGU_ORANI`
+   eklenir) ve bant üst kenarına olan boşluğu ölçer.
+4. **Yeni PRE-QA kapısı `KALITE-YAZI-NEFES-YOK` (fail).** Eşik **sabit piksel
+   değil**, altyazı puntosundan **türetilir**: `38 × 1.25 = 47.5 px`.
+   ⚠ Altyazı yoksa bant da yoktur: ölçüm `olculdu=False` döner ve **hüküm
+   verilmez** (sessiz PASS değil, "ölçülemedi").
+5. `motion.kaynak_etiketi_spec` içindeki yanıltıcı `"konum": "sag-alt"` sabiti
+   `"y_orani"` oldu — konumu artık yalnız `y_orani` belirliyor.
+
+### Testler (red-first)
+
+Kırmızı önce **çökmeden** koştu: 21 hedefli kontrolün **15'i XX** verdi
+(sabitler, ölçüm fonksiyonu, kapı, rapor alanı). Düzeltmeden sonra 21/21 yeşil.
+Kalıcı kırmızı kanıt: I-38 pilotunun **gerçek** katmanlarıyla (0.70 / 0.755)
+kurulan fixture kapıyı **her zaman** tetikler ve künye boşluğunu **32.1 px**
+olarak ölçer.
+
+⚠ **Faz C'de 1 gerileme çıktı ve düzeltildi** (sessizce geçilmedi):
+`test_faz_c.py` çakışma fixture'ı `c2.y_orani = 0.72` **sabitini** başlığın
+**eski** 0.70 konumuna göre seçmişti; başlık 0.60'a taşınınca fixture çakışmayı
+kurmayı bıraktı ve çözücüyü **boş kümeyle** sınadı. Bindirme artık başlığın
+kendi konumundan türetiliyor (`c1.y_orani + 0.02`) — sınamanın niyeti korundu.
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | **257** | **1769** | **3183** |
+
+0 hata. Faz I 1748 → **1769** (+21). 2 BLOKE: I-33 görsel inceleme kaydı +
+1 opsiyonel dış fixture (`QA_TEST_VIDEO`).
+
+### ✅ 1080p PİLOT YENİDEN ÜRETİLDİ — POST-QA **tam PASS**
+
+Sürücü: `scratchpad/i39_surucu.py` + `scratchpad/i39_qa.py` (repo dışı, motoru
+**değiştirmez**). Medya `cikti/_i37_medya`, anlatım/ambiyans
+`cikti/_i37_calisma/ses` **önbelleğinden**; sağlayıcıya **hiç istek atılmadı**,
+TTS **yeniden üretilmedi**. **Maliyet $0.00.**
+
+⚠ **SADAKAT KAPISI**: sürücü render'dan önce yeni planı I-38 kaydıyla
+karşılaştırır. `beat esit=True`, `varlık esit=True` — yani ölçülen fark
+**yalnız I-39'un yazı geometrisidir**, girdi kayması değil.
+
+Ölçümler (`outputs/sample/lawn_i39_rapor.json`):
+
+- ffprobe: h264 **1920×1080 @ 30/1**, aac 48 kHz/2ch, **25.3 sn**, 105 MB
+- LUFS **−14.27** / TP **−3.10** / LRA 3.2 · sessizlik **%0.0** · kırpma yok
+  (ham render −15.4 idi; H6'da onaylı **tek** deterministik `loudnorm`
+  remaster'ı uygulandı, **video akışı kopyalandı**, ücret $0.00)
+- kesmeler: **8** · optik hareket genel ort **9.2**, donuk sahne **yok**
+- kenar siyahlığı: **0/101 ihlal** (I-38'de 1/101 FAIL'di) — en koyu sağ **16.01**
+- **11 kare** çıkarıldı, 6 beat'in **hepsi** örneklendi; 7'si gözle incelendi
+- PRE-QA: **0 fail**, 3 warn (`PERDE-EKSIK`, `SAGLAYICI-TEKEL`, `GECIS-ASIRI`)
+- **POST-QA: PASS — hiçbir sorun yok**
+
+**Kare kanıtı (I-39'un asıl iddiası):** beş künyenin **hepsi** sağ üstte,
+altyazıdan uzakta çiziliyor (`Forest and Kim Starr / CC-BY` 3.0 sn,
+`Famartin / CC-BY-SA` 6.87 sn, `Anton / CC-BY-SA` 12.3 sn,
+`Macleay Grass Man / CC-BY` 16.83 sn, `Dietmar Rabich / CC-BY-SA` 22.73 sn).
+Bölüm başlığı 0.60'ta, altyazıyla arası **123.8 px**.
+
+### ⛔ Pilot yine de KABUL EDİLMEDİ — dürüst kusur listesi
+
+POST-QA tam PASS, ama **görsel/semantik inceleme** kusurları **duruyor**.
+Bunlar I-39'un konusu **değildi** ve talimat gereği **kodla genişletilmedi**:
+
+1. **b001 semantik yanlış** — anlatım "garaj rafındaki çim tohumu torbası",
+   ekranda **1900 sepya tarla hasadı** (atlar, saban).
+2. **b002 semantik yanlış** — ekranda **Kahoʻolawe** kurak restorasyon sahası
+   (kırmızı toprak, saman balyaları); "garaj rafı" ile uyumsuz.
+3. **b005 semantik yanlış** — anlatım "seedling", ekranda **Ricinus** (kene otu)
+   geniş yapraklı fide; çim fidesi **değil**.
+4. **Statik fotoğraf + Ken Burns** yapısı sürüyor: gerçek **B-roll/video/cutaway
+   yok** (6 çekimin 6'sı da fotoğraf).
+5. **Kurgu ritmi, hook ve kapanış zayıf**; sert kesme oranı %50 (referans %80).
+6. **Müzik/SFX yok** (yalnız anlatım + ambiyans).
+7. **Kenar siyahlığı bıçak sırtı**: en koyu sağ **16.01**, eşik **16.0** —
+   ihlal 0 ama pay yalnız **0.01**. Eşik **gevşetilmedi**, düşürülmedi.
+8. Tek sağlayıcı **%100 wikimedia** (tekel uyarısı sürüyor).
+
+**MP4 kabul edilmiş değil, mutlak yol verilmedi, deploy yok.**
+
+### SONRAKİ ATOM (I-40) — yalnız ölçülen kusurdan
+
+1. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005). I-38'den devir;
+   **ayrı ve daha büyük** bir atom. Sorguyu ya da eşiği zorlamak çözüm değil
+   (I-34/I-35'te ikisi de ölçülüp elendi).
+2. **`onizleme.py` ffmpeg önizleme yolu I-39'a katılmadı**: `chapter-title`
+   orada hâlâ **sabit 0.70** ile, `source-label` ise `y_orani`yi **hiç
+   okumadan** `y=h-th-14` ile çiziliyor. Remotion 1080p hattı ile önizleme
+   hattı artık **ayrışıyor**. Dar, bedava, ağsız bir atom.
+3. **`kaynakYazi` `VidrushVideo` yolunda taşınmıyor** (I-38'den devir,
+   `pipeline.py` hattı hâlâ ölçülmedi).

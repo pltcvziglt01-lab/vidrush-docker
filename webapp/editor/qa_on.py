@@ -43,6 +43,8 @@ FAIL_KODLARI = {
     "KALITE-BAG-KOPUK",
     # ── Faz I-38: yazi spec'i SAHNE PENCERESININ disinda baslayamaz ──
     "KALITE-YAZI-SAHNE-DISI",
+    # ── Faz I-39: yazi ile altyazi arasinda NEFES BOSLUGU zorunlu ──
+    "KALITE-YAZI-NEFES-YOK",
     # ── Faz I-27: kamera punch'i kaynagi BUYUTEMEZ ──
     "KALITE-PUNCH-BUYUTME",
 }
@@ -60,7 +62,8 @@ KALITE_KODLARI = ("KALITE-BASLIK-KIRPIK", "KALITE-BASLIK-TASMA",
                   "KALITE-MOTION-ACILIS-KAPANIS",
                   "KALITE-MOTION-ISLEV-TEKRAR",
                   "KALITE-PUNCH-BUYUTME", "KALITE-KUNYE-EKSIK",
-                  "KALITE-BAG-KOPUK", "KALITE-YAZI-SAHNE-DISI")
+                  "KALITE-BAG-KOPUK", "KALITE-YAZI-SAHNE-DISI",
+                  "KALITE-YAZI-NEFES-YOK")
 
 
 @dataclass
@@ -458,6 +461,39 @@ def _kalite_denetle(q: QaSonucu, *, beatler, cekimler, yazi_katmanlari,
               "yazi spec'inin bas_sn'i SAHNEYE GORELI olmali "
               "(mutlak zaman cizgisi DEGIL)",
               scene_id=_yd1["scene_id"], beat_id=_yd1["beat_id"])
+
+    # ── I-39: YAZI ILE ALTYAZI ARASINDA NEFES BOSLUGU ZORUNLU ──
+    # ⚠ OLCULEN KUSUR: I-38 kunyeyi GORUNUR yapti, ama kunye altyazinin
+    # DIBINDE duruyordu (32.1 px) ve bolum basligi daha da yakindi (15.8 px).
+    # Ucu de "bandin disinda" oldugu icin `KALITE-GUVENLI-ALAN`,
+    # `KALITE-YAZI-CAKISMA` ve `bant_cakisiyor` TEMIZ donuyordu — kusur ancak
+    # KAREYE BAKINCA gorundu (I-33/I-38 dersinin aynisi). Esik altyazi
+    # puntosundan TURETILIR (38 * 1.25 = 47.5 px), sabit piksel degil.
+    # ⚠ Altyazi YOKSA bant da yoktur: olcum `olculdu=False` doner ve
+    # HUKUM VERILMEZ (sessiz PASS degil, "olculemedi").
+    if altyazi_kupleri:
+        _nf = kk.altyazi_nefes_olcusu(
+            [{"ad": getattr(k, "ad", ""),
+              "y_orani": getattr(k, "y_orani", 0.0),
+              "punto": getattr(k, "punto", 0),
+              "bant": bool(getattr(k, "bant", False))}
+             for k in (yazi_katmanlari or [])],
+            kare_yukseklik=int((kare_olcu or (0, p.yukseklik))[1]
+                               or p.yukseklik),
+            bant_ust_orani=tipografi.ALTYAZI_BANT[0],
+            altyazi_punto=p.tipografi.altyazi)
+    else:
+        _nf = {"olculdu": False, "neden": "ALTYAZI-YOK",
+               "kayitlar": [], "ihlaller": []}
+    olcum["altyazi_nefesi"] = _nf
+    for _ih in (_nf.get("ihlaller") or []):
+        _ekle("KALITE-YAZI-NEFES-YOK", "fail",
+              f"{_ih['ad']} (y={_ih['y_orani']}) alt kenari {_ih['alt_px']} px; "
+              f"altyazi bandi {_nf['bant_ust_px']} px'te basliyor — arada "
+              f"yalniz {_ih['nefes_px']} px var (esik {_nf['esik_px']} px = "
+              f"altyazi puntosu {_nf['altyazi_punto']} x {_nf['carpan']})",
+              "yazi katmanini YUKARI tasi (kunye altyazi varken ust koseye, "
+              "bolum basligi 0.60'a); altyazi puntosunu KUCULTME")
 
     # ── (1) BASLIK: kelime ortasi kesik + bant tasmasi ──
     baslik_olcumleri = []

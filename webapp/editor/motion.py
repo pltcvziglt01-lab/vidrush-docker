@@ -225,8 +225,12 @@ def bolum_basligi_spec(metin: str, sure_sn: float, *,
     p = p or VARSAYILAN
     t = p.tipografi
     return _spec("chapter-title", sure_sn=sure_sn, easing="giris", katman=30,
+                 # ⚠ I-39: y_orani 0.70 IDI; altyazi bandina (0.81) yalniz
+                 # 15.8 px kaliyordu, gerekli nefes 47.5 px. Deger
+                 # `tipografi.KONUM["chapter-title"]` ile AYNI olmali —
+                 # test bu esligi kilitliyor (iki ayri aritmetik I-14 kusuru).
                  parametre={"metin": metin, "punto": t.bolum_basligi,
-                            "agirlik": 700, "x": t.izgara_x, "y_orani": 0.70,
+                            "agirlik": 700, "x": t.izgara_x, "y_orani": 0.60,
                             "bant": True, "bant_opaklik": t.bant_opaklik,
                             "giris_sn": t.min_gorunme_sn * 0.23,
                             "kademe": 3},
@@ -255,7 +259,10 @@ def kaynak_etiketi_spec(kaynak: str, fact_id: str, sure_sn: float, *,
                  katman=20,
                  parametre={"metin": kaynak, "fact_id": fact_id,
                             "punto": p.tipografi.kaynak_etiketi,
-                            "konum": "sag-alt", "opaklik": 0.62},
+                            # ⚠ I-39: "sag-alt" YAZIYORDU ama konumu artik
+                            # yalniz `y_orani` belirliyor (altyazi varsa SAG
+                            # UST). Yaniltici sabit yerine kaynak alan adi.
+                            "konum": "y_orani", "opaklik": 0.62},
                  gerekce=f"kaynak gosterimi ({fact_id})")
 
 
