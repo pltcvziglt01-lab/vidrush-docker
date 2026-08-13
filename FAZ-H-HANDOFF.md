@@ -199,7 +199,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-30 yatay güvenli alan kapısı eklendi** | `527cd28` | ✅ **push edildi**, sağ/sol taşma ölçülür oldu, pilotta ateşlemiyor, MP4 korundu, deploy YOK |
 | 13 Ağu | **I-31 ekran künyesi politikası** | `73d91e1` | ⚠ **push edildi**, taşma çözüldü + tam atıf korundu, MP4 **KABUL EDİLMEDİ** (açılış vitrin planı), deploy YOK |
 | 13 Ağu | **I-32 kare örnekleme her beat'i kapsıyor** | `7098f4b` | ✅ **push edildi**, b001 kör noktası çözüldü, rerender YOK (talimat), BLOKE kanıt olarak duruyor, deploy YOK |
-| 13 Ağu | **I-33 gerçek koşum doğrulaması** | `PENDING` | ⚠ **push edildi**, kare planı KANITLANDI (b001 kapsandı), otomatik kapılar PASS ama MP4 **KABUL EDİLMEDİ** (b001 vitrin/pano), deploy YOK |
+| 13 Ağu | **I-33 gerçek koşum doğrulaması** | `584dea6` | ⚠ **push edildi**, kare planı KANITLANDI (b001 kapsandı), otomatik kapılar PASS ama MP4 **KABUL EDİLMEDİ** (b001 vitrin/pano), deploy YOK |
 
 ---
 
