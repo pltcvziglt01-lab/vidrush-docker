@@ -303,8 +303,8 @@
         "sure": 0.407
       },
       {
-        "bas": 1.583,
-        "sure": 1.364
+        "bas": 1.58,
+        "sure": 1.367
       },
       {
         "bas": 6.307,
@@ -635,36 +635,55 @@
           ]
         },
         "saglayici": "nasa",
-        "failover_sn": 10.097,
-        "metadata_bulundu": 6,
+        "failover_sn": 63.395,
+        "metadata_bulundu": 12,
         "bayt_indirildi": 2,
         "onbellekten": false,
         "denemeler": [
           {
             "saglayici": "commons",
-            "metadata": 0,
-            "elenen": 0,
-            "durum": "ADAY-YOK",
-            "sebep": "lisans/provenance duvarini gecen aday yok",
-            "sn": 0.636
+            "kullanilan_sorgu": "Pleiades supercomputer",
+            "denenen": 18,
+            "metadata": 6,
+            "elenen": 4,
+            "durum": "BAYT-YOK",
+            "sebep": "HTTP 429",
+            "sn": 54.128,
+            "elenme_nedenleri": [
+              "COZUNURLUK-YETERSIZ"
+            ],
+            "bekleme_karari": {
+              "karar": "DEVRE-AC",
+              "retry_after": 600.0,
+              "bekleme_sn": 0.0,
+              "sebep": "Retry-After 600.0 sn > tavan 30.0 sn"
+            },
+            "http": 429,
+            "kalici": true,
+            "devre_acildi": false
           },
           {
             "saglayici": "nasa",
+            "kullanilan_sorgu": "Pleiades supercomputer",
+            "denenen": 15,
             "metadata": 6,
             "elenen": 0,
             "durum": "OK",
             "sebep": "",
-            "sn": 9.461
+            "sn": 9.267,
+            "elenme_nedenleri": []
           }
         ],
         "devre": {
           "esik": 2,
           "soguma_sn": 900.0,
-          "ardisik_hata": {},
+          "ardisik_hata": {
+            "commons": 1
+          },
           "acik_devreler": []
         },
         "durum": "OK",
-        "asset_id": "s01_99207519",
+        "asset_id": "s01_96329118",
         "baslik": "ARC-2008-ACD08-0272-005",
         "lisans": "nasa-public",
         "eser_sahibi": "Dominic Hart",
@@ -732,36 +751,58 @@
           ]
         },
         "saglayici": "nasa",
-        "failover_sn": 6.783,
-        "metadata_bulundu": 6,
+        "failover_sn": 7.267,
+        "metadata_bulundu": 12,
         "bayt_indirildi": 1,
         "onbellekten": false,
         "denemeler": [
           {
             "saglayici": "commons",
-            "metadata": 0,
-            "elenen": 0,
-            "durum": "ADAY-YOK",
-            "sebep": "lisans/provenance duvarini gecen aday yok",
-            "sn": 0.624
+            "kullanilan_sorgu": "supercomputer facility",
+            "denenen": 18,
+            "metadata": 6,
+            "elenen": 5,
+            "durum": "BAYT-YOK",
+            "sebep": "HTTP 429",
+            "sn": 1.334,
+            "elenme_nedenleri": [
+              "COZUNURLUK-YETERSIZ",
+              "lisans belirsiz"
+            ],
+            "bekleme_karari": {
+              "karar": "DEVRE-AC",
+              "retry_after": 600.0,
+              "bekleme_sn": 0.0,
+              "sebep": "Retry-After 600.0 sn > tavan 30.0 sn"
+            },
+            "http": 429,
+            "kalici": true,
+            "devre_acildi": true
           },
           {
             "saglayici": "nasa",
+            "kullanilan_sorgu": "supercomputer facility",
+            "denenen": 9,
             "metadata": 6,
             "elenen": 0,
             "durum": "OK",
             "sebep": "",
-            "sn": 6.158
+            "sn": 5.934,
+            "elenme_nedenleri": []
           }
         ],
         "devre": {
           "esik": 2,
           "soguma_sn": 900.0,
-          "ardisik_hata": {},
-          "acik_devreler": []
+          "ardisik_hata": {
+            "commons": 2
+          },
+          "acik_devreler": [
+            "commons"
+          ]
         },
         "durum": "OK",
-        "asset_id": "s02_34525120",
+        "asset_id": "s02_7255527",
         "baslik": "ACD15-0062-004",
         "lisans": "nasa-public",
         "eser_sahibi": "Dominic Hart",
@@ -812,36 +853,45 @@
           ]
         },
         "saglayici": "nasa",
-        "failover_sn": 3.37,
+        "failover_sn": 1.938,
         "metadata_bulundu": 1,
         "bayt_indirildi": 1,
         "onbellekten": false,
         "denemeler": [
           {
             "saglayici": "commons",
+            "kullanilan_sorgu": "",
+            "denenen": null,
             "metadata": 0,
             "elenen": 0,
-            "durum": "ADAY-YOK",
-            "sebep": "lisans/provenance duvarini gecen aday yok",
-            "sn": 1.069
+            "durum": "DEVRE-ACIK",
+            "sebep": "onceki kalici hatalar sonrasi atlandi",
+            "sn": 0.0
           },
           {
             "saglayici": "nasa",
+            "kullanilan_sorgu": "Silicon Carbide Integrated Circuit Chip",
+            "denenen": 1,
             "metadata": 1,
             "elenen": 0,
             "durum": "OK",
             "sebep": "",
-            "sn": 2.301
+            "sn": 1.938,
+            "elenme_nedenleri": []
           }
         ],
         "devre": {
           "esik": 2,
           "soguma_sn": 900.0,
-          "ardisik_hata": {},
-          "acik_devreler": []
+          "ardisik_hata": {
+            "commons": 2
+          },
+          "acik_devreler": [
+            "commons"
+          ]
         },
         "durum": "OK",
-        "asset_id": "s03_27872892",
+        "asset_id": "s03_49607055",
         "baslik": "Silicon Carbide Integrated Circuit Chip",
         "lisans": "nasa-public",
         "eser_sahibi": "GRC",
@@ -892,36 +942,45 @@
           ]
         },
         "saglayici": "nasa",
-        "failover_sn": 7.668,
+        "failover_sn": 6.948,
         "metadata_bulundu": 6,
         "bayt_indirildi": 1,
         "onbellekten": false,
         "denemeler": [
           {
             "saglayici": "commons",
+            "kullanilan_sorgu": "",
+            "denenen": null,
             "metadata": 0,
             "elenen": 0,
-            "durum": "ADAY-YOK",
-            "sebep": "lisans/provenance duvarini gecen aday yok",
-            "sn": 0.714
+            "durum": "DEVRE-ACIK",
+            "sebep": "onceki kalici hatalar sonrasi atlandi",
+            "sn": 0.0
           },
           {
             "saglayici": "nasa",
+            "kullanilan_sorgu": "solar array power",
+            "denenen": 100,
             "metadata": 6,
             "elenen": 0,
             "durum": "OK",
             "sebep": "",
-            "sn": 6.954
+            "sn": 6.948,
+            "elenme_nedenleri": []
           }
         ],
         "devre": {
           "esik": 2,
           "soguma_sn": 900.0,
-          "ardisik_hata": {},
-          "acik_devreler": []
+          "ardisik_hata": {
+            "commons": 2
+          },
+          "acik_devreler": [
+            "commons"
+          ]
         },
         "durum": "OK",
-        "asset_id": "s04_92699335",
+        "asset_id": "s04_64784905",
         "baslik": "Juno Solar Panel Deployment Test",
         "lisans": "nasa-public",
         "eser_sahibi": "NASA/JPL-Caltech/Lockheed Martin",
@@ -966,12 +1025,16 @@
     },
     "basarili": 4,
     "dort_k_uygun": false,
-    "en_hizli_failover_sn": 3.37,
+    "en_hizli_failover_sn": 1.938,
     "devre_ozeti": {
       "esik": 2,
       "soguma_sn": 900.0,
-      "ardisik_hata": {},
-      "acik_devreler": []
+      "ardisik_hata": {
+        "commons": 2
+      },
+      "acik_devreler": [
+        "commons"
+      ]
     }
   },
   "beat_medya_eslemesi": {
@@ -1180,38 +1243,38 @@
     "esik_degistirildi_mi": false,
     "ciftler": [
       {
-        "a": "s01_99207519",
-        "b": "s02_34525120",
+        "a": "s01_96329118",
+        "b": "s02_7255527",
         "bitisik": true,
         "benzerlik": 0.5
       },
       {
-        "a": "s01_99207519",
-        "b": "s03_27872892",
+        "a": "s01_96329118",
+        "b": "s03_49607055",
         "bitisik": false,
         "benzerlik": 0.4531
       },
       {
-        "a": "s01_99207519",
-        "b": "s04_92699335",
+        "a": "s01_96329118",
+        "b": "s04_64784905",
         "bitisik": false,
         "benzerlik": 0.5625
       },
       {
-        "a": "s02_34525120",
-        "b": "s03_27872892",
+        "a": "s02_7255527",
+        "b": "s03_49607055",
         "bitisik": true,
         "benzerlik": 0.4844
       },
       {
-        "a": "s02_34525120",
-        "b": "s04_92699335",
+        "a": "s02_7255527",
+        "b": "s04_64784905",
         "bitisik": false,
         "benzerlik": 0.5625
       },
       {
-        "a": "s03_27872892",
-        "b": "s04_92699335",
+        "a": "s03_49607055",
+        "b": "s04_64784905",
         "bitisik": true,
         "benzerlik": 0.4531
       }
@@ -1221,17 +1284,17 @@
     "esigi_asan": [],
     "siralama": {
       "once_sira": [
-        "s01_99207519",
-        "s02_34525120",
-        "s03_27872892",
-        "s04_92699335"
+        "s01_96329118",
+        "s02_7255527",
+        "s03_49607055",
+        "s04_64784905"
       ],
       "once_komsu_maks": 0.5,
       "sonra_sira": [
-        "s01_99207519",
-        "s02_34525120",
-        "s03_27872892",
-        "s04_92699335"
+        "s01_96329118",
+        "s02_7255527",
+        "s03_49607055",
+        "s04_64784905"
       ],
       "sonra_komsu_maks": 0.5,
       "not": "yalnizca SIRA degisti; kume ve esikler ayni. Havuzun en cesitli 4'lusu zaten seciliydi (olculdu)."
@@ -1241,27 +1304,27 @@
     "esik_std": 20.0,
     "olcumler": [
       {
-        "asset_id": "s01_99207519",
+        "asset_id": "s01_96329118",
         "detay_std": 52.3
       },
       {
-        "asset_id": "s02_34525120",
+        "asset_id": "s02_7255527",
         "detay_std": 45.1
       },
       {
-        "asset_id": "s03_27872892",
+        "asset_id": "s03_49607055",
         "detay_std": 63.2
       },
       {
-        "asset_id": "s04_92699335",
+        "asset_id": "s04_64784905",
         "detay_std": 60.9
       }
     ],
     "secilen": [
-      "s01_99207519",
-      "s02_34525120",
-      "s03_27872892",
-      "s04_92699335"
+      "s01_96329118",
+      "s02_7255527",
+      "s03_49607055",
+      "s04_64784905"
     ]
   },
   "anlatici_ses": {
@@ -1274,8 +1337,8 @@
         "ornekleme_hz": 24000,
         "kanal": 1,
         "sure_sn": 16.752,
-        "lufs": -17.38,
-        "tepe_dbtp": -2.95,
+        "lufs": -17.39,
+        "tepe_dbtp": -2.89,
         "lra": 3.9,
         "sessizlikler": [
           {
@@ -1283,8 +1346,8 @@
             "sure": 0.416
           },
           {
-            "bas": 1.572,
-            "sure": 1.379
+            "bas": 1.571,
+            "sure": 1.38
           },
           {
             "bas": 6.306,
@@ -1299,7 +1362,7 @@
             "sure": 1.083
           }
         ],
-        "sessiz_sn": 5.627,
+        "sessiz_sn": 5.628,
         "sessiz_pct": 33.6,
         "kirpma_var": false,
         "ses": "tr-TR-AhmetNeural",
@@ -1310,16 +1373,16 @@
         "ornekleme_hz": 24000,
         "kanal": 1,
         "sure_sn": 15.264,
-        "lufs": -18.83,
+        "lufs": -18.82,
         "tepe_dbtp": -2.47,
         "lra": 2.9,
         "sessizlikler": [
           {
-            "bas": 1.354,
-            "sure": 1.077
+            "bas": 1.359,
+            "sure": 1.072
           },
           {
-            "bas": 5.703,
+            "bas": 5.704,
             "sure": 1.122
           },
           {
@@ -1331,7 +1394,7 @@
             "sure": 0.996
           }
         ],
-        "sessiz_sn": 4.272,
+        "sessiz_sn": 4.267,
         "sessiz_pct": 28.0,
         "kirpma_var": false,
         "ses": "tr-TR-EmelNeural",
@@ -1352,8 +1415,8 @@
           "sure": 0.407
         },
         {
-          "bas": 1.583,
-          "sure": 1.364
+          "bas": 1.58,
+          "sure": 1.367
         },
         {
           "bas": 6.307,
@@ -1368,7 +1431,7 @@
           "sure": 1.082
         }
       ],
-      "sessiz_sn": 5.584,
+      "sessiz_sn": 5.587,
       "sessiz_pct": 33.3,
       "kirpma_var": false,
       "ses": "tr-TR-AhmetNeural",
@@ -1735,7 +1798,7 @@
       "beat_id": "b001",
       "scene_id": "s001",
       "fact_id": "s01",
-      "asset_id": "s01_99207519",
+      "asset_id": "s01_96329118",
       "saglayici": "nasa",
       "lisans": "nasa-public",
       "sure_sn": 0.862,
@@ -1768,7 +1831,7 @@
       "beat_id": "b002",
       "scene_id": "s001",
       "fact_id": "s01",
-      "asset_id": "s01y1_79696796",
+      "asset_id": "s01y1_97534573",
       "saglayici": "nasa",
       "lisans": "nasa-public",
       "sure_sn": 1.725,
@@ -1798,7 +1861,7 @@
       "beat_id": "b003",
       "scene_id": "s002",
       "fact_id": "s02",
-      "asset_id": "s02_34525120",
+      "asset_id": "s02_7255527",
       "saglayici": "nasa",
       "lisans": "nasa-public",
       "sure_sn": 4.738,
@@ -1828,7 +1891,7 @@
       "beat_id": "b004",
       "scene_id": "s003",
       "fact_id": "s03",
-      "asset_id": "s03_27872892",
+      "asset_id": "s03_49607055",
       "saglayici": "nasa",
       "lisans": "nasa-public",
       "sure_sn": 4.9,
@@ -1858,7 +1921,7 @@
       "beat_id": "b005",
       "scene_id": "s004",
       "fact_id": "s04",
-      "asset_id": "s04_92699335",
+      "asset_id": "s04_64784905",
       "saglayici": "nasa",
       "lisans": "nasa-public",
       "sure_sn": 4.825,

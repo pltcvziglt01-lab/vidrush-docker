@@ -115,6 +115,14 @@ def ara(sorgu: str, *, adet: int = 6, en_az_genislik: int = 0,
         baslik = _metni_temizle(sayfa.get("title") or "")
         genislik = int(bilgi.get("width") or 0)
         yukseklik = int(bilgi.get("height") or 0)
+        # ⚠ ALAKA SIRASI (Faz I-25). MediaWiki `generator=search` her sayfaya
+        # arama motorunun ALAKA SIRASINI `index` alaninda veriyor. `pages`
+        # sozlugu pageid'ye gore anahtarli oldugu icin `values()` bu sirada
+        # DEGILDIR — sira yalnizca `index`te tasinir.
+        try:
+            alaka = int(sayfa.get("index"))
+        except (TypeError, ValueError):
+            alaka = 10 ** 6          # index yoksa EN SONA (uydurma sira yok)
         # ⚠ Lisans karari BU MODULUN isi DEGIL — kayit `lisans.py`nin
         # bekledigi bicime cevrilir ve karar ORAYA birakilir.
         kayit = {"LicenseShortName": al("LicenseShortName"),
@@ -127,6 +135,7 @@ def ara(sorgu: str, *, adet: int = 6, en_az_genislik: int = 0,
             "asset_id": "",
             "baslik": baslik[5:] if baslik.lower().startswith("file:") else baslik,
             "saglayici": "wikimedia",
+            "alaka_sirasi": alaka,
             "genislik": genislik, "yukseklik": yukseklik,
             "mime": str(bilgi.get("mime") or ""),
             "indirme_url": str(bilgi.get("url") or ""),
@@ -163,8 +172,22 @@ def ara(sorgu: str, *, adet: int = 6, en_az_genislik: int = 0,
             continue
         sonuc["adaylar"].append(aday)
 
-    # En yuksek cozunurluk once — 4K hedefi icin kaynak payi onemli.
-    sonuc["adaylar"].sort(key=lambda a: -(a["genislik"] * a["yukseklik"]))
+    # ⚠ I-25'TE OLCULEN KUSUR — ALAKA SINYALI ATILIYORDU.
+    # Eski siralama SALT COZUNURLUKTU:
+    #     sort(key=lambda a: -(genislik * yukseklik))
+    # Bu, arama motorunun ZATEN VERDIGI alaka sirasini yok ediyordu ve
+    # KONU DISI ama BUYUK bir dosyayi basa tasiyabiliyordu. Olculen vaka
+    # ("Pleiades supercomputer", 18 sonuc):
+    #     "Pleiades large.jpg" (yildiz kumesi, Palomar/STScI kunyeli)
+    #     alaka sirasi 17/18 iken cozunurluk sirasinda 1. oluyordu;
+    #     gercek supercomputer fotografi (alaka 12) ARKAYA dusuyordu.
+    # Konu disi gorsel, lisansi temiz olsa bile YANLIS VIDEO demektir.
+    #
+    # Artik ALAKA BIRINCIL, cozunurluk IKINCIL (esit alakada buyuk olan).
+    # ⚠ Cozunurluk ESIGI degismedi: `en_az_genislik` filtresi YUKARIDA ve
+    # DEGISMEDEN uygulaniyor — bu siralama bir ESIK GEVSETMESI DEGILDIR.
+    sonuc["adaylar"].sort(key=lambda a: (a.get("alaka_sirasi", 10 ** 6),
+                                         -(a["genislik"] * a["yukseklik"])))
     sonuc["adaylar"] = sonuc["adaylar"][:max(1, int(adet))]
     sonuc["ok"] = bool(sonuc["adaylar"])
     return sonuc

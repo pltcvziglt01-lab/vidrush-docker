@@ -367,8 +367,22 @@ def medya_edin(sahne_aday_adedi=None):
                 benzerlik_okuyucu=benzerlik,
                 benzerlik_esigi=kk_esik(),
                 saglayicilar=[
+                    # ⚠ I-25'TE OLCULEN KUSUR: burada `tanim["sorgu"] +
+                    # " Iceland"` yaziyordu. Satir I-18'in DOGA/IZLANDA
+                    # smoke'undan `beaee8f` (I-20) ile OLDUGU GIBI
+                    # kopyalanmis; teknoloji konusunda " Iceland" bir KONU
+                    # BULASANI. Olculen etki (ayni ara() cagrisi):
+                    #   "Pleiades supercomputer Iceland"  -> denenen 0
+                    #   "Pleiades supercomputer"          -> denenen 18, aday 6
+                    #   "supercomputer facility Iceland"  -> denenen 0
+                    #   "supercomputer facility"          -> denenen 18, aday 6
+                    #   "solar array power Iceland"       -> denenen 0
+                    #   "solar array power"               -> denenen 18, aday 6
+                    # Yani SAGLAYICI-TEKEL'in sebebi Commons'in bos olmasi
+                    # DEGIL, BIZIM sorgumuzdu. s03 ise temiz sorguyla da
+                    # denenen=0 veriyor — o bosluk GERCEK ve DURUST kaliyor.
                     {"ad": "commons", "modul": commons,
-                     "sorgu": tanim["sorgu"] + " Iceland"},
+                     "sorgu": tanim["sorgu"]},
                     {"ad": "nasa", "modul": nasa, "sorgu": tanim["sorgu"]}],
                 olcu_okuyucu=_olcu_oku)
         # ⚠ I-23: OLCULEN oran + HEDEF oran + RED NEDENI raporda GORUNUR.

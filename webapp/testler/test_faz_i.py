@@ -6126,6 +6126,161 @@ kontrol("⭐ MEDYASIZ BEAT kapisi PRE-QA'da ve FAIL",
         "KALITE-MEDYASIZ-BEAT" in _qon.FAIL_KODLARI
         and "KALITE-MEDYASIZ-BEAT" in _qon.KALITE_KODLARI)
 
+blok("§39b I-25 — SAGLAYICI-TEKEL TANISI (dort katman ayri olculdu)")
+
+# ⚠ OLCULEN KOK NEDEN — "Commons bos" DEGIL, SORGUMUZ BOZUKTU.
+# Ayni `commons.ara()` cagrisiyla olculdu (ek kota/ag YOK):
+#   "Pleiades supercomputer Iceland" -> denenen  0, aday 0
+#   "Pleiades supercomputer"         -> denenen 18, aday 6
+#   "supercomputer facility Iceland" -> denenen  0, aday 0
+#   "supercomputer facility"         -> denenen 18, aday 6
+#   "solar array power Iceland"      -> denenen  0, aday 0
+#   "solar array power"              -> denenen 18, aday 6
+#   "Silicon Carbide Integrated Circuit Chip" -> denenen 0 (TEMIZ sorguyla
+#       da bos: Commons'ta bu konuda aday GERCEKTEN yok -> WARN DURUST kalir)
+# Bulasanin kaynagi: `beaee8f` (I-20) satiri I-18'in IZLANDA smoke'undan
+# oldugu gibi kopyalamis.
+
+_SM25 = oku(KOK, "testler/smoke_konsept3_teknoloji_i20.py")
+kontrol("⭐ I-25: teknoloji smoke'unda ' Iceland' KONU BULASANI YOK",
+        'tanim["sorgu"] + " Iceland"' not in _sikistir(_SM25))
+kontrol("I-25: Commons ve NASA AYNI konu sorgusunu aliyor",
+        re.sub(r"[ \t]+", "", _SM25).count('"sorgu":tanim["sorgu"]') >= 2)
+kontrol("I-18 DOGA smoke'u DEGISMEDI (orada ' Iceland' KONUYA UYGUN)",
+        'tanim["sorgu"] + " Iceland"' in
+        oku(KOK, "testler/smoke_konsept2_doga_i18.py"))
+
+# ── TANI KOR NOKTASI: "arama bos" != "hepsi elendi" ──
+class _SahteBos:
+    """Arama HIC sonuc dondurmedi (denenen=0)."""
+
+    def __init__(self):
+        self.ara_sayisi = 0
+        self.indir_sayisi = 0
+
+    def ara(self, sorgu, adet=6, en_az_genislik=0):
+        self.ara_sayisi += 1
+        return {"ok": False, "adaylar": [], "elenen": [], "denenen": 0,
+                "hata": ""}
+
+    def indir(self, aday, hedef, deneme=1):
+        self.indir_sayisi += 1
+        return {"ok": False}
+
+
+class _SahteHepsiElendi:
+    """Sonuc GELDI ama hepsi lisans/cozunurluk duvarinda elendi."""
+
+    def __init__(self):
+        self.ara_sayisi = 0
+        self.indir_sayisi = 0
+
+    def ara(self, sorgu, adet=6, en_az_genislik=0):
+        self.ara_sayisi += 1
+        return {"ok": False, "adaylar": [], "denenen": 18, "hata": "",
+                "elenen": [{"baslik": "a", "neden": "LISANS"},
+                           {"baslik": "b",
+                            "neden": "COZUNURLUK-YETERSIZ (800 < 1920)"}]}
+
+    def indir(self, aday, hedef, deneme=1):
+        self.indir_sayisi += 1
+        return {"ok": False}
+
+
+import tempfile as _tf25                                          # noqa: E402
+with _tf25.TemporaryDirectory() as _d25:
+    _h25 = os.path.join(_d25, "a.jpg")
+    _rb = _ed.edin("konu", _h25, saat=lambda: 0.0,
+                   saglayicilar=[{"ad": "bos", "modul": _SahteBos(),
+                                  "sorgu": "konu Iceland"}])
+    _db = _rb["denemeler"][0]
+    kontrol("⭐ ARAMA-BOS ile HEPSI-ELENDI AYRI raporlaniyor (bos)",
+            _db["denenen"] == 0 and "ARAMA-BOS" in _db["sebep"], _db["sebep"])
+    kontrol("⭐ raporda SAGLAYICIYA GERCEKTEN GIDEN sorgu gorunuyor",
+            _db["kullanilan_sorgu"] == "konu Iceland", _db)
+    _re = _ed.edin("konu", _h25, saat=lambda: 0.0,
+                   saglayicilar=[{"ad": "elendi",
+                                  "modul": _SahteHepsiElendi()}])
+    _de = _re["denemeler"][0]
+    kontrol("⭐ HEPSI-ELENDI ayri sebep + elenme nedenleri gorunur",
+            _de["denenen"] == 18 and "HEPSI-ELENDI" in _de["sebep"]
+            and "LISANS" in _de["elenme_nedenleri"]
+            and "COZUNURLUK-YETERSIZ" in _de["elenme_nedenleri"], _de)
+    kontrol("`denenen` vermeyen saglayicida ESKI sebep korunur (uydurma yok)",
+            "duvarini gecen aday yok" in _ed.edin(
+                "konu", _h25, saat=lambda: 0.0,
+                saglayicilar=[{"ad": "eski", "modul": _SahteSaglayici(
+                    "eski", [], {"ok": False})}])["denemeler"][0]["sebep"])
+
+# ── ALAKA SIRASI — SAHTE API YANITIYLA DAVRANIS OLCUMU (ag YOK) ──
+# ⚠ Metin taramasi yerine GERCEK DAVRANIS: `ara()` kendi `acan`ini
+# (opener) disaridan alabiliyor, yani ag olmadan tam yol kosuluyor.
+import contextlib as _cl25                                        # noqa: E402
+import io as _io25                                                # noqa: E402
+
+
+def _sahte_sayfa(pageid, index, g, y, baslik):
+    return {"pageid": pageid, "index": index, "title": f"File:{baslik}",
+            "imageinfo": [{"url": f"https://x.test/{pageid}.jpg",
+                           "descriptionurl": f"https://x.test/d{pageid}",
+                           "width": g, "height": y, "mime": "image/jpeg",
+                           "extmetadata": {
+                               "LicenseShortName": {"value": "CC BY 2.0"},
+                               "LicenseUrl": {"value":
+                                              "https://creativecommons.org/"
+                                              "licenses/by/2.0/"},
+                               "Artist": {"value": "Biri"},
+                               "Credit": {"value": "Biri"},
+                               "UsageTerms": {"value": "CC BY 2.0"}}}]}
+
+
+def _sahte_acan(sayfalar):
+    """`pages` sozlugunu ALAKA SIRASINDA OLMAYAN sirayla verir (gercek API
+    boyle davraniyor: sozluk pageid'ye gore anahtarli)."""
+    def _ac(url):
+        govde = _json.dumps({"query": {"pages": {
+            str(s["pageid"]): s for s in sayfalar}}}).encode()
+        return _cl25.closing(_io25.BytesIO(govde))
+    return _ac
+
+
+# Olculen gercek vaka: konu disi ama EN BUYUK dosya alaka 17; konulu 12.
+_r25 = _cm.ara("Pleiades supercomputer", adet=6, en_az_genislik=1920,
+               acan=_sahte_acan([
+                   _sahte_sayfa(1, 17, 4877, 3515, "Pleiades large.jpg"),
+                   _sahte_sayfa(2, 12, 4983, 3303, "NASA Pleiades Super.jpg"),
+                   _sahte_sayfa(3, 12, 2240, 1344, "Pleiades racks.jpg"),
+                   _sahte_sayfa(4, 1, 2100, 1524, "Columbia Super.jpg")]))
+kontrol("⭐ commons ALAKA SIRASINI koruyor (`index` adaya isleniyor)",
+        all(isinstance(a.get("alaka_sirasi"), int) for a in _r25["adaylar"])
+        and [a["alaka_sirasi"] for a in _r25["adaylar"]] == [1, 12, 12, 17],
+        [a.get("alaka_sirasi") for a in _r25["adaylar"]])
+kontrol("⭐ KONU DISI ama EN BUYUK dosya artik BASA GECEMIYOR",
+        _r25["adaylar"][0]["baslik"] == "Columbia Super.jpg"
+        and _r25["adaylar"][-1]["baslik"] == "Pleiades large.jpg",
+        [a["baslik"] for a in _r25["adaylar"]])
+kontrol("⭐ esit alakada COZUNURLUK ikincil anahtar (buyuk once)",
+        [a["genislik"] for a in _r25["adaylar"] if a["alaka_sirasi"] == 12]
+        == [4983, 2240])
+kontrol("I-25: `denenen` ham sonuc sayisini veriyor", _r25["denenen"] == 4)
+_r25b = _cm.ara("x", adet=6, en_az_genislik=1920,
+                acan=_sahte_acan([
+                    _sahte_sayfa(1, 5, 2000, 1200, "alakali.jpg"),
+                    dict(_sahte_sayfa(2, 0, 4000, 2400, "indekssiz.jpg"),
+                         index=None)]))
+kontrol("`index` YOKSA aday EN SONA (uydurma sira yok)",
+        [a["baslik"] for a in _r25b["adaylar"]]
+        == ["alakali.jpg", "indekssiz.jpg"],
+        [(a["baslik"], a["alaka_sirasi"]) for a in _r25b["adaylar"]])
+kontrol("⭐ COZUNURLUK ESIGI DEGISMEDI (siralama esik gevsetmesi DEGIL)",
+        not _cm.ara("x", adet=6, en_az_genislik=1920,
+                    acan=_sahte_acan([
+                        _sahte_sayfa(1, 1, 800, 600, "kucuk.jpg")]))["adaylar"])
+kontrol("elenen kaydi SEBEBIYLE birlikte duruyor",
+        "COZUNURLUK-YETERSIZ" in str(_cm.ara(
+            "x", adet=6, en_az_genislik=1920, acan=_sahte_acan([
+                _sahte_sayfa(1, 1, 800, 600, "kucuk.jpg")]))["elenen"]))
+
 blok("§39a I-24 — MOTION CESITLILIGI OLCULEBILIR KAPIYA CEVRILDI")
 
 # ⚠ BAGIMSIZ DOGRULANAN KOK NEDEN: teknoloji pilotunda `motion_cesitlilik`
@@ -6370,6 +6525,41 @@ else:
             isinstance(_pm.get("kosullar"), dict)
             and len(_pm["kosullar"]) == 5
             and all(_pm["kosullar"].values()), _pm.get("kosullar"))
+    # ── I-25: SAGLAYICI-TEKEL TANISI GERCEK RAPORDA ──
+    _cd = [d for s in (_R20["medya_edinim"].get("sahneler") or [])
+           for d in (s.get("denemeler") or [])
+           if d.get("saglayici") == "commons"]
+    kontrol("⭐ I-25: her denemede SAGLAYICIYA GIDEN sorgu raporda",
+            all("kullanilan_sorgu" in d for d in _cd) and bool(_cd))
+    kontrol("⭐ I-25: Commons'a giden sorguda ' Iceland' BULASANI YOK",
+            not any("Iceland" in str(d.get("kullanilan_sorgu") or "")
+                    for d in _cd),
+            [d.get("kullanilan_sorgu") for d in _cd])
+    _cd_arayan = [d for d in _cd if d.get("durum") != "DEVRE-ACIK"]
+    kontrol("⭐ I-25: Commons ARAMASI artik BOS DONMUYOR (denenen > 0)",
+            bool(_cd_arayan)
+            and all((d.get("denenen") or 0) > 0 for d in _cd_arayan),
+            [(d.get("kullanilan_sorgu"), d.get("denenen")) for d in _cd_arayan])
+    kontrol("⭐ I-25: lisans duvarini gecen aday ARTIK VAR (metadata > 0)",
+            all((d.get("metadata") or 0) > 0 for d in _cd_arayan),
+            [(d.get("kullanilan_sorgu"), d.get("metadata"))
+             for d in _cd_arayan])
+    # ⚠ DURUSTLUK: WARN hala varsa SEBEBI OLCULMUS olmali. Commons ileride
+    # bayt verirse bu kontrol yine gecer — sahte PASS uretmez, sebep arar.
+    _tekel = (_R20["plan"]["on_render_qa"]["olcumler"] or {}).get(
+        "tek_saglayici_orani")
+    if _tekel and _tekel >= 1.0:
+        kontrol("⭐ I-25: SAGLAYICI-TEKEL surse bile SEBEBI OLCULMUS",
+                all(d.get("durum") in ("BAYT-YOK", "DEVRE-ACIK")
+                    for d in _cd)
+                and any(d.get("http") or "429" in str(d.get("sebep"))
+                        for d in _cd),
+                [(d.get("durum"), d.get("sebep")) for d in _cd])
+        kontrol("I-25: sebep artik 'ADAY-YOK' DEGIL (kok neden degisti)",
+                not any(d.get("durum") == "ADAY-YOK" for d in _cd))
+    kontrol("I-25: elenme nedenleri raporda sayilabilir",
+            all(isinstance(d.get("elenme_nedenleri"), list)
+                for d in _cd_arayan))
     # ⚠ POST-QA FAIL ise SESSIZCE GECILMEZ — BLOKE yazilir.
     if _R20["post_qa"]["durum"] == "FAIL":
         _nedenler = [s["kod"] for s in _R20["post_qa"]["sorunlar"]

@@ -402,7 +402,16 @@ def edin(sorgu: str, hedef_yol: str, *, saglayicilar: list,
     for sag in (saglayicilar or []):
         ad = str((sag or {}).get("ad") or "")
         modul = (sag or {}).get("modul")
-        deneme = {"saglayici": ad, "metadata": 0, "elenen": 0,
+        # ⚠ I-25 TANI KOR NOKTASI KAPATILDI. Eskiden yalnizca `metadata`
+        # (gecen aday) ve `elenen` yaziliyordu. Ikisi de 0 oldugunda
+        # "API HIC SONUC DONMEDI" ile "sonuc geldi ama HEPSI ELENDI"
+        # AYIRT EDILEMIYORDU — SAGLAYICI-TEKEL kusuru tam bu yuzden dort
+        # atom boyunca "lisans duvari" sanildi. `denenen` = saglayicinin
+        # ham sonuc sayisi; `kullanilan_sorgu` = O SAGLAYICIYA GERCEKTEN
+        # gonderilen sorgu (raporda sahne sorgusu gorunuyordu, saglayici
+        # sorgusu DEGIL — bulasan bu yuzden gorunmez kalmisti).
+        deneme = {"saglayici": ad, "kullanilan_sorgu": "",
+                  "denenen": None, "metadata": 0, "elenen": 0,
                   "durum": "", "sebep": "", "sn": None}
         d_basla = saat()
         if modul is None:
@@ -417,9 +426,10 @@ def edin(sorgu: str, hedef_yol: str, *, saglayicilar: list,
             continue
 
         # ── ARAMA / METADATA ──
+        _sorgu = str(sag.get("sorgu") or sorgu)
+        deneme["kullanilan_sorgu"] = _sorgu
         try:
-            bulgu = modul.ara(str(sag.get("sorgu") or sorgu),
-                              adet=6, en_az_genislik=en_az_genislik)
+            bulgu = modul.ara(_sorgu, adet=6, en_az_genislik=en_az_genislik)
         except Exception as e:                                    # noqa: BLE001
             deneme.update({"durum": "ARAMA-HATA",
                            "sebep": f"{type(e).__name__}: {str(e)[:100]}",
@@ -430,11 +440,27 @@ def edin(sorgu: str, hedef_yol: str, *, saglayicilar: list,
         adaylar = list((bulgu or {}).get("adaylar") or [])
         deneme["metadata"] = len(adaylar)
         deneme["elenen"] = len((bulgu or {}).get("elenen") or [])
+        _denenen = (bulgu or {}).get("denenen")
+        deneme["denenen"] = _denenen
+        deneme["elenme_nedenleri"] = sorted({
+            str((e or {}).get("neden") or "").split(" (")[0]
+            for e in ((bulgu or {}).get("elenen") or [])})
         rapor["metadata_bulundu"] += len(adaylar)
         if not adaylar:
+            # ⚠ I-25: "ARAMA HIC SONUC VERMEDI" ile "SONUC GELDI, HEPSI
+            # ELENDI" AYRI SEBEPTIR. Ikisini tek cumleye sikistirmak
+            # SAGLAYICI-TEKEL kusurunu dort atom boyunca gizledi.
+            if _denenen == 0:
+                _sebep = (f"ARAMA-BOS: saglayici {_sorgu!r} icin HIC sonuc "
+                          f"dondurmedi (lisans duvari CALISMADI BILE)")
+            elif _denenen:
+                _sebep = (f"HEPSI-ELENDI: {_denenen} ham sonuc geldi, "
+                          f"{deneme['elenen']} aday elendi "
+                          f"({', '.join(deneme['elenme_nedenleri']) or 'sebep yok'})")
+            else:
+                _sebep = "lisans/provenance duvarini gecen aday yok"
             deneme.update({"durum": "ADAY-YOK",
-                           "sebep": (bulgu or {}).get("hata") or
-                                    "lisans/provenance duvarini gecen aday yok",
+                           "sebep": (bulgu or {}).get("hata") or _sebep,
                            "sn": round(saat() - d_basla, 3)})
             kesici.hata(ad, kalici=bool((bulgu or {}).get("hata")))
             rapor["denemeler"].append(deneme)

@@ -191,6 +191,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 12 Ağu | **I-22 medyasız beat kusuru çözüldü** | `a220fcb` | ⚠ **push edildi**, POST-QA FAIL (dikey kaynak), MP4 teslim YOK |
 | 13 Ağu | **I-23 en-boy oranı uyumluluk kapısı (dar atom)** | `49c726e` | ✅ **push edildi**, POST-QA **TAMAMEN PASS**, Faz I BLOKE 0, deploy YOK |
 | 13 Ağu | **I-24 motion çeşitliliği ölçülebilir kapıya çevrildi** | `929b9b4` | ✅ **push edildi**, POST-QA PASS, kalite puanı **100/100**, deploy YOK |
+| 13 Ağu | **I-25 sağlayıcı-tekel tanısı: kök neden bizdeydi** | `PENDING` | ✅ **push edildi**, 2 gerçek hata düzeltildi, WARN **dürüst** (Commons 429), medya kümesi değişmedi, deploy YOK |
 
 ---
 
@@ -3804,3 +3805,149 @@ Kalite puanı 100/100; kapılar temiz. Kalan tek WARN:
 `SAGLAYICI-TEKEL` — tek sağlayıcı %100 (`nasa`), tavan %40. Commons her
 sorguda `ADAY-YOK` dönüyor; **sebebi ölçülmeli** (lisans duvarı mı, sorgu
 biçimi mi) — dar atom olarak Commons'ın eleme gerekçesini raporlamak.
+
+---
+
+## 43. FAZ I-25 — SAĞLAYICI-TEKEL TANISI: KÖK NEDEN BİZDEYDİ (dar tanı atomu, 13 Ağu)
+
+> **Durum: yerel yeşil, iki gerçek hata düzeltildi, WARN dürüstçe duruyor,
+> push edildi. Deploy YOK. Maliyet $0.00.**
+> Değişen: `webapp/medya/commons.py`, `webapp/medya/edinim.py`,
+> `webapp/testler/smoke_konsept3_teknoloji_i20.py`,
+> `webapp/testler/test_faz_i.py`, `outputs/sample/teknoloji_i20_rapor.json`
+> (+ handoff).
+> **Sahte sağlayıcı çeşitliliği YOK. Kota/ağ çağrısı artışı YOK. Yeni
+> sağlayıcı YOK.** `pipeline.py`, `server.py`, `deploy.sh`, 22 alan
+> sözleşmesi, `gramer.py`, `qa_on.py`, `kalite_kapisi.py`, `lisans.py`,
+> `guvenlik.py`, `indirme.py`, `nasa.py` **dokunulmadı** (git ile doğrulandı).
+> I-23 oran/ayırt kapıları ve I-24 motion kapıları **korundu**.
+
+### ⚠ KÖK NEDEN: "Commons boş" DEĞİLDİ — SORGUMUZ BOZUKTU
+
+Dört atom boyunca `ADAY-YOK / "lisans/provenance duvarını geçen aday yok"`
+yazısı, sorunun **lisans duvarında** olduğunu düşündürdü. Ölçüm bunu çürüttü.
+
+İlk sinyal raporun içindeydi: Commons `metadata=0` **ve** `elenen=0`.
+Lisans duvarı çalışsaydı `elenen > 0` olurdu. **Hiçbir şey elenmemişti —
+arama zaten boş dönüyordu.**
+
+Aynı `commons.ara()` çağrısıyla ölçüldü (ek kota/ağ **yok**):
+
+| sorgu | denenen | aday |
+|---|---|---|
+| `Pleiades supercomputer **Iceland**` | **0** | 0 |
+| `Pleiades supercomputer` | **18** | **6** |
+| `supercomputer facility **Iceland**` | **0** | 0 |
+| `supercomputer facility` | **18** | **6** |
+| `solar array power **Iceland**` | **0** | 0 |
+| `solar array power` | **18** | **6** |
+| `Silicon Carbide Integrated Circuit Chip` (temiz) | **0** | 0 |
+
+**Kaynak:** `beaee8f` (I-20) satırı I-18'in **doğa/İzlanda** smoke'undan
+olduğu gibi kopyalamış. Teknoloji konusunda `" Iceland"` bir **konu
+bulaşanı**. 3/4 sahnede tek sebep buydu.
+**s03 ise temiz sorguyla da `denenen=0`** — Commons'ta bu konuda aday
+**gerçekten yok**; o boşluk **dürüst** bırakıldı, uydurulmadı.
+
+### ⚠ İKİNCİ GERÇEK HATA — ALAKA SİNYALİ ATILIYORDU
+
+Sorguyu düzeltmek **tek başına videoyu bozacaktı.** `commons.ara()` sonuçları
+**salt çözünürlüğe** göre sıralıyordu ve arama motorunun zaten verdiği
+`index` (alaka sırası) alanını **tamamen atıyordu**. MediaWiki `pages`
+sözlüğü pageid'ye göre anahtarlı olduğu için sıra yalnızca `index`te taşınır.
+
+Ölçülen vaka (`"Pleiades supercomputer"`, 18 sonuç):
+
+| dosya | alaka | ölçü | eski sıra | yeni sıra |
+|---|---|---|---|---|
+| `Pleiades large.jpg` (**yıldız kümesi**, Palomar/STScI künyeli) | **17/18** | 4877×3515 | **1.** | **son** |
+| `NASA Pleiades Supercomputer.jpg` (**gerçek konu**) | 12 | 4983×3303 | 2. | öne |
+
+`supercomputer facility` sorgusunda da **RC Lens – Lille OSC futbol maçı**
+fotoğrafları ("OSC" eşleşmesi) ilk 6'ya giriyordu; alaka sıralamasıyla
+elendiler. Lisansı temiz ama **konu dışı** görsel = **yanlış video**.
+
+Artık **alaka birincil, çözünürlük ikincil**.
+⚠ **Çözünürlük EŞİĞİ değişmedi** (`en_az_genislik` filtresi yukarıda ve aynı)
+— bu bir eşik gevşetmesi **değildir**; testle kilitli.
+
+### ⚠ ÜÇÜNCÜ DÜZELTME — KUSURU 4 ATOM GİZLEYEN TANI KÖR NOKTASI
+
+`edinim` raporu yalnızca `metadata` ve `elenen` yazıyordu. İkisi de 0 olunca
+**"arama hiç sonuç vermedi"** ile **"sonuç geldi, hepsi elendi"** ayırt
+edilemiyordu. Ayrıca rapor **sahne sorgusunu** gösteriyordu, sağlayıcıya
+**gerçekten giden** sorguyu değil — bulaşan bu yüzden görünmez kaldı.
+
+Eklendi: `kullanilan_sorgu`, `denenen`, `elenme_nedenleri` ve iki ayrı sebep
+metni (`ARAMA-BOS` / `HEPSI-ELENDI`).
+
+### ✅ ÖLÇÜLEN ÖNCE → SONRA (arama katmanı)
+
+| Ölçüm | I-24 | **I-25** |
+|---|---|---|
+| Commons `denenen` (s01/s02) | **0 / 0** | ✅ **18 / 18** |
+| Commons `metadata` (s01/s02) | **0 / 0** | ✅ **6 / 6** |
+| Commons durumu | `ADAY-YOK` | `BAYT-YOK (HTTP 429)` |
+| Konu dışı aday ilk sırada | **evet** (yıldız kümesi) | ✅ **hayır** |
+| Raporda giden sorgu | **yok** | ✅ **var** |
+
+### ⛔ SAĞLAYICI-TEKEL WARN **DÜRÜSTÇE DURUYOR** — sebep DEĞİŞTİ
+
+Arama düzeldi ama **bayt gelmedi**: Commons yük sunucusu bu host'a
+**HTTP 429 / `Retry-After: 600`** dönüyor. Tek ve nazik bir bağımsız sonda
+ile doğrulandı (1 istek): `HTTP 429  Retry-After=600`.
+
+Bu, **I-19'da zaten ölçülmüş ve tasarıma girmiş** koşulun ta kendisi. Motor
+doğru davrandı: `bekleme_karari = DEVRE-AC` (600 sn **beklenmedi**), devre
+kesici 2. kalıcı hatada açıldı, NASA'ya geçildi.
+
+Yani tekel **sahte çeşitlilikle kapatılmadı**; sebebi artık **ölçülmüş ve
+raporda yazılı** (`ADAY-YOK` değil, `HTTP 429`).
+
+### ✅ MEDYA KÜMESİ DEĞİŞMEDİ — kabul edilen MP4 korunuyor
+
+Commons bayt veremediği için 4 sahne de yine NASA'dan geldi. Yeniden render
+**zorunluydu** (kümenin değişip değişmediği ancak edinimi koşarak bilinir) ve
+sonuç **alan alan aynı** çıktı:
+
+| alan | I-24 (kabul) | I-25 | aynı? |
+|---|---|---|---|
+| POST-QA | PASS | PASS | ✅ |
+| kalite puanı | 100.0 | 100.0 | ✅ |
+| ölçü / süre | 1920×1080 / 17.109 sn | aynı | ✅ |
+| LUFS / TP | −14.36 / −4.09 | aynı | ✅ |
+| sessizlik / siyah / donmuş | 0 / 0 / 0 | aynı | ✅ |
+| kesme | 7 | 7 | ✅ |
+| kenar ihlali | 0/68 | 0/68 | ✅ |
+| hareketler | 5 ayrı | aynı | ✅ |
+| varlıklar / sağlayıcı | 4 NASA | aynı | ✅ |
+
+**ffprobe (diskteki dosya):** h264 1920×1080 + aac 48 kHz/2ch, 17.109 sn,
+39.88 MB. **11 kare** yerinde. Yeni bir MP4 kabulü **iddia edilmiyor** —
+kabul edilen I-24 çıktısı **birebir yeniden üretildi**.
+
+### Ölçülen test sonucu
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1546** | **2960** |
+
+0 hata. Faz I 1525 → **1546** (+21). Faz I BLOKE 0.
+Alaka sıralaması testleri **sahte API yanıtı** ile koşuyor (`ara()` kendi
+`acan`ını dışarıdan alıyor) — **ağ yok, kota yok**.
+
+### ⚠ ÖLÇÜLEN AMA ÇÖZÜLMEYEN (dürüst not)
+
+s01'in Commons denemesi **54.1 sn** sürdü (s02: 1.3 sn). İkisi de doğru
+kararla (`DEVRE-AC`) bitti; gecikme ilk bayt isteğinin sunucu tarafında
+yavaş 429'lanmasından geliyor. Tekrar üretmek Commons'ı dövmeyi gerektirir,
+bu yüzden **düzeltilmedi, ölçüm olarak yazıldı**. Maliyet $0; yalnızca
+duvar saati.
+
+### SONRAKİ ATOM (I-26 adayı)
+
+- Commons 429'u host/IP kaynaklı; **sağlayıcı çeşitliliği için gerçek
+  seçenek** ya farklı bir kamu malı sağlayıcı ya da 429 penceresi dışında
+  edinim. İkisi de bu atomun kapsamı dışıdır ve **kullanıcı kararıdır**.
+- s03 için Commons'ta konu gerçekten yok; sorgu genişletme (ör. eş anlamlı
+  terim) **ölçülerek** denenebilir — uydurma eşleşme değil.
