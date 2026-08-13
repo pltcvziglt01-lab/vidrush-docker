@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 13 Ağu | **I-48 b002 yer/özne biyom sözlüğüyle: ELENDİ** | `PENDING` | ✅ **push edildi**, ölçüldü: altı gerçek çiftin **hiçbirinde** sahne biyomu çıkmıyor (video bağlamı da boş) → kapı **yapısal olarak atıl**; yer adı eklense bile (Kahoolawe→tropik) **sahne tarafı boş** kaldığı için çelişki üretilemiyor; kök neden: sözlükte **"ılıman" kuşağı yok** ve lawn/grass hiçbir kuşakta değil; eklenecek iddia (**çim ⊥ tropik**) **faktüel olarak yanlış** (hawaii tropik listede, b002'nin öznesi *Heteropogon contortus* — bir çim türü); kelime örtüşmesi **ters** çalışıyor (iki POZİTİF kontrol sıfır kelime, negatif b002 iki kelime) → **üretim kodu DEĞİŞMEDİ**, b002 kabul engeli **sürüyor**, deploy YOK |
 | 13 Ağu | **I-47 dönem kapısı çift yönlü: ilk otomatik semantik işaret** | `0d21107` | ✅ **push edildi**, `donem_kapisi` yalnız **sahne tarihselse** adayı denetliyordu; ters yön (**tarihsel aday, güncel sahne**) hiç görülmüyordu → `donem_uyarisi` (saf metin, **yeni sağlayıcı/ağ/API yok**); pilotun gerçek 6 çiftinde **yalnız b001** işaretlendi (17 gerçek adayda **1** işaret, yanlış alarm **0**), gözle doğrulandı (1900 arşiv fotoğrafı vs "right now"); **seçim değişmedi** (aday elenmez, 11/11 kare SHA-256 aynı), kod **warn** (`EMIN DEGILSEN ENGELLEME`); ⚠ b002/b005 bu sinyalle **ulaşılamaz** — kabul engeli **sürüyor**, deploy YOK |
 | 13 Ağu | **I-46 risk optik birimde ifade ediliyor (enerji × yer değiştirme)** | `9a7438d` | ✅ **push edildi**, I-45 tek gezinme hızında kalibre olduğu için b002/b005'te **hüküm veremiyordu**; model **türetildi** (|ΔI| ≈ |∇I|·d) ve pan (öteleme) ile zoom (ölçek) alanları **ayrıldı**; 12 kontrollü nokta ile **k=0.8877** ölçüldü, **tutulan 6 gerçek çekimde** ort. hata **%10.8** / en kötü **%22.9**; risk artık **optik birimde** (eşik 2.0 aynen) ve fail yalnız `beklenen×1.229 < 2.0` iken → **kapsam dışı 2 → 0**, yanlış alarm **0**, `KALITE-OPTIK-DURGUN-BEKLENEN` **FAIL** seviyesine çıkarıldı (12+6 noktada yanlış fail yok); render **11/11 kare SHA-256 aynı**, POST-QA **PASS**, **kabul edilmiş MP4 DEĞİL** (b001/b002 semantik), deploy YOK |
 | 13 Ağu | **I-45 enerji gösterilen kadraj bölgesinde ölçülüyor** | `79422de` | ✅ **push edildi**, I-44 enerjiyi **ekrana hiç gelmeyen** piksellerde de ölçüyordu → gösterilen bölge `Kamera.tsx` transformundan **birebir türetildi**; ⚠ **ölçüm hipotezi çürüttü** (kırpmada ölçmek yanlış alarmı azaltmadı, b005 ile **artırdı**) → gerçek kök neden ölçüldü: eşik **tek bir kamera konfigürasyonunda** (gezinme **0.0577/sn**) kalibre edilmişti; artık **kalibrasyon alanı dışında hüküm verilmiyor** → pilotta yanlış alarm **1 → 0** (PRE-QA warn 4→3), b002/b005 **bilgi** olarak raporlanıyor; fail'e **yükseltilmedi** (ölçüm kesinleşmedi), render **11/11 kare SHA-256 aynı**, POST-QA **PASS** ama **kabul edilmiş MP4 DEĞİL** (b001/b002 semantik), deploy YOK |
@@ -5660,6 +5661,122 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 66. FAZ I-48 — b002 YER/ÖZNE, BİYOM SÖZLÜĞÜ YOLUYLA: **ELENDİ** (yalnız tanısal, 13 Ağu)
+
+> **Durum: yaklaşım ÖLÇÜLDÜ ve ELENDİ. Üretim kodu DEĞİŞMEDİ; ölçüm ve
+> gerekçe teste kilitlendi. A–I yeşil (3377, 0 hata, 1 BLOKE — I-33 kaydı
+> sürüyor). Render/medya davranışı değişmediği için **rerender YOK**.
+> Deploy YOK. Maliyet $0.00.**
+> Değişen: **yalnızca** `webapp/testler/test_faz_i.py` (+ handoff).
+> `medya_kapisi.py`, `medya/*`, `editor/*`, `deploy.sh` ve **22 alan
+> sözleşmesi** **dokunulmadı** (git ile doğrulandı: tek dosya, +176 satır).
+> Yeni sağlayıcı / ikinci ağ çağrısı / ücretli API / credential değişikliği
+> **yok**; tek `ara()`, mevcut kota ve **429 devre kesici** aynen.
+> I-23…I-47 **korundu**.
+
+### Soru
+
+I-47'nin yakalayamadığı **b002** negatifi — aday başlığındaki
+*"Kanapou-Kahoolawe"* yer adı — **mevcut yerel biyom sözlüğüyle**, ağsız ve
+deterministik olarak sınanabilir mi?
+
+### Ölçüm 1 — mevcut sözlükle altı gerçek çift
+
+| beat | sınıf | sahne biyomu | aday biyomu | kapı |
+|---|---|---|---|---|
+| b001 | NEG (dönem) | `[]` | `[]` | geçer |
+| **b002** | **NEG (hedef)** | `[]` | `[]` | geçer |
+| b003 | POZ | `[]` | `[]` | geçer |
+| b004 | POZ | `[]` | `[]` | geçer |
+| b005 | NEG (tür) | `[]` | `[]` | geçer |
+| b006 | POZ | `[]` | `[]` | geçer |
+
+**Video bağlamının biyomu da `[]`.** `biyom_kapisi` her iki tarafın biyomunu
+ister ("emin değilsen geçir") → kapı bu iş sınıfında **yapısal olarak atıl**;
+gerekçe birebir *"biyomu çıkarılamadı — kapı uygulanmadı"*.
+
+### Ölçüm 2 — yer adı eklense bile çelişki üretilemiyor
+
+Varsayımsal uzatma (`Kahoolawe`/`Kanapou` → **tropik**; sözlükte zaten
+`hawaii`, `svalbard`, `south georgia` gibi yer adları var, yani bu mevcut
+desenin uzantısı) ölçüldü:
+
+- aday tarafı **`{tropik}`** kazanıyor ✅
+- **sahne tarafı `[]` kalıyor** ⛔ → çelişki **üretilemiyor**
+
+Yani yer adı eklemek **tek başına** b002'yi yakalayamaz.
+
+### Ölçüm 3 — kök neden: sahnenin kuşağı SÖZLÜKTE İFADE EDİLEMİYOR
+
+Sözlükte dört kuşak var: `col` · `kent` · `kutup` · `tropik`.
+**"ılıman/temperate" kuşağı YOK** ve `lawn`/`grass`/`garden` işareti
+**hiçbir kuşakta** yok. "ABD banliyö çimi" kuşağı **yazılamıyor**, dolayısıyla
+`CELISEN` tablosu bu çelişkiyi **ifade edemiyor**.
+
+### Ölçüm 4 — eklenmesi gereken iddia FAKTÜEL OLARAK YANLIŞ
+
+Kapıyı çalıştırmak için `CELISEN`'e **"çim/bahçe sahnesi ⊥ tropik aday"**
+yazmak gerekirdi. Bu iddia **genel olarak yanlıştır**: sözlükte `hawaii`
+**tropik** kuşaktadır ve b002 adayının öznesi *Heteropogon contortus* —
+**bir çim türüdür**. İki taraf aynı özne ailesinde; iklim çelişkisi **yoktur**.
+Kapı bu örnekte ancak **kazayla** doğru sonuç verirdi.
+
+### Ölçüm 5 — kelime örtüşmesi TERS çalışıyor
+
+| beat | sınıf | anlatımla ortak kelime |
+|---|---|---|
+| b002 | **NEG** | `['bag', 'seed']` — **iki** |
+| b005 | NEG | `['seedling']` |
+| b001 | NEG | `['grass']` |
+| b003 | POZ | `['lawn', 'patchy', 'the']` |
+| **b004** | **POZ** | `[]` — **sıfır** |
+| **b006** | **POZ** | `[]` — **sıfır** |
+
+İki **pozitif** kontrol anlatımla **hiç** kelime paylaşmıyor; **negatif**
+b002 iki kelime paylaşıyor. Kelime tabanlı her ayrım negatifleri
+pozitiflerin **üstüne** koyar — I-34'te ölçülen *"ayıran eşik yok"*
+durumunun aynısı.
+
+### ⛔ Hüküm — I-34 dersi uygulandı
+
+**Yer/özne ayrımı mevcut yerel sözlükle taşınamaz.** Üretime **eklenmedi**:
+yer adları sözlüğe girmedi, yeni kuşak/çelişki eklenmedi, **özel-case kara
+liste yok** (varlığa/dosyaya özel eşleme olmadığı teste kilitlendi).
+Zorlama yok, sahte PASS yok.
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **1963** | **3377** |
+
+0 hata. Faz I 1941 → **1963** (+22). **1 BLOKE** — I-33 görsel inceleme
+kaydı sürüyor.
+
+### ⛔ Kabul durumu — DEĞİŞMEDİ
+
+Pilot MP4 **kabul edilmiş değildir**, deploy yok. Üç semantik negatiften
+**yalnız b001** otomatik işaretleniyor (I-47); **b002 ve b005 hâlâ gözle
+uyumsuz ve otomatik kapılarla ulaşılamıyor**.
+
+### SONRAKİ ATOM — ölçülen durum ne diyor
+
+b002 için **yerel metin/sözlük yolları tükendi**: I-34 (kare sinyalleri),
+I-35 (sorgu daraltması) ve şimdi I-48 (biyom/yer adı) ölçülüp elendi.
+Geriye ölçülmemiş **iki** yol kalıyor ve **ikisi de kullanıcı kararıdır**:
+
+1. **Operatör onayı** — b001/b002 gibi adayları insan onayına bağlamak
+   (I-34'te de aynı yere çıkmıştı).
+2. **Yeni yetenek (VLM/görüntü-metin eşleme)** — ücret ve yeni bağımlılık
+   doğurur; bu atomların ölçümü onu **gerekçelendirmiyor değil**, aksine
+   üç bağımsız elemeyle **işaret ediyor**; ama **kapsam/bütçe kararı
+   kullanıcıya aittir**.
+
+⚠ **b005 (tür/tür-adı) bu atomda genişletilmedi** (talimat gereği); ölçülmemiş
+durumda ve taksonomik bilgi ister.
+⚠ Bunlar dışında ölçülen açık kusurlar: model doygunluğu (I-46, %22.9),
+kısa sahnede pan taşma payı (I-43), önizlemede altyazı çizilmemesi (I-40).
 
 ---
 

@@ -6412,6 +6412,182 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
         "KaynakEtiketi" in _GRAFIK_TSX
         and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
 
+blok("§39x I-48 — b002 YER/OZNE: BIYOM SOZLUGU YOLUYLA **ELENDI** (olculdu)")
+
+# ⚠ HEDEF: I-47'nin yakalayamadigi b002 negatifi ("Kanapou-Kahoolawe" yer
+# adi) MEVCUT yerel biyom sozluguyle, AGSIZ ve deterministik olarak
+# sinanabilir mi? Olculdu -> SINANAMAZ. Yaklasim I-34 dersiyle ELENDI:
+# ayiran kanit yoksa zorlama YOK, ozel-case kara liste YOK, sahte PASS YOK.
+# URETIM KODU DEGISMEDI (yalniz bu test + handoff).
+#
+# ⚠ Yeni saglayici / ikinci ag cagrisi / ucretli API / credential degisikligi
+# YOK; tek `ara()`, mevcut kota ve 429 devre kesici AYNEN.
+#
+# ── OLCUM 1: MEVCUT SOZLUKLE ALTI GERCEK CIFT (sahne + aday basligi) ──
+#   beat  sinif            sahne_biyom  aday_biyom  kapi
+#   b001  NEG (donem)      []           []          gecer
+#   b002  NEG (HEDEF)      []           []          gecer
+#   b003  POZ              []           []          gecer
+#   b004  POZ              []           []          gecer
+#   b005  NEG (tur)        []           []          gecer
+#   b006  POZ              []           []          gecer
+#   VIDEO BAGLAMI biyomu da []  -> kapi YAPISAL OLARAK ATIL.
+#
+# ── OLCUM 2: YER ADI EKLENSE BILE (Kahoolawe/Kanapou -> "tropik") ──
+# Aday tarafi "tropik" kazaniyor AMA SAHNE tarafi BOS kaliyor; `biyom_kapisi`
+# her IKI tarafin biyomunu ister ("emin degilsen gecir") -> CELISKI URETILMEZ.
+# Yani yer adi eklemek TEK BASINA b002'yi yakalayamaz.
+#
+# ── OLCUM 3: SAHNENIN GERCEK KUSAGI SOZLUKTE IFADE EDILEMIYOR ──
+# Sozlukte dort kusak var: col / kent / kutup / tropik. "iliman/temperate"
+# kusagi YOK ve "lawn/grass/garden" isareti HICBIR kusakta yok. Dolayisiyla
+# "ABD banliyo cimi" kusagi YAZILAMAZ ve CELISEN tablosu bu celiskiyi
+# IFADE EDEMEZ.
+#
+# ── OLCUM 4: EKLENMESI GEREKEN IDDIA FAKTUEL OLARAK YANLIS ──
+# Kapiyi calistirmak icin CELISEN'e "cim/bahce sahnesi ⊥ tropik aday"
+# yazmak gerekirdi. Bu iddia GENEL OLARAK YANLIS: sozlukte "hawaii" tropik
+# kusaktadir ve b002 adayinin OZNESI *Heteropogon contortus* — bir CIM
+# turudur. Iki taraf AYNI ozne ailesinde; iklim celiskisi YOKTUR. Kapi bu
+# ornekte ancak KAZAYLA dogru sonuc verirdi.
+#
+# ── OLCUM 5: KELIME ORTUSMESI TERS CALISIYOR (ayirici degil) ──
+#   b002 NEG  ortak kelime: ['bag', 'seed']      <- IKI kelime
+#   b005 NEG  ortak kelime: ['seedling']
+#   b001 NEG  ortak kelime: ['grass']
+#   b003 POZ  ortak kelime: ['lawn', 'patchy', 'the']
+#   b004 POZ  ortak kelime: []                   <- SIFIR
+#   b006 POZ  ortak kelime: []                   <- SIFIR
+# Iki POZITIF kontrol anlatimla HIC kelime paylasmiyor, NEGATIF b002 iki
+# kelime paylasiyor. Kelime tabanli her ayrim negatifleri pozitiflerin
+# USTUNE koyar — I-34'te olculen "ayiran esik yok" durumunun aynisi.
+#
+# ⚠ HUKUM: yer/ozne ayrimi MEVCUT yerel sozlukle TASINAMAZ. Uretime
+# eklenmedi; b002 KABUL ENGELI OLARAK SURUYOR ve durustce raporlaniyor.
+
+_MK48 = __import__("medya_kapisi")
+_A48 = ["There is a bag of grass seed on my garage shelf right now.",
+        "By the middle of October, he was standing in the same thin, patchy "
+        "lawn he started with.",
+        "Then water lightly two or three times a day, every day for two "
+        "solid weeks.",
+        "Warm soil to germinate, and cool air so the seedling does not cook "
+        "once it comes up.",
+        "Soil is still loaded with summer heat, so germination is fast."]
+_BAGLAM48 = " ".join(_A48)
+_CIFT48 = [
+    ("b001", _A48[0], "Vegetable, grass and flower seeds, 1900 (1900) "
+                      "(20532148836).jpg"),
+    ("b002", _A48[0], "Starr-101229-6113-Heteropogon contortus-habitat seed "
+                      "ball paper bag mulch piles-Kanapou-Kahoolawe "
+                      "(25059536945).jpg"),
+    ("b003", _A48[1], "2025-04-07 15 59 57 A patchy lawn in spring within "
+                      "Ann M. Banchoff Park in the Mountainview section of "
+                      "Ewing Township, Mercer County, New Jersey.jpg"),
+    ("b004", _A48[2], "Sprinkler Irrigation - Sprinkler head.JPG"),
+    ("b005", _A48[3], "Ricinus communis seedling NC2.jpg"),
+    ("b006", _A48[4], "Dülmen, Mühlenwegfriedhof -- 2012 -- 8083.jpg"),
+]
+
+kontrol("⭐ I-48 OLCUM: alti gercek ciftin HICBIRINDE sahne biyomu cikmiyor",
+        all(not (_MK48.biyom_bul(m) or _MK48.biyom_bul(_BAGLAM48))
+            for _, m, _t in _CIFT48),
+        [(b, sorted(_MK48.biyom_bul(m))) for b, m, _t in _CIFT48])
+kontrol("⭐ I-48 OLCUM: video baglami da biyom VERMIYOR -> kapi YAPISAL ATIL",
+        not _MK48.biyom_bul(_BAGLAM48), sorted(_MK48.biyom_bul(_BAGLAM48)))
+kontrol("⭐ I-48 OLCUM: alti ciftin ALTISI da biyom kapisindan geciyor",
+        all(_MK48.biyom_kapisi(m, t, _BAGLAM48)[0] for _, m, t in _CIFT48))
+kontrol("⭐ I-48 OLCUM: kapi gerekcesi 'biyomu cikarilamadi' (atil oldugunun kaniti)",
+        "cikarilamadi" in _MK48.biyom_kapisi(_CIFT48[1][1], _CIFT48[1][2],
+                                             _BAGLAM48)[1],
+        _MK48.biyom_kapisi(_CIFT48[1][1], _CIFT48[1][2], _BAGLAM48)[1])
+
+# ── Yer adi eklense BILE sahne tarafi bos kalir -> celiski uretilemez ──
+_YER48 = ("kahoolawe", "kanapou")
+
+
+def _biyom_uzatilmis48(metin):
+    b = set(_MK48.biyom_bul(metin))
+    d = " " + str(metin or "").lower() + " "
+    if any(_MK48._gecer_mi(a, d) for a in _YER48):
+        b.add("tropik")
+    return b
+
+
+kontrol("⭐ I-48 OLCUM: yer adi eklense ADAY 'tropik' kazanir",
+        _biyom_uzatilmis48(_CIFT48[1][2]) == {"tropik"},
+        sorted(_biyom_uzatilmis48(_CIFT48[1][2])))
+kontrol("⭐ I-48 HUKUM: yer adi eklense BILE sahne bos -> CELISKI URETILEMEZ",
+        not _biyom_uzatilmis48(_CIFT48[1][1])
+        and not _biyom_uzatilmis48(_BAGLAM48),
+        sorted(_biyom_uzatilmis48(_CIFT48[1][1])))
+
+# ── Sahnenin gercek kusagi sozlukte IFADE EDILEMIYOR ──
+kontrol("⭐ I-48 KOK NEDEN: sozlukte 'iliman/temperate' kusagi YOK",
+        not ({"iliman", "temperate", "ılıman"} & set(_MK48.BIYOM_ISARETI)),
+        sorted(_MK48.BIYOM_ISARETI))
+kontrol("⭐ I-48 KOK NEDEN: 'lawn/grass/garden' HICBIR kusakta yok",
+        not [k for k, v in _MK48.BIYOM_ISARETI.items()
+             if any(("lawn" in x or "grass" in x or "garden" in x)
+                    for x in v)],
+        [k for k, v in _MK48.BIYOM_ISARETI.items()
+         if any(("lawn" in x or "grass" in x or "garden" in x) for x in v)])
+kontrol("⭐ I-48: eklenecek iddia FAKTUEL YANLIS — 'hawaii' TROPIK kusakta "
+        "ve b002 adayinin oznesi bir CIM turu (Heteropogon contortus)",
+        "hawaii" in _MK48.BIYOM_ISARETI["tropik"]
+        and "Heteropogon contortus" in _CIFT48[1][2])
+
+# ── Kelime ortusmesi TERS calisiyor (ayirici degil) ──
+_kel48 = lambda s: set(re.findall(r"[a-zà-ÿ]{3,}", s.lower()))  # noqa: E731
+_ort48 = {b: sorted(_kel48(m) & _kel48(t)) for b, m, t in _CIFT48}
+kontrol("⭐ I-48 OLCUM: IKI POZITIF kontrol anlatimla SIFIR kelime paylasiyor",
+        _ort48["b004"] == [] and _ort48["b006"] == [], _ort48)
+kontrol("⭐ I-48 HUKUM: NEGATIF b002 pozitiflerden DAHA COK kelime paylasiyor "
+        "-> kelime tabanli ayrim TERS calisir",
+        len(_ort48["b002"]) > len(_ort48["b004"])
+        and len(_ort48["b002"]) > len(_ort48["b006"]), _ort48)
+
+# ── ELENDI: URETIM KODU DEGISMEDI ──
+_MKS48 = oku(KOK, "medya_kapisi.py")
+kontrol("⭐ I-48: yer adlari sozluge EKLENMEDI (yaklasim elendi)",
+        not any(x in _MKS48.lower() for x in ("kahoolawe", "kanapou")),
+        "yer adi uretime sizmis")
+kontrol("⭐ I-48: yeni kusak/celiski EKLENMEDI (4 kusak, 3 celiski)",
+        len(_MK48.BIYOM_ISARETI) == 4 and len(_MK48.CELISEN) == 3,
+        (sorted(_MK48.BIYOM_ISARETI), sorted(_MK48.CELISEN)))
+kontrol("I-48: ozel-case kara liste YOK (varliga/dosyaya ozel esleme yok)",
+        "starr-101229" not in _MKS48.lower()
+        and "25059536945" not in _MKS48)
+kontrol("⭐ I-48: yeni saglayici/ag cagrisi/credential YOK",
+        not any(x in _MKS48 for x in ("requests", "urllib", "http",
+                                      "subprocess", "socket", "api_key",
+                                      "API_KEY")))
+
+# ── GERILEME YOK ──
+kontrol("I-48 GERILEME YOK: I-47 donem uyarisi HALA b001'i yakaliyor",
+        _MK48.donem_uyarisi(_CIFT48[0][1], _CIFT48[0][2]).get("uyari") is True)
+kontrol("I-48 GERILEME YOK: biyom kapisi GERCEK celiskide HALA REDDEDIYOR",
+        _MK48.kapi("The desert dunes stretch for miles.",
+                   "polar bear on arctic sea ice")[0] is False)
+kontrol("I-48 GERILEME YOK: edinim kapilari ve 429 devre kesici DURUYOR",
+        "class DevreKesici" in oku(KOK, "medya/edinim.py")
+        and "COZUNURLUK-YETERSIZ" in oku(KOK, "medya/edinim.py")
+        and "ORAN-UYUMSUZ" in oku(KOK, "medya/edinim.py"))
+kontrol("I-48 GERILEME YOK: lisans/provenance kapilari DURUYOR",
+        "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI
+        and "def lisans_suz" in oku(KOK, "edit_kopru.py"))
+kontrol("⭐ I-48: ESIKLER GEVSETILMEDI (optik 2.0 / enerji 11.589 / k 0.8877)",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0
+        and abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9
+        and abs(_kk.MODEL_K - 0.8877) < 1e-4)
+kontrol("I-48 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+_V48 = oku(os.path.dirname(KOK), "app", "render-studio", "src", "Video.tsx")
+kontrol("I-48: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in _V48
+        and "pan: 'right' | 'left' | 'top' | 'bottom' | 'yok'" in _V48)
+
 blok("§39w I-47 — DONEM KAPISI TEK YONLUYDU (semantik kabul engeli)")
 
 # ⚠ KABUL ENGELI: lawn pilotu I-39'dan beri "otomatik kapilarin HEPSI PASS"
