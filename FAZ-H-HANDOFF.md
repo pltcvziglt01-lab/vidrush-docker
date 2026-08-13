@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 14 Ağu | **I-52 pan taşma payı, pan yokken de zoom yolunu yiyordu** | `PENDING` | ✅ **push edildi**, I-43 borcunun kök nedeni kodda gösterildi: `kbHesap` pan payını **koşulsuz** ödüyordu ama kayma yalnız `pan` bir yönken uygulanıyor → `pan: 'yok'` sahnelerde %3.49 boşa gidiyordu; **koşullu** düzeltme (taban 1.0349→1.012 yalnız pan yokken) gerçek render'da ölçüldü: pan'sız sahneler **+%9…+%35** optik, pan yapan sahneler **bit-bit aynı**; ⚠ payın pan yapan sahnede **gerekli** olduğu karşı-örnekle kanıtlandı (payı herkesten kaldırınca tam çözünürlükte **9 koyu sütun**), koşullu halde **0**; 25.2 sn 1080p pilot POST-QA **WARN** (tek kalan s1'in kök nedeni bu atom değil — görsel enerjisi), kenar **0/101 + tam çözünürlükte 0**, **kabul edilmiş MP4 DEĞİL**, deploy YOK |
 | 14 Ağu | **I-51 eksik veri üretildi, doygunluk ölçülerek kabul edildi** | `ce6be80` | ✅ **push edildi**, gerçek editorv2 1080p'de **18 yeni kontrollü nokta** (2 enerji × {pan, zoom} × hedef d 0.5–1.3; parametreler üretimin kendi saf fonksiyonlarıyla **sayısal çözüldü**, ölçek tavanı yetmeyen 6 zoom noktası **düşürüldü**); **train/held-out ayrımı render'dan ÖNCE** diske sabitlendi; model TRAIN'de seçilip HELD-OUT'ta **tek kez** ölçüldü: doygunluk **HELD MAE 15.7%→7.6%**, **en kötü 38.7%→14.4%**, **fail bandı 1.442→1.748**, **yanlış fail 0** korundu → I-50'nin oracle beklentisi **doğrulandı**; `MODEL_K` 0.935 / `MODEL_D0` 3.012 / marj 0.144; eşikler gevşetilmedi; 25.2 sn pilot POST-QA **PASS**, **11/11 kare SHA-256 aynı**, **kabul edilmiş MP4 DEĞİL** (b001/b002 semantik), deploy YOK |
 | 14 Ağu | **I-50 doygunluk terimi mevcut veriyle: ELENDİ** | `f4a0afe` | ✅ **push edildi**, sıkı train/held-out ile ölçüldü: **TRAIN'de d ≥ 0.5 olan nokta YOK** (0.016–0.289) oysa en kötü hata d=1.311'de → doygunluk parametresi train verisiyle **kısıtlanamıyor**; ek parametre TRAIN'i iyileştirip (9.4→7.8%) **HELD-OUT'u kötüleştiriyor** (10.6→11.8%) ve en kötü hatayı **büyütüyor** (22.4→27.3/28.2%) → **fail bandı daralıyor** (1.627→1.571/1.560), yani kapı daha az vaka yakalar; oracle (sızıntı) %6.0/%11.8 ile sinyalin **gerçek ama verinin yetersiz** olduğunu gösteriyor → **üretim modeli DEĞİŞMEDİ** (`MODEL_K` 0.8877, hata payı 0.229), rerender YOK, deploy YOK |
 | 13 Ağu | **I-49 b005 tür/takson yerel olarak: ELENDİ** | `f136778` | ✅ **push edildi**, ölçüldü: kurulu taksonomi/ML paketi **yok**, `taksonomi.py` biyolojik değil, `webapp/veri/` altında tür verisi yok, 17 gerçek künyenin **21 alanında** tür/kategori alanı **yok**; tek çıkarılabilir sinyal (Latin ikili adlandırma, salt yapısal) örneklemde ayırıyor gibi görünüyor (negatif 2/3, pozitif 0/3, 17 adayda 1) **ama hüküm taşımıyor**: işaretlenen iki adaydan biri (b002) anlatımla **aynı özne ailesinde** — *Heteropogon contortus* bir **çim türü**; "tür adı var" ile "tür yanlış" ayrımı için yerel kaynak yok ve sinyal en iyi etiketlenmiş adayları cezalandırırdı → **üretim kodu DEĞİŞMEDİ**, b005 kabul engeli **sürüyor**, deploy YOK |
@@ -5664,6 +5665,129 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 70. FAZ I-52 — PAN TAŞMA PAYI, PAN YOKKEN DE ZOOM YOLUNU YİYORDU (14 Ağu)
+
+> **Durum: I-43'te ölçülen borcun kök nedeni KODDA gösterildi ve ÇÖZÜLDÜ.
+> `pan: 'yok'` sahnelerde optik hareket gerçek pilotta **+%9…+%35**; pan
+> yapan sahneler **bit-bit aynı**. Kenar **0/101** ve **tam çözünürlükte
+> 0 koyu sütun** — yanlış alarm yok. A–I yeşil (3458, 0 hata).
+> POST-QA **WARN** (tek kalan bulgunun kök nedeni bu atom değil).
+> MP4 **kabul edilmedi**. Deploy YOK. Maliyet $0.00.**
+> Değişen: `app/render-studio/src/Video.tsx` (**tek dallanma**),
+> `webapp/testler/test_faz_i.py`. `TABAN_OLCEK` formülü, `kalite_kapisi`,
+> `qa_on`, `medya/*`, `deploy.sh`, **eşikler**, **22 alan sözleşmesi** ve
+> **kullanıcı zoom/pan seçimleri** **dokunulmadı**. I-23…I-51 **korundu**.
+
+### ⛔ Kök neden — kodda gösterildi
+
+```js
+TABAN_OLCEK(panPx, dikey, kareGen, kareYuk) = 1 + 2·panPx/kare + 0.012
+```
+`kbHesap` bu tabanı **koşulsuz** uyguluyordu; oysa **kayma** yalnızca
+`sahne.pan` bir **yön** iken uygulanıyor (`pan: 'yok'` → `tx = ty = 0`).
+Yani pan **yokken** de %3.49'luk taşma payı ödeniyor ve **doğrudan zoom
+yolundan** düşüyordu:
+
+| süre | taban | tepe | yol | etkin | **pay olmasa** yol / etkin |
+|---|---|---|---|---|---|
+| 2.201 sn | 1.0349 | 1.0990 | 0.0641 | **%2.914/sn** | **0.0870 / %3.955** |
+| 5.549 sn | 1.0349 | 1.2497 | 0.2148 | %3.871/sn | 0.2377 / %4.284 |
+
+I-43'ün ölçtüğü *"istenen %4.5/sn ekranda %2.91/sn"* tam olarak budur.
+
+### Kontrollü ölçüm — üç gerçek render, aynı props
+
+| sahne | R1 mevcut | **R2 koşullu** | R3 karşı-örnek |
+|---|---|---|---|
+| kisa-panyok-in | 2.388 | **3.236** | 3.236 |
+| uzun-panyok-in | 2.913 | **3.236** | 3.237 |
+| kisa-panvar-in | 2.794 | **2.794** | 3.576 |
+| kisa-panyok-out | 2.394 | **3.232** | 3.235 |
+| kisa-panvar-out | 2.731 | **2.730** | 3.489 |
+| uzun-panvar-out | 2.969 | **2.971** | 3.290 |
+
+R2 pan'sız sahneleri **%11–%35** iyileştiriyor, pan yapan sahneleri
+**değiştirmiyor** (fark <%1).
+
+### ⚠ Pay, pan YAPAN sahnede GERÇEKTEN gerekli — karşı-örnekle kanıtlandı
+
+Payı **herkesten** kaldırınca (R3), **tam çözünürlükte** (1080p karede en dış
+40 px, tamamen koyu sütun sayısı) siyah bant ölçüldü:
+
+| koşum | en kötü koyu sütun |
+|---|---|
+| R1 mevcut | **0** |
+| **R2 koşullu** | **0** |
+| R3 karşı-örnek | **9** (`kisa-panvar-out@14.29` sağ=9, `uzun-panvar-out@19.74` sol=7) |
+
+En kötü birleşim **zoom=out + pan=yön**: ölçek **düşerken** kayma **artar** —
+4 Ağu'daki orijinal kusurun tarifi. Bu yüzden düzeltme **koşullu olmak
+zorunda**; ilk test ailem bu birleşimi kapsamıyordu ve eklendi.
+
+### ⚠ Ölçüm sınırı bulundu (kapsam dışı, sonraki atom adayı)
+
+`kenar_siyahligi_olcusu` (64×36 örnekleme, %4 şerit) R3'ün **gerçek** siyah
+bandını **görmedi** (0/79 dedi). Kaba ızgara ~20 px'lik bir bandı çözemiyor
+(64 px genişlikte 20 px ≈ 0.67 sütun, 2 sütunluk şerit içinde eriyor).
+Bu atomda kenar güvenliği **tam çözünürlükte** doğrulandı.
+
+### Düzeltme (en küçük) — tek dallanma
+
+```js
+const panYok = sahne.pan === 'yok' || !sahne.pan;
+const taban = TABAN_OLCEK(panYok ? 0 : panPx, dikeyPan, kareGen, kareYuk)
+  + (panYok ? 0.012 : 0);
+```
+`TABAN_OLCEK` **formülü değişmedi**; `hizli` yolu (panPx=0) etkilenmedi;
+dikey pan (`top`/`bottom`) payını **almaya devam ediyor**.
+
+| Paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Zengin venv | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 257 | **2044** | **3458** |
+
+0 hata. Faz I 2023 → **2044** (+21). Red-first: 2 XX.
+
+### 1080p pilot — `vidrushvideo_pan_i52.mp4` (25.2 sn)
+
+Değişen yol `VidrushVideo` olduğu için **o** pilot koşuldu; I-43 pilotuyla
+**aynı props** (elma-elmaya).
+
+| sahne | kamera | I-43 | **I-52** | değişim |
+|---|---|---|---|---|
+| s0 | in/**yok** | 3.534 | **4.479** | **+26.7%** |
+| s1 | out/**yok** | 0.955 | **1.288** | **+34.9%** |
+| s2 | in/right | 2.914 | 2.914 | **+0.0%** |
+| s3 | in/left | 2.810 | 2.810 | **+0.0%** |
+| s4 | in/**yok** | 2.806 | **3.058** | **+9.0%** |
+| s5 | out/**yok** | 2.195 | **2.450** | **+11.6%** |
+
+- **1920×1080 @ 30**, aac 48 kHz/2ch, 25.259 sn · **6 kesme** · **11 kare** (6 beat)
+- LUFS **−14.92** / TP −4.47 · sessizlik 1 aralık %1.4 · kırpma yok
+- kenar **0/101** ve **tam çözünürlükte 0 koyu sütun**
+- medya tekrarı **6 benzersiz**, bitişik yok · motion **4 hareket**, tekrar yok
+- tipografi dört ölçümde **temiz** · künye 4 CC sahnesinde
+- **POST-QA: WARN** — tek bulgu `s1` (ort 1.288 < 2.0)
+
+⚠ **s1'in kök nedeni bu atom değil**: görselin uzamsal enerjisi
+(I-44/I-45'te ölçüldü, |grad| 7.557 — kırpma enerjisi 9.391). Bu atom onu
+da **%34.9 iyileştirdi** ama eşiğin altında kalıyor. Eşik **gevşetilmedi**.
+
+### ⛔ Kabul durumu
+
+**Kabul edilmiş MP4 değildir**, mutlak yol verilmedi, deploy yok: POST-QA
+WARN ve ayrıca s0/s1 semantik uyumsuz (bilinen sınıf).
+
+### SONRAKİ ATOM
+
+1. **`kenar_siyahligi_olcusu` çözünürlük sınırı** — bu atomda ölçüldü:
+   64×36 ızgara ~20 px'lik gerçek siyah bandı **kaçırıyor**. Dar, ölçülebilir,
+   ağsız bir atom (örnekleme ölçüsü ya da şerit tanımı ölçülerek türetilir).
+2. **Semantik kabul engeli** (b002/b005) — dört eleme sonrası **kullanıcı kararı**.
+3. **Önizlemede altyazı hiç çizilmiyor** (I-40).
+4. Model d ≤ 1.31'de doğrulandı; **d > 1.31** hâlâ ölçülmemiş.
 
 ---
 

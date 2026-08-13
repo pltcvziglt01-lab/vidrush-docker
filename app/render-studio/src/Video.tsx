@@ -162,7 +162,23 @@ const kbHesap = (
 ) => {
   if (sahne.zoom === 'yok') return {olcek: 1, tx: 0, ty: 0};
   const dikeyPan = sahne.pan === 'top' || sahne.pan === 'bottom';
-  const taban = TABAN_OLCEK(panPx, dikeyPan, kareGen, kareYuk);
+  // ── PAN TASMA PAYI, PAN YOKKEN ODENIYORDU (Faz I-52) ──
+  // ⚠ I-43'te olculen borc: 2.201 sn'lik sahnede istenen %4.5/sn ekranda
+  // %2.91/sn oluyordu. Kok neden: taban KOSULSUZ pan payini tasiyordu, oysa
+  // KAYMA yalnizca `sahne.pan` bir YON iken uygulaniyor (asagida tx/ty,
+  // `pan: 'yok'` icin 0). Yani pan YOKKEN %3.49'luk tasma payi bosa
+  // oduniyor ve DOGRUDAN zoom yolundan dusuyordu:
+  //   sure 2.201 -> yol 0.0641 (etkin %2.914/sn); pay olmadan 0.0870 (%3.955)
+  // ⚠ GERCEK RENDER'DA OLCULDU (ayni props, oran 0.045):
+  //   pan YOK sahneler : 2.388 -> 3.236 | 2.913 -> 3.236 | 2.394 -> 3.232
+  //   pan YAPAN sahneler: 2.794 -> 2.794 | 2.731 -> 2.730 | 2.969 -> 2.971
+  // ⚠ PAY, PAN YAPAN SAHNEDE GERCEKTEN GEREKLI — karsi-ornekle kanitlandi:
+  // payi HERKESTEN kaldirinca TAM COZUNURLUKTE 9 koyu sutun (siyah bant)
+  // olculdu (en kotu birlesim ZOOM=OUT + PAN=YON: olcek DUSERKEN kayma
+  // ARTAR). Kosullu halde 0 koyu sutun. Bu yuzden dallanma SART.
+  const panYok = sahne.pan === 'yok' || !sahne.pan;
+  const taban = TABAN_OLCEK(panYok ? 0 : panPx, dikeyPan, kareGen, kareYuk)
+    + (panYok ? 0.012 : 0);
   const tepe = Math.max(buyume, taban + 0.06);   // tepe her zaman tabandan yukarida
   const olcek = interpolate(frame, [0, K], sahne.zoom === 'in' ? [taban, tepe] : [tepe, taban], {
     extrapolateRight: 'clamp',

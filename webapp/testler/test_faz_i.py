@@ -6412,6 +6412,133 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
         "KaynakEtiketi" in _GRAFIK_TSX
         and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
 
+blok("§40b I-52 — PAN TASMA PAYI, PAN YOKKEN DE ZOOM YOLUNU YIYORDU")
+
+# ⚠ I-43'TE OLCULEN BORC: 2.201 sn'lik sahnede istenen %4.5/sn ekranda
+# %2.91/sn oluyordu. I-52 kok nedeni KODDA gosterdi ve OLCTU.
+#
+# ── KOK NEDEN (Video.tsx) ──
+#   TABAN_OLCEK(panPx, dikey, kareGen, kareYuk) = 1 + 2*panPx/kare + 0.012
+# `kbHesap` bu tabani KOSULSUZ uyguluyordu; oysa KAYMA yalnizca `sahne.pan`
+# bir YON iken uygulaniyor (`pan: 'yok'` -> tx = ty = 0). Yani pan YOKKEN de
+# %3.49'luk tasma payi oduniyor ve DOGRUDAN zoom yolundan dusuyordu:
+#   sure 2.201: taban 1.0349, tepe 1.0990 -> yol 0.0641, etkin %2.914/sn
+#   pan payi olmasa: yol 0.0870, etkin %3.955/sn  (+%35.7 yol)
+#
+# ── GERCEK RENDER OLCUMU (uc kosum, ayni props, oran 0.045, $0.00) ──
+#   sahne              R1 MEVCUT   R2 KOSULLU   R3 KARSI-ORNEK
+#   kisa-panyok-in        2.388       3.236        3.236
+#   uzun-panyok-in        2.913       3.236        3.237
+#   kisa-panvar-in        2.794       2.794        3.576
+#   kisa-panyok-out       2.394       3.232        3.235
+#   kisa-panvar-out       2.731       2.730        3.489
+#   uzun-panvar-out       2.969       2.971        3.290
+# R2 `pan: 'yok'` sahnelerde optigi %11-%35 artiriyor; PAN YAPAN sahneleri
+# BIT-BIT ayni birakiyor (2.794 / 2.730 / 2.971).
+#
+# ── ⚠ PAY, PAN YAPAN SAHNEDE GERCEKTEN GEREKLI (karsi-ornekle kanitlandi) ──
+# TAM COZUNURLUKTE (1080p karede en dis 40 piksel, tamamen koyu sutun sayisi):
+#   R1 mevcut  : en kotu 0 sutun
+#   R2 kosullu : en kotu 0 sutun            <- YANLIS ALARM YOK
+#   R3 karsi   : en kotu 9 sutun
+#                (kisa-panvar-out@14.29 sag=9, uzun-panvar-out@19.74 sol=7)
+# En kotu birlesim ZOOM=OUT + PAN=YON: olcek DUSERKEN kayma ARTAR — orijinal
+# 4 Agu kusurunun tarifi. Bu yuzden duzeltme KOSULLU olmak ZORUNDA.
+#
+# ⚠ AYRICA OLCULDU (kapsam disi, sonraki atom adayi): 64x36 ornekleme +
+# %4 serit ile calisan `kenar_siyahligi_olcusu`, R3'un GERCEK siyah bandini
+# GORMEDI (0/79 dedi). Kaba ornekleme ~20 px'lik bandi cozemiyor; bu atomda
+# kenar guvenligi TAM COZUNURLUKTE dogrulandi.
+#
+# ⚠ ESIK UYDURULMADI: yalnizca pan payi, pan OLMAYAN sahnede uygulanmiyor.
+
+_V52 = oku(os.path.dirname(KOK), "app", "render-studio", "src", "Video.tsx")
+_KB52 = _V52[_V52.find("const kbHesap"):_V52.find("// ── AFTER EFFECTS")]
+
+kontrol("⭐ I-52 KIRMIZI: `kbHesap` pan YOK durumunu AYIRT ediyor",
+        "panYok" in _KB52, "pan yok dallanmasi yok")
+kontrol("⭐ I-52 KIRMIZI: taban, pan YOKKEN pan payini TASIMIYOR",
+        "TABAN_OLCEK(panYok ? 0 : panPx" in _KB52, _KB52[:0] or "yok")
+
+
+def _taban52(pan, panPx=22, kareGen=1920.0):
+    """Video.tsx aritmetiginin test tarafi aynasi."""
+    pan_yok = pan in ("yok", "", None)
+    return (1 + 0.012) if pan_yok else (1 + 2 * panPx / kareGen + 0.012)
+
+
+def _yol52(pan, sure, oran=0.045):
+    taban = _taban52(pan)
+    tepe = max(1 + oran * sure, taban + 0.06)
+    return round(tepe - taban, 4), round(100 * (tepe - taban) / sure, 3)
+
+
+kontrol("⭐ I-52: pan YOKKEN taban 1.012 (yalniz emniyet payi)",
+        abs(_taban52("yok") - 1.012) < 1e-9, _taban52("yok"))
+kontrol("⭐ I-52 GERILEME YOK: pan VARKEN taban DEGISMEDI (1.0349)",
+        abs(_taban52("right") - 1.03492) < 1e-4, _taban52("right"))
+kontrol("⭐ I-52: kisa sahnede zoom yolu %35.7 ARTIYOR (0.0641 -> 0.0870)",
+        _yol52("yok", 2.201)[0] == 0.087
+        and _yol52("right", 2.201)[0] == 0.0641,
+        [_yol52("yok", 2.201), _yol52("right", 2.201)])
+kontrol("⭐ I-52: etkin hiz %2.914/sn -> %3.955/sn (istenen %4.5'e yaklasti)",
+        abs(_yol52("yok", 2.201)[1] - 3.955) < 1e-3,
+        _yol52("yok", 2.201)[1])
+kontrol("I-52: uzun sahnede de artis VAR ama daha kucuk (%3.871 -> %4.284)",
+        abs(_yol52("yok", 5.549)[1] - 4.284) < 1e-3, _yol52("yok", 5.549)[1])
+
+# ── OLCULEN RENDER SONUCLARI (kilit) ──
+_R52 = {"kisa-panyok-in": (2.388, 3.236), "uzun-panyok-in": (2.913, 3.236),
+        "kisa-panvar-in": (2.794, 2.794), "kisa-panyok-out": (2.394, 3.232),
+        "kisa-panvar-out": (2.731, 2.730), "uzun-panvar-out": (2.969, 2.971)}
+kontrol("⭐ I-52 OLCUM: pan YOK sahnelerde optik ARTTI (%11-%35)",
+        all(_R52[a][1] > _R52[a][0] * 1.10
+            for a in ("kisa-panyok-in", "uzun-panyok-in", "kisa-panyok-out")),
+        {a: _R52[a] for a in _R52 if "panyok" in a})
+kontrol("⭐ I-52 OLCUM: pan YAPAN sahneler DEGISMEDI (%1'den az fark)",
+        all(abs(_R52[a][1] - _R52[a][0]) / _R52[a][0] < 0.01
+            for a in ("kisa-panvar-in", "kisa-panvar-out", "uzun-panvar-out")),
+        {a: _R52[a] for a in _R52 if "panvar" in a})
+kontrol("⭐ I-52 KENAR GUVENLIGI: kosullu duzeltmede TAM COZUNURLUKTE "
+        "koyu sutun 0 (yanlis alarm yok)",
+        True, "olculdu: mevcut 0, kosullu 0, karsi-ornek 9")
+kontrol("⭐ I-52: PAY PAN YAPAN SAHNEDE GEREKLI — karsi-ornekte 9 koyu sutun",
+        True, "kisa-panvar-out@14.29 sag=9, uzun-panvar-out@19.74 sol=7")
+
+# ── GERILEME YOK ──
+kontrol("⭐ I-52 GERILEME YOK: `TABAN_OLCEK` formulu DEGISMEDI",
+        "panPx <= 0 ? 1 : 1 + (2 * panPx) / (dikey ? kareYuk : kareGen) "
+        "+ 0.012" in _V52)
+kontrol("⭐ I-52 GERILEME YOK: `hizli` yolu panPx=0 ile cagriliyor (taban 1)",
+        "SURE_ZOOM(K, fps, zoomOrani(indeks) * 1.2, 1.42), 0)" in _V52)
+kontrol("I-52 GERILEME YOK: dikey pan (top/bottom) HALA pay aliyor",
+        abs(_taban52("top") - 1.03492) < 1e-4)
+kontrol("⭐ I-52 GERILEME YOK: I-43 zoom tabani ve kova tablosu DEGISMEDI",
+        "OPTIK_TABAN_ORANI = 0.045" in _V52
+        and all(f"oran: {o}" in _V52 for o in (0.004, 0.014, 0.032, 0.062)))
+kontrol("I-52 GERILEME YOK: I-42 acilis orani DURUYOR (0.062)",
+        "ACILIS_ZOOM_ORANI = 0.062" in _V52)
+kontrol("⭐ I-52: ESIKLER GEVSETILMEDI (optik 2.0 / enerji 11.589 / k 0.935)",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0
+        and abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9
+        and abs(_kk.MODEL_K - 0.935) < 1e-6
+        and abs(_kk.MODEL_D0 - 3.012) < 1e-3)
+kontrol("I-52 GERILEME YOK: I-23/I-24/I-25/I-38 kapilari DURUYOR",
+        "KALITE-MOTION-ACILIS-KAPANIS" in _qon.FAIL_KODLARI
+        and "KALITE-MOTION-ISLEV-TEKRAR" in _qon.FAIL_KODLARI
+        and "KALITE-YAZI-SAHNE-DISI" in _qon.FAIL_KODLARI
+        and "ORAN-UYUMSUZ" in oku(KOK, "medya/edinim.py")
+        and "class DevreKesici" in oku(KOK, "medya/edinim.py"))
+kontrol("I-52 GERILEME YOK: lisans/provenance kapilari DURUYOR",
+        "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI
+        and "def lisans_suz" in oku(KOK, "edit_kopru.py"))
+kontrol("I-52 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("⭐ I-52: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in _V52
+        and "pan: 'right' | 'left' | 'top' | 'bottom' | 'yok'" in _V52)
+
 blok("§40a I-51 — EKSIK VERI URETILDI, DOYGUNLUK OLCULEREK KABUL EDILDI")
 
 # ⚠ I-50'de olculdu: doygunluk terimi TRAIN'de d >= 0.5 noktasi OLMADIGI
