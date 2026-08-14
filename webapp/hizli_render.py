@@ -27,6 +27,21 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 KOK_YOL = os.environ.get("VIDRUSH_KOK", "/opt/vidrush")
+
+# ── FAZ R-1d-f: TESLIM EDILEN MP4'UN PIKSEL FORMATI ──
+# ⚠ OLCULEN KUSUR (R-1d-e pilotu, job_1786720519626): teslim edilen MP4
+# `ffprobe` ile `pix_fmt = yuv444p` cikti. SEGMENT filtre zincirlerinde
+# `format=yuv420p` VARDI (satir ~695 ve ~753) ama NIHAI birlestirme/encode
+# (`_xfade_zincir`) ve altyazi gomme adimlari `-pix_fmt` VERMIYORDU; `xfade`
+# filtresi formati 4:4:4'e YUKSELTIYOR ve son encode onu aynen yaziyordu.
+# Sonuc: H.264 High 4:4:4 profili yaygin desteklenmedigi icin video bircok
+# oynatici/tarayicida COZULEMIYOR.
+# ⚠ SEGMENT FILTRESINE GUVENILMEZ: format sinir ADIMLARINDA acikca verilir
+# VE teslim sinirinda GERCEK ffprobe ile DOGRULANIR.
+TESLIM_PIX_FMT = "yuv420p"
+# Stabil hata kodu — sessiz kabul YOK.
+PIX_FMT_HATA_KODU = "RENDER-PIX-FMT-YANLIS"
+
 STUDYO = os.path.join(KOK_YOL, "render-studio")
 PUBLIC = os.path.join(STUDYO, "public")
 FONT_DIZIN = os.path.join(PUBLIC, "fonts")
@@ -772,6 +787,60 @@ def _segment_uret(sahne, gecis, fps, crf, seg_yol):
         return False
 
 
+def pix_fmt_komutu(video_yolu):
+    """ffprobe komutunu KUR (calistirmaz).
+
+    ⚠ Ayri fonksiyon: komut SOZLESMESI medyasiz test edilebilsin diye.
+    """
+    return ["ffprobe", "-v", "error", "-select_streams", "v:0",
+            "-show_entries", "stream=pix_fmt", "-of", "csv=p=0",
+            str(video_yolu)]
+
+
+def pix_fmt_oku(video_yolu, *, kosucu=None):
+    """Dosyanin GERCEK piksel formatini ffprobe ile oku.
+
+    ⚠ Okunamazsa `None` doner — "herhalde dogrudur" DENMEZ; cagiran taraf
+    olculemeyen ciktiyi KABUL ETMEZ.
+    ⚠ `kosucu(komut) -> stdout` DISARIDAN verilebilir (repodaki okuyucu
+    enjeksiyonu deseni). Boylece kapinin karar mantigi MEDYASIZ test edilir;
+    gercek ffprobe YALNIZCA uretimde/remote pilotta kosar.
+    """
+    komut = pix_fmt_komutu(video_yolu)
+    try:
+        if callable(kosucu):
+            ham = kosucu(komut)
+        else:
+            r = subprocess.run(komut, capture_output=True, text=True,
+                               timeout=30)
+            ham = r.stdout
+        # ⚠ `csv=p=0` bazi ffprobe surumlerinde ARDIL VIRGUL birakiyor;
+        # kirpma virgulun IKI YANINI da temizler (test bunu kilitliyor).
+        ad = (ham or "").strip().rstrip(",").strip()
+        return ad or None
+    except Exception:                                        # noqa: BLE001
+        return None
+
+
+def teslim_ciktisini_dogrula(video_yolu, *, beklenen=TESLIM_PIX_FMT,
+                             kosucu=None):
+    """TESLIM SINIRI KAPISI — nihai MP4 gercekten `yuv420p` mi?
+
+    ⚠ Filtre zincirine GUVENILMEZ: dosya ffprobe ile OLCULUR.
+    ⚠ FAIL-CLOSED: format yanlis YA DA olculemiyorsa `ok=False` + STABIL
+    KOD doner; cagiran taraf ciktiyi TESLIM ETMEZ.
+    """
+    ham = pix_fmt_oku(video_yolu, kosucu=kosucu)
+    if ham is None:
+        return {"ok": False, "kod": PIX_FMT_HATA_KODU, "pix_fmt": None,
+                "beklenen": beklenen, "neden": "OLCULEMEDI"}
+    if ham != beklenen:
+        return {"ok": False, "kod": PIX_FMT_HATA_KODU, "pix_fmt": ham,
+                "beklenen": beklenen, "neden": "FORMAT-YANLIS"}
+    return {"ok": True, "kod": "", "pix_fmt": ham, "beklenen": beklenen,
+            "neden": ""}
+
+
 def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
     """props (Remotion props.json ile ayni sozluk) -> hedef_mp4. Basari: True.
     Kapsam disi durumda/hatada False doner; cagiran Remotion'a duser."""
@@ -900,6 +969,10 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
                      ["-filter_complex", ";".join(filt),
                       "-map", f"[{son_v}]", "-map", f"[{son_a}]",
                       "-c:v", "libx264", "-crf", str(crf), "-preset", "veryfast",
+                      # ⚠ FAZ R-1d-f: `xfade` formati 4:4:4'e YUKSELTIYOR;
+                      # segment filtresindeki `format=yuv420p` BURADA
+                      # KORUNMUYORDU. Format ACIKCA verilir.
+                      "-pix_fmt", TESLIM_PIX_FMT,
                       "-c:a", "aac", "-ar", "44100", "-b:a", "160k", cikti])
             r2 = subprocess.run(komut, capture_output=True, text=True,
                                 timeout=int(max(900, sum(sureler) * 4)))
@@ -930,6 +1003,21 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
             print("  hizli motor: xfade basarisiz -> Remotion", file=sys.stderr)
             return False
 
+        def _teslim_kapisi(yol):
+            """TESLIM SINIRI: nihai dosya GERCEKTEN yuv420p mi? (ffprobe)
+
+            ⚠ Filtreye GUVENILMEZ, dosya OLCULUR. Yanlissa `False` doner ve
+            hat Remotion'a duser — COZULEMEYEN bir MP4 TESLIM EDILMEZ.
+            """
+            d = teslim_ciktisini_dogrula(yol)
+            if not d["ok"]:
+                print(f"  {d['kod']}: pix_fmt={d['pix_fmt']} "
+                      f"beklenen={d['beklenen']} ({d['neden']}) "
+                      f"-> hizli motor ciktisi TESLIM EDILMEZ",
+                      file=sys.stderr)
+                return False
+            return True
+
         # ── 3) Altyazi (varsa tek gecişte ASS ile gomulur) ──
         stil = str(props.get("altyaziStil", "orta"))
         toplam_sure = sum(float(s.get("sure", 0)) for s in sahneler)
@@ -942,15 +1030,19 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
                 vf = f"ass={ass_yol}:fontsdir={FONT_DIZIN}"
                 r = subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", birlesik,
                                     "-vf", vf, "-c:v", "libx264", "-crf", str(crf),
-                                    "-preset", "veryfast", "-c:a", "copy", hedef_mp4],
+                                    "-preset", "veryfast",
+                                    # ⚠ FAZ R-1d-f: altyazi gomme de bir
+                                    # ENCODE'dur; format ACIKCA verilir.
+                                    "-pix_fmt", TESLIM_PIX_FMT,
+                                    "-c:a", "copy", hedef_mp4],
                                    capture_output=True, text=True,
                                    timeout=int(max(600, toplam_sure * 3)))
                 if r.returncode != 0 or not os.path.exists(hedef_mp4):
                     print(f"  hizli motor altyazi hata: {r.stderr[-300:]}", file=sys.stderr)
                     return False
-                return True
+                return _teslim_kapisi(hedef_mp4)
         shutil.move(birlesik, hedef_mp4)
-        return True
+        return _teslim_kapisi(hedef_mp4)
     except Exception as e:
         print(f"  hizli motor istisna: {str(e)[:200]}", file=sys.stderr)
         return False

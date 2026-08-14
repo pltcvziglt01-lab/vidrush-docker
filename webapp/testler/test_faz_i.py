@@ -9520,6 +9520,92 @@ kontrol("R-1d-e GERILEME YOK: 22 alan + K kapilari + render motoru DURUYOR",
         and "hizli_render.ffmpeg_render(" in oku(KOK, "pipeline.py"))
 
 
+blok("§40z R-1d-f — TESLIM EDILEN MP4 DETERMINISTIK yuv420p")
+
+# ── OLCULEN KUSUR (R-1d-e pilotu, job_1786720519626) ──
+#   ffprobe: 1920x1080 h264  pix_fmt = yuv444p   (yuv420p DEGIL)
+# SEGMENT filtre zincirlerinde `format=yuv420p` VARDI ama NIHAI birlestirme
+# (`_xfade_zincir`) ve altyazi gomme adimlari `-pix_fmt` VERMIYORDU; `xfade`
+# formati 4:4:4'e YUKSELTIYOR. H.264 High 4:4:4 yaygin desteklenmedigi icin
+# teslim edilen MP4 bircok oynatici/tarayicida COZULEMIYORDU.
+#
+# ⚠ Bu bolum ffmpeg GEREKTIRIR ve YALNIZCA gecici dizinde 0.2 sn'lik SENTETIK
+# test klipleri uretir (renk cubugu). Depoya/cikti dizinine HICBIR SEY
+# yazilmaz; is bitince dizin silinir. Ag/kredi YOK.
+
+_HR = __import__("hizli_render")
+
+kontrol("⭐ R-1d-f: teslim formati ve STABIL HATA KODU tanimli",
+        _HR.TESLIM_PIX_FMT == "yuv420p"
+        and _HR.PIX_FMT_HATA_KODU == "RENDER-PIX-FMT-YANLIS")
+# ⚠ MEDYASIZ: hicbir video/ses/kare/MP4 URETILMEZ ve KAYDEDILMEZ (gecici
+# dizin dahil). Kapinin karar mantigi MOCK ffprobe ciktisiyla, komut
+# sozlesmesi ise dogrudan kurucu fonksiyonla test edilir. GERCEK ffprobe
+# dogrulamasi YALNIZCA remote worker pilotunda kosar.
+
+# ── (1) KOMUT SOZLESMESI (calistirmadan) ──
+_HR_KOMUT = _HR.pix_fmt_komutu("/x/y.mp4")
+kontrol("⭐ R-1d-f: ffprobe komutu DOGRU alanlari istiyor "
+        "(v:0 akisindan pix_fmt, ayristirilabilir bicimde)",
+        _HR_KOMUT[0] == "ffprobe"
+        and "-select_streams" in _HR_KOMUT and "v:0" in _HR_KOMUT
+        and "stream=pix_fmt" in _HR_KOMUT and "csv=p=0" in _HR_KOMUT
+        and _HR_KOMUT[-1] == "/x/y.mp4", _HR_KOMUT)
+
+# ── (2) MOCK ffprobe ile KARAR MANTIGI ──
+def _mock(cikti):
+    return lambda komut: cikti
+
+
+_D444 = _HR.teslim_ciktisini_dogrula("v.mp4", kosucu=_mock("yuv444p\n"))
+kontrol("⭐ R-1d-f BELIRLEYICI: yuv444p cikti TESLIM KAPISINDAN GECMIYOR "
+        "(kusurun ta kendisi — once GECIYORDU)",
+        _D444 == {"ok": False, "kod": "RENDER-PIX-FMT-YANLIS",
+                  "pix_fmt": "yuv444p", "beklenen": "yuv420p",
+                  "neden": "FORMAT-YANLIS"}, _D444)
+kontrol("⭐ R-1d-f: yuv420p cikti TESLIM KAPISINDAN GECIYOR",
+        _HR.teslim_ciktisini_dogrula("v.mp4", kosucu=_mock("yuv420p\n"))
+        == {"ok": True, "kod": "", "pix_fmt": "yuv420p",
+            "beklenen": "yuv420p", "neden": ""})
+kontrol("⭐ R-1d-f RED-FIRST: ffprobe BOS donerse 'dogrudur' DENMIYOR",
+        _HR.teslim_ciktisini_dogrula("v.mp4", kosucu=_mock(""))["neden"]
+        == "OLCULEMEDI")
+kontrol("⭐ R-1d-f RED-FIRST: ffprobe PATLARSA 'dogrudur' DENMIYOR",
+        _HR.teslim_ciktisini_dogrula(
+            "v.mp4", kosucu=lambda k: (_ for _ in ()).throw(OSError("yok"))
+        )["neden"] == "OLCULEMEDI")
+kontrol("⭐ R-1d-f: yuv420p10le gibi YAKIN formatlar da REDDEDILIYOR "
+        "(tam esitlik araniyor)",
+        _HR.teslim_ciktisini_dogrula(
+            "v.mp4", kosucu=_mock("yuv420p10le"))["ok"] is False)
+kontrol("⭐ R-1d-f: `pix_fmt_oku` mock ciktisini KIRPIYOR (satir sonu/virgul)",
+        _HR.pix_fmt_oku("v.mp4", kosucu=_mock(" yuv420p ,\n")) == "yuv420p")
+
+# ── URETIM KODU: her nihai encode formati ACIKCA veriyor ──
+# ⚠ `_kod_yalniz` DIZE sabitlerini atiyor; `-pix_fmt` bir dizedir, bu yuzden
+# HAM kaynakta aranir (yorumlarda bu birlesim gecmiyor).
+_HR_HAM = oku(KOK, "hizli_render.py").replace(" ", "").replace("\n", "")
+kontrol("⭐ R-1d-f: HER nihai encode `-pix_fmt` geciyor "
+        "(xfade birlestirme + altyazi gomme)",
+        _HR_HAM.count('"-pix_fmt",TESLIM_PIX_FMT') >= 2,
+        _HR_HAM.count('"-pix_fmt",TESLIM_PIX_FMT'))
+kontrol("⭐ R-1d-f BELIRLEYICI: teslim sinirinda GERCEK ffprobe dogrulamasi "
+        "var (segment filtresine GUVENILMIYOR)",
+        "_teslim_kapisi(hedef_mp4)" in oku(KOK, "hizli_render.py")
+        and oku(KOK, "hizli_render.py").count("_teslim_kapisi(hedef_mp4)") == 2)
+kontrol("⭐ R-1d-f: dogrulama BASARISIZSA cikti TESLIM EDILMIYOR "
+        "(fail-closed, Remotion'a duser)",
+        "TESLIM EDILMEZ" in oku(KOK, "hizli_render.py"))
+kontrol("R-1d-f: hizli_render.py derleniyor",
+        _derlenir(os.path.join(KOK, "hizli_render.py")))
+kontrol("R-1d-f GERILEME YOK: gercek-timeline PRE-QA + tenant/imza + "
+        "kaynak_ses + kaynak tavani kapilari DURUYOR",
+        'k.get("render_qa")' in oku(KOK, "teslim.py")
+        and _IU.kapsam_ozeti()["tenant_baglanabilir"] is True
+        and _GQ.KAYNAK_TAVANI_SN == 8.0
+        and "GERCEK-KAYNAK-SES-SIZINTI" in _GQ.FAIL_KODLARI)
+
+
 blok("§40h I-58 — IKI ADAY DUZENI KARSI-OLGU OLARAK OLCULDU (yalniz tanisal)")
 
 # ⚠ YALNIZ TANISAL. Uretim davranisi DEGISMEDI, kapi/esik eklenmedi.

@@ -9471,3 +9471,54 @@ atamıyor — uydurulmadı).
 
 ⚠ Kütüphanede artık **2 kayıt** var: bu kabul + **R-1d-b'deki hatalı kabul**
 (`job_1786712620354`). Eski kayda **dokunulmadı** (talimat).
+
+---
+
+## 69. FAZ R-1d-f — TESLİM EDİLEN MP4 DETERMİNİSTİK `yuv420p` (14 Ağu)
+
+> **Durum: küçük atom, ölçülen blokaj kapatıldı. A–I yeşil.
+> Mac'te medya/QA artefaktı ÜRETİLMEDİ (geçici dizin dahil). $0.00.**
+> Değişen: `webapp/hizli_render.py`, `webapp/testler/test_faz_i.py`.
+> Başka hiçbir dosyaya dokunulmadı.
+
+### ⛔ Ölçülen kusur
+
+R-1d-e pilotu (`job_1786720519626`): teslim edilen MP4 `ffprobe` ile
+**`pix_fmt = yuv444p`**. H.264 High 4:4:4 profili yaygın desteklenmediği için
+video birçok oynatıcı/tarayıcıda **çözülemiyordu**.
+
+**Kök neden:** `format=yuv420p` yalnızca **segment** filtre zincirlerindeydi
+(satır ~695, ~753). **Nihai** iki encode — `_xfade_zincir` (birleştirme) ve
+altyazı gömme — `-pix_fmt` **vermiyordu**; `xfade` filtresi formatı 4:4:4'e
+**yükseltiyor** ve son encode onu aynen yazıyordu.
+
+### Düzeltme
+
+1. **Her nihai encode formatı AÇIKÇA veriyor** — `-pix_fmt yuv420p`
+   (birleştirme + altyazı gömme). Sabit: `TESLIM_PIX_FMT`.
+2. **Teslim sınırında GERÇEK ffprobe doğrulaması** — `_teslim_kapisi()`
+   nihai dosyayı ölçer. ⚠ **Segment filtresine GÜVENİLMEZ.**
+3. **Stabil hata kodu:** `RENDER-PIX-FMT-YANLIS`.
+   **FAIL-CLOSED:** format yanlış **ya da ölçülemiyorsa** hızlı motor
+   çıktısı **teslim edilmez** (`False` → hat Remotion'a düşer). Çözülemeyen
+   bir MP4 teslim edilmektense render yolu değişir.
+4. `pix_fmt_oku(..., kosucu=...)` — okuyucu **enjekte edilebilir** (repo
+   deseni), böylece kapı **medyasız** test edilir.
+
+⚠ **Ek üretim düzeltmesi:** bazı ffprobe sürümleri `csv=p=0` ile **ardıl
+virgül** bırakıyor; kırpma virgülün **iki yanını** da temizliyor (testte
+yakalandı).
+
+### Red-first + MEDYASIZ test
+
+⚠ Kullanıcı talimatı gereği **Mac'te hiçbir medya üretilmedi** — geçici
+dizin dahil. Test iki eksende **medyasız**:
+* **Komut sözleşmesi**: `pix_fmt_komutu()` doğrudan çağrılır (çalıştırılmaz).
+* **Karar mantığı**: **mock ffprobe** çıktısı enjekte edilir —
+  `yuv444p` → **RED** (`FORMAT-YANLIS`), `yuv420p` → geçer,
+  boş/exception → **`OLCULEMEDI`**, `yuv420p10le` → **RED** (tam eşitlik).
+
+Gerçek `ffprobe` doğrulaması **yalnızca remote worker pilotunda** koşar.
+
+Red-first ölçüldü: düzeltme geri alınınca
+**`AttributeError: module 'hizli_render' has no attribute 'TESLIM_PIX_FMT'`**.
