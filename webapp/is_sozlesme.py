@@ -93,8 +93,17 @@ def _sayi(v, varsayilan=0):
         return varsayilan
 
 
+def _imzali(yol, imzalayici):
+    """Goreli cikti yolunu imzali baglantiya cevir. Imzalayici yoksa AYNEN doner."""
+    y = str(yol or "")
+    if not y or not callable(imzalayici):
+        return y
+    ad = y.split("/")[-1].split("?")[0]
+    return imzalayici(ad) or y
+
+
 def normalize(is_id: str, ham: dict, *, kuyruk_sira=None, kuyruk_toplam=None,
-              zaman=None) -> dict:
+              zaman=None, imzalayici=None) -> dict:
     """Ham is sozlugunu TEK TIP sozlesmeye cevir (eski alanlar korunur).
 
     `ham` bellekten ya da diskteki durum dosyasindan gelebilir; ikisi de ayni
@@ -136,7 +145,11 @@ def normalize(is_id: str, ham: dict, *, kuyruk_sira=None, kuyruk_toplam=None,
         "stage": stage,
         "stage_ad": stage_ad,
         "message": str(ham.get("mesaj") or ham.get("message") or ""),
-        "video_url": str(ham.get("video") or ham.get("video_url") or ""),
+        # ⚠ FAZ R-1a: `video_url` artik IMZALI ve SURELI. `imzalayici`
+        # verilmezse ESKI davranis (imzasiz goreli yol) korunur — cagiran
+        # taraf (server) imzalayiciyi GECER; testler ikisini de kosar.
+        "video_url": _imzali(ham.get("video") or ham.get("video_url") or "",
+                             imzalayici),
         "cover_url": str(ham.get("kapak") or ham.get("cover_url") or ""),
         "error": str(ham.get("hata") or ham.get("error") or ""),
         "qa": qa,
@@ -145,7 +158,13 @@ def normalize(is_id: str, ham: dict, *, kuyruk_sira=None, kuyruk_toplam=None,
         "kalite_ok": kalite_ok,
         "attribution": ham.get("atiflar") or ham.get("attribution") or [],
         "sources": ham.get("kaynaklar") or [],
-        "research": arastirma,
+        # ⚠ FAZ R-1a: arastirma manifesti de IMZALI baglanti ile verilir;
+        # arayuz artik ham `ciktilar/...` yolu KURMAZ (o yol 403 doner).
+        "research": (dict(arastirma,
+                          manifest_url=_imzali(arastirma.get("manifest"),
+                                               imzalayici))
+                     if isinstance(arastirma, dict)
+                     and arastirma.get("manifest") else arastirma),
         "fallbacks": dususler,
         "warning": str(ham.get("uyari") or ham.get("warning") or ""),
         "duration": ham.get("sure"),

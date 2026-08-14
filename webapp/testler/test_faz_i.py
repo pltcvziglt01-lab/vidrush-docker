@@ -7993,6 +7993,71 @@ kontrol("K-3: deploy.sh DOKUNULMADI",
         "docker commit" in oku(os.path.dirname(KOK), "deploy.sh"))
 
 
+blok("§40q R-1a — IMZALI CIKTI URL'LERI (medyasiz, saf kripto)")
+
+# ⚠ MEDYASIZ: dosya/medya URETILMEZ, yalniz imza mantigi test edilir.
+# ── OLCULEN KUSUR ── `/ciktilar/{dosya}` IMZASIZDI: dosya adini bilen
+# HERKES indirebiliyordu. Tenant izolasyonu (R-1b) icin de ON KOSUL.
+
+_IU = __import__("imzali_url")
+_isz = __import__("is_sozlesme")
+_IU_DIZ = tempfile.mkdtemp(prefix="imza_")
+kontrol("⭐ R-1a: anahtar env yoksa VERI dizininde 0600 ile URETILIYOR",
+        _IU.anahtar_kur(_IU_DIZ) is True and _IU.hazir() is True)
+kontrol("⭐ R-1a: anahtar dosyasi yalniz sahibine okunur (0600)",
+        (os.stat(os.path.join(_IU_DIZ, _IU.ANAHTAR_DOSYA_ADI)).st_mode & 0o077)
+        == 0, oct(os.stat(os.path.join(_IU_DIZ,
+                                       _IU.ANAHTAR_DOSYA_ADI)).st_mode))
+_IU_URL = _IU.imzala("job_x.mp4")
+_IU_Q = dict(x.split("=") for x in _IU_URL.split("?")[1].split("&"))
+kontrol("⭐ R-1a: baglanti SURELI ve IMZALI (exp + sig)",
+        "exp" in _IU_Q and "sig" in _IU_Q and _IU_URL.startswith("ciktilar/"))
+kontrol("⭐ R-1a: dogru imza GECERLI",
+        _IU.dogrula("job_x.mp4", _IU_Q["exp"], _IU_Q["sig"])["gecerli"] is True)
+kontrol("⭐ R-1a RED-FIRST: BOZUK imza REDDEDILIYOR",
+        _IU.dogrula("job_x.mp4", _IU_Q["exp"],
+                    _IU_Q["sig"][:-2] + "xx")["neden"] == "IMZA-GECERSIZ")
+kontrol("⭐ R-1a RED-FIRST: BASKA dosya adina TASINAN imza REDDEDILIYOR",
+        _IU.dogrula("gizli.mp4", _IU_Q["exp"],
+                    _IU_Q["sig"])["neden"] == "IMZA-GECERSIZ")
+kontrol("⭐ R-1a RED-FIRST: SURESI DOLMUS baglanti REDDEDILIYOR",
+        _IU.dogrula("job_x.mp4", _IU_Q["exp"], _IU_Q["sig"],
+                    simdi=int(_IU_Q["exp"]) + 1)["neden"] == "SURESI-DOLMUS")
+kontrol("⭐ R-1a: imza gecersizken 'suresi dolmus' bilgisi SIZMIYOR "
+        "(once imza dogrulanir)",
+        _IU.dogrula("job_x.mp4", int(_IU_Q["exp"]) - 10 ** 6,
+                    _IU_Q["sig"])["neden"] == "IMZA-GECERSIZ")
+kontrol("⭐ R-1a: YOL GEZINMESI kesiliyor (path traversal)",
+        _IU.guvenli_ad("../../etc/passwd") == "passwd"
+        and _IU.guvenli_ad("a/b/c.mp4") == "c.mp4")
+kontrol("⭐ R-1a: sabit zamanli karsilastirma kullaniliyor",
+        "compare_digest" in oku(KOK, "imzali_url.py"))
+kontrol("⭐ R-1a: anahtar REPODA DEGIL ve LOGLANMIYOR",
+        _IU.kapsam_ozeti()["anahtar_repoda"] is False
+        and _IU.kapsam_ozeti()["anahtar_loglanir"] is False
+        and not any(os.path.exists(os.path.join(KOK, a))
+                    for a in (".imza_anahtari",)))
+kontrol("⭐ R-1a: is sozlesmesi IMZALI video_url uretiyor",
+        "sig=" in _isz.normalize(
+            "j1", {"video": "ciktilar/job_x.mp4", "durum": "bitti"},
+            imzalayici=_IU.imzala)["video_url"])
+kontrol("⭐ R-1a: imzalayici VERILMEZSE eski davranis KORUNUYOR "
+        "(geriye uyumlu)",
+        _isz.normalize("j1", {"video": "ciktilar/job_x.mp4",
+                              "durum": "bitti"})["video_url"]
+        == "ciktilar/job_x.mp4")
+kontrol("⭐ R-1a: arayuz ARTIK ham `ciktilar/` yolu KURMUYOR "
+        "(imzali manifest_url kullaniyor)",
+        "manifest_url" in oku(KOK, "static/js/bilesenler.js")
+        and 'href="ciktilar/${' not in oku(KOK, "static/js/bilesenler.js"))
+kontrol("⭐ R-1a: anahtar kurulamazsa uc SESSIZCE KORUMASIZ calismiyor "
+        "(503)",
+        "imza anahtari kurulmadi" in oku(KOK, "server.py")
+        and "503" in oku(KOK, "server.py"))
+kontrol("R-1a: imzali_url.py derleniyor",
+        _derlenir(os.path.join(KOK, "imzali_url.py")))
+
+
 blok("§40h I-58 — IKI ADAY DUZENI KARSI-OLGU OLARAK OLCULDU (yalniz tanisal)")
 
 # ⚠ YALNIZ TANISAL. Uretim davranisi DEGISMEDI, kapi/esik eklenmedi.

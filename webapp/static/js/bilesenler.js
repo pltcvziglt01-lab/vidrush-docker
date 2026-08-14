@@ -165,9 +165,9 @@ export function isKart(is) {
       <div class="iskart-eylem">
         <a class="dugme dugme-ana" href="${kac(video)}" download>
           ${ikon('yukle', {boyut: 16})} Videoyu indir</a>
-        ${is.research?.manifest
-          ? `<a class="dugme dugme-hayalet" href="ciktilar/${
-            kac(is.research.manifest)}" download>
+        ${is.research?.manifest_url
+          ? `<a class="dugme dugme-hayalet" href="${
+            kac(is.research.manifest_url)}" download>
             ${ikon('bilgi', {boyut: 16})} Araştırma manifesti</a>` : ''}
       </div>` : ''}
     ${bittiMi && is.qa && is.qa.durum ? `

@@ -21,6 +21,7 @@ from PIL import Image
 
 import pipeline
 import anim_studyo
+import imzali_url
 import is_sozlesme   # Faz H: tek tip, geriye donuk uyumlu is sozlesmesi
 import saglik_derin  # Faz H: bagimliliklari GERCEKTEN olcen saglik ucu
 import girdi_analizi # Faz H: otomatik girdi analizi (LLM YOK, ucretsiz)
@@ -29,7 +30,10 @@ KOK = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(KOK, "static")
 VERI = os.path.join(KOK, "veri")
 GECICI = os.path.join(VERI, "gecici")     # is basina yuklenen gorseller (uretim sonrasi silinir)
-IS_DURUM_DIR = os.path.join(VERI, "durumlar")  # job state diske yazilir (restart'ta kaybolmasin)
+IS_DURUM_DIR = os.path.join(VERI, "durumlar")
+# ⚠ FAZ R-1a: cikti baglantilarini imzalayan anahtar. env -> veri/.imza_anahtari
+# -> URETILIR. Anahtar hicbir yerde LOGLANMAZ, repoda DEGIL.
+_IMZA_HAZIR = imzali_url.anahtar_kur(VERI)  # job state diske yazilir (restart'ta kaybolmasin)
 os.makedirs(GECICI, exist_ok=True)
 os.makedirs(IS_DURUM_DIR, exist_ok=True)
 
@@ -850,7 +854,9 @@ def is_durum(is_id: str):
             yol = os.path.join(IS_DURUM_DIR, f"{gecerli_session(is_id)}.json")
             if os.path.exists(yol):
                 with open(yol, encoding="utf-8") as f:
-                    return is_sozlesme.normalize(is_id, json.load(f))
+                    return is_sozlesme.normalize(
+                        is_id, json.load(f),
+                        imzalayici=imzali_url.imzala)
         except HTTPException:
             raise
         except Exception:
@@ -859,7 +865,8 @@ def is_durum(is_id: str):
     sira = _kuyruk_sirasi(is_id) if d.get("durum") == "kuyrukta" else None
     return is_sozlesme.normalize(
         is_id, d, kuyruk_sira=sira,
-        kuyruk_toplam=is_kuyrugu.qsize() if sira is not None else None)
+        kuyruk_toplam=is_kuyrugu.qsize() if sira is not None else None,
+        imzalayici=imzali_url.imzala)
 
 
 def _kuyruk_sirasi(is_id):
@@ -873,8 +880,20 @@ def _kuyruk_sirasi(is_id):
 
 
 @app.get("/ciktilar/{dosya}")
-def cikti(dosya: str):
-    yol = os.path.join(pipeline.CIKTI_DIR, os.path.basename(dosya))
+def cikti(dosya: str, exp: str = "", sig: str = ""):
+    """⚠ FAZ R-1a: cikti indirmesi artik IMZALI ve SURELI.
+
+    Onceden dosya adini bilen HERKES indirebiliyordu. Imza anahtari
+    kurulamadiysa uc ACIK KALMAZ — 503 doner (sessizce korumasiz
+    calismaktansa durustce reddeder).
+    """
+    ad = imzali_url.guvenli_ad(dosya)
+    if not imzali_url.hazir():
+        raise HTTPException(503, "imza anahtari kurulmadi")
+    k = imzali_url.dogrula(ad, exp, sig)
+    if not k["gecerli"]:
+        raise HTTPException(403, f"baglanti gecersiz: {k['neden']}")
+    yol = os.path.join(pipeline.CIKTI_DIR, ad)
     if not os.path.exists(yol):
         raise HTTPException(404, "yok")
     return FileResponse(yol)

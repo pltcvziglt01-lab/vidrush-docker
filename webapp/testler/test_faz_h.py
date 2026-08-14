@@ -646,8 +646,21 @@ if FASTAPI_VAR:
                 c.get("/api/job/olmayan_is").status_code == 404)
         kontrol("GET /api/isler gecersiz session -> 400",
                 c.get("/api/isler?session=ge%20cersiz").status_code == 400)
-        kontrol("GET /ciktilar/olmayan.mp4 -> 404",
-                c.get("/ciktilar/olmayan.mp4").status_code == 404)
+        # ⚠ FAZ R-1a: cikti ucu ARTIK IMZALI. Imzasiz istek 403 doner —
+        # 404 DEGIL: dosyanin VAR OLUP OLMADIGI imzasiz istege SIZDIRILMAZ.
+        # Bu bir gerileme degil, BILEREK sikilastirmadir.
+        kontrol("GET /ciktilar/olmayan.mp4 (IMZASIZ) -> 403",
+                c.get("/ciktilar/olmayan.mp4").status_code == 403)
+        import imzali_url as _iu
+        _imz = _iu.imzala("olmayan.mp4")
+        kontrol("GET /ciktilar/... (IMZALI, dosya yok) -> 404",
+                (c.get("/" + _imz).status_code == 404) if _imz else True,
+                _imz[:40])
+        kontrol("GET /ciktilar/... (IMZA BOZUK) -> 403",
+                (c.get("/" + _imz[:-2] + "xx").status_code == 403)
+                if _imz else True)
+        kontrol("cikti baglantisi SURELI (exp tasiyor)",
+                ("exp=" in _imz and "sig=" in _imz) if _imz else True)
         kontrol("GET /ui/../server.py -> 404 (traversal kapali)",
                 c.get("/ui/../server.py").status_code == 404)
         kontrol("GET /ui/gizli.txt -> 404 (allowlist disi)",
