@@ -571,7 +571,33 @@ def akis_sayfasi(istek: Request):
     if ZORUNLU_OTURUM and not teslim.oturum_kapisi(
             _oturum_jetonu(istek))["izin"]:
         return _GIRIS_HTML
-    return _AKIS_HTML
+    return _anonim_csrf(HTMLResponse(_AKIS_HTML), istek)
+
+
+def _anonim_csrf(cevap, istek: Request):
+    """⚠ FAZ UI-5 — OTURUMSUZ MODDA CSRF JETONU.
+
+    OLCULEN KUSUR (`UI5-ANONIM-CSRF-YOK`): `vr_csrf` cerezi YALNIZCA
+    `/api/giris` basarisinda kuruluyordu. Oturumsuz modda (R-1e) anonim
+    ziyaretcinin hic CSRF jetonu olmadigi icin `POST /api/kaynak-tercihi`
+    403 `UI3-CSRF-GECERSIZ` aliyordu — yani medya kaynagi secimi
+    KULLANILAMIYORDU.
+
+    ⚠ BU JETON YETKI DEGILDIR. Yetki HttpOnly oturum cerezindedir; bu
+    cerez double-submit dogrulamasi icin JS'ten OKUNABILIR olmak
+    ZORUNDADIR (httponly=False). Anonim kapsam disinda hicbir sey
+    acmaz: `_tenant()` yine `ANON_TENANT` doner ve mevcut tenant verisi
+    `kapsam_kapisi` ile KAPALI kalir.
+    ⚠ Zorunlu oturum ACIKKEN bu jeton KURULMAZ — giris akisi degismez.
+    """
+    if ZORUNLU_OTURUM:
+        return cevap
+    if istek.cookies.get(kimlik.CSRF_COOKIE):
+        return cevap                      # zaten var; her istekte yenileme yok
+    cevap.set_cookie(kimlik.CSRF_COOKIE, kimlik.csrf_uret(),
+                     max_age=kimlik.OTURUM_OMRU_SN, path="/",
+                     httponly=False, samesite="lax", secure=COOKIE_SECURE)
+    return cevap
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -582,7 +608,7 @@ def anasayfa(istek: Request):
             _oturum_jetonu(istek))["izin"]:
         return _GIRIS_HTML
     with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:
-        return f.read()
+        return _anonim_csrf(HTMLResponse(f.read()), istek)
 
 
 @app.get("/api/saglik/derin")

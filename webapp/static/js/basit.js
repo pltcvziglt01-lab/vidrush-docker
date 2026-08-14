@@ -23,8 +23,8 @@
 import {$, alan, gelismis, kac, ozetSatir, secimAlani, uyariKutu}
   from './bilesenler.js';
 import {ikon} from './ikon.js';
-import {calanSes, hizliTercihler, markaBolumu, proPanel, sesBolumu,
-        stilBolumu} from './secim-deneyimi.js';
+import {calanSes, hizliTercihler, markaBolumu, medyaBolumu, medyaBolumuKur,
+        proPanel, sesBolumu, stilBolumu} from './secim-deneyimi.js';
 
 /** Uzun yer tutucu — sablon dizesi icinde kesme isareti kacis sorunu yaratir. */
 export const BASIT_YERTUTUCU =
@@ -240,6 +240,12 @@ export function basitGovde({t, kaynak, analiz, durum, dosyalar}) {
     secenekler: SURE_SECENEKLERI,
   })}
 
+    ${/* ⚠ FAZ UI-5 (`UI5-SAGLAYICI-ANA-AKISTA-YOK`): medya kaynagi ve
+         Magnific durumu ANA akista GORUNUR olmali — gelismis ayarlarin
+         icinde gizli DEGIL. Canli DOM olcumu: Basit modda hic yoktu. */ ''}
+    ${medyaBolumu({tercih: t.kaynakTercihi, sureDk: t.sureDk,
+    stil: (kaynak.editStilleri || []).find((x) => x.id === t.editStili) || null})}
+
     <section class="kart bs-auto" id="bsAuto">
       <h3 class="ozet-kart-bas">${otomatikStil
     ? 'Sistemin okuduğu' : 'Metin analizi'}</h3>
@@ -295,6 +301,10 @@ export function basitGovde({t, kaynak, analiz, durum, dosyalar}) {
  */
 export function basitKur({kok, taslak, taslakYaz, yenidenCiz, analizTazele,
                           uret}) {
+  // ⚠ FAZ UI-5: medya kaynagi secimi SUNUCUYA baglanir (`/api/kaynak-tercihi`).
+  // `/api/generate` sozlesmesi (22 alan) BUYUMEZ.
+  medyaBolumuKur(kok);
+
   const metin = $('#bsMetin', kok);
   if (metin) {
     metin.addEventListener('input', () => {

@@ -25,7 +25,7 @@
  * bir suslemenin degil, olculebilir bir bilginin gorselidir.
  */
 import {UCLAR, getirSessiz, yol} from './api.js';
-import {$, $$, etiket, kac, uyariKutu} from './bilesenler.js';
+import {$, $$, etiket, kac, secimAlani, uyariKutu} from './bilesenler.js';
 import {ikon, ikonlariBagla} from './ikon.js';
 
 /* ════════════════════ YARDIMCILAR ════════════════════ */
@@ -545,6 +545,107 @@ export function markaBolumu({liste, deger, hataVar}) {
   </section>`;
 }
 
+/* ════════════════════ MEDYA KAYNAGI (FAZ UI-5) ════════════════════ */
+
+/**
+ * Medya kaynagi + Magnific iyilestirme + video hedefi.
+ *
+ * ⚠ OLCULEN KUSUR (`UI5-SAGLAYICI-ANA-AKISTA-YOK`): kaynak tercihi arayuzu
+ * YALNIZCA `/akis` sayfasinin scripti `ui1.js`de vardi; ANA akista
+ * (`#/yeni` Basit + Adim adim) HIC YOKTU. Kullanici Magnific/saglayici
+ * secimini goremiyordu.
+ *
+ * ⚠ MAGNIFIC BIR STOK SAGLAYICISI DEGILDIR (`UI5-MAGNIFIC-STOK-SAGLAYICI-
+ * DEGIL`): `kaynak.magnific_upscale` bir UPSCALE (iyilestirme) servisidir,
+ * stok arama yetenegi YOKTUR. Bu yuzden medya KAYNAGI secenekleri arasinda
+ * YER ALMAZ; AYRI bir "Magnific iyileştirme" alani olarak gosterilir.
+ *
+ * ⚠ SAHTE "bagli" GOSTERIMI YOK: gercek OAuth/capability kesfi olmadigi
+ * icin durum DURUSTCE "Bağlı değil" yazilir, kredi harcanmadigi ve
+ * ucretsiz stok video fallback'i ACIKCA soylenir.
+ *
+ * ⚠ `/api/generate` SOZLESMESI (22 alan) BUYUMEZ: secim generate
+ * payload'ina EKLENMEZ, `POST /api/kaynak-tercihi` ile tenant kaydina
+ * yazilir (UI-3 deseni).
+ */
+export function medyaBolumu({tercih = 'otomatik', sureDk = 1, stil = null} = {}) {
+  // Klip sayaci: kullanici "75 gorsel" gordugunu sandi (aslinda ses adindaki
+  // "(75)" yas etiketiydi). Artik DURUST bir VIDEO KLIP tahmini gosteriyoruz.
+  const sn = stil && Number.isFinite(Number(stil.sahne_sn))
+    ? Math.max(2, Number(stil.sahne_sn)) : 6;
+  const klip = Math.max(1, Math.round((Number(sureDk) || 1) * 60 / sn));
+  const secenekler = [
+    {id: 'otomatik', ad: 'Otomatik — uygun ücretsiz stok video'},
+    {id: 'ucretsiz', ad: 'Yalnızca ücretsiz stok video'},
+  ];
+  return `<section class="kart" id="medyaBolum">
+    <h3 class="ozet-kart-bas">Medya sağlayıcısı</h3>
+    ${secimAlani({
+    id: 'mdKaynak', ad: 'Medya kaynağı', deger: tercih,
+    ipucu: 'Sahne görüntüleri bu kaynaktan gelir. Seçim sunucuya yazılır.',
+    secenekler,
+  })}
+    <p class="kucuk onay-durum" id="mdDurum" role="status" aria-live="polite"
+      data-tercih="${kac(tercih)}"></p>
+
+    <div class="alan" id="mdMagnific">
+      <span class="alan-ad">Magnific iyileştirme</span>
+      <p class="kucuk sessiz">
+        ${etiket('Bağlı değil', 'uyari')}
+        Magnific bir stok kaynağı değil, görüntü <strong>iyileştirme</strong>
+        servisidir. Hesap bağlama akışı henüz yok; bu üretimde
+        <strong>kredi kullanılmadı</strong> ve görüntüler
+        <strong>ücretsiz stok video</strong> kaynağından alınır.</p>
+    </div>
+
+    ${uyariKutu(`Video hedefi: <strong>%100 gerçek video</strong> klip. ` +
+      `Statik fotoğraf veya zoom'lu slayt zaman çizelgesine otomatik ` +
+      `girmez. Bu sürede yaklaşık <strong>${klip} video klip</strong> ` +
+      `kullanılır. Gerçek video bulunamayan sahne yapay zekâ görseline ` +
+      `düşürülmez; nedeni sonuçta gösterilir.`, 'bilgi')}
+  </section>`;
+}
+
+/**
+ * Medya kaynagi secimini SUNUCUYA yazar ve GERCEK karari geri okur.
+ * ⚠ Tahmin yazmayiz: ekrana sunucunun dondugu `saglayici` +
+ * `fallback_reason` yazilir. Yazilamazsa SESSIZ BASARI YOK.
+ */
+export function medyaBolumuKur(kok) {
+  const sec = $('#mdKaynak', kok);
+  const durum = $('#mdDurum', kok);
+  if (!sec || !durum) return;
+
+  const csrf = () =>
+    (document.cookie.match(/(?:^|;\s*)vr_csrf=([^;]*)/) || [])[1] || '';
+
+  const yaz = async () => {
+    const fd = new FormData();
+    fd.append('tercih', sec.value);
+    try {
+      const r = await fetch(yol('api/kaynak-tercihi'), {
+        method: 'POST', body: fd, headers: {'x-csrf-token': csrf()},
+      });
+      if (!r.ok) throw new Error(String(r.status));
+      const d = await r.json();
+      durum.textContent = `Kaynak: ${d.saglayici}` +
+        (d.saglayici_fallback ? ` (düşüş: ${d.saglayici_fallback})` : '') +
+        ` — ${d.kredi_tuketilir ? 'kredi harcanabilir' : 'kredi harcanmaz'}`;
+      durum.dataset.tercih = d.tercih;
+      durum.dataset.saglayici = d.saglayici || '';
+    } catch (e) {
+      // ⚠ SESSIZ BASARI YOK: yazilamadiysa kullanici bunu GORUR.
+      durum.textContent =
+        'UI5-KAYNAK-TERCIHI-YAZILAMADI — seçimin sunucuya yazılamadı ' +
+        `(${String(e.message || e).slice(0, 40)}). Üretim varsayılan ` +
+        'ücretsiz stok video ile sürer.';
+      durum.dataset.saglayici = '';
+    }
+  };
+  sec.addEventListener('change', yaz);
+  yaz();
+}
+
 /* ════════════════════ HIZLI TERCIHLER ════════════════════ */
 
 /** Uc anlasilir tercih — teknik ad YOK. */
@@ -889,6 +990,10 @@ export function adim3Govde({t, kaynak, durum, dosyalar}) {
     katalog: durum.katalog[durum.sesKaynagi] || null,
     katalogYukleniyor: durum.katalogYukleniyor})}
       ${markaBolumu({liste: kaynak.profiller, deger: t.profil, hataVar})}
+      ${/* ⚠ FAZ UI-5: medya kaynagi + Magnific durumu GORUNUR — gelismis
+           ayarlarin ICINDE DEGIL. Adim adim modda Gorsel adimindadir. */ ''}
+      ${medyaBolumu({tercih: t.kaynakTercihi, sureDk: t.sureDk,
+    stil: (stilListe || []).find((x) => x.id === stilDeger) || null})}
       ${hizliTercihler({gecis: t.gecis, zoom: t.zoom, altyazi: t.altyazi})}
       ${proPanel({acik: durum.proAcik, t, kaynak})}
     </div>
@@ -906,6 +1011,10 @@ export function adim3Kur(baglam) {
 
   const dosyaSayisi = () => dosyalar.sahneRef.length
     + (dosyalar.karakter ? 1 : 0) + (dosyalar.stil ? 1 : 0);
+
+  // ⚠ FAZ UI-5: medya kaynagi secimi SUNUCUYA baglanir (yalniz CSS/metin
+  // degil). `/api/generate` sozlesmesi buyumez — secim ayri uca yazilir.
+  medyaBolumuKur(kap);
 
   /** Ozet panelini YERINDE tazele. */
   const ozetiTazele = () => {

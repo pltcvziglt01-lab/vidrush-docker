@@ -685,6 +685,13 @@ def oai_chat(body: dict, timeout: int = 180, deneme: int = 6) -> dict:
     raise son_hata or RuntimeError("oai_chat basarisiz")
 
 
+# ⚠ FAZ UI-5 — STABIL MEDYA HATA KODU.
+# Belge/gercek-kaynak tabanli stillerde timeline medya turu %100 VIDEO'dur.
+# Gercek video klip bulunamayan sahne AI STATIK GORSELE DUSMEZ; bu kodla
+# bos birakilir ve neden kapsam boslugunda GORUNUR kalir. Sessiz dusus
+# (zoom'lu statik kare) kullanici karariyla KALDIRILDI (15 Agu 2026).
+MEDYA_VIDEO_YOK = "MEDYA-VIDEO-YOK"
+
 # ─────────────────────────── EDIT STILLERI ───────────────────────────
 # Gercek belgesel kanallarindan turetilen 3 profesyonel kurgu profili.
 # motion -> Remotion Video.tsx gecis modu; footage_pct -> gercek footage sahne orani;
@@ -693,7 +700,11 @@ EDIT_STILLERI = {
     "sinematik-belgesel": {
         "ad": "Sinematik Belgesel",
         "ozet": "BBC Earth / Nat Geo — yavaş, hard-cut, gerçek footage, orkestral",
-        "sahne_sn": 7, "kelime": 17, "footage_pct": 85, "overlay": "yok",
+        # ⚠ FAZ UI-5: timeline medya turu %100 VIDEO. AI statik gorsel
+        # URETILMEZ; video bulunamayan sahne MEDYA_VIDEO_YOK ile bos
+        # kalir (sessizce zoom slayta DUSULMEZ).
+        "gorsel_yasak": True,
+        "sahne_sn": 7, "kelime": 17, "footage_pct": 100, "overlay": "yok",
         "altyazi": "orta", "motion": "sinematik", "mag": "films_n_photography",
         "saha_etiketi": True, "etiket_pct": 24,
         "bolumler": True,   # bolum basligi + bolum bazli anlatim
@@ -705,7 +716,11 @@ EDIT_STILLERI = {
     "anlati-video-essay": {
         "ad": "Anlatı Video-Essay",
         "ozet": "Johnny Harris / Vox Atlas — Ken Burns 2.0 push-in, analog texture, kinetik başlık",
-        "sahne_sn": 4, "kelime": 11, "footage_pct": 55, "overlay": "yogun",
+        # ⚠ FAZ UI-5: timeline medya turu %100 VIDEO. AI statik gorsel
+        # URETILMEZ; video bulunamayan sahne MEDYA_VIDEO_YOK ile bos
+        # kalir (sessizce zoom slayta DUSULMEZ).
+        "gorsel_yasak": True,
+        "sahne_sn": 4, "kelime": 11, "footage_pct": 100, "overlay": "yogun",
         "altyazi": "orta", "motion": "anlati", "mag": "films_n_photography",
         "saha_etiketi": True, "etiket_pct": 28,
         "bolumler": True,   # bolum basligi + bolum bazli anlatim
@@ -753,7 +768,11 @@ EDIT_STILLERI = {
     "veri-anlatisi": {
         "ad": "Veri Anlatısı (Neu)",
         "ozet": "Beyaz tuvalde işaretli veri etiketleri, ölçü okları, alıntı kartları + gerçek footage",
-        "sahne_sn": 7, "maks_sahne_sn": 8, "kelime": 22, "footage_pct": 45, "overlay": "yok",
+        # ⚠ FAZ UI-5: timeline medya turu %100 VIDEO. AI statik gorsel
+        # URETILMEZ; video bulunamayan sahne MEDYA_VIDEO_YOK ile bos
+        # kalir (sessizce zoom slayta DUSULMEZ).
+        "gorsel_yasak": True,
+        "sahne_sn": 7, "maks_sahne_sn": 8, "kelime": 22, "footage_pct": 100, "overlay": "yok",
         "altyazi": "yok", "motion": "sinematik", "mag": "films_n_photography",
         "edit_paketi": True,      # plan 'grafik' alani uretir (EditPaketi.tsx sablonlari)
         "grafik_pct": 41,         # olculen beyaz-tuval orani
@@ -766,7 +785,11 @@ EDIT_STILLERI = {
     "hizli-explainer": {
         "ad": "Hızlı Explainer",
         "ozet": "Vox / Insider — 1.5-3sn hızlı kesme, sürekli kinetik metin, flat grafik",
-        "sahne_sn": 2.4, "kelime": 6, "footage_pct": 45, "overlay": "yogun",
+        # ⚠ FAZ UI-5: timeline medya turu %100 VIDEO. AI statik gorsel
+        # URETILMEZ; video bulunamayan sahne MEDYA_VIDEO_YOK ile bos
+        # kalir (sessizce zoom slayta DUSULMEZ).
+        "gorsel_yasak": True,
+        "sahne_sn": 2.4, "kelime": 6, "footage_pct": 100, "overlay": "yogun",
         "altyazi": "yogun", "motion": "hizli", "mag": "standard",
         "gorsel_ek": ("clean flat-design explainer graphic, bright saturated palette, bold "
                       "high-contrast infographic style, crisp vector shapes, solid or white "
@@ -2405,14 +2428,14 @@ SESLER = {
     "otomatik": {"ad": "Otomatik (dile göre)", "motor": "edge", "grup": "ucretsiz", "ses": "",
                  "ozet": "Metnin diline uygun ücretsiz ses", "ucret": "ücretsiz", "dil": ""},
     # ── Kullanicinin 1 Agu 2026'da ORNEK DINLEYIP ONAYLADIGI ses ──
-    "yasli-kadin": {"ad": "Yaşlı Kadın (75)", "motor": "openai", "grup": "karakterli", "ses": "shimmer",
+    "yasli-kadin": {"ad": "Yaşlı Kadın — 75 yaş", "motor": "openai", "grup": "karakterli", "ses": "shimmer",
                     "talimat": YASLI_KADIN_TALIMAT, "hiz": 0.92, "dil": "en",
                     "ozet": "Kırılgan, hafif titrek, sakin — tasarruf/anı kanalları için",
                     "ucret": "~$0.03/video"},
     # ── Yasli Amerikali kadin sesleri (Polat istegi, 4 Agu 2026) ──
     # Hepsi gpt-4o-mini-tts + talimat: model sesin YASINI ve aksanini tarif etmeye izin
     # veriyor. edge-tts'te bu imkansiz (322 sesin hicbiri yasli degil).
-    "yasli-guneyli": {"ad": "Yaşlı Kadın · Güneyli (72)", "motor": "openai", "grup": "karakterli",
+    "yasli-guneyli": {"ad": "Yaşlı Kadın · Güneyli — 72 yaş", "motor": "openai", "grup": "karakterli",
                       "ses": "sage", "hiz": 0.90, "dil": "en",
                       "talimat": ("An American woman of about seventy two from the deep South. Warm "
                                   "unhurried drawl, softened vowels, a little husky with age. She "
@@ -2420,7 +2443,7 @@ SESLER = {
                                   "patient, faintly amused."),
                       "ozet": "Güney aksanı, ağır ağır, sıcak — veranda sohbeti tonu",
                       "ucret": "~$0.03/video"},
-    "yasli-newyork": {"ad": "Yaşlı Kadın · New York (70)", "motor": "openai", "grup": "karakterli",
+    "yasli-newyork": {"ad": "Yaşlı Kadın · New York — 70 yaş", "motor": "openai", "grup": "karakterli",
                       "ses": "nova", "hiz": 0.96, "dil": "en",
                       "talimat": ("A seventy year old woman from New York. Direct, quick, a little "
                                   "clipped, with the dryness of someone who has heard every excuse. "
@@ -2428,7 +2451,7 @@ SESLER = {
                                   "plain truth delivered fast."),
                       "ozet": "Keskin, hızlı, lafı dolandırmayan — kuru mizah",
                       "ucret": "~$0.03/video"},
-    "yasli-cok-yasli": {"ad": "Çok Yaşlı Kadın (85)", "motor": "openai", "grup": "karakterli",
+    "yasli-cok-yasli": {"ad": "Çok Yaşlı Kadın — 85 yaş", "motor": "openai", "grup": "karakterli",
                         "ses": "alloy", "hiz": 0.86, "dil": "en",
                         "talimat": ("A woman of about eighty five. Thin, papery voice with a real "
                                     "tremor, short breaths, long pauses between thoughts. Very quiet "
@@ -2436,7 +2459,7 @@ SESLER = {
                                     "but completely lucid."),
                         "ozet": "Çok yavaş, titrek, nefes araları — en yaşlı ton",
                         "ucret": "~$0.03/video"},
-    "yasli-neseli": {"ad": "Yaşlı Kadın · Neşeli (70)", "motor": "openai", "grup": "karakterli",
+    "yasli-neseli": {"ad": "Yaşlı Kadın · Neşeli — 70 yaş", "motor": "openai", "grup": "karakterli",
                      "ses": "verse", "hiz": 0.98, "dil": "en",
                      "talimat": ("A lively American woman of seventy who has not slowed down. Bright, "
                                  "playful, quick to laugh at herself. The voice has age in its texture "
@@ -2444,7 +2467,7 @@ SESLER = {
                                  "and still argues about politics."),
                      "ozet": "Enerjik, esprili, kendine gülen — yaşlı ama canlı",
                      "ucret": "~$0.03/video"},
-    "yasli-ogretmen": {"ad": "Yaşlı Kadın · Öğretmen (74)", "motor": "openai", "grup": "karakterli",
+    "yasli-ogretmen": {"ad": "Yaşlı Kadın · Öğretmen — 74 yaş", "motor": "openai", "grup": "karakterli",
                        "ses": "fable", "hiz": 0.92, "dil": "en",
                        "talimat": ("A retired American schoolteacher, about seventy four. Clear, "
                                    "measured, carefully articulated — every word lands. Patient and "
@@ -2452,7 +2475,7 @@ SESLER = {
                                    "and pauses to let a point sink in."),
                        "ozet": "Net, ölçülü, açıklayıcı — emekli öğretmen",
                        "ucret": "~$0.03/video"},
-    "yasli-kirsal": {"ad": "Yaşlı Kadın · Çiftlik (78)", "motor": "openai", "grup": "karakterli",
+    "yasli-kirsal": {"ad": "Yaşlı Kadın · Çiftlik — 78 yaş", "motor": "openai", "grup": "karakterli",
                      "ses": "shimmer", "hiz": 0.88, "dil": "en",
                      "talimat": ("A seventy eight year old woman from rural America who worked hard "
                                  "her whole life. Low, weathered, plain-spoken. No decoration, no "
@@ -2460,7 +2483,7 @@ SESLER = {
                                  "toughness under the warmth."),
                      "ozet": "Alçak, yıpranmış, süssüz — çalışmış kadın tonu",
                      "ucret": "~$0.03/video"},
-    "olgun-kadin": {"ad": "Olgun Kadın (68)", "motor": "openai", "grup": "karakterli", "ses": "coral",
+    "olgun-kadin": {"ad": "Olgun Kadın — 68 yaş", "motor": "openai", "grup": "karakterli", "ses": "coral",
                     "talimat": ("Speak as a warm woman in her late sixties. Unhurried and gentle, "
                                 "with the soft dryness and slight breathiness of an older voice. "
                                 "Lower and thinner than a young voice, with small natural pauses, "
@@ -2473,7 +2496,7 @@ SESLER = {
                                   "quiet certainty from years of doing it herself."),
                       "hiz": 0.93, "dil": "en", "ozet": "Alçak, düz konuşan, çakıllı",
                       "ucret": "~$0.03/video"},
-    "yasli-erkek": {"ad": "Yaşlı Erkek (70)", "motor": "openai", "grup": "karakterli", "ses": "onyx",
+    "yasli-erkek": {"ad": "Yaşlı Erkek — 70 yaş", "motor": "openai", "grup": "karakterli", "ses": "onyx",
                     "talimat": ("A man of about seventy telling a story he has told before. Deep, "
                                 "slow and weathered, with a dry rasp. Calm authority, no drama."),
                     "hiz": 0.92, "dil": "en", "ozet": "Derin, yavaş, yıpranmış",
@@ -4343,8 +4366,19 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                     print(f"  sahne {n}: klip TEKRARI (gorsel yasak)", file=sys.stderr)
                     _kopru_yaz(vyol_full)
                     return ("video", f"isler/{is_adi}/sahne_{n}.mp4")
-                print(f"  sahne {n}: footage YOK ve gorsel yasak -> AI gorsele mecbur",
-                      file=sys.stderr)
+                # ⚠ FAZ UI-5 — STABIL HATA, SESSIZ DUSUS DEGIL.
+                # ESKI HAL: buradan AI STATIK GORSELE dusuluyordu ("AI gorsele
+                # mecbur") ve kullanici "tamami video olacakti" derken
+                # timeline'a zoom'lu statik kare giriyordu. Kullanici karari
+                # (15 Agu 2026): video bulunamayan sahne AI statik gorsele
+                # DUSMEZ; STABIL kodla bos birakilir ve neden GORUNUR kalir.
+                # Sahne None doner -> ust katman onu "atlandi" sayar ve mevcut
+                # esikler (basarisiz>=8 ve uretilmis<3) isi durdurur.
+                print(f"  sahne {n}: {MEDYA_VIDEO_YOK} — gercek video klip yok, "
+                      f"AI statik gorsele DUSULMUYOR", file=sys.stderr)
+                _bosluk_yaz(f"{MEDYA_VIDEO_YOK}: gercek video klip bulunamadi "
+                            f"(gorsel_yasak: statik gorsele dusulmedi)")
+                return None
             # ⚠ FAZ R-1d-b: footage yolundan CIKIYORUZ (AI gorsele dusuluyor)
             # -> kapsam boslugu BURADA yazilir, RASTGELE STOKLA KAPANMAZ.
             _bosluk_yaz("footage bulunamadi; AI gorsele dusuldu")
