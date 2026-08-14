@@ -9863,3 +9863,37 @@ Dosya yok / decoder hatası / `rc != 0` durumunda `blackdetect` eşleşmesi
 **gerçek ffmpeg** çağrılıyor → `KATMAN-OLCULEMEDI`, `temiz_mi=False`.
 ⚠ Bu test **hiçbir medya/kare üretmez** (girdi yok, çıktı `-f null`);
 Mac'te artefakt oluşmaz — doğrulandı.
+
+### R-1d-h PİLOTU — siyah/donmuş TEKRARLAMADI; blokaj kaynak tavanına döndü
+
+`job_1786727121434_r1dasm_efa7fe` · 8 sahne · 55.8 sn.
+
+```
+POST-QA : WARN   siyah_aralik=0   donmus_aralik=0
+(log'da hiç `KATMAN-` satırı YOK -> kapı tetiklenmedi)
+RENDER-QA: FAIL fail=1
+  GERCEK-KAYNAK-TAVANI: ..._s001  8.172 sn (tavan 8.0)
+TESLIM: RED — ZINCIR-EKSIK:pre_qa
+```
+
+⚠ **Dürüst sonuç:** R-1d-g pilotundaki siyah/donmuş bölüm **bu koşuda
+tekrarlamadı** (`siyah=0, donmus=0`). Kapı ve katman-atıf mekanizması
+yerinde ve fail-closed, ama **atfedilecek bir olay olmadığı için ilk
+bozulan katman KANITLANAMADI**. Kusur **aralıklı (intermittent)** görünüyor;
+tetiklendiğinde artık hem **teslimi durduracak** hem de **hangi katmanda
+başladığını yazacak**.
+
+### ⛔ SONRAKİ TEK GERÇEK BLOKAJ — üretilmiş-görsel sahnesi BÖLÜNEMİYOR
+
+`..._s001` bir **AI üretilmiş görsel** sahnesi (`openai/uretilmis-eser`) ve
+**8.172 sn** ile tavanı aşıyor. Bölme yolu ek varlığı **yalnızca
+`footage_sorgu` üzerinden ücretsiz stok klip** çekerek buluyor; üretilmiş-
+görsel sahnesinde bu sorgu **yok/boş** olduğu için aday havuzu **boş**
+kalıyor → `ek_varlik_edin` **`KAYNAK-TAVANI-VARLIK-YOK`** ile fail-closed
+→ sahne **bölünmüyor** → kapı ihlali sürüyor.
+
+**Doğru atom (R-1d-i):** üretilmiş-görsel sahnesi için de **farklı kaynaklı
+ikinci varlık** üretilebilmeli — ya sahne metninden **ücretsiz stok** sorgusu
+türetilsin, ya da bölme **görsel düzeyinde** (aynı sahnenin farklı kadraj/
+çerçevesi ayrı `asset_id` ile) çözülsün. ⚠ Tavanı yükseltmek **YANLIŞ**;
+⚠ ücretli yeni görsel üretmek de **kapsam dışı**.
