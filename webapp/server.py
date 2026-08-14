@@ -15,8 +15,8 @@ import threading
 import traceback
 from typing import List
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
+from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from PIL import Image
 
 import pipeline
@@ -25,6 +25,9 @@ import imzali_url
 import is_sozlesme   # Faz H: tek tip, geriye donuk uyumlu is sozlesmesi
 import saglik_derin  # Faz H: bagimliliklari GERCEKTEN olcen saglik ucu
 import girdi_analizi # Faz H: otomatik girdi analizi (LLM YOK, ucretsiz)
+import kimlik        # Faz R-1c-a: Argon2id parola + oturum + tenant izolasyonu
+import kutuphane     # Faz R-1c-b: tenant basina son 3 kabul edilmis video
+import teslim        # Faz R-1d-a: zinciri UCTAN UCA baglayan teslim atomu
 
 KOK = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(KOK, "static")
@@ -36,6 +39,21 @@ IS_DURUM_DIR = os.path.join(VERI, "durumlar")
 _IMZA_HAZIR = imzali_url.anahtar_kur(VERI)  # job state diske yazilir (restart'ta kaybolmasin)
 os.makedirs(GECICI, exist_ok=True)
 os.makedirs(IS_DURUM_DIR, exist_ok=True)
+
+# ⚠ FAZ R-1d-a — TESLIM ZINCIRI. Oturum jetonunu muhurleyen anahtar (imza
+# anahtarindan AYRI): env -> veri/.oturum_anahtari (0600) -> uretilir.
+_OTURUM_HAZIR = teslim.anahtar_kur(VERI)
+KULLANICI_DOSYA = os.path.join(VERI, "kullanicilar.json")
+KUTUPHANE_DOSYA = os.path.join(VERI, "kutuphane.json")
+# ⚠ ZORUNLU OTURUM varsayilan ACIK (R-1c-a fail-closed sozlesmesi). Kapatmak
+# ACIK bir karardir ve `/api/saglik`ta GORUNUR — sessizce korumasiz calismaz.
+ZORUNLU_OTURUM = os.environ.get("ZORUNLU_OTURUM", "1").lower() not in (
+    "0", "false", "hayir", "off")
+# Signed URL omru (R-1a varsayilani).
+IMZA_TTL_SN = imzali_url.VARSAYILAN_TTL_SN
+
+_kimlik_kilidi = threading.Lock()
+_giris_denemeleri: dict = {}     # hiz siniri durumu (kimlik.py durum tutmaz)
 
 MAKS_UPLOAD = 20 * 1024 * 1024   # 20 MB gorsel tavani (OOM korumasi)
 
@@ -141,8 +159,210 @@ def _bayrak(v) -> bool:
     return str(v).lower() in ("1", "true", "on", "evet", "yes")
 
 
+# ═════════ FAZ R-1d-a — KIMLIK DEPOSU + ZORUNLU OTURUM KAPISI ═══════════
+# ⚠ Depo dosyalari 0600: parola HASH'i disinda hicbir sey tutmaz, DUZ METIN
+# parola ne saklanir ne loglanir (R-1c-a sozlesmesi).
+
+def _json_oku(yol, varsayilan):
+    try:
+        import json
+        with open(yol, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return varsayilan
+
+
+def _json_yaz_0600(yol, veri):
+    try:
+        import json
+        fd = os.open(yol, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(veri, f, ensure_ascii=False)
+        return True
+    except OSError:
+        return False
+
+
+def _kullanicilar():
+    return _json_oku(KULLANICI_DOSYA, {})
+
+
+def _kutuphane_oku():
+    return _json_oku(KUTUPHANE_DOSYA, {})
+
+
+def _kutuphane_yaz(d):
+    return _json_yaz_0600(KUTUPHANE_DOSYA, d)
+
+
+def _saglayici_kayitlari():
+    """Tenant -> provider baglantisi (R-1b registry deposu).
+
+    ⚠ GERCEK OAuth AKISI BU ATOMDA YOK: dosya yoksa depo BOS'tur ve her
+    tenant ucretsiz stok fallback'ine duser. "Magnific bagli" gibi kanitsiz
+    bir iddia URETILMEZ — `fallback_reason` bunu acikca yazar.
+    """
+    return _json_oku(os.path.join(VERI, "saglayicilar.json"), {})
+
+
+def _provizyon():
+    """Ilk hesabi env'den ac (`VIDRUSH_ADMIN_KULLANICI`/`_PAROLA`).
+
+    ⚠ Parola koda/commit'e YAZILMAZ; yalnizca env'den okunur ve ANINDA
+    hash'lenir. Hesap zaten varsa DOKUNULMAZ (parola SIFIRLANMAZ).
+    """
+    if not os.environ.get("VIDRUSH_ADMIN_KULLANICI"):
+        return {"acildi": False, "neden": "ENV-YOK"}
+    with _kimlik_kilidi:
+        depo = _kullanicilar()
+        ad = os.environ["VIDRUSH_ADMIN_KULLANICI"].strip()
+        if ad in depo:
+            return {"acildi": False, "neden": "ZATEN-VAR"}
+        g = kimlik.provisioning_girdisi()
+        if not g["hazir"]:
+            print(f"  KIMLIK: hesap acilamadi — {g['neden']}")
+            return {"acildi": False, "neden": g["neden"]}
+        depo[g["kayit"]["kullanici"]] = {
+            "parola_hash": g["kayit"]["parola_hash"],
+            "tenant_id": g["kayit"]["tenant_id"]}
+        _json_yaz_0600(KULLANICI_DOSYA, depo)
+        print(f"  KIMLIK: hesap acildi ({g['kayit']['kullanici']}, "
+              f"kdf={kimlik.kdf_adi()})")
+        return {"acildi": True, "neden": ""}
+
+
+def _oturum_jetonu(istek: Request) -> str:
+    return istek.cookies.get(kimlik.OTURUM_COOKIE, "") if istek else ""
+
+
+def _tenant(istek: Request) -> str:
+    """Istegin tenant kimligi. ⚠ ZORUNLU OTURUM acikken kimliksiz = 401.
+
+    Kapaliyken (`ZORUNLU_OTURUM=0`) bos string doner ve cagiran taraf eski
+    davranisi surdurur — bu ACIK bir karardir, sessiz bir bosluk degil.
+    """
+    d = teslim.oturum_kapisi(_oturum_jetonu(istek))
+    if d["izin"]:
+        return d["tenant_id"]
+    if not ZORUNLU_OTURUM:
+        return ""
+    # ⚠ Sunucu tarafi eksikligi (anahtar/KDF) ile kullanici tarafi eksikligi
+    # (jeton yok/bozuk) AYIRT EDILIR: ilki 503, ikincisi 401.
+    if d["neden"] in ("OTURUM-ANAHTARI-YOK", kimlik.KDF_HATA_KODU):
+        raise HTTPException(503, f"oturum altyapisi hazir degil: {d['neden']}")
+    raise HTTPException(401, f"giris gerekli: {d['neden'] or 'OTURUM-YOK'}")
+
+
+def _imzalayici(tenant_id: str):
+    """Tenant'a BAGLI imzalayici; tenant yoksa eski (tenant'siz) imzalayici."""
+    im = teslim.imzalayici_kur(tenant_id, ttl_sn=IMZA_TTL_SN)
+    return im or (imzali_url.imzala if not ZORUNLU_OTURUM else None)
+
+
+@app.post("/api/giris")
+async def giris(istek: Request, kullanici: str = Form(...),
+                parola: str = Form(...)):
+    """Giris. ⚠ Hiz sinirli, sabit-zamanli, parola LOGLANMAZ.
+
+    Basarili girisde HttpOnly+SameSite oturum cerezi ve CSRF cerezi kurulur.
+    """
+    if not teslim.hazir():
+        raise HTTPException(503, "oturum anahtari kurulmadi")
+    if not kimlik.kdf_hazir():
+        # ⚠ FAIL-CLOSED: zayif bir algoritmaya DUSULMEZ.
+        raise HTTPException(503, kimlik.KDF_HATA_KODU)
+    ad = (kullanici or "").strip()
+    ip = (istek.client.host if istek and istek.client else "?")
+    with _kimlik_kilidi:
+        hs = kimlik.hiz_siniri(_giris_denemeleri, f"{ip}|{ad}")
+    if not hs["izin"]:
+        raise HTTPException(429, f"cok fazla deneme, {hs['bekle_sn']} sn bekleyin")
+    kayit = _kullanicilar().get(ad) or {}
+    # ⚠ Kullanici yoksa da parola dogrulamasi CALISTIRILIR (zamanlama farki
+    # kullanici adi varligini SIZDIRMASIN).
+    ok = kimlik.parola_dogrula(parola, kayit.get("parola_hash") or "")
+    if not ok or not kayit.get("tenant_id"):
+        with _kimlik_kilidi:
+            kimlik.hiz_siniri_isle(_giris_denemeleri, f"{ip}|{ad}")
+        raise HTTPException(401, "kullanici adi ya da parola hatali")
+    jeton = kimlik.oturum_uret(kayit["tenant_id"], anahtar=teslim.anahtar())
+    csrf = kimlik.csrf_uret()
+    cevap = JSONResponse({"ok": True, "tenant_id": kayit["tenant_id"]})
+    cevap.set_cookie(kimlik.OTURUM_COOKIE, jeton,
+                     max_age=kimlik.OTURUM_OMRU_SN, path="/",
+                     **kimlik.COOKIE_BAYRAKLARI)
+    # ⚠ CSRF cerezi JS tarafindan OKUNABILIR olmali (double-submit).
+    cevap.set_cookie(kimlik.CSRF_COOKIE, csrf, max_age=kimlik.OTURUM_OMRU_SN,
+                     path="/", httponly=False, samesite="lax", secure=True)
+    return cevap
+
+
+@app.post("/api/cikis")
+def cikis():
+    cevap = JSONResponse({"ok": True})
+    cevap.delete_cookie(kimlik.OTURUM_COOKIE, path="/")
+    cevap.delete_cookie(kimlik.CSRF_COOKIE, path="/")
+    return cevap
+
+
+@app.get("/api/oturum")
+def oturum_durumu(istek: Request):
+    """Arayuz "girisli miyim" diye buna bakar. ⚠ TENANT DISINDA bilgi vermez."""
+    d = teslim.oturum_kapisi(_oturum_jetonu(istek))
+    return {"girisli": d["izin"], "tenant_id": d["tenant_id"],
+            "neden": d["neden"], "zorunlu": ZORUNLU_OTURUM,
+            "kdf": kimlik.kdf_adi(), "kdf_hazir": kimlik.kdf_hazir()}
+
+
+@app.get("/api/kutuphane")
+def kutuphane_listesi(istek: Request):
+    """Bu tenant'in SON 3 kabul edilmis videosu (R-1c-b), imzali URL ile.
+
+    ⚠ Signed URL SAKLANMAZ — talep aninda ve TENANT'A BAGLI uretilir.
+    """
+    tid = _tenant(istek)
+    if not tid:
+        raise HTTPException(401, "giris gerekli")
+    return teslim.listele(_kutuphane_oku(), tid, ttl_sn=IMZA_TTL_SN)
+
+
+@app.get("/giris", response_class=HTMLResponse)
+def giris_sayfasi():
+    return _GIRIS_HTML
+
+
+# ⚠ Zorunlu oturum acikken tarayici kullanicisi kilitli kalmasin diye asgari
+# bir giris formu. Tek dosya, dis bagimlilik YOK.
+_GIRIS_HTML = """<!doctype html><html lang="tr"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BEDOSAHO AI — Giris</title>
+<style>body{background:#0f1115;color:#e8eaed;font:15px system-ui,sans-serif;
+display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0}
+form{background:#171a21;padding:28px;border-radius:12px;width:300px}
+h1{font-size:17px;margin:0 0 18px}input{width:100%;box-sizing:border-box;
+padding:10px;margin:6px 0 12px;border-radius:7px;border:1px solid #2c313c;
+background:#0f1115;color:#e8eaed}button{width:100%;padding:10px;border:0;
+border-radius:7px;background:#3b82f6;color:#fff;font-weight:600;cursor:pointer}
+p{color:#f87171;min-height:18px;font-size:13px;margin:10px 0 0}</style>
+<form id="f"><h1>BEDOSAHO AI — giris</h1>
+<label>Kullanici</label><input name="kullanici" autocomplete="username" required>
+<label>Parola</label><input name="parola" type="password"
+ autocomplete="current-password" required>
+<button>Giris</button><p id="h"></p></form>
+<script>document.getElementById('f').onsubmit=async e=>{e.preventDefault();
+const r=await fetch('/api/giris',{method:'POST',body:new FormData(e.target)});
+if(r.ok){location.href='/';}else{const d=await r.json().catch(()=>({}));
+document.getElementById('h').textContent=d.detail||('hata '+r.status);}};
+</script></html>"""
+
+
 @app.get("/", response_class=HTMLResponse)
-def anasayfa():
+def anasayfa(istek: Request):
+    # ⚠ Zorunlu oturum acikken girisi olmayan kullaniciya uygulama DEGIL
+    # giris formu gosterilir (uygulama zaten her ucta 401 alirdi).
+    if ZORUNLU_OTURUM and not teslim.oturum_kapisi(
+            _oturum_jetonu(istek))["izin"]:
+        return _GIRIS_HTML
     with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:
         return f.read()
 
@@ -194,6 +414,15 @@ def saglik():
         # main (12 Agu): Grok/xAI unlu modu gorsel+video motoru
         "grok": bool(pipeline.XAI_KEY),
         "freepik_anahtar_sayisi": len(kaynak.FREEPIK_KEYS),
+        # ⚠ FAZ R-1d-a: teslim zincirinin ON KOSULLARI GORUNUR. Kapali/eksik
+        # bir koruma sessizce gizlenmez.
+        "oturum_zorunlu": ZORUNLU_OTURUM,
+        "oturum_anahtari": teslim.hazir(),
+        "imza_anahtari": imzali_url.hazir(),
+        "kdf": kimlik.kdf_adi(),
+        "kdf_hazir": kimlik.kdf_hazir(),
+        "hesap_sayisi": len(_kullanicilar()),
+        "kutuphane_tavani": kutuphane.TAVAN,
     }
 
 
@@ -686,7 +915,8 @@ async def girdi_analiz_uc(story: str = Form(...), tur: str = Form(""),
 
 
 @app.post("/api/generate")
-async def uret_baslat(session: str = Form(...), story: str = Form(...),
+async def uret_baslat(istek: Request,
+                      session: str = Form(...), story: str = Form(...),
                       tur: str = Form("documentary"),
                       edit: str = Form(pipeline.VARSAYILAN_EDIT),
                       sure_dk: str = Form("2"),
@@ -709,6 +939,9 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
                       sahne_ref: List[UploadFile] = File(None)):
     """Karakter/stil gorselleri her video icin DOGRUDAN yuklenir (kalici kayit yok).
     Magnific ve footage plana gore OTOMATIK. tur: animasyon|documentary|hikaye."""
+    # ⚠ FAZ R-1d-a: ZINCIRIN 1. HALKASI. `session` yalnizca bir arayuz
+    # etiketidir, YETKI DEGILDIR — yetki oturum cerezinden gelir.
+    tenant_id = _tenant(istek)
     session = gecerli_session(session)
     if len(story.strip()) < 20:
         raise HTTPException(400, "Hikaye metni cok kisa")
@@ -770,7 +1003,21 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
         raise HTTPException(400, "Görsel okunamadı (geçerli bir resim dosyası yükleyin)")
 
     isler[is_id] = {"durum": "kuyrukta", "ilerleme": 0, "mesaj": "Sirada...",
-                    "video": None, "kapak": None, "hata": None}
+                    "video": None, "kapak": None, "hata": None,
+                    "olusturma_zamani": time.time()}
+    # ⚠ FAZ R-1d-a — ZINCIRIN 2. ve 4. HALKASI, kuyruga girmeden ONCE:
+    # is TENANT'a muhurlenir ve bu tenant'in SAGLAYICI KARARI (R-1b) yazilir.
+    # Tenant'in onayli+kredili bir baglantisi yoksa (gercek OAuth/kredi YOK)
+    # UCRETSIZ STOK'a duser ve `fallback_reason` GORUNUR kalir.
+    _sag = teslim.saglayici_karari(_saglayici_kayitlari(), tenant_id)
+    _dmg = teslim.is_damgala(isler[is_id], tenant_id=tenant_id,
+                             metin=story, saglayici=_sag)
+    if not _dmg["ok"] and ZORUNLU_OTURUM:
+        # ⚠ Damgalanamayan is KUYRUGA GIRMEZ: sahipsiz is kimseye teslim
+        # edilemez, uretmek bosa kredi olurdu.
+        shutil.rmtree(idir, ignore_errors=True)
+        del isler[is_id]
+        raise HTTPException(401, f"is tenant'a baglanamadi: {_dmg['neden']}")
     _durum_kaydet(is_id)
     pal = palet.strip() if (palet.strip() in pipeline.PALETLER or palet.strip() == "ozel") else ""
     # Hikaye: hareketli acilis suresi (dk). "" = varsayilan (HIKAYE_ACILIS_SN); 0 = kapali.
@@ -802,20 +1049,27 @@ async def uret_baslat(session: str = Form(...), story: str = Form(...),
     # kimligi HER ZAMAN bos kaliyordu. Simdi job_id + id + is_id birlikte var.
     cevap = is_sozlesme.normalize(is_id, isler[is_id],
                                   kuyruk_sira=_kuyruk_sirasi(is_id),
-                                  kuyruk_toplam=is_kuyrugu.qsize())
+                                  kuyruk_toplam=is_kuyrugu.qsize(),
+                                  imzalayici=_imzalayici(tenant_id))
     cevap.update({"kuyruk": is_kuyrugu.qsize(), "tur": mod, "edit": edit_id,
-                  "profil": profil.strip()})
+                  "profil": profil.strip(),
+                  # ⚠ Saglayici karari BASTAN GORUNUR: kullanici videonun
+                  # hangi kaynaktan cekilecegini uretim bitmeden bilir.
+                  "saglayici": _sag["provider_used"],
+                  "saglayici_fallback": _sag["fallback_reason"]})
     return cevap
 
 
 @app.get("/api/isler")
-def is_listesi(session: str):
+def is_listesi(istek: Request, session: str):
     """Bu oturumun TUM isleri (Videolarim sekmesi) — sayfa yenilense/kapansa da is kaybolmaz.
     Kaynak: diskteki durum dosyalari; bellekte daha guncel hal varsa o kullanilir.
     Is id'si 'job_<ts>_<session[:6]>_<hex>' oldugu icin oturum eslesmesi id icinden yapilir."""
     import json
+    tenant_id = _tenant(istek)
     session = gecerli_session(session)
     on6 = session[:6]
+    imz = _imzalayici(tenant_id)
     cikti = []
     try:
         for ad in os.listdir(IS_DURUM_DIR):
@@ -827,11 +1081,17 @@ def is_listesi(session: str):
                 if d is None:
                     with open(yol, encoding="utf-8") as f:
                         d = json.load(f)
+                # ⚠ FAZ R-1d-a: `session` on eki TAHMIN EDILEBILIR bir
+                # etikettir, yetki degildir. Zorunlu oturumda liste TENANT
+                # SAHIPLIGINE gore suzulur; sahipsiz eski kayitlar GORUNMEZ.
+                if tenant_id and not teslim.erisim_kapisi(d, tenant_id)["izin"]:
+                    continue
                 # ⚠ FAZ H: liste de TEK TIP sozlesmeden geciyor. Eskiden
                 # `ilerleme` donuyordu ama arayuz `yuzde` okuyordu -> ilerleme
                 # cubugu her zaman %0 gorunuyordu. normalize() ikisini de verir.
                 cikti.append(is_sozlesme.normalize(
-                    ad[:-5], d, zaman=os.path.getmtime(yol)))
+                    ad[:-5], d, zaman=os.path.getmtime(yol),
+                    imzalayici=imz))
             except Exception:
                 continue
     except Exception:
@@ -841,11 +1101,13 @@ def is_listesi(session: str):
 
 
 @app.get("/api/job/{is_id}")
-def is_durum(is_id: str):
+def is_durum(istek: Request, is_id: str):
     """Tek isin CANLI durumu. Arayuz Projeler ekraninda bunu periyodik cagirir.
     ⚠ FAZ H: cevap `is_sozlesme.normalize()`ten geciyor — yeni (job_id/status/
     progress/stage/video_url/qa/attribution/fallbacks) ve eski (durum/ilerleme/
     mesaj/video) adlar BIRLIKTE donuyor."""
+    tenant_id = _tenant(istek)
+    imz = _imzalayici(tenant_id)
     d = isler.get(is_id)
     if not d:
         # bellekte yoksa (restart olmus olabilir) diskten dene
@@ -854,19 +1116,32 @@ def is_durum(is_id: str):
             yol = os.path.join(IS_DURUM_DIR, f"{gecerli_session(is_id)}.json")
             if os.path.exists(yol):
                 with open(yol, encoding="utf-8") as f:
-                    return is_sozlesme.normalize(
-                        is_id, json.load(f),
-                        imzalayici=imzali_url.imzala)
+                    d = json.load(f)
+                _erisim_dogrula(d, tenant_id)
+                return is_sozlesme.normalize(is_id, d, imzalayici=imz)
         except HTTPException:
             raise
         except Exception:
             pass
         raise HTTPException(404, "is yok")
+    _erisim_dogrula(d, tenant_id)
     sira = _kuyruk_sirasi(is_id) if d.get("durum") == "kuyrukta" else None
     return is_sozlesme.normalize(
         is_id, d, kuyruk_sira=sira,
         kuyruk_toplam=is_kuyrugu.qsize() if sira is not None else None,
-        imzalayici=imzali_url.imzala)
+        imzalayici=imz)
+
+
+def _erisim_dogrula(kayit: dict, tenant_id: str) -> None:
+    """⚠ FAZ R-1d-a: BASKA tenant'in isi 404 verir (403 DEGIL).
+
+    403 "bu is var ama senin degil" bilgisini sizdirirdi; is kimlikleri
+    tahmin edilebilir zaman damgasi tasidigi icin bu bir sayim yoluydu.
+    """
+    if not tenant_id:
+        return
+    if not teslim.erisim_kapisi(kayit, tenant_id)["izin"]:
+        raise HTTPException(404, "is yok")
 
 
 def _kuyruk_sirasi(is_id):
@@ -880,17 +1155,23 @@ def _kuyruk_sirasi(is_id):
 
 
 @app.get("/ciktilar/{dosya}")
-def cikti(dosya: str, exp: str = "", sig: str = ""):
-    """⚠ FAZ R-1a: cikti indirmesi artik IMZALI ve SURELI.
+def cikti(istek: Request, dosya: str, exp: str = "", sig: str = ""):
+    """⚠ FAZ R-1a: cikti indirmesi IMZALI ve SURELI.
+    ⚠ FAZ R-1d-a: imza ayrica TENANT'A BAGLI.
 
-    Onceden dosya adini bilen HERKES indirebiliyordu. Imza anahtari
-    kurulamadiysa uc ACIK KALMAZ — 503 doner (sessizce korumasiz
-    calismaktansa durustce reddeder).
+    Onceden dosya adini bilen HERKES indirebiliyordu (R-1a bunu kesti), ama
+    imza dosya+sureye baglanmisti: SIZAN bir baglanti BASKA BIR HESAPTA da
+    calisiyordu. Artik imza istegin OTURUMUNDAKI tenant ile dogrulanir —
+    baglanti sizsa bile yabanci oturumda gecersizdir.
+
+    Imza anahtari kurulamadiysa uc ACIK KALMAZ — 503 doner (sessizce
+    korumasiz calismaktansa durustce reddeder).
     """
     ad = imzali_url.guvenli_ad(dosya)
     if not imzali_url.hazir():
         raise HTTPException(503, "imza anahtari kurulmadi")
-    k = imzali_url.dogrula(ad, exp, sig)
+    tenant_id = _tenant(istek)
+    k = imzali_url.dogrula(ad, exp, sig, tenant=tenant_id)
     if not k["gecerli"]:
         raise HTTPException(403, f"baglanti gecersiz: {k['neden']}")
     yol = os.path.join(pipeline.CIKTI_DIR, ad)
@@ -935,7 +1216,12 @@ def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom
                   "arastirma": sonuc.get("arastirma") or {},
                   "kaynaklar": sonuc.get("kaynaklar") or [],
                   "qa": sonuc.get("qa") or {},
+                  "edit_plani": sonuc.get("edit_plani") or {},
                   "dususler": sonuc.get("dususler") or []})
+        # ── FAZ R-1d-a: ZINCIRIN SON HALKASI — TESLIM ──
+        # ⚠ Burada RENDER/STORAGE yeniden yazilmaz; sadece bitmis isin
+        # kanitlari toplanip kabul edilip edilmedigine karar verilir.
+        _teslim_et(is_id, d)
     except Exception as e:
         traceback.print_exc()
         d.update({"durum": "hata", "hata": str(e)[:300], "mesaj": "Hata olustu"})
@@ -950,6 +1236,41 @@ def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom
                 os.remove(ham)
         except Exception:
             pass
+
+
+_teslim_kilidi = threading.Lock()
+
+
+def _teslim_et(is_id, d):
+    """Bitmis isi TESLIM ZINCIRINDEN gecir ve kabul edilirse kutuphaneye al.
+
+    ⚠ TESLIM EDILMEMEK BIR HATA DEGILDIR: video dosyasi durur ve sahibi
+    indirebilir; yalnizca "kabul edilmis final" SAYILMAZ ve son-3
+    kutuphanesine GIRMEZ. Neden `d["teslim"]` icinde GORUNUR kalir.
+    ⚠ Tavani asan kayit icin DOSYA SILINMEZ; silme KUYRUGU ise yazilir.
+    """
+    tid = str(d.get("tenant_id") or "")
+    dosya = imzali_url.guvenli_ad(str(d.get("video") or ""))
+    var = os.path.exists(os.path.join(pipeline.CIKTI_DIR, dosya)) if dosya \
+        else False
+    try:
+        with _teslim_kilidi:
+            depo = _kutuphane_oku()
+            r = teslim.teslim_et(is_id=is_id, tenant_id=tid, kayit=d,
+                                 kutuphane_deposu=depo,
+                                 kabul_zamani=time.time(), dosya_var=var,
+                                 ttl_sn=IMZA_TTL_SN)
+            if r["teslim"]:
+                _kutuphane_yaz(depo)
+        d["teslim"] = {"teslim": r["teslim"], "neden": r["neden"],
+                       "eksik": r["zincir"]["eksik"],
+                       "silme_kuyrugu": r["silinecek"]}
+        print(f"  TESLIM {is_id}: {'KABUL' if r['teslim'] else 'RED'}"
+              f"{'' if r['teslim'] else ' — ' + r['neden']}")
+    except Exception as e:                                    # noqa: BLE001
+        # ⚠ Teslim karari patlarsa is "kabul edildi" SAYILMAZ.
+        d["teslim"] = {"teslim": False, "neden": f"TESLIM-HATASI:{e}"[:200],
+                       "eksik": [], "silme_kuyrugu": []}
 
 
 def _isci():
@@ -973,6 +1294,10 @@ def _temizlik_dongusu():
         _eski_ciktilari_temizle()
 
 
+# ⚠ FAZ R-1d-a: ilk hesap env'den acilir (parola koda YAZILMAZ). Hesap yoksa
+# ve ZORUNLU_OTURUM aciksa hicbir uc calismaz — bu FAIL-CLOSED sozlesmesinin
+# istenen davranisi; `/api/saglik` `hesap_sayisi: 0` diyerek GORUNUR kilar.
+_provizyon()
 _durumlari_yukle()          # restart'ta eski job state'leri geri yukle (poll 404 vermesin)
 _eski_ciktilari_temizle()   # 14 gunden eski cikti/durum dosyalarini temizle (disk)
 threading.Thread(target=_temizlik_dongusu, daemon=True).start()

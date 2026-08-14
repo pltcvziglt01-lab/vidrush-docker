@@ -155,6 +155,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 
 | Tarih | Adım | Commit | Durum |
 |---|---|---|---|
+| 14 Ağu | **R-1d-a TESLİM ATOMU — zincir uçtan uca bağlandı** | _(bu commit)_ | ✅ A–I **4003 geçti / 0 hata**; ⚠ **ÖLÇÜLEN KUSUR: R-1a/R-1b/R-1c-a/R-1c-b modülleri VARDI ama `server.py` ÜÇÜNÜ DE İMPORT ETMİYORDU** — `/api/generate` serbest `session` string'i alıyor, `/ciktilar/` imzayı doğrulayıp **tenant'a bakmıyor**, kütüphane **hiç dolmuyordu**; yeni `webapp/teslim.py` (10 halkalı **kanıt temelli** zincir, kanıtsız halka → **teslim YOK**), `imzali_url` imzası **tenant'a bağlanabilir** (tenant boşken **bit-bit** eski davranış), `server.py` zorunlu oturum + tenant süzme + `/api/kutuphane`; ⚠ **AYRI GÜVENLİK BULGUSU: R-1a imza anahtarı (`webapp/veri/.imza_anahtari`) kazayla COMMIT EDİLMİŞTİ** (`4846264`) — modülün kendi sözleşmesi "anahtar_repoda: False" diyordu ama test **YANLIŞ YOLU** kontrol ediyordu; izlemeden çıkarıldı + **döndürüldü** + `.gitignore`; sunucuda anahtar **hiç yoktu** (R-1a deploy edilmemişti) → **üretimde kullanılmadı**; Mac'te medya üretilmedi, $0.00 |
 | 12 Ağu | H0 envanter + handoff | `4ec1be1` | ✅ |
 | 12 Ağu | H1 kök yolu + deploy.sh alt paket | `eda27fc` | ✅ |
 | 12 Ağu | H2–H3 araştırma köprüsü + iş sözleşmesi + derin sağlık + UI | `e4af286` | ✅ |
@@ -8616,3 +8617,121 @@ ayarlanmadı, mutlak yol verilmedi, deploy yok.
    eşiği **ölçerek** ayrı kalibre et. ⚠ Körlemesine eşik düşürmek YANLIŞ.
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005).
+
+---
+
+## 62. FAZ R-1d-a — TESLİM ATOMU: ZİNCİR UÇTAN UCA BAĞLANDI (14 Ağu)
+
+> **Durum: ölçülen kusur ÇÖZÜLDÜ. A–I yeşil (4003, 0 hata).
+> Ayrı bir güvenlik bulgusu (sızan imza anahtarı) de kapatıldı.
+> Mac'te medya ÜRETİLMEDİ. Maliyet $0.00.**
+> Değişen: yeni `webapp/teslim.py`; `webapp/server.py`, `webapp/imzali_url.py`,
+> `webapp/is_sozlesme.py`, `.gitignore`, `webapp/testler/test_faz_{f,h,i}.py`.
+> `pipeline.py`, `hizli_render.py`, `kaynak.py`, `editor/*`, `medya/*`,
+> `kimlik.py`, `kutuphane.py`, `saglayici_motoru.py`, `deploy.sh`,
+> `Video.tsx` ve **22 alan sözleşmesi** **DOKUNULMADI**.
+
+### ⛔ ÖLÇÜLEN KUSUR — modüller vardı, TESLİM yoktu
+
+R-1a (imzalı URL), R-1b (tenant provider zinciri), R-1c-a (zorunlu oturum)
+ve R-1c-b (son-3 kütüphane) **yazılmıştı**, ama `server.py` **hiçbirini
+import etmiyordu**. Ölçüldü (`grep`):
+
+| iddia edilen halka | gerçekte | kanıt |
+|---|---|---|
+| zorunlu login/tenant guard | **YOK** | `/api/generate` → `gecerli_session()`, sadece `^[A-Za-z0-9_-]{1,64}$` regex'i |
+| tenant korumalı signed URL | **YARIM** | `/ciktilar/` imzayı doğruluyor ama **tenant'a bakmıyor** → sızan link **her hesapta** çalışıyor |
+| son-3 kütüphane | **HİÇ DOLMUYOR** | `kutuphane.py` hiçbir yerden çağrılmıyor |
+| tenant provider kararı | **HİÇ ÇALIŞMIYOR** | `saglayici_motoru.py` hiçbir yerden çağrılmıyor |
+| `/api/isler` izolasyonu | **TAHMİN EDİLEBİLİR** | yetki = iş id'sindeki `session[:6]` ön eki |
+
+### Düzeltme — mevcut hat YENİDEN YAZILMADAN
+
+Yeni `webapp/teslim.py`: **10 halkalı, kanıt temelli** zincir.
+
+```
+oturum → metin → plan → saglayici(R-1b) → uzak_tts_render
+       → pre_qa → post_qa → depolama → imzali_url(R-1a) → kutuphane(R-1c-b)
+```
+
+⚠ **HER HALKA KANIT İSTER.** Kanıt işin **kendi kaydından** okunur;
+yoksa `tamam=False` yazılır ve **teslim EDİLMEZ**. "Muhtemelen olmuştur"
+denmez. Özellikle `depolama` halkası `dosya_var=None` iken **DEPOLAMA-ÖLÇÜLMEDİ**
+sayılır — ölçülmemiş olan "var" **kabul edilmez**.
+
+Teslim üç ayrı kapıdan geçer, üçü de fail-closed: zincir **tam** olacak,
+`kutuphane.kabul_edilebilir_mi` **KABUL** diyecek (QA FAIL / ölçülmemiş
+**girmez**), kayıt **bu tenant'a ait** olacak.
+
+**`server.py` (en ince entegrasyon):** `/api/giris` `/api/cikis`
+`/api/oturum` `/api/kutuphane` eklendi; `/api/generate` işi tenant'a **ve
+sağlayıcı kararına** mühürlüyor; `/api/isler` ve `/api/job` **sahipliğe**
+göre süzülüyor (`session` ön eki artık yetki DEĞİL); `/ciktilar/` imzayı
+**oturumun tenant'ı ile** doğruluyor. Kuyruk/render/storage hattına
+**dokunulmadı** — işçi yalnızca bitmiş işi `_teslim_et()` ile zincirden
+geçiriyor.
+
+⚠ **`/api/job` başka tenant'ta 404 döner (403 DEĞİL)**: iş kimlikleri
+tahmin edilebilir zaman damgası taşıyor; 403 "bu iş var" bilgisini
+sızdırırdı.
+
+### Tenant'a bağlı imza — GERİYE UYUMLU
+
+`imzali_url._imza()` artık opsiyonel `tenant` alıyor. ⚠ **Tenant boşken
+mesaj eskisiyle BİT-BİT AYNI** (test kilitliyor) → R-1a bağlantıları
+kırılmıyor. Tenant kimliği **URL'e yazılmaz** (link kimin olduğunu
+sızdırmaz); sunucu onu **oturumdan** okur.
+
+| senaryo | R-1a | R-1d-a |
+|---|---|---|
+| link sahibinin oturumunda | ✅ geçer | ✅ geçer |
+| **link sızdı, başka hesapta** | **✅ geçerdi** ⛔ | **⛔ `IMZA-GECERSIZ`** |
+| link sızdı, oturumsuz | ✅ geçerdi ⛔ | ⛔ 401 |
+
+### ⚠ AYRI GÜVENLİK BULGUSU — imza anahtarı DEPOYA COMMIT EDİLMİŞ
+
+`webapp/veri/.imza_anahtari` (64 bayt HMAC anahtarı) `4846264` (R-1a) ile
+**depoya girmiş**. Modülün kendi sözleşmesi `anahtar_repoda: False` diyordu
+ve bir test bunu iddia ediyordu — ama test **`webapp/.imza_anahtari`**
+yolunu kontrol ediyordu, anahtar ise **`webapp/veri/.imza_anahtari`**'ydi.
+Depoya erişen herkes **herhangi bir tenant adına** imza üretebilirdi.
+
+**Ölçülen kapsam:** sunucuda (`185.23.17.240`) anahtar dosyası **YOK** —
+R-1a hiç deploy edilmemişti. Yani **üretimde kullanılmadı**.
+**Yapılan:** `git rm --cached` + yerel dosya silinip **döndürüldü** +
+`.gitignore`'a anahtarlar/kimlik depoları eklendi + test artık **gerçek
+yolu** (`git ls-files webapp/veri`) kontrol ediyor.
+⚠ **Git geçmişinde değer hâlâ duruyor**; geçmiş yeniden yazılmadı (yıkıcı,
+kapsam dışı) — anahtar döndürüldüğü için eski değer ÖLÜ.
+
+### Testler — RED-FIRST kanıtı
+
+| paket | A | B | C | D | E | F | G | H | I | Toplam |
+|---|---|---|---|---|---|---|---|---|---|---|
+| önce | 125 | 200 | 148 | 95 | 127 | 244 | 218 | 260 | 2521 | **3938** |
+| sonra | 125 | 200 | 148 | 95 | 127 | 245 | 218 | 277 | 2568 | **4003** |
+
+Red-first **ölçüldü**: R-1d-a üretim değişiklikleri geri alınıp aynı testler
+koşuldu →
+
+* `test_faz_h`: 277 → **203 geçti, blok komple ÖLDÜ**
+  (`AttributeError: module 'server' has no attribute 'KULLANICI_DOSYA'`) —
+  **74 kontrol koşamadı bile**.
+* `test_faz_i`: `TypeError: imzala() got an unexpected keyword argument
+  'tenant'` — tenant'a bağlı imza API'si **yoktu**.
+
+⚠ **GEVŞETİLEN test YOK.** Üç test güncellendi ve **gerekçesi yazıldı**:
+`test_faz_f` "generate imzası değişmedi" (yalnız `istek: Request` eklendi,
+**22 Form alanı ayrıca sayılıyor**), `test_faz_h` uç taraması artık
+**gerçek giriş** yapıyor (+ kimliksiz red kontrolleri), `test_faz_i` I-49
+`webapp/veri/` ölçümü **yanlış pozitif** veriyordu (`.o**tur**um_anahtari`).
+
+### SONRAKİ ATOM (R-1d-b) — yalnız ölçülen eksikten
+
+1. **Arayüz giriş akışı asgari**: `/giris` tek dosyalık form; `app.js`
+   401 alınca yönlendirmiyor, "Videolarım" kütüphane ucunu kullanmıyor.
+2. **Silme kuyruğu İŞLENMİYOR**: tavanı aşan kayıt kuyruğa alınıyor ama
+   dosyayı gerçekten silen remote lifecycle işi **YOK** → disk büyümeye
+   devam eder.
+3. **`saglayicilar.json` yazan bir uç yok**: provider registry okunuyor ama
+   tenant bağlantısını **kuran** akış (gerçek OAuth) hâlâ yok — bu bilinçli.

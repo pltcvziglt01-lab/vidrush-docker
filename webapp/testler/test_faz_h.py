@@ -220,7 +220,11 @@ blok("5. 21 generate alani birebir korunuyor")
 
 alanlar_js = re.findall(r"\{ad: '([a-z_]+)'", API_JS)
 imza = re.search(r"async def uret_baslat\((.*?)\):", SERVER, re.S)
-alanlar_py = re.findall(r"(\w+): [^=]+= (?:Form|File)\(", imza.group(1)) if imza else []
+# ⚠ FAZ R-1d-a: desen SATIR SONUNU asmamali. `uret_baslat` artik ilk
+# parametre olarak `istek: Request` aliyor (Form/File DEGIL); eski desendeki
+# `[^=]+` yeni satirlari da yuttugu icin `istek`i 23. Form alani SANIYORDU.
+alanlar_py = re.findall(r"(\w+): [^=\n]+= (?:Form|File)\(",
+                        imza.group(1)) if imza else []
 # ⚠ 12 Agu 2026: main `unlu` (unlu modu) alanini ekledi -> 21 DEGIL 22.
 # Sayi degisirse iki taraf da degismeli; bu test tam o senkronu kilitler.
 ALAN_SAYISI = 22
@@ -624,9 +628,66 @@ if FASTAPI_VAR:
     shutil.copy(os.path.join(DEPO, "app", "uret.py"),
                 os.path.join(gecici_kok, "uret.py"))
     os.environ["VIDRUSH_KOK"] = gecici_kok
+    # ⚠ FAZ R-1d-a: ZORUNLU OTURUM artik ACIK. Bu blok eskiden KIMLIKSIZ
+    # kosuyordu ve tum uclar 200 doneceğini varsayiyordu; o varsayim ARTIK
+    # YANLIS ve bu BILEREK yapilan bir sikilastirmadir (R-1a'daki 403
+    # degisikliginin aynisi). Blok once KIMLIKSIZ REDDI dogrular, sonra
+    # GERCEK BIR GIRIS yapip ayni uclari yeniden kosar.
+    # ⚠ Parola koda YAZILMAZ diye env'den okunur; bu YEREL TEST hesabidir,
+    # sunucuya deploy EDILMEZ (deploy.sh yalniz *.py + static kopyalar).
+    _TEST_KUL, _TEST_PAR = "faz_h_test", "Faz-H-Test-Parola-2026!"
+    os.environ["VIDRUSH_ADMIN_KULLANICI"] = _TEST_KUL
+    os.environ["VIDRUSH_ADMIN_PAROLA"] = _TEST_PAR
+    # ⚠ Kontrol IMPORT'TAN ONCE: `_provizyon()` server import edilirken
+    # calisiyor, sonra bakarsak dosyayi HEP "zaten vardi" sanip temizlemeyiz.
+    _kul_dosya_vardi = os.path.exists(
+        os.path.join(KOK, "veri", "kullanicilar.json"))
     try:
         import server as _srv
-        c = TestClient(_srv.app)
+        # ⚠ https: Secure cerezleri http'de saklanmaz (httpx bunlari atar).
+        c = TestClient(_srv.app, base_url="https://testserver")
+
+        # ── FAZ R-1d-a: KIMLIKSIZ ERISIM REDDI (red-first) ──
+        kontrol("⭐ R-1d-a: KIMLIKSIZ /api/isler -> 401",
+                c.get("/api/isler?session=abc123").status_code == 401)
+        kontrol("⭐ R-1d-a: KIMLIKSIZ /api/generate -> 401",
+                c.post("/api/generate",
+                       data={"session": "abc123", "story": "x" * 40}
+                       ).status_code == 401)
+        kontrol("⭐ R-1d-a: KIMLIKSIZ /api/kutuphane -> 401",
+                c.get("/api/kutuphane").status_code == 401)
+        kontrol("⭐ R-1d-a: KIMLIKSIZ /ciktilar/... -> 401",
+                c.get("/ciktilar/olmayan.mp4").status_code == 401)
+        kontrol("⭐ R-1d-a: KIMLIKSIZ anasayfa GIRIS FORMU donduruyor "
+                "(uygulama degil)",
+                "/api/giris" in c.get("/").text
+                and c.get("/").status_code == 200)
+        kontrol("⭐ R-1d-a: /api/saglik oturum kosullarini GORUNUR kiliyor",
+                c.get("/api/saglik").json().get("oturum_zorunlu") is True)
+        kontrol("⭐ R-1d-a RED-FIRST: YANLIS parola 401",
+                c.post("/api/giris", data={"kullanici": _TEST_KUL,
+                                           "parola": "yanlis"}
+                       ).status_code == 401)
+        kontrol("⭐ R-1d-a RED-FIRST: OLMAYAN kullanici da 401 "
+                "(varlik sizdirilmiyor)",
+                c.post("/api/giris", data={"kullanici": "yok_boyle",
+                                           "parola": "yanlis"}
+                       ).status_code == 401)
+        _gr = c.post("/api/giris", data={"kullanici": _TEST_KUL,
+                                         "parola": _TEST_PAR})
+        kontrol("⭐ R-1d-a: dogru parola ile GIRIS 200 + tenant kimligi",
+                _gr.status_code == 200 and bool(_gr.json().get("tenant_id")),
+                f"{_gr.status_code} {_gr.text[:120]}")
+        kontrol("⭐ R-1d-a: oturum cerezi HttpOnly + SameSite + Secure",
+                all(b in str(_gr.headers.get("set-cookie", "")).lower()
+                    for b in ("httponly", "samesite=lax", "secure")),
+                _gr.headers.get("set-cookie", "")[:120])
+        kontrol("⭐ R-1d-a: parola cevapta/cerezde SIZMIYOR",
+                _TEST_PAR not in _gr.text
+                and _TEST_PAR not in str(_gr.headers))
+        _TENANT = _gr.json().get("tenant_id", "")
+        kontrol("⭐ R-1d-a: /api/oturum girisli diyor",
+                c.get("/api/oturum").json().get("girisli") is True)
 
         GET_UCLARI = [
             ("/", 200), ("/api/saglik", 200), ("/api/saglik/derin", 200),
@@ -652,13 +713,19 @@ if FASTAPI_VAR:
         kontrol("GET /ciktilar/olmayan.mp4 (IMZASIZ) -> 403",
                 c.get("/ciktilar/olmayan.mp4").status_code == 403)
         import imzali_url as _iu
-        _imz = _iu.imzala("olmayan.mp4")
+        # ⚠ FAZ R-1d-a: imza ARTIK TENANT'A BAGLI; oturumun tenant'i ile
+        # imzalanmayan baglanti kendi sahibinde bile 403 alir.
+        _imz = _iu.imzala("olmayan.mp4", tenant=_TENANT)
         kontrol("GET /ciktilar/... (IMZALI, dosya yok) -> 404",
                 (c.get("/" + _imz).status_code == 404) if _imz else True,
                 _imz[:40])
         kontrol("GET /ciktilar/... (IMZA BOZUK) -> 403",
                 (c.get("/" + _imz[:-2] + "xx").status_code == 403)
                 if _imz else True)
+        kontrol("⭐ R-1d-a BELIRLEYICI: BASKA TENANT'a imzalanmis baglanti "
+                "bu oturumda 403 (sizan link baskasinda calismiyor)",
+                (c.get("/" + _iu.imzala("olmayan.mp4", tenant="baska_tenant")
+                       ).status_code == 403) if _imz else True)
         kontrol("cikti baglantisi SURELI (exp tasiyor)",
                 ("exp=" in _imz and "sig=" in _imz) if _imz else True)
         kontrol("GET /ui/../server.py -> 404 (traversal kapali)",
@@ -723,7 +790,10 @@ if FASTAPI_VAR:
         # ── IS SOZLESMESI CANLI ──
         _srv.isler["job_test_abc123_ff"] = {
             "durum": "uretiliyor", "ilerleme": 42, "mesaj": "Render",
-            "video": None, "kapak": None, "hata": None}
+            "video": None, "kapak": None, "hata": None,
+            # ⚠ FAZ R-1d-a: is artik TENANT'a muhurlu olmadan sahibine bile
+            # gorunmez (sahipsiz kayit "herkese acik" SAYILMAZ).
+            "tenant_id": _TENANT}
         j = c.get("/api/job/job_test_abc123_ff").json()
         for a in ("job_id", "status", "progress", "stage", "video_url",
                   "fallbacks", "durum", "ilerleme", "yuzde"):
@@ -743,6 +813,28 @@ if FASTAPI_VAR:
             kontrol("/api/isler ogesinde progress var", "progress" in lst[0])
             kontrol("/api/isler ogesinde yuzde alias'i da var",
                     "yuzde" in lst[0])
+        # ── FAZ R-1d-a: TENANT SIZINTISI (red-first) ──
+        _srv.isler["job_test_abc123_yb"] = {
+            "durum": "bitti", "ilerleme": 100, "mesaj": "Hazir",
+            "video": "ciktilar/yabanci.mp4", "kapak": None, "hata": None,
+            "tenant_id": "baska_tenant"}
+        _test_isler.append("job_test_abc123_yb")
+        _srv._durum_kaydet("job_test_abc123_yb")
+        kontrol("⭐ R-1d-a BELIRLEYICI: BASKA tenant'in isi /api/job'da 404 "
+                "(403 degil — varligi sizdirmaz)",
+                c.get("/api/job/job_test_abc123_yb").status_code == 404)
+        kontrol("⭐ R-1d-a BELIRLEYICI: BASKA tenant'in isi /api/isler "
+                "listesinde GORUNMUYOR (session on eki yetki DEGIL)",
+                "job_test_abc123_yb" not in
+                [x.get("job_id") for x in
+                 c.get("/api/isler?session=abc123").json()])
+        _kut = c.get("/api/kutuphane")
+        kontrol("⭐ R-1d-a: /api/kutuphane girisliye 200 + son-3 sozlesmesi",
+                _kut.status_code == 200 and _kut.json().get("tavan") == 3
+                and _kut.json().get("ok") is True, _kut.text[:120])
+        kontrol("⭐ R-1d-a: cikis sonrasi korumali uc yeniden 401",
+                (c.post("/api/cikis").status_code == 200
+                 and c.get("/api/kutuphane").status_code == 401))
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -755,6 +847,15 @@ if FASTAPI_VAR:
                     os.remove(os.path.join(_srv.IS_DURUM_DIR, _ad))
         except Exception:
             pass
+        # ⚠ FAZ R-1d-a: test hesabi dosyayi KENDISI yarattiysa geri al —
+        # gercek bir yerel hesap varsa DOKUNMA.
+        try:
+            if _kul_dosya_vardi is False:
+                os.remove(_srv.KULLANICI_DOSYA)
+        except Exception:
+            pass
+        os.environ.pop("VIDRUSH_ADMIN_KULLANICI", None)
+        os.environ.pop("VIDRUSH_ADMIN_PAROLA", None)
         shutil.rmtree(gecici_kok, ignore_errors=True)
 
 # ═══════════════ 9. DERLEME + JS SOZDIZIMI ═══════════════

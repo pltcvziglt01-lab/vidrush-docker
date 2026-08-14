@@ -150,7 +150,11 @@ def normalize(is_id: str, ham: dict, *, kuyruk_sira=None, kuyruk_toplam=None,
         # taraf (server) imzalayiciyi GECER; testler ikisini de kosar.
         "video_url": _imzali(ham.get("video") or ham.get("video_url") or "",
                              imzalayici),
-        "cover_url": str(ham.get("kapak") or ham.get("cover_url") or ""),
+        # ⚠ FAZ R-1d-a: kapak da `/ciktilar/` altinda duruyor ve o uc artik
+        # TENANT KORUMALI imza istiyor. Imzalanmazsa arayuzdeki kapak 403
+        # alirdi — video_url ile AYNI imzalayicidan geciyor.
+        "cover_url": _imzali(ham.get("kapak") or ham.get("cover_url") or "",
+                             imzalayici),
         "error": str(ham.get("hata") or ham.get("error") or ""),
         "qa": qa,
         # PASS/WARN/FAIL/OLCULEMEDI/OLCULMEDI/KAPALI

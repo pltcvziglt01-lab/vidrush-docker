@@ -88,8 +88,15 @@ def hazir() -> bool:
     return bool(_ANAHTAR)
 
 
-def _imza(dosya: str, exp: int) -> str:
-    mesaj = f"{dosya}\n{exp}".encode("utf-8")
+def _imza(dosya: str, exp: int, tenant: str = "") -> str:
+    """⚠ FAZ R-1d-a: `tenant` verilirse imza mesajina KARISIR.
+
+    Boylece baglanti SIZSA BILE baska bir tenant'in oturumunda gecersizdir.
+    ⚠ GERIYE UYUMLULUK: `tenant` bos ise mesaj ESKISIYLE BIT-BIT AYNIDIR;
+    R-1a'da uretilmis baglantilar aynen dogrulanmaya devam eder.
+    """
+    t = str(tenant or "")
+    mesaj = (f"{dosya}\n{exp}\n{t}" if t else f"{dosya}\n{exp}").encode("utf-8")
     ozet = hmac.new(_ANAHTAR or b"", mesaj, hashlib.sha256).digest()
     return base64.urlsafe_b64encode(ozet).decode("ascii").rstrip("=")
 
@@ -100,11 +107,14 @@ def guvenli_ad(dosya: str) -> str:
 
 
 def imzala(dosya: str, *, ttl_sn: int = VARSAYILAN_TTL_SN,
-           simdi: Optional[int] = None) -> str:
+           simdi: Optional[int] = None, tenant: str = "") -> str:
     """`ciktilar/<ad>?exp=..&sig=..` uret. Anahtar yoksa BOS doner.
 
     ⚠ Bos donmek SESSIZ BASARI DEGILDIR: cagiran taraf `hazir()` ile
     durumu bilir ve kullaniciya durustce raporlar.
+    ⚠ `tenant` verilirse baglanti O TENANT'A BAGLANIR (R-1d-a). Tenant
+    kimligi URL'e YAZILMAZ — sunucu onu oturumdan okur; boylece link
+    kimin oldugunu SIZDIRMAZ.
     """
     ad = guvenli_ad(dosya)
     if not ad or not hazir():
@@ -114,12 +124,16 @@ def imzala(dosya: str, *, ttl_sn: int = VARSAYILAN_TTL_SN,
     except (TypeError, ValueError):
         omur = VARSAYILAN_TTL_SN
     exp = int(simdi if simdi is not None else time.time()) + omur
-    return f"ciktilar/{ad}?exp={exp}&sig={_imza(ad, exp)}"
+    return f"ciktilar/{ad}?exp={exp}&sig={_imza(ad, exp, tenant)}"
 
 
 def dogrula(dosya: str, exp, sig: str, *,
-            simdi: Optional[int] = None) -> dict:
-    """Imza gecerli ve suresi dolmamis mi?  {gecerli, neden}"""
+            simdi: Optional[int] = None, tenant: str = "") -> dict:
+    """Imza gecerli ve suresi dolmamis mi?  {gecerli, neden}
+
+    ⚠ `tenant` imzalamada kullanildiysa dogrulamada da AYNISI verilmelidir;
+    baska tenant (ya da tenant'siz istek) `IMZA-GECERSIZ` alir.
+    """
     ad = guvenli_ad(dosya)
     if not hazir():
         return {"gecerli": False, "neden": "ANAHTAR-YOK"}
@@ -134,7 +148,7 @@ def dogrula(dosya: str, exp, sig: str, *,
         return {"gecerli": False, "neden": "IMZA-YOK"}
     # ⚠ Once IMZA dogrulanir, sonra sure. Sirasi onemli: gecersiz imzali bir
     # istekten "suresi dolmus" bilgisi sizmasin.
-    if not hmac.compare_digest(_imza(ad, e), s):
+    if not hmac.compare_digest(_imza(ad, e, tenant), s):
         return {"gecerli": False, "neden": "IMZA-GECERSIZ"}
     now = int(simdi if simdi is not None else time.time())
     if e < now:
@@ -155,5 +169,9 @@ def kapsam_ozeti() -> dict:
         "anahtar_repoda": False,
         "anahtar_loglanir": False,
         "yol_gezinmesi_engellenir": True,
+        # ⚠ FAZ R-1d-a: imza artik tenant'a BAGLANABILIR (opsiyonel, geriye
+        # uyumlu). Tenant kimligi URL'e yazilmaz.
+        "tenant_baglanabilir": True,
+        "tenant_url_de_gorunur": False,
         "aga_cikar": False,
     }

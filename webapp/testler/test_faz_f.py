@@ -445,9 +445,24 @@ _ui_blok = _ui_blok[:_ui_blok.find('@app.get("/api/paletler")')]
 _ui_kod = re.sub(r"^\s*#.*$", "", _ui_blok, flags=re.M)
 kontrol("/ui rotasinda uzun max-age YOK (bayat arayuz riski)",
         "max-age" not in _ui_kod, _ui_kod.strip()[-140:])
-kontrol("API/generate imzasi DEGISMEDI",
-        "async def uret_baslat(session: str = Form(...), story: str = Form(...)"
+# ⚠ FAZ R-1d-a: imzaya `istek: Request` EKLENDI — zorunlu oturum kapisi
+# istegin cerezini okumak zorunda. Bu BILEREK yapilan tek eklemedir; 22
+# Form/File alaninin HICBIRI degismedi (test_faz_h o sozlesmeyi ayrica
+# kilitliyor). Eski tek-satirlik desen bu yuzden guncellendi, GEVSETILMEDI:
+# alan adlari ve sirasi hala birebir dogrulaniyor.
+kontrol("API/generate imzasi: yalniz `istek: Request` eklendi, Form alanlari "
+        "AYNI",
+        "async def uret_baslat(istek: Request,\n"
+        "                      session: str = Form(...), story: str = Form(...)"
         in SUNUCU)
+kontrol("API/generate 22 Form/File alani KORUNDU",
+        len(re.findall(r"(\w+): [^=\n]+= (?:Form|File)\(",
+                       SUNUCU[SUNUCU.find("async def uret_baslat("):
+                              SUNUCU.find("async def uret_baslat(") + 1600]))
+        == 22,
+        len(re.findall(r"(\w+): [^=\n]+= (?:Form|File)\(",
+                       SUNUCU[SUNUCU.find("async def uret_baslat("):
+                              SUNUCU.find("async def uret_baslat(") + 1600])))
 kontrol("pipeline cagrisi degismedi", "import pipeline" in SUNUCU)
 
 

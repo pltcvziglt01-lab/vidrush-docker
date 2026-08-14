@@ -28,6 +28,19 @@ webapp/veri/durumlar/
 webapp/veri/gecici/
 webapp/ciktilar/
 
+# ⚠ FAZ R-1d-a — SIRLAR VE CALISMA ZAMANI DEPOLARI DEPOYA GIRMEZ.
+# R-1a'da `webapp/veri/.imza_anahtari` KAZAYLA COMMIT EDILDI (4846264):
+# modulun kendi sozlesmesi "anahtar_repoda: False" diyordu ama test YANLIS
+# YOLU (`webapp/.imza_anahtari`) kontrol ettigi icin yakalanmadi. Depoya
+# erisen herkes o anahtarla HERHANGI bir tenant adina imza uretebilirdi.
+# Anahtar izlemeden cikarildi ve DONDURULDU (yeniden uretiliyor).
+webapp/veri/.imza_anahtari
+webapp/veri/.oturum_anahtari
+webapp/veri/kullanicilar.json
+webapp/veri/kutuphane.json
+webapp/veri/saglayicilar.json
+webapp/veri/*_key.txt
+
 # Faz I-11 render smoke ciktisi — IKILI dosyalar depoya girmez (~13 MB).
 # `outputs/sample/README.md` ve `smoke_rapor.json` IZLENIR; video/kareler
 # betik yerelde kosturularak yeniden uretilir.

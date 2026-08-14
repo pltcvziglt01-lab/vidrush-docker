@@ -8530,6 +8530,258 @@ kontrol("R-1c-b GERILEME YOK: 22 alan + kimlik/imza kapilari DURUYOR",
         and _IU.kapsam_ozeti()["ttl_zorunlu"] is True)
 
 
+blok("§40u R-1d-a — TESLIM ATOMU: ZINCIR UCTAN UCA BAGLANDI")
+
+# ⚠ MEDYASIZ + AGSIZ + PARASIZ: hicbir video URETILMEZ, hicbir saglayiciya
+# baglanilmaz, GERCEK OAuth/kredi YOKTUR. Olculen sey KARAR MANTIGI ve
+# GERCEK FastAPI uclarinin davranisidir.
+#
+# ── OLCULEN KUSUR ──
+# R-1a/R-1b/R-1c-a/R-1c-b moduller olarak vardi ama `server.py` UCUNU DE
+# IMPORT ETMIYORDU: `/api/generate` serbest bir `session` string'i aliyor,
+# `/ciktilar/` imzayi dogruluyor ama TENANT'a bakmiyor, kutuphane HICBIR
+# ZAMAN dolmuyordu. Yani teslim zinciri KAGIT UZERINDEYDI.
+
+_TS = __import__("teslim")
+
+# ── (0) ZINCIR GERCEKTEN BAGLI MI (kusurun kendisi) ──
+_srv_kod = oku(KOK, "server.py")
+kontrol("⭐ R-1d-a BELIRLEYICI: server.py kimlik + kutuphane + teslim'i "
+        "GERCEKTEN import ediyor (once hicbirini etmiyordu)",
+        all(f"import {m}" in _srv_kod
+            for m in ("kimlik", "kutuphane", "teslim")))
+kontrol("⭐ R-1d-a: zincirin 10 halkasi da ADLANDIRILMIS ve SIRALI",
+        list(_TS.ZINCIR_ADLARI) == [
+            "oturum", "metin", "plan", "saglayici", "uzak_tts_render",
+            "pre_qa", "post_qa", "depolama", "imzali_url", "kutuphane"],
+        list(_TS.ZINCIR_ADLARI))
+
+# ── (1) OTURUM ANAHTARI + FAIL-CLOSED OTURUM KAPISI ──
+_TS_DIZ = tempfile.mkdtemp(prefix="oturum_")
+kontrol("⭐ R-1d-a: oturum anahtari IMZA anahtarindan AYRI ve 0600 uretiliyor",
+        _TS.anahtar_kur(_TS_DIZ) is True and _TS.hazir() is True
+        and (os.stat(os.path.join(_TS_DIZ, _TS.ANAHTAR_DOSYA_ADI)).st_mode
+             & 0o077) == 0
+        and _TS.anahtar() != _IU._ANAHTAR)
+_TS_JETON = _KM.oturum_uret("t1", anahtar=_TS.anahtar())
+kontrol("⭐ R-1d-a: gecerli jeton tenant'a cozuluyor",
+        _TS.oturum_kapisi(_TS_JETON) == {"izin": True, "tenant_id": "t1",
+                                         "neden": ""})
+kontrol("⭐ R-1d-a RED-FIRST: JETONSUZ istek REDDEDILIYOR",
+        _TS.oturum_kapisi("")["izin"] is False)
+kontrol("⭐ R-1d-a RED-FIRST: BASKA anahtarla imzalanmis jeton REDDEDILIYOR",
+        _TS.oturum_kapisi(_KM.oturum_uret("t1", anahtar=b"sahte-anahtar")
+                          )["neden"] == "IMZA-GECERSIZ")
+kontrol("⭐ R-1d-a RED-FIRST: SURESI DOLMUS jeton REDDEDILIYOR",
+        _TS.oturum_kapisi(_KM.oturum_uret("t1", anahtar=_TS.anahtar(),
+                                          omur_sn=1, simdi=1000),
+                          simdi=2000)["neden"] == "SURESI-DOLMUS")
+kontrol("⭐ R-1d-a: BASKA tenant'in kaydina erisim YOK; SAHIPSIZ kayit da "
+        "'herkese acik' SAYILMIYOR",
+        _TS.erisim_kapisi({"tenant_id": "t2"}, "t1")["neden"] == "BASKA-TENANT"
+        and _TS.erisim_kapisi({}, "t1")["neden"] == "KAYNAK-SAHIPSIZ")
+
+# ── (2) TENANT'A BAGLI SIGNED URL (R-1a uzerine, GERIYE UYUMLU) ──
+kontrol("⭐ R-1d-a: tenant VERILMEZSE imza R-1a ile BIT-BIT AYNI "
+        "(eski baglantilar kirilmiyor)",
+        _IU.imzala("j.mp4", simdi=1000)
+        == _IU.imzala("j.mp4", simdi=1000, tenant=""))
+_T1_URL = _IU.imzala("j.mp4", simdi=1000, tenant="t1")
+_T1_Q = dict(x.split("=") for x in _T1_URL.split("?")[1].split("&"))
+kontrol("⭐ R-1d-a: tenant'a bagli imza KENDI tenant'inda GECERLI",
+        _IU.dogrula("j.mp4", _T1_Q["exp"], _T1_Q["sig"], simdi=1000,
+                    tenant="t1")["gecerli"] is True)
+kontrol("⭐ R-1d-a BELIRLEYICI: SIZAN baglanti BASKA TENANT'in oturumunda "
+        "GECERSIZ (R-1a'da her oturumda calisiyordu)",
+        _IU.dogrula("j.mp4", _T1_Q["exp"], _T1_Q["sig"], simdi=1000,
+                    tenant="t2")["neden"] == "IMZA-GECERSIZ")
+kontrol("⭐ R-1d-a RED-FIRST: tenant'a bagli baglanti OTURUMSUZ da GECERSIZ",
+        _IU.dogrula("j.mp4", _T1_Q["exp"], _T1_Q["sig"], simdi=1000,
+                    tenant="")["neden"] == "IMZA-GECERSIZ")
+kontrol("⭐ R-1d-a: TENANT KIMLIGI URL'e YAZILMIYOR (link kimin oldugunu "
+        "sizdirmiyor)",
+        "t1" not in _T1_URL and set(_T1_Q) == {"exp", "sig"}, _T1_URL)
+kontrol("⭐ R-1d-a: tenant YOKSA imzalayici URETILMIYOR (imzasiz link YOK)",
+        _TS.imzalayici_kur("") is None)
+
+# ── (3) SAGLAYICI HALKASI: GERCEK OAuth/KREDI YOK ──
+_TS_SAG = _TS.saglayici_karari({}, "t1")
+kontrol("⭐ R-1d-a: baglantisi olmayan tenant UCRETSIZ STOK'a duser ve NEDEN "
+        "GORUNUR kalir ('magnific bagli' DENMEZ)",
+        _TS_SAG["provider_used"] == "wikimedia"
+        and _TS_SAG["ucretsiz_fallback"] is True
+        and _TS_SAG["fallback_reason"].startswith("BAGLANTI-YOK"), _TS_SAG)
+kontrol("⭐ R-1d-a: ucretsiz yolda KREDI TUKETILMIYOR",
+        _TS_SAG["kredi_tuketildi"] is False
+        and _TS.kapsam_ozeti()["gercek_oauth"] is False
+        and _TS.kapsam_ozeti()["kredi_tuketir"] is False)
+kontrol("⭐ R-1d-a: test-double Magnific baglantisi verilirse O secilir "
+        "(zincir gercekten registry'den geciyor)",
+        _TS.saglayici_karari(
+            {"t1": {"saglayici": "magnific", "aktif": True, "onayli": True,
+                    "sifreli_token": b"ENC", "kredi_onayi": True}},
+            "t1")["provider_used"] == "magnific")
+kontrol("⭐ R-1d-a BELIRLEYICI: BASKA tenant'in baglantisi SECILMIYOR",
+        _TS.saglayici_karari(
+            {"t2": {"saglayici": "magnific", "aktif": True, "onayli": True,
+                    "sifreli_token": b"ENC", "kredi_onayi": True}},
+            "t1")["provider_used"] == "wikimedia")
+kontrol("⭐ R-1d-a: is TENANT'a ve SAGLAYICI KARARINA muhurleniyor",
+        _TS.is_damgala({}, tenant_id="t1", metin="x" * 30,
+                       saglayici=_TS_SAG)["kayit"]["saglayici"]
+        ["provider_used"] == "wikimedia")
+kontrol("⭐ R-1d-a RED-FIRST: TENANT'SIZ is DAMGALANMIYOR",
+        _TS.is_damgala({}, tenant_id="")["ok"] is False)
+
+# ── (4) ZINCIR RAPORU: KANITSIZ HALKA GECMEZ ──
+def _ts_tam(**ek):
+    k = {"tenant_id": "t1", "metin_uzunlugu": 42, "sahne_sayisi": 6,
+         "saglayici": {"provider_used": "wikimedia",
+                       "fallback_reason": "BAGLANTI-YOK:BAGLANTI-YOK"},
+         "video": "ciktilar/j1.mp4", "sure": 60.0, "durum": "bitti",
+         "edit_plani": {"qa": {"durum": "PASS"}},
+         "qa": {"durum": "PASS", "fail": 0, "warn": 0}}
+    k.update(ek)
+    return k
+
+
+kontrol("⭐ R-1d-a: HER halkanin kaniti varsa zincir TAM",
+        _TS.zincir_raporu(_ts_tam(), dosya_var=True)["tam"] is True,
+        _TS.zincir_raporu(_ts_tam(), dosya_var=True)["eksik"])
+for _alan, _bek in (({"sahne_sayisi": 0}, "plan"),
+                    ({"metin_uzunlugu": 0}, "metin"),
+                    ({"saglayici": {}}, "saglayici"),
+                    ({"sure": 0}, "uzak_tts_render"),
+                    ({"edit_plani": {}}, "pre_qa"),
+                    ({"qa": {}}, "post_qa")):
+    kontrol(f"⭐ R-1d-a RED-FIRST: '{_bek}' halkasinin KANITI yoksa zincir "
+            f"TAM DEGIL",
+            _bek in _TS.zincir_raporu(_ts_tam(**_alan),
+                                      dosya_var=True)["eksik"],
+            _TS.zincir_raporu(_ts_tam(**_alan), dosya_var=True)["eksik"])
+kontrol("⭐ R-1d-a BELIRLEYICI: depolama OLCULMEDIYSE 'vardir' SAYILMIYOR "
+        "(dosya_var=None -> DEPOLAMA-OLCULMEDI)",
+        "depolama" in _TS.zincir_raporu(_ts_tam())["eksik"]
+        and [h for h in _TS.zincir_raporu(_ts_tam())["halkalar"]
+             if h["asama"] == "depolama"][0]["neden"] == "DEPOLAMA-OLCULMEDI")
+kontrol("⭐ R-1d-a: PRE-QA WARN teslimi ENGELLEMIYOR, FAIL ENGELLIYOR",
+        _TS.zincir_raporu(_ts_tam(edit_plani={"qa": {"durum": "WARN"}}),
+                          dosya_var=True)["tam"] is True
+        and "pre_qa" in _TS.zincir_raporu(
+            _ts_tam(edit_plani={"qa": {"durum": "FAIL"}}),
+            dosya_var=True)["eksik"])
+
+# ── (5) TESLIM: UC KAPI DA GECILMEDEN KUTUPHANEYE GIRILMEZ ──
+_TSD: dict = {}
+_TS_R = _TS.teslim_et(is_id="j1", tenant_id="t1", kayit=_ts_tam(),
+                      kutuphane_deposu=_TSD, kabul_zamani=100.0,
+                      dosya_var=True)
+kontrol("⭐ R-1d-a: zincir TAM + QA KABUL + sahiplik TAMAM ise is TESLIM "
+        "EDILIYOR ve kutuphaneye GIRIYOR",
+        _TS_R["teslim"] is True and len(_TSD["t1"]) == 1, _TS_R["neden"])
+kontrol("⭐ R-1d-a: teslim edilen kayit TENANT'A BAGLI signed URL tasiyor",
+        "sig=" in (_TS_R["video_url"] or "")
+        and _TS_R["imzalanamadi"] is False)
+kontrol("⭐ R-1d-a BELIRLEYICI: teslim URL'i BASKA tenant'ta CALISMIYOR",
+        _IU.dogrula(*( [_TS_R["video_url"].split("/")[1].split("?")[0]]
+                      + [dict(x.split("=") for x in
+                              _TS_R["video_url"].split("?")[1].split("&"))[k]
+                         for k in ("exp", "sig")]),
+                    tenant="t2")["gecerli"] is False)
+_TS_FAIL = _TS.teslim_et(is_id="j2", tenant_id="t1",
+                         kayit=_ts_tam(qa={"durum": "FAIL", "fail": 2}),
+                         kutuphane_deposu=dict(_TSD), kabul_zamani=101.0,
+                         dosya_var=True)
+kontrol("⭐ R-1d-a RED-FIRST: POST-QA FAIL olan video TESLIM EDILMIYOR ve "
+        "kutuphaneye GIRMIYOR",
+        _TS_FAIL["teslim"] is False and "post_qa" in _TS_FAIL["zincir"]["eksik"]
+        and "KABUL-YOK" in _TS_FAIL["neden"], _TS_FAIL["neden"])
+kontrol("⭐ R-1d-a RED-FIRST: DOSYASI OLMAYAN is TESLIM EDILMIYOR "
+        "(object storage kaniti sart)",
+        _TS.teslim_et(is_id="j3", tenant_id="t1", kayit=_ts_tam(),
+                      kutuphane_deposu=dict(_TSD), kabul_zamani=102.0,
+                      dosya_var=False)["teslim"] is False)
+kontrol("⭐ R-1d-a RED-FIRST: BASKA tenant adina teslim REDDEDILIYOR",
+        _TS.teslim_et(is_id="j4", tenant_id="t2", kayit=_ts_tam(),
+                      kutuphane_deposu=dict(_TSD), kabul_zamani=103.0,
+                      dosya_var=True)["teslim"] is False)
+kontrol("⭐ R-1d-a: teslim edilmeyen isin NEDENI acikca yaziliyor "
+        "(sessiz basarisizlik YOK)",
+        bool(_TS_FAIL["neden"]) and _TS_FAIL["video_url"] is None)
+
+# ── (6) SON-3 YASAM DONGUSU GERCEK TESLIM UZERINDEN ──
+for _i in range(2, 5):
+    _TS.teslim_et(is_id=f"j{_i}", tenant_id="t1", kayit=_ts_tam(),
+                  kutuphane_deposu=_TSD, kabul_zamani=100.0 + _i,
+                  dosya_var=True)
+_TS_5 = _TS.teslim_et(is_id="j5", tenant_id="t1", kayit=_ts_tam(),
+                      kutuphane_deposu=_TSD, kabul_zamani=105.0,
+                      dosya_var=True)
+kontrol("⭐ R-1d-a: 5 kabul sonrasi kutuphanede 3 kayit kaliyor",
+        len(_TSD["t1"]) == 3, [x["is_id"] for x in _TSD["t1"]])
+kontrol("⭐ R-1d-a: tavani asan kayit SILINMIYOR, SILME KUYRUGUNA aliniyor",
+        len(_TS_5["silinecek"]) == 1
+        and _TS_5["silinecek"][0]["sebep"] == "TAVAN-ASILDI"
+        and _TS.kapsam_ozeti()["dosya_siler"] is False, _TS_5["silinecek"])
+_TS.teslim_et(is_id="jx", tenant_id="t9", kayit=dict(_ts_tam(),
+                                                     tenant_id="t9"),
+              kutuphane_deposu=_TSD, kabul_zamani=200.0, dosya_var=True)
+kontrol("⭐ R-1d-a BELIRLEYICI: bir tenant DIGERININ kutuphanesini GORMUYOR",
+        [v["is_id"] for v in _TS.listele(_TSD, "t9")["videolar"]] == ["jx"]
+        and "jx" not in [v["is_id"]
+                         for v in _TS.listele(_TSD, "t1")["videolar"]])
+kontrol("⭐ R-1d-a: kutuphane listesi signed URL'i TALEP ANINDA uretiyor, "
+        "SAKLAMIYOR",
+        all("sig=" in (v["video_url"] or "")
+            for v in _TS.listele(_TSD, "t1")["videolar"])
+        and all("video_url" not in x for x in _TSD["t1"]))
+kontrol("⭐ R-1d-a: provenance saglayici + fallback + kredi bilgisini "
+        "TASIYOR, model UYDURULMUYOR",
+        _TSD["t1"][0]["provenance"]["provider_used"] == "wikimedia"
+        and _TSD["t1"][0]["provenance"]["model"] is None
+        and _TSD["t1"][0]["provenance"]["kredi_tuketildi"] is False)
+
+# ── (7) SINIRLAR ──
+kontrol("⭐ R-1d-a: teslim.py AG ACMIYOR / MEDYA ACMIYOR / DOSYA SILMIYOR / "
+        "RENDER ETMIYOR",
+        not any(a in _kod_yalniz(oku(KOK, "teslim.py"))
+                for a in ("requests", "urllib", "subprocess", "ffmpeg",
+                          "os.remove", "shutil.rmtree"))
+        and _TS.kapsam_ozeti()["aga_cikar"] is False
+        and _TS.kapsam_ozeti()["render_eder"] is False)
+kontrol("R-1d-a: teslim.py derleniyor",
+        _derlenir(os.path.join(KOK, "teslim.py")))
+
+# ── (8) SIZAN IMZA ANAHTARI (R-1a'da olculen kusur) ──
+# ⚠ R-1a'nin kendi testi YANLIS YOLU kontrol ediyordu (`webapp/.imza_anahtari`)
+# ve anahtar `webapp/veri/.imza_anahtari` olarak COMMIT EDILMISTI (4846264).
+_DEPO_KOK = os.path.dirname(KOK)
+_IZLENEN = subprocess.run(["git", "ls-files", "webapp/veri"],
+                          cwd=_DEPO_KOK, capture_output=True, text=True
+                          ).stdout.split()
+kontrol("⭐ R-1d-a BELIRLEYICI: imza/oturum anahtari DEPODA IZLENMIYOR "
+        "(R-1a'da kazayla commit edilmisti)",
+        not any(a.endswith((".imza_anahtari", ".oturum_anahtari"))
+                for a in _IZLENEN), _IZLENEN)
+kontrol("⭐ R-1d-a: kimlik/kutuphane depolari da .gitignore'da",
+        all(a in oku(_DEPO_KOK, ".gitignore")
+            for a in ("webapp/veri/.imza_anahtari",
+                      "webapp/veri/.oturum_anahtari",
+                      "webapp/veri/kullanicilar.json")))
+
+# ── (9) GERILEME YOK ──
+kontrol("R-1d-a GERILEME YOK: 22 alan sozlesmesi + R-1a/R-1b/R-1c kapilari",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22
+        and _KM.kapsam_ozeti()["fail_closed"] is True
+        and _IU.kapsam_ozeti()["ttl_zorunlu"] is True
+        and _SM.kapsam_ozeti()["duz_metin_token_kabul"] is False
+        and _KT.kapsam_ozeti()["signed_url_saklanir"] is False)
+kontrol("R-1d-a GERILEME YOK: pipeline/render/deploy hatti DOKUNULMADI",
+        "docker commit" in oku(_DEPO_KOK, "deploy.sh")
+        and "def uret(" in oku(KOK, "pipeline.py"))
+
+
 blok("§40h I-58 — IKI ADAY DUZENI KARSI-OLGU OLARAK OLCULDU (yalniz tanisal)")
 
 # ⚠ YALNIZ TANISAL. Uretim davranisi DEGISMEDI, kapi/esik eklenmedi.
@@ -9947,10 +10199,17 @@ _TK49 = __import__("taksonomi")
 kontrol("⭐ I-49 OLCUM: `taksonomi.py` BIYOLOJIK degil (konsept/niyet)",
         not any(x in (_TK49.__doc__ or "").lower()
                 for x in ("species", "binomial", "botanik", "poaceae")))
+# ⚠ FAZ R-1d-a: alt dizi eslesmesi CALISMA ZAMANI SIRLARINI da yakaliyordu —
+# `.oturum_anahtari` icinde "o(tur)um" gectigi icin bu olcum YANLIS POZITIF
+# veriyordu. Olcumun iddiasi "tur/takson VERI KUMESI yok"; nokta ile baslayan
+# sir dosyalari ve calisma zamani JSON depolari veri kumesi DEGILDIR ve
+# .gitignore'dadir. Iddia GEVSETILMEDI, kapsami DOGRULANDI.
+_VERI49_CALISMA = {"kullanicilar.json", "kutuphane.json", "saglayicilar.json"}
 kontrol("⭐ I-49 OLCUM: `webapp/veri/` altinda tur/takson veri kumesi YOK",
         not [d for d in os.listdir(os.path.join(KOK, "veri"))
-             if any(x in d.lower() for x in ("tur", "takson", "species",
-                                             "plant", "bitki"))],
+             if not d.startswith(".") and d not in _VERI49_CALISMA
+             and any(x in d.lower() for x in ("tur", "takson", "species",
+                                              "plant", "bitki"))],
         sorted(os.listdir(os.path.join(KOK, "veri"))))
 
 # ── OLCUM 2: metadata'da tur/kategori alani YOK ──
