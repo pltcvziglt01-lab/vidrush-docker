@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 14 Ağu | **J-3 B-roll/cutaway çeşitliliği ölçüldü (kapı YOK)** | `PENDING` | ✅ **push edildi**, ağsız tanısal: 7 bağımsız planda `kaynak_saglayici_dagilimi` (çekim **ve süre**), `benzersiz_varlik_orani`, `cekim_turu_dagilimi`, `tekrar_sure_orani`, provenance ve `gercek_video_*` ölçüldü; **taban**: benzersiz oran 6 planda 1.000 / `_smoke_editorv2` **0.750**, tekrar süresi 6 planda 0.000 / **0.126**, **çekim türü çeşidi 7/7 planda tam 3** (cutaway **dar**), tek sağlayıcı **süre** oranı 6 planda **1.000** / `_i20` **0.949**, **gerçek video 0.0** (açıkça 0 raporlanıyor, J-2a'dan okunuyor); ⚠ süre tabanlı ölçüm mevcut çekim tabanlı kapıdan **farklı bilgi** veriyor (`_i20` 0.80 → 0.949) → `SAGLAYICI-TEKEL` **çoğaltılmadı**; EMİN DEĞİLSEN ENGELLEME: kimlik yoksa oran **`None`** (1.0 değil), lisans boş/`unknown` ise provenance **ölçülemedi** + `uyari_adayi` (WARN **üretilmedi**, `durum`u değiştirirdi), J-2a yoksa video alanı **`None`**; `hedef: None`, `enforce: False`, **yeni fail kodu YOK**; red-first: doğal karşı-örnek `_smoke_editorv2` ayrışıyor + 5 sentetik müdahalenin **5'i** metriği tersine çeviriyor; **render değişmezliği kanıtlandı** (HEAD worktree, `render_plan`/`edit_manifest`/`props` SHA **birebir aynı**, QA WARN 0/3) → **pilot üretilmedi**; I-23/I-24/I-25/I-38, eşikler, lisans/provenance, 22 alan, kullanıcı seçimleri, `deploy.sh`, üretim seçim kodu **korundu**; deploy YOK, $0.00 |
 | 14 Ağu | **J-2a medya türü rapor sözleşmesi (kapı YOK)** | `09edd97` | ✅ **push edildi**, J-1 tabanı uygulamanın kendi raporuna bağlandı: `olcumler["medya_turu"]` → `video_sure_orani` + `donmus_kadraj_sure_orani` (+ statik/ölçülemedi oranları, kalemler); okuyucu deseni **mevcutla birebir** (`kare_okuyucu` dışarıdan, modül **dosya açmaz**), okuyucu yoksa oranlar **`None`** — 0.0 değil, çünkü 0.0 "video yok" **iddiasıdır**; ⚠ **seviye hatası ölçülüp ayrıştırıldı**: 0.155 **korpus agregası**, plan başına uygulanırsa **7 planın 4'ünde yanlış pozitif** → ayrı `DONMUS_KADRAJ_PLAN_REFERANSI = 0.334` (formül: `ceil(maks_gözlenen, 3)`), mevcut korpusta yanlış pozitif **0/7**; ikisi de **`enforce: False`**, hiçbir yerde uygulanmıyor; `VIDEO_SURE_ORANI_HEDEFI = None` — **uydurulmadı** (pozitif örnek yok); **yeni fail kodu YOK**, ölçüm modülü hüküm vermiyor; **render değişmezliği kanıtlandı** (HEAD worktree ile `render_plan`/`edit_manifest`/`props` SHA **birebir aynı**, QA WARN 0/3 aynı) → **pilot üretilmedi**; ⚠ yol boyunca gerçek kusur: `denetle()` imzasındaki bool `kalite_kapisi` parametresi modül adını **gölgeliyor** (→ `_KK` takma adı); I-23/I-24/I-25/I-38, eşikler, lisans/provenance, 22 alan, kullanıcı seçimleri, `deploy.sh` **korundu**; deploy YOK, $0.00 |
 | 14 Ağu | **J-1 statik fotoğraf / gerçek video oranı ölçüldü (tanısal)** | `ca9ebc1` | ⚠ **push edildi**, kullanıcı önceliğinin 1. atomu, ağsız: 17 koşum → **7 benzersiz plan** (lawn'ın 10 render'ı **tek** örnek), 32 çekim / 118.5 sn; **gerçek hareketli video %0.0**, statik fotoğraf **süre %94.7** (Ken Burns %79.2 + **donmuş kadraj %15.5**), sentetik %5.3, **ölçülemedi %0**; sınıf kararı `medya_turu` alanına DEĞİL `ffprobe -count_frames` ile **dosyanın kendisine** dayanıyor, belirsiz olan varsayılmıyor; yanlış sınıflama payı **24/24 doğru** (4 gerçek MP4 → 4/4 `a_video`, 20 kaynak → 20/20 tek kare) ⚠ ama pozitif örnekler **render çıktısı**, korpusa hiç video kaynağı girmemiş; red-first: sahte korpusa video enjekte edilince iddia **KIRMIZI** yanıyor (totolojik değil); ⚠ kısıt **kod değil** — `avci`/`medya_kopru` varsayılanı zaten `"video"`; J-2 eşiği **önerildi ama ÜRETİME ALINMADI** (pozitif örnek yok, E türetilemez); üretim kodu/eşik değişmedi, rerender/deploy YOK, $0.00 |
 | 14 Ağu | **I-58 iki aday düzeni karşı-olgu olarak ölçüldü (tanısal)** | `855a60c` | ⚠ **push edildi**, ağsız/ücretsiz karşı-olgu: **A** (farklı 2. aday) tekrar kapısından temiz, **B** (aynı adayın farklı kadrajı) **mevcut I-22 kapısını ihlal ediyor** (bitişik aynı varlık → `KALITE-MEDYA-TEKRAR` fail, üretimin kendi manifestinden canlı hesaplandı); B'yi bloke eden şeyin benzerlik **değil** yalnız `asset_id` olduğu **kaynak koddan** gösterildi (`medya_tekrari` aynı-kimlik çiftinde benzerlik bacağını `continue` ile atlıyor; üretimde `benzerlik_okuyucu=None`); ⚠ **belirleyici**: B **semantik kusuru gidermiyor** — b002 1900 arşiv fotoğrafını alıyor, I-47 uyarısı onun için de yanıyor (canlı çağrı); ⚠ çok-beatli sahne 17 koşumun 12'sinde var ama 10'u aynı planın yeniden render'ı → lawn ailesi dışında yalnız **iki** bağımsız iş (`_i20`, `_smoke_editorv2`) → yanlış pozitif payı güvenilir ölçülemez (I-34 dersi); ⚠ **kapanış denetiminde ÜÇ iddia ELENDİ ve silindi** — kadraj varyantı dHash'leri (0.59–0.77), beş varyantın beklenen optiği (2.83–3.48) ve lisans/provenance iddiası: üçü de sabit sözlükten okunup eşikle karşılaştırılıyordu, **yeniden türetilmiyordu** ve dayanağı (dHash uygulaması / E,d girdileri / ilgili kontrol) repoda **yok**; **üretime alınmadı**, üretim kodu değişmedi, rerender/deploy YOK, $0.00 |
@@ -5673,6 +5674,110 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 79. FAZ J-3 — B-ROLL/CUTAWAY ÇEŞİTLİLİĞİ ÖLÇÜLDÜ (kapı YOK, hedef YOK, 14 Ağu)
+
+> **Durum: çeşitlilik artık ölçülüyor — sağlayıcı, benzersiz varlık, çekim
+> türü, zaman içi tekrar ve provenance. **Hiçbir kapı/eşik/hedef eklenmedi**,
+> üretim **seçim davranışı değişmedi**, render **değişmedi** (SHA ile
+> kanıtlandı) → **pilot üretilmedi**. A–I yeşil (**3648**, 0 hata, 2 bilinen
+> BLOKE). Ağ YOK, ücretli API YOK, deploy YOK, $0.00.**
+> Değişen: `webapp/editor/kalite_kapisi.py` (+ ölçüm fonksiyonu),
+> `webapp/editor/qa_on.py`, `webapp/edit_kopru.py` (rapor alanı),
+> `webapp/testler/test_faz_i.py` (§40k, 30 kontrol).
+
+### Ölçülen taban — 7 bağımsız plan
+
+| Metrik | Dağılım | Bulgu |
+|---|---|---|
+| `benzersiz_varlik_orani` | 6 planda **1.000**, `_smoke_editorv2` **0.750** | tekrar yalnız bir planda |
+| `tekrar_sure_orani` | 6 planda **0.000**, `_smoke_editorv2` **0.126** | aynı bulgu, süre cinsinden |
+| `cekim_turu_cesidi` | **7 planın 7'sinde de 3** | ⚠ cutaway çeşidi **dar**, hiçbiri 3'ü geçmiyor |
+| `tek_saglayici_sure_orani` | 6 planda **1.000**, `_i20` **0.949** | ⚠ süre neredeyse tek sağlayıcıda |
+| `gercek_video_sure_orani` | **0.0** (7/7) | J-1/J-2a ile aynı, bağımsız yoldan |
+| `provenance` belirsiz | **0** (7/7) | bu korpusta lisans hep dolu |
+
+5 planda **tek sağlayıcı süresi %100** (wikimedia ya da nasa). Çekim türü
+sözlüğü fiilen `{close-detail, medium, establishing}` üçlüsüne kilitli;
+`_smoke_editorv2` yalnızca farklı bir üçlü kullanıyor
+(`atmospheric/medium/data`), daha **zengin** değil.
+
+⚠ **Süre tabanlı ölçüm yeni bilgi veriyor**: `_i20`'de mevcut çekim tabanlı
+kapı %80 derken süre tabanlı oran **%94.9**. Aynı şey değiller — bu yüzden
+mevcut `SAGLAYICI-TEKEL` kapısı **çoğaltılmadı**, yanına süre tabanlı **rapor**
+kondu.
+
+### Sözleşme
+
+`kalite_kapisi.broll_cesitliligi_ozeti(sahneler, *, medya_turu_ozeti_=None)`
+→ `olcumler["broll_cesitliligi"]` (ayrıca köprünün `qa` özetinde).
+
+Alanlar: `kaynak_saglayici_dagilimi` (çekim **ve** süre + süre oranı),
+`benzersiz_varlik_orani`, `benzersiz_varlik_sayisi`, `kimliksiz_cekim`,
+`tekrar_sure_orani`, `tekrar_eden_varlik` (**isimlendirilmiş**),
+`cekim_turu_dagilimi`, `cekim_turu_cesidi`, `cekim_turu_belirsiz`,
+`provenance`, `gercek_video_cekim` / `gercek_video_sure_orani`.
+
+**EMİN DEĞİLSEN ENGELLEME** üç yerde uygulanıyor:
+- varlık kimliği eksikse `benzersiz_varlik_orani` **`None`** (1.0 değil);
+- lisans boş/`unknown` ise provenance **`olculdu: False`**, `uyari_adayi: True`
+  (lisanslı **sayılmaz**);
+- J-2a ölçümü verilmezse `gercek_video_sure_orani` **`None`** — "video yok"
+  **iddia edilmez**. Ölçüldüyse **açıkça `0.0`** yazılır.
+
+⚠ Gerçek video oranı J-2a'dan **okunur**, yeniden hesaplanmaz — `ffprobe`
+iki kez koşmaz.
+
+⚠ `hedef: None`, `enforce: False`, **yeni fail kodu yok**, dönen sözlükte
+`fail/warn/seviye/ihlal` anahtarı bile yok. "Kaç çeşit çekim türü olmalı"
+sorusunun cevabı bu korpustan **türetilemez** (tüm planlar aynı dar bantta,
+pozitif örnek yok) — I-34/I-58 dersi.
+
+⚠ **Provenance için WARN ÜRETİLMEDİ.** Belirsizlik `uyari_adayi` +
+`kod_adayi: BROLL-PROVENANCE-BELIRSIZ` olarak **görünür** kılındı; gerçek WARN
+üretmek `durum`u değiştireceği için sonraki atoma bırakıldı.
+
+### Red-first — metrikler totolojik değil
+
+**Doğal karşı-örnek**: `_smoke_editorv2` (I-58'in "düzen B"si) metriklerle
+diğer 6 plandan **ayrışıyor** — benzersiz oran < 1.0 **ve** tekrar > 0, diğer
+altısında tam tersi.
+
+**Sentetik karşı-örnekler** (her alan tersine dönüyor):
+
+| Müdahale | Beklenen | Ölçülen |
+|---|---|---|
+| Varlığı tekrarla | benzersiz ↓, tekrar ↑ | ✅ |
+| İkinci sağlayıcı ekle | süre tabanlı tekel ↓ | ✅ |
+| Yeni çekim türü ekle | çeşit sayısı ↑ | ✅ |
+| `asset_id` boşalt | oran `None` olmalı | ✅ (1.0 **değil**) |
+| Lisansı `unknown` yap | provenance ölçülemedi | ✅ |
+
+⚠ Test bloğunda **sabit indeks kullanılmadı**: karşı-örnek planı, ölçülen
+özelliğinden seçiliyor (tekrarsız + en çok medya çekimi olan plan).
+
+### Render değişmezliği (kanıt)
+
+HEAD `686d1e0`'dan ayrı git worktree, aynı fixture:
+
+| | HEAD | Çalışma ağacı |
+|---|---|---|
+| `render_plan` SHA | `c488eb157312a380` | **aynı** |
+| `edit_manifest` SHA | `34ed2b459b410903` | **aynı** |
+| `props` SHA | `db1ff69176149dfa` | **aynı** |
+| QA durum/fail/warn | WARN 0/3 | **aynı** |
+| `qa.broll_cesitliligi` | YOK | **VAR** |
+
+→ **pilot üretilmedi.**
+
+### Korunanlar
+
+I-23/I-24/I-25/I-38, tüm eşikler, lisans-provenance kapıları, 22 alan
+sözleşmesi, modüler okuyucu arayüzü, kullanıcı seçimleri, `deploy.sh`,
+üretim seçim kodu (`siralama.py`, `medya_tekrari`) — testle doğrulanarak
+**dokunulmadı**.
 
 ---
 

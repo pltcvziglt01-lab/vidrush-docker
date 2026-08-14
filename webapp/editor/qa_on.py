@@ -309,14 +309,27 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
     # ═══ 4b) MEDYA TURU DAGILIMI (Faz J-2a — YALNIZ RAPOR) ═══
     # ⚠ HUKUM YOK: hicbir Sorun URETILMEZ, hicbir esik ENFORCE EDILMEZ.
     # Okuyucu yoksa `olculemedi` yazilir; statik VARSAYILMAZ.
+    _j2_sahneler = [
+        {"beat_id": getattr(c_, "beat_id", ""),
+         "kaynak_turu": getattr(c_, "kaynak_turu", ""),
+         "asset_id": getattr(c_, "asset_id", ""),
+         "saglayici": getattr(c_, "saglayici", ""),
+         "cekim_turu": getattr(c_, "cekim_turu", ""),
+         "lisans": ((adaylar_index.get(getattr(c_, "asset_id", "")) or {})
+                    .get("lisans") or ""),
+         "medya_yolu": ((adaylar_index.get(getattr(c_, "asset_id", "")) or {})
+                        .get("yerel_yol") or ""),
+         "sure_sn": getattr(b_, "sure_sn", 0.0)}
+        for c_, b_ in zip(cekimler, beat_plani.beatler)]
     q.olcumler["medya_turu"] = _KK.medya_turu_ozeti(
-        [{"beat_id": getattr(c_, "beat_id", ""),
-          "kaynak_turu": getattr(c_, "kaynak_turu", ""),
-          "medya_yolu": ((adaylar_index.get(getattr(c_, "asset_id", "")) or {})
-                         .get("yerel_yol") or ""),
-          "sure_sn": getattr(b_, "sure_sn", 0.0)}
-         for c_, b_ in zip(cekimler, beat_plani.beatler)],
-        kare_okuyucu=kare_okuyucu, motion_specler=motion_specler)
+        _j2_sahneler, kare_okuyucu=kare_okuyucu,
+        motion_specler=motion_specler)
+
+    # ═══ 4c) B-ROLL / CUTAWAY CESITLILIGI (Faz J-3 — YALNIZ RAPOR) ═══
+    # ⚠ HUKUM YOK: Sorun URETILMEZ, esik ENFORCE EDILMEZ, SECIM DEGISMEZ.
+    # Gercek video orani J-2a olcumunden OKUNUR; yeniden hesaplanmaz.
+    q.olcumler["broll_cesitliligi"] = _KK.broll_cesitliligi_ozeti(
+        _j2_sahneler, medya_turu_ozeti_=q.olcumler["medya_turu"])
 
     # ═══ 5) EFEKT YOGUNLUGU / RENDERABILITY ═══
     beat_efekt: dict = {}

@@ -2401,20 +2401,185 @@ def medya_turu_ozeti(sahneler, *, kare_okuyucu: Optional[Callable] = None,
     return ozet
 
 
+# ═══════ B-ROLL / CUTAWAY CESITLILIGI (Faz J-3 — YALNIZ RAPOR) ═════════
+#
+# ⚠ BU DA BIR KAPI DEGILDIR. Hicbir fail/warn kodu URETMEZ, hicbir esik
+# ENFORCE ETMEZ, uretim SECIM davranisini DEGISTIRMEZ.
+#
+# ── J-3'TE OLCULEN TABAN (7 BAGIMSIZ PLAN) ──
+#   benzersiz_varlik_orani : 6 planda 1.000, `_smoke_editorv2`de 0.750
+#   tekrar_sure_orani      : 6 planda 0.000, `_smoke_editorv2`de 0.126
+#   cekim_turu_cesidi      : HER PLANDA 3 (hicbiri 3'u gecmiyor)
+#   tek saglayici orani    : 5 planda 1.000 (wikimedia ya da nasa),
+#                            `_i20`de 0.800 -> cesitlilik DAR
+#   gercek video           : 0 (J-1/J-2a ile ayni sonuc)
+# ⚠ Saglayici TEKELI icin kapi ZATEN VAR (`SAGLAYICI-TEKEL`, tavan 0.40);
+# burada YENIDEN kapi kurulmaz, yalniz SURE tabanli dagilim raporlanir
+# (mevcut kapi CEKIM SAYISI tabanlidir — ayni sey degildir).
+#
+# ⚠ HICBIR HEDEF UYDURULMADI. "Kac cesit cekim turu olmali", "benzersiz
+# oran en az kac olmali" sorularinin cevabi bu korpustan TURETILEMEZ:
+# butun planlar ayni dar bandda ve POZITIF ornek (cesitliligi yuksek,
+# kabul edilmis bir video) YOK. I-34/I-58 dersi.
+
+# Provenance'i BELIRSIZ sayilan lisans degerleri (kucuk harfe indirilir).
+BELIRSIZ_LISANS = ("", "unknown", "bilinmiyor", "belirsiz", "?")
+
+
+def broll_cesitliligi_ozeti(sahneler, *,
+                            medya_turu_ozeti_: Optional[dict] = None) -> dict:
+    """B-roll / cutaway CESITLILIGI — saglayici, varlik, cekim turu, tekrar.
+
+    ⚠ HUKUM VERMEZ: donen sozlukte fail/warn/seviye YOKTUR; esik yoktur.
+    ⚠ EMIN DEGILSEN ENGELLEME: olculemeyen hicbir sey iyimser bir degere
+    itilmez — ilgili oran `None` doner ve `olculdu` False olur.
+
+    `medya_turu_ozeti_`: J-2a'nin ciktisi. Verilirse `gercek_video_*`
+    alanlari ONDAN okunur (ffprobe IKI KEZ kosturulmaz); verilmezse
+    "video yok" DENMEZ, None yazilir.
+    """
+    try:
+        liste = [s for s in (sahneler or []) if isinstance(s, dict)]
+    except TypeError:
+        return {"olculdu": False, "neden": "GIRDI-BOZUK"}
+
+    def _sure(s):
+        try:
+            return float(s.get("sure_sn") or 0.0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    toplam = sum(_sure(s) for s in liste)
+    medya = [s for s in liste if str(s.get("kaynak_turu") or "") == "medya"]
+
+    # ── (1) SAGLAYICI DAGILIMI — cekim VE sure ──
+    sag: dict = {}
+    for s in medya:
+        ad = str(s.get("saglayici") or "") or "?"
+        h = sag.setdefault(ad, {"cekim": 0, "sure_sn": 0.0})
+        h["cekim"] += 1
+        h["sure_sn"] += _sure(s)
+    medya_sure = sum(h["sure_sn"] for h in sag.values())
+    for h in sag.values():
+        h["sure_sn"] = round(h["sure_sn"], 3)
+        h["sure_orani"] = (round(h["sure_sn"] / medya_sure, 4)
+                           if medya_sure > 0 else None)
+    tek_sag_sure_orani = (max((h["sure_orani"] or 0) for h in sag.values())
+                          if sag else None)
+
+    # ── (2) BENZERSIZ VARLIK ORANI ──
+    kimlikler = [str(s.get("asset_id") or "") for s in medya]
+    kimliksiz = sum(1 for k in kimlikler if not k)
+    varlik_olculdu = bool(medya) and kimliksiz == 0
+    benzersiz = len({k for k in kimlikler if k})
+    benzersiz_orani = (round(benzersiz / len(medya), 4)
+                       if varlik_olculdu else None)
+
+    # ── (3) ZAMAN ICI TEKRAR — 2. ve sonraki gorunumlerin SURESI ──
+    gorulen: dict = {}
+    tekrar_sure = 0.0
+    for s in medya:
+        k = str(s.get("asset_id") or "")
+        if not k:
+            continue
+        gorulen[k] = gorulen.get(k, 0) + 1
+        if gorulen[k] > 1:
+            tekrar_sure += _sure(s)
+    tekrar_sure_orani = (round(tekrar_sure / toplam, 4)
+                         if varlik_olculdu and toplam > 0 else None)
+
+    # ── (4) CEKIM TURU DAGILIMI ──
+    ct: dict = {}
+    for s in liste:
+        ad = str(s.get("cekim_turu") or "") or "?"
+        h = ct.setdefault(ad, {"cekim": 0, "sure_sn": 0.0})
+        h["cekim"] += 1
+        h["sure_sn"] += _sure(s)
+    for h in ct.values():
+        h["sure_sn"] = round(h["sure_sn"], 3)
+    tur_belirsiz = ct.get("?", {}).get("cekim", 0)
+    cesit = len([a for a in ct if a != "?"])
+
+    # ── (5) PROVENANCE — BELIRSIZSE OLCULEMEDI, IYIMSER SAYILMAZ ──
+    belirsiz_n = 0
+    belirsiz_sure = 0.0
+    for s in medya:
+        lis = str(s.get("lisans") or "").strip().lower()
+        if lis in BELIRSIZ_LISANS:
+            belirsiz_n += 1
+            belirsiz_sure += _sure(s)
+    prov_olculdu = belirsiz_n == 0
+    provenance = {
+        "olculdu": prov_olculdu,
+        "lisansli_cekim": len(medya) - belirsiz_n,
+        "belirsiz_cekim": belirsiz_n,
+        "belirsiz_sure_orani": (round(belirsiz_sure / toplam, 4)
+                                if toplam > 0 else None),
+        # ⚠ WARN ADAYI: bu atomda WARN URETILMEZ (uretilseydi `durum`
+        # degisirdi). Belirsizlik GORUNUR kilinir, karar sonraki atomun.
+        "uyari_adayi": (not prov_olculdu),
+        "kod_adayi": "BROLL-PROVENANCE-BELIRSIZ",
+    }
+
+    ozet = {
+        "olculdu": bool(medya) and varlik_olculdu and prov_olculdu
+        and tur_belirsiz == 0,
+        "medya_cekim_sayisi": len(medya),
+        "toplam_sn": round(toplam, 3),
+        "kaynak_saglayici_dagilimi": sag,
+        "tek_saglayici_sure_orani": tek_sag_sure_orani,
+        "benzersiz_varlik_sayisi": benzersiz if varlik_olculdu else None,
+        "benzersiz_varlik_orani": benzersiz_orani,
+        "kimliksiz_cekim": kimliksiz,
+        "tekrar_sure_orani": tekrar_sure_orani,
+        "tekrar_eden_varlik": {k: n for k, n in gorulen.items() if n > 1},
+        "cekim_turu_dagilimi": ct,
+        "cekim_turu_cesidi": cesit,
+        "cekim_turu_belirsiz": tur_belirsiz,
+        "provenance": provenance,
+        # ── GERCEK VIDEO: J-2a'dan OKUNUR, VARSAYILMAZ ──
+        "gercek_video_cekim": (
+            (medya_turu_ozeti_ or {}).get("cekim", {}).get("video")
+            if isinstance(medya_turu_ozeti_, dict) else None),
+        "gercek_video_sure_orani": (
+            (medya_turu_ozeti_ or {}).get("video_sure_orani")
+            if isinstance(medya_turu_ozeti_, dict) else None),
+        # ── HEDEF YOK ──
+        "hedef": None,
+        "enforce": False,
+        "not": ("cesitlilik OLCUMU; hedef/esik UYDURULMADI. Saglayici "
+                "tekeli icin kapi ZATEN var (SAGLAYICI-TEKEL, cekim "
+                "tabanli); buradaki oran SURE tabanlidir."),
+    }
+    if not ozet["olculdu"]:
+        nedenler = []
+        if not medya:
+            nedenler.append("MEDYA-CEKIM-YOK")
+        if kimliksiz:
+            nedenler.append("VARLIK-KIMLIGI-EKSIK")
+        if tur_belirsiz:
+            nedenler.append("CEKIM-TURU-EKSIK")
+        if not prov_olculdu:
+            nedenler.append("PROVENANCE-BELIRSIZ")
+        ozet["neden"] = "+".join(nedenler)
+    return ozet
+
+
 # ═════════════════════════ KAPSAM OZETI ═════════════════════════════════
 
 def kapsam_ozeti() -> dict:
     """Bu modulun NE OLCTUGU sayilabilir olsun — "her seyi olcuyoruz" yok."""
     return {
         "sema_surum": SEMA_SURUM,
-        "olcum": 14,
+        "olcum": 15,
         "olcum_adlari": ["baslik_olcusu", "kelime_ortasi_kesik",
                          "medya_tekrari", "ritim_olcusu",
                          "ambans_duyulabilirligi", "miks_olcusu",
                          "guvenli_alan_olcusu", "yazi_cakismasi",
                          "altyazi_kupleri", "optik_hareket_olcusu",
                          "motion_grammar_olcusu", "izleyici_kalite_puani",
-                         "kenar_siyahligi_olcusu", "medya_turu_ozeti"],
+                         "kenar_siyahligi_olcusu", "medya_turu_ozeti",
+                         "broll_cesitliligi_ozeti"],
         "render_sabiti": 7,
         "enjekte_edilen_okuyucu": 1,
         "esik": {

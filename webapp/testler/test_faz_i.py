@@ -6764,6 +6764,220 @@ kontrol("J-2a: kapsam_ozeti yeni olcumu SAYIYOR (gizli buyume yok)",
         and "medya_turu_ozeti" in _kk.kapsam_ozeti()["olcum_adlari"])
 
 
+blok("§40k J-3 — B-ROLL/CUTAWAY CESITLILIGI OLCULDU (kapi YOK, hedef YOK)")
+
+# ⚠ YALNIZ RAPOR/OLCUM. Kapi EKLENMEDI, esik/hedef ENFORCE EDILMEDI,
+# uretim SECIM davranisi DEGISMEDI, render DEGISMEDI (pilot yok).
+# Ag YOK, ucretli API YOK, $0.00.
+#
+# Olculen alanlar (hepsi HER KOSUMDA yeniden hesaplanir — sabit sozluk YOK):
+#   kaynak_saglayici_dagilimi · benzersiz_varlik_orani ·
+#   cekim_turu_dagilimi · tekrar_sure_orani · provenance · gercek_video_*
+#
+# ── RED-FIRST: METRIKLER AYIRT EDIYOR MU? ──
+# Korpusta DOGAL bir karsi-ornek var: `_smoke_editorv2` ayni varligi iki
+# beat'te kullaniyor (I-58'in "duzen B"si). Metrikler onu digerlerinden
+# AYIRMAZSA totolojiktir. Ayrica sentetik karsi-orneklerle her alanin
+# TERSINE dondugu gosteriliyor.
+
+_J3_KK = _kk
+
+if _J1_PLAN:
+    _J3 = []
+    for _pl3 in _J1_TEMSIL:
+        _J3.append(_J3_KK.broll_cesitliligi_ozeti(_pl3))
+    print(f"     [J-3] benzersiz_varlik_orani: "
+          f"{sorted(o['benzersiz_varlik_orani'] for o in _J3)}")
+    print(f"     [J-3] tekrar_sure_orani     : "
+          f"{sorted(o['tekrar_sure_orani'] for o in _J3)}")
+    print(f"     [J-3] cekim_turu_cesidi     : "
+          f"{sorted(o['cekim_turu_cesidi'] for o in _J3)}")
+    print(f"     [J-3] tek_saglayici_sure_orani: "
+          f"{sorted(round(o['tek_saglayici_sure_orani'], 3) for o in _J3)}")
+
+    kontrol("⭐ J-3: 7 bagimsiz planin HEPSI TAM OLCULDU "
+            "(kimliksiz cekim yok, provenance belirsiz yok)",
+            all(o["olculdu"] is True for o in _J3),
+            [o.get("neden") for o in _J3 if not o["olculdu"]])
+
+    # ── TABAN: CESITLILIK DAR ──
+    kontrol("⭐ J-3 TABAN: HICBIR planda 3'ten fazla cekim turu YOK "
+            "(cutaway cesidi dar)",
+            max(o["cekim_turu_cesidi"] for o in _J3) == 3,
+            sorted(o["cekim_turu_cesidi"] for o in _J3))
+    kontrol("⭐ J-3 TABAN: planlarin cogunda TEK saglayici sureyi "
+            "TAMAMEN tasiyor (sure tabanli tekel >= 0.94)",
+            min(o["tek_saglayici_sure_orani"] for o in _J3) >= 0.94,
+            sorted(round(o["tek_saglayici_sure_orani"], 4) for o in _J3))
+    kontrol("⭐ J-3: SURE tabanli tekel, mevcut CEKIM tabanli kapidan "
+            "FARKLI bilgi veriyor (_i20: 0.80 cekim -> 0.949 sure)",
+            any(abs(o["tek_saglayici_sure_orani"] - 0.9494) < 1e-3
+                for o in _J3),
+            [round(o["tek_saglayici_sure_orani"], 4) for o in _J3])
+
+    # ── RED-FIRST (1): DOGAL KARSI-ORNEK AYRISIYOR ──
+    _J3_TEK = [o for o in _J3 if o["benzersiz_varlik_orani"] < 1.0]
+    _J3_TAM = [o for o in _J3 if o["benzersiz_varlik_orani"] == 1.0]
+    kontrol("⭐ J-3 RED-FIRST: DOGAL karsi-ornek (`_smoke_editorv2`) "
+            "metriklerle AYRISIYOR — benzersiz oran < 1.0 VE tekrar > 0",
+            len(_J3_TEK) == 1 and len(_J3_TAM) == 6
+            and _J3_TEK[0]["tekrar_sure_orani"] > 0
+            and all(o["tekrar_sure_orani"] == 0.0 for o in _J3_TAM),
+            (_J3_TEK[0]["benzersiz_varlik_orani"],
+             _J3_TEK[0]["tekrar_sure_orani"]) if _J3_TEK else None)
+    kontrol("⭐ J-3: tekrar EDEN varlik ISIMLENDIRILIYOR (sessiz sayi degil)",
+            bool(_J3_TEK) and bool(_J3_TEK[0]["tekrar_eden_varlik"]),
+            _J3_TEK[0]["tekrar_eden_varlik"] if _J3_TEK else None)
+
+    # ── RED-FIRST (2): SENTETIK KARSI-ORNEKLER, HER ALAN TERSINE DONUYOR ──
+    # ⚠ Sabit indeks KIRILGAN: plan, OLCULEN ozelliginden secilir —
+    # tekrarsiz (benzersiz oran 1.0) ve en cok medya cekimi olan plan.
+    _J3_SEC = max(zip(_J3, _J1_TEMSIL),
+                  key=lambda t: (t[0]["benzersiz_varlik_orani"] == 1.0,
+                                 t[0]["medya_cekim_sayisi"]))
+    _J3_TEMIZ = [dict(s) for s in _J3_SEC[1]]
+    assert _J3_SEC[0]["benzersiz_varlik_orani"] == 1.0
+    _J3_T0 = _J3_KK.broll_cesitliligi_ozeti(_J3_TEMIZ)
+    _J3_KOPYA = [dict(s) for s in _J3_TEMIZ]
+    _J3_KOPYA[1]["asset_id"] = _J3_KOPYA[0]["asset_id"]
+    _J3_T1 = _J3_KK.broll_cesitliligi_ozeti(_J3_KOPYA)
+    kontrol("⭐ J-3 RED-FIRST: varlik TEKRARLANINCA benzersiz oran DUSUYOR "
+            "ve tekrar_sure_orani YUKSELIYOR (totoloji degil)",
+            _J3_T1["benzersiz_varlik_orani"] < _J3_T0["benzersiz_varlik_orani"]
+            and _J3_T1["tekrar_sure_orani"] > _J3_T0["tekrar_sure_orani"],
+            (_J3_T0["benzersiz_varlik_orani"], _J3_T1["benzersiz_varlik_orani"],
+             _J3_T1["tekrar_sure_orani"]))
+
+    _J3_SAG = [dict(s) for s in _J3_TEMIZ]
+    _J3_SAG[0]["saglayici"] = "pexels"
+    _J3_T2 = _J3_KK.broll_cesitliligi_ozeti(_J3_SAG)
+    kontrol("⭐ J-3 RED-FIRST: IKINCI saglayici eklenince sure tabanli "
+            "tekel DUSUYOR",
+            _J3_T2["tek_saglayici_sure_orani"]
+            < _J3_T0["tek_saglayici_sure_orani"]
+            and len(_J3_T2["kaynak_saglayici_dagilimi"]) == 2,
+            (_J3_T0["tek_saglayici_sure_orani"],
+             _J3_T2["tek_saglayici_sure_orani"]))
+
+    _J3_TUR = [dict(s) for s in _J3_TEMIZ]
+    _J3_TUR[0]["cekim_turu"] = "insert-makro"
+    _J3_T3 = _J3_KK.broll_cesitliligi_ozeti(_J3_TUR)
+    kontrol("⭐ J-3 RED-FIRST: YENI cekim turu eklenince cesit sayisi ARTIYOR",
+            _J3_T3["cekim_turu_cesidi"] > _J3_T0["cekim_turu_cesidi"],
+            (_J3_T0["cekim_turu_cesidi"], _J3_T3["cekim_turu_cesidi"]))
+
+# ── EMIN DEGILSEN ENGELLEME: BELIRSIZLIK IYIMSER SAYILMIYOR ──
+_J3_KIMLIKSIZ = [{"kaynak_turu": "medya", "asset_id": "", "saglayici": "w",
+                  "cekim_turu": "medium", "lisans": "cc-by", "sure_sn": 2.0}]
+_J3_K = _J3_KK.broll_cesitliligi_ozeti(_J3_KIMLIKSIZ)
+kontrol("⭐ J-3: varlik kimligi YOKSA benzersiz oran 1.0 DEGIL None "
+        "(cesitlilik VARSAYILMIYOR)",
+        _J3_K["benzersiz_varlik_orani"] is None
+        and _J3_K["tekrar_sure_orani"] is None
+        and "VARLIK-KIMLIGI-EKSIK" in _J3_K["neden"], _J3_K.get("neden"))
+
+_J3_UNK = [{"kaynak_turu": "medya", "asset_id": "a", "saglayici": "w",
+            "cekim_turu": "medium", "lisans": "unknown", "sure_sn": 2.0}]
+_J3_U = _J3_KK.broll_cesitliligi_ozeti(_J3_UNK)
+kontrol("⭐ J-3: BELIRSIZ provenance `olculemedi` yaziyor ve WARN ADAYI "
+        "olarak isaretleniyor — lisansli SAYILMIYOR",
+        _J3_U["provenance"]["olculdu"] is False
+        and _J3_U["provenance"]["belirsiz_cekim"] == 1
+        and _J3_U["provenance"]["uyari_adayi"] is True
+        and "PROVENANCE-BELIRSIZ" in _J3_U["neden"], _J3_U["provenance"])
+kontrol("⭐ J-3: bos lisans da BELIRSIZ sayiliyor (sessiz gecis yok)",
+        _J3_KK.broll_cesitliligi_ozeti(
+            [{"kaynak_turu": "medya", "asset_id": "a", "saglayici": "w",
+              "cekim_turu": "medium", "lisans": "", "sure_sn": 2.0}]
+        )["provenance"]["belirsiz_cekim"] == 1)
+kontrol("⭐ J-3: cekim turu BOSSA cesit sayisina KATILMIYOR, ayri "
+        "`cekim_turu_belirsiz` kalemi olarak sayiliyor",
+        _J3_KK.broll_cesitliligi_ozeti(
+            [{"kaynak_turu": "medya", "asset_id": "a", "saglayici": "w",
+              "cekim_turu": "", "lisans": "cc-by", "sure_sn": 2.0}]
+        )["cekim_turu_belirsiz"] == 1)
+
+# ── GERCEK VIDEO: 0 OLARAK ACIKCA RAPORLANIYOR, VARSAYILMIYOR ──
+if _J1_FFPROBE and _J1_PLAN:
+    _J3_MT = _J3_KK.medya_turu_ozeti(_J3_SEC[1], kare_okuyucu=_j2_okuyucu)
+    _J3_V = _J3_KK.broll_cesitliligi_ozeti(_J3_SEC[1],
+                                           medya_turu_ozeti_=_J3_MT)
+    kontrol("⭐ J-3: gercek video YOK ve bu ACIKCA 0 olarak raporlaniyor "
+            "(J-2a olcumunden OKUNUYOR, yeniden hesaplanmiyor)",
+            _J3_V["gercek_video_cekim"] == 0
+            and _J3_V["gercek_video_sure_orani"] == 0.0,
+            (_J3_V["gercek_video_cekim"], _J3_V["gercek_video_sure_orani"]))
+kontrol("⭐ J-3: J-2a olcumu VERILMEZSE video alani 0 DEGIL None "
+        "('video yok' IDDIA EDILMIYOR)",
+        _J3_KK.broll_cesitliligi_ozeti(
+            [{"kaynak_turu": "medya", "asset_id": "a", "saglayici": "w",
+              "cekim_turu": "medium", "lisans": "cc-by", "sure_sn": 2.0}]
+        )["gercek_video_sure_orani"] is None)
+
+# ── HICBIR SEY ENFORCE EDILMIYOR ──
+kontrol("⭐ J-3: hedef UYDURULMADI (`hedef` None, `enforce` False)",
+        _J3_KK.broll_cesitliligi_ozeti([])["hedef"] is None
+        and _J3_KK.broll_cesitliligi_ozeti([])["enforce"] is False)
+kontrol("⭐ J-3: cesitlilik icin YENI FAIL KODU EKLENMEDI",
+        not any("BROLL" in k or "CESIT" in k for k in _qon.FAIL_KODLARI),
+        _qon.FAIL_KODLARI)
+kontrol("⭐ J-3: olcum modulu hukum VERMIYOR — donen sozlukte "
+        "fail/warn/seviye/ihlal ANAHTARI YOK",
+        not ({"fail", "warn", "seviye", "ihlal"}
+             & set(_J3_KK.broll_cesitliligi_ozeti([]))),
+        sorted(_J3_KK.broll_cesitliligi_ozeti([])))
+kontrol("⭐ J-3: saglayici TEKEL kapisi COGALTILMADI — mevcut kapi "
+        "AYNEN duruyor (cekim tabanli, tavan 0.40)",
+        "SAGLAYICI-TEKEL" in oku(KOK, "editor", "qa_on.py")
+        and "oran > 0.40" in oku(KOK, "editor", "qa_on.py"))
+
+# ── UCTAN UCA ──
+if "_R9" in dir():
+    _J3_E2E = (_R9["qa"] or {}).get("broll_cesitliligi")
+    kontrol("⭐ J-3 UCTAN UCA: `broll_cesitliligi` QA raporunda VAR",
+            isinstance(_J3_E2E, dict), sorted(_R9["qa"] or {}))
+    kontrol("⭐ J-3 UCTAN UCA: dagilim alanlari GERCEKTEN dolu",
+            bool(_J3_E2E.get("kaynak_saglayici_dagilimi"))
+            and bool(_J3_E2E.get("cekim_turu_dagilimi"))
+            and _J3_E2E.get("medya_cekim_sayisi", 0) > 0,
+            _J3_E2E.get("medya_cekim_sayisi"))
+    kontrol("⭐ J-3: rapor alani HUKMU DEGISTIRMIYOR — durum yalnizca "
+            "fail/warn sayisindan turuyor",
+            (_R9["qa"]["durum"] == "FAIL") == (_R9["qa"]["fail"] > 0))
+
+# ── KORUNANLAR ──
+kontrol("J-3 GERILEME YOK: I-23/I-24/I-25/I-38 kapilari DURUYOR",
+        "KALITE-MOTION-ACILIS-KAPANIS" in _qon.FAIL_KODLARI
+        and "KALITE-MOTION-ISLEV-TEKRAR" in _qon.FAIL_KODLARI
+        and "KALITE-YAZI-SAHNE-DISI" in _qon.FAIL_KODLARI
+        and "ORAN-UYUMSUZ" in oku(KOK, "medya/edinim.py")
+        and "class DevreKesici" in oku(KOK, "medya/edinim.py"))
+kontrol("J-3 GERILEME YOK: ESIKLER GEVSETILMEDI",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0
+        and abs(_kk.BENZERLIK_ESIGI - 0.86) < 1e-9
+        and abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9
+        and abs(_kk.KENAR_DIS_ESIGI - 6.234) < 1e-9
+        and abs(_kk.MODEL_K - 0.935) < 1e-6)
+kontrol("J-3 GERILEME YOK: lisans/provenance kapilari DURUYOR",
+        "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI
+        and "def lisans_suz" in oku(KOK, "edit_kopru.py"))
+kontrol("J-3 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("J-3: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in oku(os.path.dirname(KOK), "app",
+                                            "render-studio", "src",
+                                            "Video.tsx"))
+kontrol("J-3: deploy.sh DOKUNULMADI",
+        "docker commit" in oku(os.path.dirname(KOK), "deploy.sh"))
+kontrol("J-3: uretim SECIM kodu DEGISMEDI (siralama/aday atama)",
+        "def semantik_puan" in oku(KOK, "medya/siralama.py")
+        and "def medya_tekrari" in oku(KOK, "editor", "kalite_kapisi.py"))
+kontrol("J-3: kapsam_ozeti yeni olcumu SAYIYOR (gizli buyume yok)",
+        _kk.kapsam_ozeti()["olcum"] >= 15
+        and "broll_cesitliligi_ozeti" in _kk.kapsam_ozeti()["olcum_adlari"])
+
+
 blok("§40h I-58 — IKI ADAY DUZENI KARSI-OLGU OLARAK OLCULDU (yalniz tanisal)")
 
 # ⚠ YALNIZ TANISAL. Uretim davranisi DEGISMEDI, kapi/esik eklenmedi.
