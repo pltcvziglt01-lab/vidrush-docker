@@ -13963,6 +13963,111 @@ else:
                 _R20.get("kenar_siyahligi"))
 
 
+
+blok("§40aa R-1d-g — AYNI KAYNAK <= 8.0 sn DETERMINISTIK GARANTI")
+
+# ⚠ MEDYASIZ: hicbir video/ses/kare/MP4 URETILMEZ. Saf karar mantigi.
+#
+# ── OLCULEN KUSUR (R-1d-f pilotu, job_1786721869701) ──
+#   GERCEK-KAYNAK-TAVANI: 36560908 8.508 · ..._s001 8.124 ·
+#                         38614588 8.052 · 15924008 8.028   (tavan 8.0)
+# Gercek hatta 1 SAHNE = 1 VARLIK; sahne 8.0'i asinca varlik TEK BASINA
+# tavani asiyor. Kabul SUREYE BAGLI ve KARARSIZDI: R-1d-e'de 7.1-7.6 sn
+# sahnelerle AYNI urun KABUL EDILMISTI.
+
+_KT2 = __import__("kaynak_tavani")
+
+
+def _kt_adaylar(n, sag="pexels"):
+    return [{"asset_id": f"a{i}", "saglayici": sag,
+             "lisans": "pexels-license"} for i in range(1, n + 1)]
+
+
+kontrol("⭐ R-1d-g: tavan `saglayici_motoru` ile AYNI tek sabitten okunuyor "
+        "(YUKSELTILMIYOR)",
+        _KT2.KAYNAK_BASINA_TAVAN_SN == _SM.KAYNAK_BASINA_TAVAN_SN == 8.0
+        and _KT2.kapsam_ozeti()["tavan_yukseltilir"] is False)
+
+# ── (1) SINIR DAVRANISI: 8.0 PASS, 8.001 BOLUNUR ──
+kontrol("⭐ R-1d-g: TAM 8.0 sn sahne BOLUNMUYOR (davranis korunur)",
+        _KT2.parca_sayisi(8.0) == 1
+        and _KT2.bolme_plani([{"scene_id": "s1", "sure_sn": 8.0}],
+                             adaylar=_kt_adaylar(2))["bolunen_sahne"] == 0)
+_KT_801 = _KT2.bolme_plani([{"scene_id": "s1", "sure_sn": 8.001}],
+                           adaylar=_kt_adaylar(2))
+kontrol("⭐ R-1d-g BELIRLEYICI RED-FIRST: 8.001 sn sahne BOLUNUYOR ve iki "
+        "parca FARKLI varlik aliyor",
+        _KT2.parca_sayisi(8.001) == 2 and _KT_801["ok"] is True
+        and len(_KT_801["parcalar"]) == 2
+        and _KT_801["parcalar"][0]["asset_id"]
+        != _KT_801["parcalar"][1]["asset_id"], _KT_801["parcalar"])
+kontrol("⭐ R-1d-g: her parca tavani ASMIYOR ve TOPLAM sure korunuyor",
+        all(p["sure_sn"] <= 8.0 for p in _KT_801["parcalar"])
+        and abs(sum(p["sure_sn"] for p in _KT_801["parcalar"]) - 8.001) < 0.01)
+
+# ── (2) PILOTUN GERCEK SAYILARI ──
+_KT_P = _KT2.bolme_plani(
+    [{"scene_id": "s1", "sure_sn": 8.508}, {"scene_id": "s2", "sure_sn": 8.124},
+     {"scene_id": "s3", "sure_sn": 8.052}, {"scene_id": "s4", "sure_sn": 8.028}],
+    adaylar=_kt_adaylar(8))
+kontrol("⭐ R-1d-g BELIRLEYICI: R-1d-f pilotunun DORT ihlali de plana "
+        "uyuyor (hicbir varlik 8.0'i asmiyor)",
+        _KT_P["ok"] is True and _KT_P["asan"] == []
+        and max(_KT_P["kullanim"].values()) <= 8.0
+        and _KT_P["bolunen_sahne"] == 4, _KT_P["kullanim"])
+kontrol("⭐ R-1d-g: dogrulayici nihai kullanimi ONAYLIYOR",
+        _KT2.dogrula(_KT_P["kullanim"])["ok"] is True)
+
+# ── (3) RED-FIRST: TEKRAR-KAYNAK ile TOPLAM ASILMIYOR ──
+_KT_TEK = _KT2.bolme_plani([{"scene_id": "s1", "sure_sn": 16.0}],
+                           adaylar=_kt_adaylar(1))
+kontrol("⭐ R-1d-g BELIRLEYICI RED-FIRST: TEK aday varken ayni kaynak "
+        "TEKRAR kullanilip toplam ASILMIYOR — stabil kodla FAIL-CLOSED",
+        _KT_TEK["ok"] is False
+        and any(s["kod"] == "KAYNAK-TAVANI-VARLIK-YOK"
+                for s in _KT_TEK["sorunlar"])
+        and _KT2.dogrula(_KT_TEK["kullanim"])["ok"] is True,
+        _KT_TEK["kullanim"])
+kontrol("⭐ R-1d-g: atanamayan parca SESSIZ gecmiyor (atandi=False)",
+        any(p["atandi"] is False and p["asset_id"] is None
+            for p in _KT_TEK["parcalar"]))
+kontrol("⭐ R-1d-g: iki sahne ayni tek varligi PAYLASINCA da tavan "
+        "ASILMIYOR",
+        _KT2.dogrula(_KT2.bolme_plani(
+            [{"scene_id": "s1", "sure_sn": 5.0},
+             {"scene_id": "s2", "sure_sn": 5.0}],
+            adaylar=_kt_adaylar(1))["kullanim"])["ok"] is True)
+
+# ── (4) PROVENANS ZORUNLU + DETERMINIZM ──
+kontrol("⭐ R-1d-g RED-FIRST: LISANSSIZ/SAGLAYICISIZ aday ATANMIYOR",
+        _KT2.bolme_plani(
+            [{"scene_id": "s1", "sure_sn": 4.0}],
+            adaylar=[{"asset_id": "a1"},
+                     {"asset_id": "a2", "saglayici": "pexels"}])["ok"] is False
+        and _KT2.kapsam_ozeti()["provenanssiz_varlik_atanir"] is False)
+kontrol("⭐ R-1d-g: ayni girdi AYNI cikti (rastgelelik YOK)",
+        [p["asset_id"] for p in _KT2.bolme_plani(
+            [{"scene_id": "s1", "sure_sn": 8.508}],
+            adaylar=_kt_adaylar(4))["parcalar"]]
+        == [p["asset_id"] for p in _KT2.bolme_plani(
+            [{"scene_id": "s1", "sure_sn": 8.508}],
+            adaylar=_kt_adaylar(4))["parcalar"]]
+        and _KT2.kapsam_ozeti()["rastgelelik"] is False)
+kontrol("⭐ R-1d-g: BOZUK sure sessizce gecmiyor (stabil kod)",
+        any(s["kod"] == "KAYNAK-TAVANI-SURE-BOZUK"
+            for s in _KT2.bolme_plani([{"scene_id": "s1", "sure_sn": 0}],
+                                      adaylar=_kt_adaylar(2))["sorunlar"]))
+kontrol("⭐ R-1d-g: modul MEDYA/AG/DOSYA/RENDER'a DOKUNMUYOR",
+        not any(a in _kod_yalniz(oku(KOK, "kaynak_tavani.py"))
+                for a in ("open(", "requests", "subprocess", "ffmpeg",
+                          "os.remove"))
+        and _KT2.kapsam_ozeti()["render_eder"] is False)
+kontrol("R-1d-g: kaynak_tavani.py derleniyor",
+        _derlenir(os.path.join(KOK, "kaynak_tavani.py")))
+kontrol("R-1d-g GERILEME YOK: gercek-timeline kapisi ve pix_fmt kapisi DURUYOR",
+        "GERCEK-KAYNAK-TAVANI" in _GQ.FAIL_KODLARI
+        and _HR.TESLIM_PIX_FMT == "yuv420p")
+
 print(f"\n{'=' * 60}")
 print(f"GECEN: {gecen}   BASARISIZ: {len(basarisiz)}   BLOKE: {len(bloke)}")
 for b in basarisiz:

@@ -9566,3 +9566,67 @@ kullanıcı şartı ve `saglayici_motoru` ile aynı tek sabit.
 **Diğer kalanlar (blokaj değil):** rumble 18.1 dB (⚠ eşik **benim**, kalibre
 değil) · olgu bağı 4/8 · `geçiş hard_cut` ve `J/L-cut ducking` gerçek zaman
 çizgisinde **ölçülmüyor** · B-roll `GERCEK-TIMELINE-CEKIM-TURU-YOK`.
+
+---
+
+## 70. FAZ R-1d-g — AYNI KAYNAK ≤ 8.0 sn DETERMİNİSTİK PLAN (14 Ağu)
+
+> **Durum: KARAR MANTIĞI tamamlandı ve kilitlendi; UYGULAMA (ses bölme +
+> ikinci varlık çekimi) HENÜZ BAĞLANMADI. A–I yeşil.
+> Mac'te medya/QA artefaktı ÜRETİLMEDİ. $0.00.**
+> Değişen: yeni `webapp/kaynak_tavani.py`, `webapp/testler/test_faz_i.py`.
+> Başka hiçbir üretim dosyasına dokunulmadı.
+
+### ⛔ Ölçülen kusur
+
+R-1d-f pilotu (`job_1786721869701`):
+
+```
+GERCEK-KAYNAK-TAVANI: 36560908  8.508 sn   (tavan 8.0)
+                      ..._s001  8.124 sn
+                      38614588  8.052 sn
+                      15924008  8.028 sn
+```
+
+Gerçek hatta **1 sahne = 1 varlık**. Sahne 8.0 sn'yi aşarsa varlık **tek
+başına** tavanı aşar. ⚠ Kabul bu yüzden **süreye bağlı ve kararsızdı**:
+R-1d-e pilotunda sahneler 7.1–7.6 sn olduğu için **aynı ürün kabul
+edilmişti**.
+
+### Yapılan — `webapp/kaynak_tavani.py` (saf karar mantığı)
+
+Deterministik politika, **rastgelelik yok**:
+1. Tavanı **aşmayan** sahne **bölünmez** (davranış aynen korunur; `8.0` → 1).
+2. Aşan sahne `ceil(sure/tavan)` **eşit** parçaya bölünür (`8.001` → 2).
+3. Her parçaya **farklı** varlık; toplamı tavanı aşacak varlık **atanmaz**.
+4. Aday sırası verilen sırayla taranır → **aynı girdi aynı çıktı**.
+5. Yeterli farklı varlık yoksa parça **atanmaz** ve **stabil kod**:
+   **`KAYNAK-TAVANI-VARLIK-YOK`**. ⚠ Aynı kaynağı tekrar kullanıp toplamı
+   **aşmaz**, tavanı **yükseltmez** — FAIL-CLOSED.
+   Bozuk süre: **`KAYNAK-TAVANI-SURE-BOZUK`**.
+
+⚠ Tavan `medya.saglayici_motoru` ile **aynı tek sabitten** okunur.
+⚠ Lisansı/sağlayıcısı olmayan aday havuzdan **elenir**.
+
+**Pilotun gerçek sayılarıyla doğrulandı:** dört ihlalin dördü de plana
+uyuyor (`bolunen_sahne: 4`, `asan: []`, en yüksek kullanım ≤ 8.0).
+
+### Red-first — MEDYASIZ
+
+`8.0` → bölünmez · **`8.001` → bölünür, iki parça FARKLI varlık** ·
+tek aday + 16 sn → **`KAYNAK-TAVANI-VARLIK-YOK`** (tekrar-kaynakla toplam
+**aşılmıyor**) · lisanssız aday **atanmıyor** · bozuk süre stabil kod.
+Modül kaldırılınca: **`ModuleNotFoundError: No module named 'kaynak_tavani'`**.
+
+### ⛔ AÇIK KALAN — uygulama bağlanmadı
+
+Planlayıcı **kararı** veriyor ama **uygulanmıyor**: gerçek hatta bir sahneyi
+bölmek **ses dosyasını da bölmeyi** (ffmpeg trim), **altyazı küplerini**
+yeniden dilimlemeyi ve o sahne için **ikinci ücretsiz stok varlık**
+çekmeyi gerektiriyor (`_sahne_medya` sahne başına **tek** klip alıyor).
+Bu bağlanmadan **teslim edilen video değişmez** ve `GERCEK-KAYNAK-TAVANI`
+aynen tekrarlar.
+
+⚠ **Bu yüzden bu turda ücretli pilot KOŞULMADI**: sonucu önceden belli bir
+render kredi harcaması olurdu. Kapı zaten fail-closed çalışıyor — video
+üretilir ama **kabul edilmez**.
