@@ -6978,6 +6978,211 @@ kontrol("J-3: kapsam_ozeti yeni olcumu SAYIYOR (gizli buyume yok)",
         and "broll_cesitliligi_ozeti" in _kk.kapsam_ozeti()["olcum_adlari"])
 
 
+blok("§40l J-4 — VIDEO PROVENANCE/LISANS SOZLESMESI (YALNIZ ENGELLER)")
+
+# ⚠ BU ATOM SOZLESME + TEST. Ag YOK, INDIRME YOK, render/secim davranisi
+# DEGISMEDI, edinim hattina BILEREK BAGLANMADI. $0.00.
+#
+# ⚠ SOZLESME YALNIZCA ENGELLER: mevcut `lisans_karari()` reddettiyse
+# `video_provenance_karari()` o karari ASLA cevirmez. Gorsel yolu HIC
+# degismez. EMIN DEGILSEN ALMA -> varsayilan karar REDDIR.
+#
+# ── RED-FIRST TASARIMI ──
+# (a) TEMIZ bir vaka KABUL edilmeli — yoksa "her seye hayir diyen" bir kapi
+#     totolojik olarak butun red testlerini gecerdi.
+# (b) SEKIZ zorunlu kanit TEK TEK cikarilinca kapi REDDETMELI ve eksik alani
+#     ADIYLA soylemeli.
+# (c) YouTube: aciklamadaki lisans beyani TEK BASINA yetmemeli.
+
+_VL = __import__("medya.video_lisans", fromlist=["video_lisans"])
+
+_J4_TEK = {"codec": "h264", "genislik": 1920, "yukseklik": 1080,
+           "bitrate": 8_000_000}
+_J4_TEMIZ = {
+    "license": "CC BY 4.0", "artist": "Jane Doe",
+    "orijinal_url": "https://commons.wikimedia.org/wiki/File:ornek.webm",
+    "lisans_kaydi": "https://commons.wikimedia.org/w/api.php?titles=File:x",
+    "indirme_zamani": "2026-08-14T10:00:00Z",
+}
+
+
+def _j4(kayit=None, saglayici="wikimedia", teknik=None, **ek):
+    k = dict(_J4_TEMIZ if kayit is None else kayit)
+    k.update(ek)
+    return _VL.video_provenance_karari(
+        k, saglayici, teknik=_J4_TEK if teknik is None else teknik)
+
+
+# ── (a) TEMIZ VAKA KABUL EDILIYOR (kapi "her seye hayir" DEGIL) ──
+_J4_OK = _j4()
+kontrol("⭐ J-4 RED-FIRST TABANI: kanitlarin HEPSI olan temiz commons "
+        "videosu KABUL EDILIYOR (kapi totolojik degil)",
+        _J4_OK["video_kabul"] is True and not _J4_OK["red_nedeni"],
+        _J4_OK["red_nedeni"])
+kontrol("⭐ J-4: kabul edilen kayitta TUM kanitlar RAPORLANIYOR "
+        "(kaynak URL, saglayici, lisans, lisans kaydi, zaman, teknik)",
+        all(_J4_OK["kanit"].get(a) for a in _VL.VIDEO_ZORUNLU_KANIT),
+        _J4_OK["kanit"])
+
+# ── (b) SEKIZ ZORUNLU KANIT: HER BIRI TEK TEK CIKARILINCA RED ──
+_J4_DUSUR = {
+    "kaynak_url": dict(_J4_TEMIZ, orijinal_url=""),
+    "lisans_kaydi": dict(_J4_TEMIZ, lisans_kaydi="", lisans_url=""),
+    "indirme_zamani": dict(_J4_TEMIZ, indirme_zamani=""),
+}
+for _ad4, _kay4 in _J4_DUSUR.items():
+    _r4 = _VL.video_provenance_karari(_kay4, "wikimedia", teknik=_J4_TEK)
+    kontrol(f"⭐ J-4 RED-FIRST: `{_ad4}` YOKKEN video REDDEDILIYOR "
+            f"ve eksik alan ADIYLA soyleniyor",
+            _r4["video_kabul"] is False and _ad4 in _r4["eksik_kanit"],
+            (_r4["video_kabul"], _r4["eksik_kanit"]))
+
+_J4_TEKNIK_EKSIK = {
+    "codec": {"genislik": 1920, "yukseklik": 1080, "bitrate": 8_000_000},
+    "cozunurluk": {"codec": "h264", "bitrate": 8_000_000},
+    "bitrate": {"codec": "h264", "genislik": 1920, "yukseklik": 1080},
+}
+for _ad4, _tk4 in _J4_TEKNIK_EKSIK.items():
+    _r4 = _j4(teknik=_tk4)
+    kontrol(f"⭐ J-4 RED-FIRST: OZGUN KALITE kaniti `{_ad4}` yoksa "
+            f"video REDDEDILIYOR",
+            _r4["video_kabul"] is False and _ad4 in _r4["eksik_kanit"],
+            _r4["eksik_kanit"])
+kontrol("⭐ J-4: teknik kanit HIC verilmezse de RED (varsayim yok)",
+        _j4(teknik={})["video_kabul"] is False
+        and len(_j4(teknik={})["eksik_kanit"]) == 3,
+        _j4(teknik={})["eksik_kanit"])
+kontrol("⭐ J-4: SIFIR/negatif cozunurluk-bitrate GECERLI SAYILMIYOR",
+        _j4(teknik={"codec": "h264", "genislik": 0, "yukseklik": 0,
+                    "bitrate": 0})["video_kabul"] is False)
+kontrol("⭐ J-4: saglayici bos ise RED",
+        _VL.video_provenance_karari(_J4_TEMIZ, "",
+                                    teknik=_J4_TEK)["video_kabul"] is False)
+
+# ── (c) YOUTUBE VE BENZERI PLATFORMLAR ──
+_J4_YT = {"license": "CC BY 3.0", "artist": "Kanal",
+          "orijinal_url": "https://www.youtube.com/watch?v=abc",
+          "lisans_kaydi": "https://www.youtube.com/watch?v=abc",
+          "indirme_zamani": "2026-08-14T10:00:00Z"}
+_R_YT = _VL.video_provenance_karari(_J4_YT, "youtube", teknik=_J4_TEK)
+kontrol("⭐ J-4 BELIRLEYICI: YouTube videosunun ACIKLAMASINDAKI 'CC BY' "
+        "beyani TEK BASINA YETMIYOR — video REDDEDILIYOR",
+        _R_YT["video_kabul"] is False
+        and "indirme izni" in _R_YT["red_nedeni"], _R_YT["red_nedeni"])
+kontrol("⭐ J-4: platform karari `beyan_tek_basina_yeterli: False` diye "
+        "ACIKCA yaziliyor ve eksik izin kanitlari sayiliyor",
+        _R_YT["platform"]["izin_kaniti_zorunlu"] is True
+        and _R_YT["platform"]["beyan_tek_basina_yeterli"] is False
+        and set(_R_YT["platform"]["eksik_izin_kaniti"])
+        == set(_VL.PLATFORM_IZIN_KANITI), _R_YT["platform"])
+kontrol("⭐ J-4: red SESSIZ degil — WARN metni ToS/indirme iznini "
+        "acikca gerekce gosteriyor",
+        any("PLATFORM-IZIN-KANITI-YOK" in u for u in _R_YT["uyarilar"]),
+        _R_YT["uyarilar"])
+_R_YT2 = _VL.video_provenance_karari(
+    dict(_J4_YT, indirme_izni=True, tos_uyumu=True,
+         hak_sahibi_dogrulandi=True), "youtube", teknik=_J4_TEK)
+kontrol("⭐ J-4: izinler ACIK olsa BILE 'lisans kaydi' videonun KENDI "
+        "sayfasiysa bu BEYANDIR, bagimsiz kayit degildir -> RED",
+        _R_YT2["video_kabul"] is False
+        and "bagimsiz degil" in _R_YT2["red_nedeni"], _R_YT2["red_nedeni"])
+for _p4 in ("https://vimeo.com/1", "https://www.tiktok.com/@a/video/1",
+            "https://x.com/a/status/1", "https://youtu.be/abc"):
+    kontrol(f"⭐ J-4: izin kaniti zorunlu platform taniniyor ({_p4})",
+            _VL.platform_gerekli_mi(_p4, "") is True)
+kontrol("⭐ J-4: commons/nasa/pexels izin kaniti ZORUNLU platform DEGIL "
+        "(kendi lisans kaydini veriyorlar)",
+        not _VL.platform_gerekli_mi(
+            "https://commons.wikimedia.org/wiki/File:x", "wikimedia")
+        and not _VL.platform_gerekli_mi("https://images.nasa.gov/a", "nasa"))
+
+# ── MEVCUT LISANS DUVARI GEVSETILMIYOR / CEVRILMIYOR ──
+for _ham4, _et4 in (("All Rights Reserved", "ARR"),
+                    ("CC BY-NC 4.0", "NC"), ("CC BY-ND 4.0", "ND"),
+                    ("Getty Images", "ticari stok")):
+    _r4 = _VL.video_provenance_karari(
+        dict(_J4_TEMIZ, license=_ham4, artist="X"), "wikimedia",
+        teknik=_J4_TEK)
+    kontrol(f"⭐ J-4: lisans duvarinin reddi ({_et4}) video kapisinda "
+            f"ASLA CEVRILMIYOR",
+            _r4["video_kabul"] is False and _r4["render_kullanilabilir"]
+            is not True, (_et4, _r4["red_nedeni"]))
+kontrol("⭐ J-4: atif gerektiren lisansta eser sahibi YOKSA yine RED "
+        "(mevcut kural KORUNDU)",
+        _VL.video_provenance_karari(
+            dict(_J4_TEMIZ, license="CC BY 4.0", artist=""), "wikimedia",
+            teknik=_J4_TEK)["video_kabul"] is False)
+
+# ── GORSEL YOLU HIC DEGISMEDI ──
+_LIS4 = __import__("medya.lisans", fromlist=["lisans"])
+kontrol("⭐ J-4: GORSEL lisans karari DEGISMEDI — PD beyani hala geciyor "
+        "('No known copyright restrictions')",
+        _LIS4.lisans_karari(
+            {"license": "No known copyright restrictions",
+             "artist": "LoC"}, "loc")["render_kullanilabilir"] is True)
+kontrol("⭐ J-4: GORSEL yolu icin YENI SART EKLENMEDI — gorsel karari "
+        "video kanitlarini SORMUYOR",
+        _LIS4.lisans_karari({"license": "CC0", "artist": ""},
+                            "pixabay")["render_kullanilabilir"] is True)
+kontrol("⭐ J-4: video modulu gorsel modulunu SARMALIYOR, KOPYALAMIYOR "
+        "(tek lisans gercegi)",
+        "from .lisans import lisans_karari" in oku(KOK, "medya",
+                                                   "video_lisans.py"))
+
+# ── AG YOK / EDINIM HATTINA BAGLI DEGIL ──
+_VLS = oku(KOK, "medya", "video_lisans.py")
+kontrol("⭐ J-4: modul AGA CIKMIYOR (requests/urlopen/httpx yok)",
+        not any(a in _VLS for a in ("import requests", "urlopen", "httpx",
+                                    "http.client", "socket")))
+kontrol("⭐ J-4: bu atomda edinim hattina BAGLANMADI — secim/render "
+        "davranisi DEGISMEDI",
+        "video_lisans" not in oku(KOK, "medya", "edinim.py")
+        and "video_lisans" not in oku(KOK, "medya", "indirme.py")
+        and "video_lisans" not in oku(KOK, "medya", "avci.py"))
+kontrol("⭐ J-4: kapsam_ozeti bu sinirlari ACIKCA yaziyor",
+        _VL.kapsam_ozeti()["yalniz_engeller"] is True
+        and _VL.kapsam_ozeti()["aga_cikar"] is False
+        and _VL.kapsam_ozeti()["edinim_hattina_bagli"] is False
+        and _VL.kapsam_ozeti()["gorsel_yolunu_degistirir"] is False)
+kontrol("⭐ J-4: SEKIZ zorunlu kanit sozlesmede SAYILI",
+        len(_VL.VIDEO_ZORUNLU_KANIT) == 8
+        and set(_VL.VIDEO_ZORUNLU_KANIT) == {
+            "kaynak_url", "saglayici", "lisans_turu", "lisans_kaydi",
+            "indirme_zamani", "codec", "cozunurluk", "bitrate"},
+        _VL.VIDEO_ZORUNLU_KANIT)
+kontrol("⭐ J-4: taninmayan saglayici KABUL edilse bile SESSIZ gecmiyor "
+        "(elle dogrulama uyarisi)",
+        any("SAGLAYICI-TANINMIYOR" in u for u in _VL.video_provenance_karari(
+            dict(_J4_TEMIZ, orijinal_url="https://ornek-arsiv.org/v/1"),
+            "ornek-arsiv", teknik=_J4_TEK)["uyarilar"]))
+kontrol("J-4: video_lisans.py derleniyor",
+        _derlenir(os.path.join(KOK, "medya", "video_lisans.py")))
+
+# ── KORUNANLAR ──
+kontrol("J-4 GERILEME YOK: I-23/I-24/I-25/I-38 kapilari DURUYOR",
+        "KALITE-MOTION-ACILIS-KAPANIS" in _qon.FAIL_KODLARI
+        and "KALITE-MOTION-ISLEV-TEKRAR" in _qon.FAIL_KODLARI
+        and "KALITE-YAZI-SAHNE-DISI" in _qon.FAIL_KODLARI
+        and "ORAN-UYUMSUZ" in oku(KOK, "medya/edinim.py")
+        and "class DevreKesici" in oku(KOK, "medya/edinim.py"))
+kontrol("J-4 GERILEME YOK: ESIKLER GEVSETILMEDI",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0
+        and abs(_kk.BENZERLIK_ESIGI - 0.86) < 1e-9
+        and abs(_kk.KENAR_DIS_ESIGI - 6.234) < 1e-9)
+kontrol("J-4 GERILEME YOK: lisans/provenance kapilari DURUYOR",
+        "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI
+        and "def lisans_suz" in oku(KOK, "edit_kopru.py"))
+kontrol("J-4 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("J-4: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in oku(os.path.dirname(KOK), "app",
+                                            "render-studio", "src",
+                                            "Video.tsx"))
+kontrol("J-4: deploy.sh DOKUNULMADI",
+        "docker commit" in oku(os.path.dirname(KOK), "deploy.sh"))
+
+
 blok("§40h I-58 — IKI ADAY DUZENI KARSI-OLGU OLARAK OLCULDU (yalniz tanisal)")
 
 # ⚠ YALNIZ TANISAL. Uretim davranisi DEGISMEDI, kapi/esik eklenmedi.

@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 14 Ağu | **J-4 video provenance/lisans sözleşmesi (YALNIZ ENGELLER)** | `PENDING` | ✅ **push edildi**, ağsız/indirmesiz koruyucu sözleşme: yeni `medya/video_lisans.py`, video kabulü için **8 zorunlu kanıt** (`kaynak_url`, `saglayici`, `lisans_turu`, **`lisans_kaydi`** — beyan değil, `indirme_zamani`, ffprobe ile ölçülen `codec`/`cozunurluk`/`bitrate`); biri eksikse **RED** ve eksik alan **adıyla** raporlanıyor; ⚠ **YouTube/Vimeo/TikTok/X vb.**: video **açıklamasındaki lisans beyanı TEK BAŞINA YETMİYOR** (`beyan_tek_basina_yeterli: False`), ayrıca `indirme_izni`+`tos_uyumu`+`hak_sahibi_dogrulandi` **üçü birden** şart, eksikse `PLATFORM-IZIN-KANITI-YOK` → RED; izinler açık olsa **bile** lisans kaydı videonun kendi sayfasıysa **beyan sayılıp** RED → ToS/telif ihlali yolu kapalı; **mevcut kapılar gevşetilmedi**: `lisans_karari()` **sarmalanıyor**, ARR/NC/ND/Getty reddi **asla çevrilmiyor**, görsel yolu **hiç değişmedi** (PD beyanı hâlâ geçiyor); red-first **kabul tabanıyla** kuruldu (temiz Commons videosu KABUL) ki kapı totolojik olmasın; ⚠ **bilerek edinim hattına bağlanmadı** ve **ağa çıkmıyor** → seçim/render davranışı değişmedi (HEAD worktree ile `render_plan`/`edit_manifest`/`props` SHA **birebir aynı**), **pilot üretilmedi**; I-23/I-24/I-25/I-38, eşikler, 22 alan, kullanıcı seçimleri, `deploy.sh` **korundu**; deploy YOK, $0.00 |
 | 14 Ağu | **J-3 B-roll/cutaway çeşitliliği ölçüldü (kapı YOK)** | `e9034bb` | ✅ **push edildi**, ağsız tanısal: 7 bağımsız planda `kaynak_saglayici_dagilimi` (çekim **ve süre**), `benzersiz_varlik_orani`, `cekim_turu_dagilimi`, `tekrar_sure_orani`, provenance ve `gercek_video_*` ölçüldü; **taban**: benzersiz oran 6 planda 1.000 / `_smoke_editorv2` **0.750**, tekrar süresi 6 planda 0.000 / **0.126**, **çekim türü çeşidi 7/7 planda tam 3** (cutaway **dar**), tek sağlayıcı **süre** oranı 6 planda **1.000** / `_i20` **0.949**, **gerçek video 0.0** (açıkça 0 raporlanıyor, J-2a'dan okunuyor); ⚠ süre tabanlı ölçüm mevcut çekim tabanlı kapıdan **farklı bilgi** veriyor (`_i20` 0.80 → 0.949) → `SAGLAYICI-TEKEL` **çoğaltılmadı**; EMİN DEĞİLSEN ENGELLEME: kimlik yoksa oran **`None`** (1.0 değil), lisans boş/`unknown` ise provenance **ölçülemedi** + `uyari_adayi` (WARN **üretilmedi**, `durum`u değiştirirdi), J-2a yoksa video alanı **`None`**; `hedef: None`, `enforce: False`, **yeni fail kodu YOK**; red-first: doğal karşı-örnek `_smoke_editorv2` ayrışıyor + 5 sentetik müdahalenin **5'i** metriği tersine çeviriyor; **render değişmezliği kanıtlandı** (HEAD worktree, `render_plan`/`edit_manifest`/`props` SHA **birebir aynı**, QA WARN 0/3) → **pilot üretilmedi**; I-23/I-24/I-25/I-38, eşikler, lisans/provenance, 22 alan, kullanıcı seçimleri, `deploy.sh`, üretim seçim kodu **korundu**; deploy YOK, $0.00 |
 | 14 Ağu | **J-2a medya türü rapor sözleşmesi (kapı YOK)** | `09edd97` | ✅ **push edildi**, J-1 tabanı uygulamanın kendi raporuna bağlandı: `olcumler["medya_turu"]` → `video_sure_orani` + `donmus_kadraj_sure_orani` (+ statik/ölçülemedi oranları, kalemler); okuyucu deseni **mevcutla birebir** (`kare_okuyucu` dışarıdan, modül **dosya açmaz**), okuyucu yoksa oranlar **`None`** — 0.0 değil, çünkü 0.0 "video yok" **iddiasıdır**; ⚠ **seviye hatası ölçülüp ayrıştırıldı**: 0.155 **korpus agregası**, plan başına uygulanırsa **7 planın 4'ünde yanlış pozitif** → ayrı `DONMUS_KADRAJ_PLAN_REFERANSI = 0.334` (formül: `ceil(maks_gözlenen, 3)`), mevcut korpusta yanlış pozitif **0/7**; ikisi de **`enforce: False`**, hiçbir yerde uygulanmıyor; `VIDEO_SURE_ORANI_HEDEFI = None` — **uydurulmadı** (pozitif örnek yok); **yeni fail kodu YOK**, ölçüm modülü hüküm vermiyor; **render değişmezliği kanıtlandı** (HEAD worktree ile `render_plan`/`edit_manifest`/`props` SHA **birebir aynı**, QA WARN 0/3 aynı) → **pilot üretilmedi**; ⚠ yol boyunca gerçek kusur: `denetle()` imzasındaki bool `kalite_kapisi` parametresi modül adını **gölgeliyor** (→ `_KK` takma adı); I-23/I-24/I-25/I-38, eşikler, lisans/provenance, 22 alan, kullanıcı seçimleri, `deploy.sh` **korundu**; deploy YOK, $0.00 |
 | 14 Ağu | **J-1 statik fotoğraf / gerçek video oranı ölçüldü (tanısal)** | `ca9ebc1` | ⚠ **push edildi**, kullanıcı önceliğinin 1. atomu, ağsız: 17 koşum → **7 benzersiz plan** (lawn'ın 10 render'ı **tek** örnek), 32 çekim / 118.5 sn; **gerçek hareketli video %0.0**, statik fotoğraf **süre %94.7** (Ken Burns %79.2 + **donmuş kadraj %15.5**), sentetik %5.3, **ölçülemedi %0**; sınıf kararı `medya_turu` alanına DEĞİL `ffprobe -count_frames` ile **dosyanın kendisine** dayanıyor, belirsiz olan varsayılmıyor; yanlış sınıflama payı **24/24 doğru** (4 gerçek MP4 → 4/4 `a_video`, 20 kaynak → 20/20 tek kare) ⚠ ama pozitif örnekler **render çıktısı**, korpusa hiç video kaynağı girmemiş; red-first: sahte korpusa video enjekte edilince iddia **KIRMIZI** yanıyor (totolojik değil); ⚠ kısıt **kod değil** — `avci`/`medya_kopru` varsayılanı zaten `"video"`; J-2 eşiği **önerildi ama ÜRETİME ALINMADI** (pozitif örnek yok, E türetilemez); üretim kodu/eşik değişmedi, rerender/deploy YOK, $0.00 |
@@ -5674,6 +5675,89 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 80. FAZ J-4 — VİDEO PROVENANCE/LİSANS SÖZLEŞMESİ (YALNIZ ENGELLER, 14 Ağu)
+
+> **Durum: gerçek video edinimi için **koruyucu** sözleşme kuruldu. Bu modül
+> **yalnızca engeller** — mevcut `lisans_karari()` reddettiyse o kararı
+> **asla çevirmez**, görsel yolu **hiç değişmez**. Ağ YOK, indirme YOK,
+> render/seçim davranışı **değişmedi** (SHA ile kanıtlandı), edinim hattına
+> **bilerek bağlanmadı**. A–I yeşil (**3688**, 0 hata, 2 bilinen BLOKE).
+> $0.00.**
+> Değişen: **yeni** `webapp/medya/video_lisans.py`,
+> `webapp/testler/test_faz_i.py` (§40l, 40 kontrol). Başka **hiçbir üretim
+> dosyası** değişmedi.
+
+### Sözleşme
+
+`medya/video_lisans.video_provenance_karari(kayit, saglayici, *, teknik,
+indirme_zamani)` → `{video_kabul, red_nedeni, eksik_kanit, uyarilar, kanit,
+platform, ...lisans_karari alanları}`
+
+**Sekiz zorunlu kanıt** — biri bile eksikse **RED**, eksik alan **adıyla**
+raporlanır:
+
+| # | Kanıt | Neden |
+|---|---|---|
+| 1 | `kaynak_url` | insan tarafından açılabilir kaynak sayfası |
+| 2 | `saglayici` | hangi sağlayıcıdan alındı |
+| 3 | `lisans_turu` | normalize edilmiş lisans anahtarı (`unknown` kabul edilmez) |
+| 4 | `lisans_kaydi` | **sağlayıcının kaydı** — beyan değil |
+| 5 | `indirme_zamani` | lisansın o an geçerli olduğunun kaydı |
+| 6 | `codec` | ffprobe ile **ölçülen** |
+| 7 | `cozunurluk` | özgün genişlik×yükseklik, **ölçülen** |
+| 8 | `bitrate` | **ölçülen** (0/negatif geçersiz) |
+
+### ⚠ YouTube ve benzeri platformlar
+
+`youtube.com`, `youtu.be`, `vimeo`, `dailymotion`, `tiktok`, `instagram`,
+`facebook`, `x.com`, `twitter`, `reddit`, `pinterest` → **izin kanıtı
+zorunlu**. Bu platformlarda:
+
+- **Video açıklamasındaki lisans beyanı TEK BAŞINA YETMEZ.** Rapor bunu
+  `beyan_tek_basina_yeterli: False` diye açıkça yazar. Yükleyen kişi eseri
+  lisanslama hakkına sahip olmayabilir.
+- Kabul için ayrıca **üçü de** gerekir: `indirme_izni`, `tos_uyumu`,
+  `hak_sahibi_dogrulandi`. Eksikse **RED** + `PLATFORM-IZIN-KANITI-YOK`.
+- ⚠ İzinler açık olsa **bile**, `lisans_kaydi` olarak videonun **kendi
+  sayfası** gösterilmişse bu bir **beyandır**, bağımsız kayıt değildir → **RED**.
+
+Böylece ToS ihlali ve telif ihlali yolu kapalı; `EMİN DEĞİLSEN ALMA` gereği
+**varsayılan karar REDDİR**.
+
+### Mevcut kapılar gevşetilmedi
+
+`lisans_karari()` **sarmalanıyor, kopyalanmıyor** (tek lisans gerçeği).
+Testle doğrulandı: ARR / CC-BY-NC / CC-BY-ND / Getty reddi video kapısında
+**asla çevrilmiyor**; atıf gerektiren lisansta eser sahibi yoksa yine RED.
+Görsel yolu için **yeni şart eklenmedi** — PD beyanı (`No known copyright
+restrictions`) hâlâ geçiyor, görsel kararı video kanıtlarını **sormuyor**.
+
+Tanınmayan sağlayıcı kanıtları tamsa kabul edilir ama **sessiz geçmez**:
+`SAGLAYICI-TANINMIYOR` uyarısıyla elle doğrulamaya işaret edilir.
+
+### Red-first
+
+⚠ "Her şeye hayır diyen" bir kapı bütün red testlerini totolojik olarak
+geçerdi. Bu yüzden **önce kabul tabanı** kuruldu: kanıtların hepsi olan temiz
+bir Commons videosu **KABUL EDİLİYOR**. Ardından **8 zorunlu kanıt tek tek
+düşürülüp** her birinde red ve doğru eksik alan adı doğrulandı; 4 platform
+tanıma, 4 lisans reddi ve 2 görsel-yolu değişmezlik kontrolü eklendi.
+
+### Sınırlar (bilerek)
+
+⚠ Modül **edinim hattına bağlanmadı** (`edinim.py` / `indirme.py` / `avci.py`
+onu import etmiyor — testle doğrulandı), çünkü bağlamak seçim davranışını
+değiştirirdi. **Ağa çıkmıyor** (`requests`/`urlopen`/`httpx`/`socket` yok).
+Bağlama + gerçek indirme **J-5**'in işi.
+
+### Render değişmezliği (kanıt)
+
+HEAD `974784b` worktree, aynı fixture: `render_plan` `c488eb157312a380`,
+`edit_manifest` `34ed2b459b410903`, `props` `db1ff69176149dfa` — **üçü de
+birebir aynı**, QA WARN 0/3 aynı → **pilot üretilmedi**.
 
 ---
 
