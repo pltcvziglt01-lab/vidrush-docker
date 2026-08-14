@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 14 Ağu | **K-2 arka plan uğultu kapısı + kaynak sesi sıfır** | `PENDING` | ✅ **push edildi**, **MEDYASIZ atom** (Mac'te medya/ses/kare/render/QA artefaktı yok, `ffmpeg` çalıştırılmadı): kaynak video sesi **mutlak sıfır** olarak üç katmanda kilitlendi — renderer zaten `muted`, `render_plan` artık **makine okunur** `ses_kanali: "sifir"` yazıyor, `kaynak_ses_sozlesmesi()` denetliyor → ihlal **`KALITE-KAYNAK-SES-SIZINTI`**; TTS dışı sürekli hiss/rumble/wind için yeni `editor/ses_gurultu.py`: öznitelikler (`konusma_disi_lufs`, `sureklilik_orani`, `spektral_duzluk`, `dusuk/yuksek_frekans_orani`, `belirsizlik_db`) **sayı olarak dışarıdan** enjekte edilir (mevcut okuyucu deseni), modül **medya açmaz/ffmpeg çalıştırmaz**; karar **üç koşul birlikte** (duyulabilir + sürekli + spektral iz) — tek başına düşük SNR müzik yatağında da olur; ⚠ SNR eşiği **TÜRETİLMİŞ** (`DUYULABILIR_FARK_DB`=30 dB ters yönde okundu), diğerleri `DUYULABILIR_FARK_DB` ile **aynı dürüstlük etiketiyle** "beyan edilmiş tasarım eşiği" ve `esik_kaynagi` alanında **raporlanıyor**; **güven aralığı**: SNR±belirsizlik eşiği kesiyorsa `supheli` → **WARN, FAIL değil** (emin değilsen temiz içeriği FAIL etme), ölçüm eksikse **hüküm yok**; deterministik akış ölç→**güvenli** filtre öner (rumble `highpass f=80` — konuşma temel frekansının altında; genişbant bastırma **≤6 dB tavanlı**; **konuşma bandı 300–3400 Hz'e dokunulmaz**)→temizlemeyi doğrula (konuşma bandı >1.0 dB geriler **ya da** ASR güveni >0.02 düşerse **filtre reddedilir**, netliği bozan denoise **uygulanmaz**)→temizlenemiyorsa **`KALITE-SES-GURULTU`** FAIL; 38 red-first kontrol; ⚠ testte I-9 tuzağı (ham dize modülün kendi docstring'ini yakaladı) `_kod_yalniz` ile düzeltildi; I-23/I-24/I-25/I-38, eşikler, 22 alan, kullanıcı seçimleri, `deploy.sh`, K-1 B-roll kapısı **korundu**; deploy YOK, $0.00 |
 | 14 Ağu | **K-1 video kamera muafiyeti + B-roll çeşitlilik kapısı** | `759fe9b` | ✅ **push edildi**, **MEDYASIZ atom** (Mac'te medya/ses/kare/render cache/QA artefaktı/MP4 **üretilmedi**): video ağırlıklı kurguyu **yapısal olarak imkânsız** kılan etiket artefaktı düzeltildi — J-5a'dan beri gerçek video `static` diye etiketleniyordu ve I-24'ün "aynı işlevde aynı kamera hareketi" kuralı bunu gerçek kamera kararı sanıp **4+ video sahnesinde kaçınılmaz FAIL** üretiyordu; `islev_tekrari` + `pencere_tekrari` bacakları artık video çekimlerde **muaf** (enerji I-44 ve statik-süre J-5a bacaklarındaki **mevcut** desenin aynısı), muaf çekimler `kamera_kapisi_muaf_video`da **sayılabilir**; ⚠ boşluk **boş bırakılmadı**: yerini `broll_cesitliligi_ozeti`nin **B-roll görsel dili** bacağı aldı — I-24 işlev kuralının **birebir** karşılığı (`hareket` yerine `cekim_turu`), stabil kod **`KALITE-BROLL-CESITLILIK`** (işlev tekrarı → FAIL, pencere tekrarı → WARN); **sayısal eşik UYDURULMADI** — J-3 oranları hâlâ yalnız rapor (`hedef: None`, `enforce: False`), kapıya bağlı alanlar `kapiya_bagli`da sayılı; red-first: fotoğraf yolu **bit-bit aynı** (I-24 korundu), video yokken davranış **değişmez**, farklı çekim türünde **yanlış pozitif yok**, kod `KALITE_KODLARI`'nda olduğu için kalite kapısı kapalıyken **üretilmez**; ⚠ `ardisik_tekrar` **bilerek kapsam dışı** → iki video hâlâ yan yana gelemez (K-1b); I-23/I-24/I-25/I-38, eşikler, lisans/provenance, 22 alan, kullanıcı seçimleri, `deploy.sh` **korundu**; deploy YOK, $0.00 |
 | 14 Ağu | **J-5a ilk gerçek video edinimi + pilot** | `ee81265` | ⚠ **push edildi**, J-4 kapısı edinim hattına **bağlandı**; Wikimedia Commons'tan **tam 1** gerçek video indi (`Irrigation sprinkler 7`, **1920×1080 vp9 52.2 Mbps** 12.47 sn 81.4 MB, **cc-by-sa**, F ASTILY, lisans **kaydı** API'den — izleme sayfası değil, indirme zamanı kayıtlı, **$0.00**); tavanlar **1 dosya / 300 MB**, NASA **devreye girmedi** (sorgu uzay değil), konu dışı fallback **yok**, PEXELS/PIXABAY anahtarı **aranmadı**; kapı **iki kez** koştu (indirme öncesi + ffprobe ölçümüyle sonrası, red → dosya silinir); **25.30 sn 1080p pilot**: POST-QA **PASS**, kalite **100/100**, `video_sure_orani` **0.0 → 0.2123**, statik **1.0 → 0.7877**, LUFS −14.2 (aynı), LRA 2.5 (aynı), TP −2.6 dBFS, **0** sessizlik bölütü, **11 kare**, benzersiz varlık 1.0 / tekrar 0.0 (gerileme yok); ⚠ gerçek video **iki yapısal kısıt** ortaya çıkardı ve düzeltildi: (1) 1080p kaynak 1080p karede **sıfır punch payı** → video kaynakta dijital zoom **yok** (`VIDEO-KAMERA-NOTR`), (2) `static` süre kapısı hareketli kaynakta **geçersiz tahmin** → statik bacağı video atlıyor (enerji bacağındaki **mevcut** desenin aynısı); ⚠ **kapılar gevşetilmedi**, `KALITE-PUNCH-BUYUTME` ve `KALITE-OPTIK-DURGUN` duruyor, POST-QA optiği b004'te **4.366** ölçtü (eşik 2.0) → muafiyet bypass **değil**; (3) `girdi_kur` medya türünü sabit `"image"` yazıyordu — J-1'deki %0'ın **mekanik nedeni**, düzeltildi; ⚠ **KABUL EDİLMİŞ MP4 DEĞİL** — teknik tam PASS ama **semantik değil** (b001 hâlâ 1900 arşiv fotoğrafı, `KALITE-SEMANTIK-DONEM`); ⚠ ilk koşum `teknoloji_i20_rapor.json` + `i20_kare_*.png` üzerine yazdı, rapor git'ten **geri yüklendi**, smoke çıktı adları **parametrelendi**; 34 red-first **ağsız** test; deploy YOK |
 | 14 Ağu | **J-4 video provenance/lisans sözleşmesi (YALNIZ ENGELLER)** | `4440a81` | ✅ **push edildi**, ağsız/indirmesiz koruyucu sözleşme: yeni `medya/video_lisans.py`, video kabulü için **8 zorunlu kanıt** (`kaynak_url`, `saglayici`, `lisans_turu`, **`lisans_kaydi`** — beyan değil, `indirme_zamani`, ffprobe ile ölçülen `codec`/`cozunurluk`/`bitrate`); biri eksikse **RED** ve eksik alan **adıyla** raporlanıyor; ⚠ **YouTube/Vimeo/TikTok/X vb.**: video **açıklamasındaki lisans beyanı TEK BAŞINA YETMİYOR** (`beyan_tek_basina_yeterli: False`), ayrıca `indirme_izni`+`tos_uyumu`+`hak_sahibi_dogrulandi` **üçü birden** şart, eksikse `PLATFORM-IZIN-KANITI-YOK` → RED; izinler açık olsa **bile** lisans kaydı videonun kendi sayfasıysa **beyan sayılıp** RED → ToS/telif ihlali yolu kapalı; **mevcut kapılar gevşetilmedi**: `lisans_karari()` **sarmalanıyor**, ARR/NC/ND/Getty reddi **asla çevrilmiyor**, görsel yolu **hiç değişmedi** (PD beyanı hâlâ geçiyor); red-first **kabul tabanıyla** kuruldu (temiz Commons videosu KABUL) ki kapı totolojik olmasın; ⚠ **bilerek edinim hattına bağlanmadı** ve **ağa çıkmıyor** → seçim/render davranışı değişmedi (HEAD worktree ile `render_plan`/`edit_manifest`/`props` SHA **birebir aynı**), **pilot üretilmedi**; I-23/I-24/I-25/I-38, eşikler, 22 alan, kullanıcı seçimleri, `deploy.sh` **korundu**; deploy YOK, $0.00 |
@@ -5677,6 +5678,108 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 83. FAZ K-2 — ARKA PLAN UĞULTU KAPISI + KAYNAK SESİ SIFIR (14 Ağu)
+
+> **Durum: TTS dışı sürekli hiss/rumble/wind için **ölçülebilir öznitelikler,
+> güven aralığı ve stabil hata kodu** tanımlandı; kaynak video sesi render
+> sözleşmesinde **mutlak sıfır** olarak kilitlendi. **MEDYASIZ ATOM**:
+> Mac'te medya/ses/kare/render/QA artefaktı **üretilmedi**, `ffmpeg`
+> çalıştırılmadı. A–I yeşil (**3803**, 0 hata, 2 bilinen BLOKE). Deploy YOK.
+> $0.00.**
+> Değişen: **yeni** `webapp/editor/ses_gurultu.py`, `webapp/editor/plan.py`,
+> `webapp/editor/qa_on.py`, `webapp/testler/test_faz_i.py` (§40o, 38 kontrol).
+
+### Kaynak video sesi: mutlak sıfır
+
+`KAYNAK_SES_POLITIKASI = "sifir"` — tartışılabilir bir ayar **değil**.
+Harici klibin kendi sesi (rüzgâr/trafik/konuşma/müzik) mikse **giremez**.
+Üç katmanda kilitli:
+
+1. Renderer zaten `OffthreadVideo … muted` (`Kamera.tsx`, `Video.tsx`).
+2. `render_plan` artık **makine okunur** `ses_kanali: "sifir"` yazıyor.
+3. `kaynak_ses_sozlesmesi()` her video çekimini denetler → ihlal
+   **`KALITE-KAYNAK-SES-SIZINTI`** (fail).
+
+### Ölçülebilir öznitelikler (hepsi remote worker'dan **sayı** olarak)
+
+`anlatim_lufs`, `konusma_disi_lufs`, `sureklilik_orani`, `spektral_duzluk`,
+`dusuk_frekans_orani` (<120 Hz), `yuksek_frekans_orani` (>6 kHz),
+`belirsizlik_db`.
+
+⚠ Modül **medya açmaz, ffmpeg çalıştırmaz, dosya yazmaz** — mevcut
+`benzerlik_okuyucu` / `enerji_okuyucu` / `kare_okuyucu` enjeksiyon deseninin
+aynısı. Bu sayede karar mantığı yerelde **medyasız** test edilebiliyor.
+
+### Karar: üç koşul **birlikte**
+
+Gürültü ancak (a) **duyulabilir** (SNR eşiğin altında), (b) **sürekli** ve
+(c) **genişbant/rumble/hiss izi** taşıyorsa vardır. Tek başına düşük SNR bir
+müzik yatağında da olur — bu yüzden üçü birden aranır.
+
+| Eşik | Değer | Kaynak |
+|---|---|---|
+| `GURULTU_SNR_ESIGI_DB` | 30.0 | **TÜRETİLMİŞ** — `DUYULABILIR_FARK_DB` ters yönde okundu: 30 dB'den fazla altta kalan taban **duyulmaz** |
+| `SUREKLILIK_ESIGI` | 0.80 | beyan edilmiş tasarım eşiği |
+| `SPEKTRAL_DUZLUK_ESIGI` | 0.35 | beyan edilmiş |
+| `RUMBLE/HISS bant oranı` | 0.30 / 0.25 | beyan edilmiş |
+
+⚠ "Beyan edilmiş tasarım eşiği" etiketi `DUYULABILIR_FARK_DB`'nin kendi
+dürüstlük etiketiyle **aynıdır**: dinleme testi değildir, parametre olarak
+dışarı açıldı, `kapsam_ozeti()["esik_kaynagi"]` bunu **raporlar**.
+
+### Güven aralığı — emin değilsen FAIL etme
+
+SNR ± `belirsizlik_db` aralığı eşiği **kesiyorsa** sonuç `supheli` olur ve
+hüküm **WARN**'dır, FAIL değil. Aralık tamamen eşiğin altındaysa `gurultu`,
+tamamen üstündeyse `temiz`. Ölçüm eksikse `olculdu: False` — **"temiz"
+denmez**.
+
+### Deterministik akış
+
+```
+gurultu_olcusu()  →  filtre_profili_oner()  →  temizleme_dogrula()  →  gurultu_karari()
+```
+
+- **Filtre profili güvenli:** rumble → `highpass f=80` (yetişkin konuşma
+  temel frekansı ~85 Hz'in **altında**); hiss/genişbant → `afftdn` ama
+  bastırma **≤6 dB tavanlı**. **Konuşma bandı 300–3400 Hz'e dokunulmaz** ve
+  profil bunu açıkça beyan eder. Temiz içerikte filtre **önerilmez**.
+- **Doğrulama:** temizleme sonrası konuşma bandı `>1.0 dB` gerilerse **ya da**
+  ASR güveni `>0.02` düşerse **filtre reddedilir** — netliği bozan denoise
+  **uygulanmaz**.
+- **FAIL yalnızca** gürültü güven aralığıyla kesin **ve** güvenli temizleme
+  ya denenmedi ya da konuşmayı bozmadan gideremedi ise:
+  **`KALITE-SES-GURULTU`**.
+
+### Red-first (38/38)
+
+| İddia | Sonuç |
+|---|---|
+| Kaynak sesini kullanmaya çalışan çekim → **yakalanır** | ✅ |
+| Süreksiz gürültü → **FAIL değil** | ✅ |
+| Spektral iz yok (tonal/müzik yatağı) → **gürültü sayılmaz** | ✅ |
+| Güven aralığı eşiği kesiyor → **WARN, FAIL değil** | ✅ |
+| Belirsizlik büyüdükçe şüpheli bant **genişler** | ✅ |
+| Ölçüm eksik → **hüküm yok** | ✅ |
+| Konuşma bandı tavandan fazla geriler → **filtre reddedilir → FAIL** | ✅ |
+| Gürültü gitti + konuşma korundu → **TEMİZLENDİ** | ✅ |
+| Çalışan kodda `subprocess/ffmpeg/open/os.path` **yok** | ✅ |
+
+⚠ Test yazarken I-9 tuzağına düşüldü: ham dize taraması modülün **kendi
+docstring'ini** (`FFMPEG CALISTIRMAZ`) yakaladı. `_kod_yalniz` ile yalnız
+**çalışan kod** taranacak şekilde düzeltildi.
+
+### Medyasız atom kanıtı
+
+`cikti/` ve `outputs/` altında **tek bir yeni dosya oluşmadı**; değişen dört
+dosyanın hepsi kaynak koddur.
+
+⚠ **Kapanış ölçütü hatırlatması:** bu atom karar sözleşmesini kilitler; aynı
+davranışın `server.py` → pipeline üzerinden **otomatik** çalışması R-1 ile
+gelecek. Scratch kanıt atom kapatmaz.
 
 ---
 

@@ -7633,6 +7633,217 @@ kontrol("K-1: deploy.sh DOKUNULMADI",
         "docker commit" in oku(os.path.dirname(KOK), "deploy.sh"))
 
 
+blok("§40o K-2 — ARKA PLAN UGULTU KAPISI + KAYNAK SESI SIFIR")
+
+# ⚠ MEDYASIZ ATOM: ses/medya dosyasi ACILMAZ, ffmpeg CALISTIRILMAZ, artefakt
+# URETILMEZ. Butun olcumler SENTETIK SAYI olarak verilir (remote worker'in
+# uretecegi degerlerin test-double'i). $0.00.
+#
+# ── AKIS ──  olc -> guvenli filtre profili oner -> temizlemeyi DOGRULA
+#             -> temizlenemiyorsa FAIL
+# ⚠ EMIN DEGILSEN TEMIZ ICERIGI FAIL ETME: guven araligi esigi kesiyorsa
+#   sonuc `supheli` ve hukum WARN'dir, FAIL DEGIL.
+
+_SGT = __import__("editor.ses_gurultu", fromlist=["ses_gurultu"])
+
+_K2_TABAN = {"anlatim_lufs": -16.0, "sureklilik_orani": 0.95,
+             "spektral_duzluk": 0.55}
+
+
+def _k2(**ek):
+    return _SGT.gurultu_olcusu(**{**_K2_TABAN, **ek})
+
+
+# ── (1) KAYNAK VIDEO SESI: MUTLAK SIFIR ──
+kontrol("⭐ K-2: kaynak ses politikasi SIFIR olarak SABIT",
+        _SGT.KAYNAK_SES_POLITIKASI == "sifir")
+kontrol("⭐ K-2: render sozlesmesi `ses_kanali`i MAKINE OKUNUR yaziyor "
+        "(plan.py)",
+        '"ses_kanali": ses_gurultu.KAYNAK_SES_POLITIKASI'
+        in oku(KOK, "editor", "plan.py"))
+kontrol("⭐ K-2: HER IKI renderer yolu da kaynak sesi MUTE ediyor",
+        "muted" in oku(os.path.dirname(KOK), "app", "render-studio", "src",
+                       "editorv2", "Kamera.tsx")
+        and "muted" in oku(os.path.dirname(KOK), "app", "render-studio",
+                           "src", "Video.tsx"))
+_K2_SES_OK = _SGT.kaynak_ses_sozlesmesi(
+    [{"beat_id": "b1", "medya_turu": "video", "ses_kanali": "yok"},
+     {"beat_id": "b2", "medya_turu": "image"}])
+kontrol("⭐ K-2: sifir beyan eden video cekim SOZLESMEYE UYGUN",
+        _K2_SES_OK["temiz"] is True and _K2_SES_OK["video_cekim"] == 1)
+_K2_SES_RED = _SGT.kaynak_ses_sozlesmesi(
+    [{"beat_id": "b1", "medya_turu": "video", "ses_kanali": "kaynak"}])
+kontrol("⭐ K-2 RED-FIRST: kaynak sesini KULLANMAYA calisan cekim "
+        "YAKALANIYOR (`KALITE-KAYNAK-SES-SIZINTI`)",
+        _K2_SES_RED["temiz"] is False
+        and _K2_SES_RED["ihlal"][0]["ses_kanali"] == "kaynak"
+        and "KALITE-KAYNAK-SES-SIZINTI" in _qon.FAIL_KODLARI,
+        _K2_SES_RED["ihlal"])
+kontrol("⭐ K-2: FOTOGRAF cekimleri kaynak-ses sozlesmesine GIRMIYOR",
+        _SGT.kaynak_ses_sozlesmesi(
+            [{"beat_id": "b1", "medya_turu": "image",
+              "ses_kanali": "kaynak"}])["temiz"] is True)
+
+# ── (2) OLCUM: TEMIZ ICERIK YANLIS FAIL EDILMIYOR ──
+kontrol("⭐ K-2: gurultu tabani anlatimin 39 dB altindaysa TEMIZ "
+        "(esik DUYULABILIR_FARK_DB'den TURETILDI)",
+        _k2(konusma_disi_lufs=-55.0)["seviye"] == "temiz")
+kontrol("⭐ K-2 RED-FIRST: SUREKSIZ gurultu (gecici ses) FAIL DEGIL",
+        _k2(konusma_disi_lufs=-38.0, sureklilik_orani=0.20)["seviye"]
+        == "temiz")
+kontrol("⭐ K-2 RED-FIRST: SPEKTRAL IZ YOKSA (tonal/muzik yatagi) "
+        "gurultu SAYILMIYOR",
+        _k2(konusma_disi_lufs=-38.0, spektral_duzluk=0.05)["seviye"]
+        == "temiz")
+kontrol("⭐ K-2: uc kosul (duyulabilir + surekli + iz) BIRLIKTE saglanirsa "
+        "gurultu TESPIT EDILIYOR",
+        _k2(konusma_disi_lufs=-38.0)["seviye"] == "gurultu",
+        _k2(konusma_disi_lufs=-38.0)["izler"])
+kontrol("⭐ K-2: rumble ve hiss AYRI izler olarak taniniyor",
+        "rumble" in _k2(konusma_disi_lufs=-38.0, spektral_duzluk=0.0,
+                        dusuk_frekans_orani=0.44)["izler"]
+        and "hiss" in _k2(konusma_disi_lufs=-38.0, spektral_duzluk=0.0,
+                          yuksek_frekans_orani=0.40)["izler"])
+
+# ── (3) GUVEN ARALIGI: ESIGI KESIYORSA FAIL YOK ──
+_K2_SUP = _k2(konusma_disi_lufs=-46.5)
+kontrol("⭐ K-2 BELIRLEYICI: guven araligi esigi KESIYORSA sonuc `supheli` "
+        "— hukum WARN, FAIL DEGIL (EMIN DEGILSEN FAIL ETME)",
+        _K2_SUP["seviye"] == "supheli"
+        and _K2_SUP["snr_alt"] < _K2_SUP["esik_db"] < _K2_SUP["snr_ust"]
+        and _SGT.gurultu_karari(olcum=_K2_SUP)["seviye"] == "warn",
+        (_K2_SUP["snr_alt"], _K2_SUP["snr_ust"]))
+kontrol("⭐ K-2: belirsizlik BUYUDUKCE supheli bant GENISLIYOR "
+        "(karar belirsizlige DUYARLI)",
+        _k2(konusma_disi_lufs=-42.0,
+            belirsizlik_db=6.0)["seviye"] == "supheli"
+        and _k2(konusma_disi_lufs=-42.0,
+                belirsizlik_db=0.5)["seviye"] == "gurultu")
+kontrol("⭐ K-2: OLCUM EKSIKSE hukum YOK — 'temiz' DENMIYOR",
+        _SGT.gurultu_olcusu(anlatim_lufs=-16.0)["olculdu"] is False
+        and _SGT.gurultu_karari(
+            olcum=_SGT.gurultu_olcusu(anlatim_lufs=-16.0))["karar"]
+        == "OLCULEMEDI")
+
+# ── (4) GUVENLI FILTRE PROFILI ──
+_K2_RUM = _k2(konusma_disi_lufs=-38.0, spektral_duzluk=0.0,
+              dusuk_frekans_orani=0.44)
+_K2_FP = _SGT.filtre_profili_oner(_K2_RUM)
+kontrol("⭐ K-2: rumble icin YUKSEK-GECIREN oneriliyor ve kesim KONUSMA "
+        "TEMEL FREKANSININ ALTINDA (80 Hz)",
+        _K2_FP["adimlar"][0]["ad"] == "highpass"
+        and _K2_FP["adimlar"][0]["parametre"]["f"] == 80
+        and _K2_FP["adimlar"][0]["parametre"]["f"] < 85)
+kontrol("⭐ K-2: genis bantli bastirma TAVANLI (agresif denoise YOK)",
+        _SGT.filtre_profili_oner(_k2(konusma_disi_lufs=-38.0)
+                                 )["maks_bastirma_db"] <= 6.0)
+kontrol("⭐ K-2: profil KONUSMA BANDINA DOKUNMADIGINI acikca beyan ediyor "
+        "(300-3400 Hz)",
+        _K2_FP["konusma_bandina_dokunmaz"] is True
+        and _K2_FP["konusma_bandi_hz"] == [300, 3400])
+kontrol("⭐ K-2: TEMIZ icerikte filtre ONERILMIYOR (gereksiz islem yok)",
+        _SGT.filtre_profili_oner(_k2(konusma_disi_lufs=-55.0)
+                                 )["onerildi"] is False)
+kontrol("⭐ K-2: zincir DETERMINISTIK — ayni olcum ayni zinciri veriyor",
+        _SGT.filtre_profili_oner(_K2_RUM)
+        == _SGT.filtre_profili_oner(_K2_RUM))
+
+# ── (5) TEMIZLEME DOGRULAMASI: NETLIK BOZULURSA FILTRE REDDEDILIR ──
+_K2_SONRA = _k2(konusma_disi_lufs=-55.0)
+_K2_IYI = _SGT.temizleme_dogrula(
+    once=_K2_RUM, sonra=_K2_SONRA,
+    konusma_bandi_lufs_once=-18.0, konusma_bandi_lufs_sonra=-18.3)
+kontrol("⭐ K-2: gurultu gitti ve konusma bandi KORUNDUYSA filtre KABUL",
+        _K2_IYI["filtre_kabul"] is True
+        and _SGT.gurultu_karari(olcum=_K2_RUM,
+                                dogrulama=_K2_IYI)["karar"] == "TEMIZLENDI")
+_K2_KOTU = _SGT.temizleme_dogrula(
+    once=_K2_RUM, sonra=_K2_SONRA,
+    konusma_bandi_lufs_once=-18.0, konusma_bandi_lufs_sonra=-21.0)
+kontrol("⭐ K-2 BELIRLEYICI: konusma bandi TAVANDAN fazla gerilerse filtre "
+        "REDDEDILIYOR ve sonuc FAIL — netligi bozan denoise UYGULANMAZ",
+        _K2_KOTU["netlik_bozuldu"] is True
+        and _K2_KOTU["filtre_kabul"] is False
+        and _SGT.gurultu_karari(olcum=_K2_RUM,
+                                dogrulama=_K2_KOTU)["karar"] == "FAIL",
+        _K2_KOTU["konusma_gerilemesi_db"])
+kontrol("⭐ K-2: ASR guveni tavandan fazla duserse de filtre REDDEDILIYOR "
+        "(spektral olcum yoksa ASR bacagi calisir)",
+        _SGT.temizleme_dogrula(once=_K2_RUM, sonra=_K2_SONRA,
+                               asr_guven_once=0.94, asr_guven_sonra=0.88
+                               )["filtre_kabul"] is False)
+kontrol("⭐ K-2: temizleme DENENMEDIYSE kesin gurultu FAIL veriyor",
+        _SGT.gurultu_karari(olcum=_K2_RUM)["karar"] == "FAIL"
+        and _SGT.gurultu_karari(olcum=_K2_RUM)["seviye"] == "fail")
+kontrol("⭐ K-2: filtre uygulandi ama gurultu SURUYORSA da FAIL",
+        _SGT.gurultu_karari(
+            olcum=_K2_RUM,
+            dogrulama=_SGT.temizleme_dogrula(
+                once=_K2_RUM, sonra=_k2(konusma_disi_lufs=-38.0),
+                konusma_bandi_lufs_once=-18.0,
+                konusma_bandi_lufs_sonra=-18.1))["karar"] == "FAIL")
+
+# ── (6) KODLAR VE KAPI BAGLANTISI ──
+kontrol("⭐ K-2: `KALITE-SES-GURULTU` FAIL kodu KILITLENDI",
+        "KALITE-SES-GURULTU" in _qon.FAIL_KODLARI
+        and "KALITE-SES-GURULTU" in _qon.KALITE_KODLARI)
+kontrol("⭐ K-2: `KALITE-KAYNAK-SES-SIZINTI` FAIL kodu KILITLENDI",
+        "KALITE-KAYNAK-SES-SIZINTI" in _qon.FAIL_KODLARI
+        and "KALITE-KAYNAK-SES-SIZINTI" in _qon.KALITE_KODLARI)
+kontrol("⭐ K-2: olcum DISARIDAN enjekte ediliyor (`ses_gurultu_olcumu`)",
+        "ses_gurultu_olcumu" in oku(KOK, "editor", "qa_on.py"))
+kontrol("⭐ K-2: olcum verilmezse QA raporunda `olculdu=False` yaziyor, "
+        "'temiz' DENMIYOR",
+        _SGT.gurultu_karari(olcum={})["karar"] == "OLCULEMEDI")
+
+# ── (7) MEDYASIZ ATOM KANITI ──
+# ⚠ I-9 DERSI: ham dize taramasi modulun KENDI dokumantasyonunu yakalar
+# ("FFMPEG CALISTIRMAZ" cumlesi gibi). `_kod_yalniz` ile yalniz CALISAN kod
+# taranir.
+_K2_KOD = _kod_yalniz(oku(KOK, "editor", "ses_gurultu.py"))
+kontrol("⭐ K-2: modul MEDYA ACMIYOR / FFMPEG CALISTIRMIYOR — CALISAN "
+        "kodda subprocess/ffmpeg/open/dosya erisimi YOK",
+        not any(a in _K2_KOD for a in ("subprocess", "ffmpeg", "ffprobe",
+                                       "open(", "os.path", "import os")),
+        [a for a in ("subprocess", "ffmpeg", "ffprobe", "open(", "os.path")
+         if a in _K2_KOD])
+kontrol("⭐ K-2: kapsam ozeti sinirlari ACIKCA yaziyor",
+        _SGT.kapsam_ozeti()["medya_acar"] is False
+        and _SGT.kapsam_ozeti()["ffmpeg_calistirir"] is False
+        and _SGT.kapsam_ozeti()["agresif_denoise"] is False
+        and _SGT.kapsam_ozeti()["olcum_enjekte_edilir"] is True)
+kontrol("⭐ K-2 DURUSTLUK: esiklerin KAYNAGI raporlaniyor "
+        "(turetilmis vs beyan edilmis)",
+        "TURETILMIS" in _SGT.kapsam_ozeti()["esik_kaynagi"]["snr_db"]
+        and "BEYAN EDILMIS"
+        in _SGT.kapsam_ozeti()["esik_kaynagi"]["digerleri"])
+kontrol("K-2: ses_gurultu.py derleniyor",
+        _derlenir(os.path.join(KOK, "editor", "ses_gurultu.py")))
+
+# ── KORUNANLAR ──
+kontrol("K-2 GERILEME YOK: I-23/I-24/I-25/I-38 kapilari DURUYOR",
+        "KALITE-MOTION-ACILIS-KAPANIS" in _qon.FAIL_KODLARI
+        and "KALITE-MOTION-ISLEV-TEKRAR" in _qon.FAIL_KODLARI
+        and "KALITE-YAZI-SAHNE-DISI" in _qon.FAIL_KODLARI
+        and "ORAN-UYUMSUZ" in oku(KOK, "medya/edinim.py"))
+kontrol("K-2 GERILEME YOK: ESIKLER GEVSETILMEDI",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0
+        and abs(_kk.DUYULABILIR_FARK_DB - 30.0) < 1e-9
+        and abs(_kk.BASTIRMA_FARK_DB - 12.0) < 1e-9
+        and abs(_kk.KENAR_DIS_ESIGI - 6.234) < 1e-9)
+kontrol("K-2 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("K-2: kullanici secimleri DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in oku(os.path.dirname(KOK), "app",
+                                            "render-studio", "src",
+                                            "Video.tsx"))
+kontrol("K-2: deploy.sh DOKUNULMADI",
+        "docker commit" in oku(os.path.dirname(KOK), "deploy.sh"))
+kontrol("K-2: B-ROLL kapisi (K-1) DURUYOR",
+        "KALITE-BROLL-CESITLILIK" in _qon.FAIL_KODLARI)
+
+
 blok("§40h I-58 — IKI ADAY DUZENI KARSI-OLGU OLARAK OLCULDU (yalniz tanisal)")
 
 # ⚠ YALNIZ TANISAL. Uretim davranisi DEGISMEDI, kapi/esik eklenmedi.

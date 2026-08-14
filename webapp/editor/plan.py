@@ -17,7 +17,7 @@ import re
 from typing import Optional
 
 from . import (adapter, beat, gramer, kalite_kapisi, motion, profil, qa_on,
-               ses, tipografi)
+               ses, tipografi, ses_gurultu)
 from .profil import EditProfili
 
 
@@ -480,7 +480,13 @@ def uret(*, cumleler: list, medya_manifest: dict,
             "indirme_url": (aday.get("indirme_url") or "") if aday else "",
             "orijinal_url": (aday.get("orijinal_url") or "") if aday else "",
             "lisans": (aday.get("lisans") or "") if aday else "",
-            "ses_yolu": "", "sure_sn": b.sure_sn, "bas_sn": b.bas_sn,
+            "ses_yolu": "",
+            # ⚠ FAZ K-2 — KAYNAK VIDEO SESI MUTLAK SIFIR. Renderer zaten
+            # `OffthreadVideo ... muted` kullaniyor; burada sozlesme
+            # MAKINE OKUNUR hale getiriliyor ki kapi denetleyebilsin.
+            # Harici klibin sesi (ruzgar/trafik/konusma/muzik) mikse GIREMEZ.
+            "ses_kanali": ses_gurultu.KAYNAK_SES_POLITIKASI,
+            "sure_sn": b.sure_sn, "bas_sn": b.bas_sn,
             "altyazi_punto": p.tipografi.altyazi,
             "altyazi_y": tipografi.ALTYAZI_BANT[0],
             "islev": b.islev, "perde": b.perde,

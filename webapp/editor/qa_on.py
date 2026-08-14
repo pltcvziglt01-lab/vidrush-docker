@@ -18,12 +18,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
-from . import gramer, kalite_kapisi, motion, tipografi
+from . import gramer, kalite_kapisi, motion, ses_gurultu, tipografi
 
 # ⚠ `denetle()` imzasinda `kalite_kapisi` adinda BOOL bir parametre var ve
 # modul adini GOLGELIYOR. Modul fonksiyonlarina o kapsamdan erisebilmek
 # icin golgelenmeyen bir takma ad tutuluyor.
 _KK = kalite_kapisi
+_SG = ses_gurultu
 
 try:                          # ⚠ I-47: paket disi modul; yoksa kapi SESSIZ
     import medya_kapisi as medya_kapisi_modulu
@@ -67,12 +68,16 @@ FAIL_KODLARI = {
     # ⚠ Kamera-hareketi bacagi (I-24) gercek VIDEO cekimlerde MUAF; bosluk
     # bos birakilmadi, yerini bu kod aldi. Yapisal kosul, sayisal esik YOK.
     "KALITE-BROLL-CESITLILIK",
+    # ── Faz K-2: arka plan ugultu/rumble/wind + kaynak ses sizintisi ──
+    # ⚠ Olcum remote worker'dan SAYI olarak gelir; verilmezse HUKUM YOK.
+    "KALITE-SES-GURULTU", "KALITE-KAYNAK-SES-SIZINTI",
 }
 
 # I-14 kapisinin urettigi kodlar. Kapi KAPALIYKEN bunlarin HICBIRI uretilmez;
 # olcumler yine de `olcumler["kalite"]`e yazilir (gizlenmiyor, yalniz hukum
 # verilmiyor). Boylece varsayilan yolun PASS/WARN/FAIL karari BIT-BIT ayni kalir.
 KALITE_KODLARI = ("KALITE-BROLL-CESITLILIK",
+                  "KALITE-SES-GURULTU", "KALITE-KAYNAK-SES-SIZINTI",
                   "KALITE-BASLIK-KIRPIK", "KALITE-BASLIK-TASMA",
                   "KALITE-MEDYA-TEKRAR", "KALITE-RITIM-SABIT",
                   "KALITE-OLU-FINAL", "KALITE-MEDYA-BENZER-OLCULEMEDI",
@@ -162,6 +167,7 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
             benzerlik_okuyucu=None,
             enerji_okuyucu=None,
             kare_okuyucu=None,
+            ses_gurultu_olcumu=None,
             altyazi_kupleri: Optional[list] = None,
             kunye_kararlari: Optional[list] = None,
             kalite_kapisi: bool = False) -> QaSonucu:
@@ -175,6 +181,10 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
       `anlatim_bitis_sn` : anlatim sesinin bittigi an (olu final olcumu icin).
       `benzerlik_okuyucu`: (yolA, yolB) -> 0..1. Verilmezse gorsel benzerlik
                            `olculemedi` yazilir; "benzer medya yok" DENMEZ.
+      `ses_gurultu_olcumu`: remote worker'in OLCTUGU SAYILAR
+                           ({"olcum": {...}, "dogrulama": {...}}). Bu modul
+                           SES ACMAZ; verilmezse arka plan gurultusu
+                           `olculemedi` yazilir ve "temiz" DENMEZ (K-2).
       `kare_okuyucu`     : (yol) -> dosyanin KARE SAYISI ya da None.
                            ⚠ FAZ J-2a: bu modul DOSYA ACMAZ; olcer
                            DISARIDAN verilir. Verilmezse medya turu
@@ -320,6 +330,11 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
          "asset_id": getattr(c_, "asset_id", ""),
          "saglayici": getattr(c_, "saglayici", ""),
          "cekim_turu": getattr(c_, "cekim_turu", ""),
+         # ⚠ K-2: politika "sifir"; aday ACIKCA baska bir kanal beyan
+         # ederse (ornegin bir saglayici adaptoru) kapi YAKALAR.
+         "ses_kanali": str((adaylar_index.get(getattr(c_, "asset_id", ""))
+                            or {}).get("ses_kanali")
+                           or _SG.KAYNAK_SES_POLITIKASI),
          # ⚠ K-1: B-ROLL GORSEL DILI bacagi icin gerekli iki alan.
          "islev": getattr(b_, "islev", ""),
          "medya_turu": str((adaylar_index.get(getattr(c_, "asset_id", ""))
@@ -358,6 +373,33 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
                   f"tekrar etti: {_bt['cekim_turu']} (sahne {_bt['indeks']})",
                   "B-roll cekim turunu cesitlendir",
                   beat_id=_bt.get("beat_id", ""))
+
+    # ═══ 4d) SES: KAYNAK SESI SIFIR + ARKA PLAN UGULTU (Faz K-2) ═══
+    # ⚠ Bu modul SES ACMAZ. Kaynak-ses sozlesmesi PLANDAN, gurultu karari
+    # ise DISARIDAN verilen SAYILARDAN turer. Olcum yoksa HUKUM YOK.
+    _ks = _SG.kaynak_ses_sozlesmesi(_j2_sahneler)
+    q.olcumler["kaynak_ses"] = _ks
+    if kalite_kapisi:
+        for _ih in (_ks.get("ihlal") or []):
+            _ekle("KALITE-KAYNAK-SES-SIZINTI", "fail",
+                  f"kaynak video sesi SIFIR degil: "
+                  f"ses_kanali={_ih['ses_kanali']!r}",
+                  "harici klibin kendi sesi mikse GIREMEZ; kanali sifirla",
+                  beat_id=_ih.get("beat_id", ""))
+    _sgo = ses_gurultu_olcumu if isinstance(ses_gurultu_olcumu, dict) else {}
+    _gk = _SG.gurultu_karari(olcum=_sgo.get("olcum") or {},
+                             dogrulama=_sgo.get("dogrulama"))
+    q.olcumler["ses_gurultu"] = {
+        "olcum": _sgo.get("olcum") or {"olculdu": False,
+                                       "neden": "OLCUM-VERILMEDI"},
+        "dogrulama": _sgo.get("dogrulama"),
+        "karar": _gk,
+        "filtre_onerisi": _SG.filtre_profili_oner(_sgo.get("olcum") or {}),
+    }
+    if kalite_kapisi and _gk.get("kod"):
+        _ekle(_gk["kod"], _gk["seviye"], _gk["neden"],
+              "gurultuyu KAYNAKTA gider ya da guvenli filtre profilini "
+              "remote worker'da uygula; konusma netligini bozan denoise YOK")
 
     # ═══ 5) EFEKT YOGUNLUGU / RENDERABILITY ═══
     beat_efekt: dict = {}
