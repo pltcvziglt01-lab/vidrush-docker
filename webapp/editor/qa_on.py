@@ -20,6 +20,11 @@ from typing import Optional
 
 from . import gramer, kalite_kapisi, motion, tipografi
 
+# ⚠ `denetle()` imzasinda `kalite_kapisi` adinda BOOL bir parametre var ve
+# modul adini GOLGELIYOR. Modul fonksiyonlarina o kapsamdan erisebilmek
+# icin golgelenmeyen bir takma ad tutuluyor.
+_KK = kalite_kapisi
+
 try:                          # ⚠ I-47: paket disi modul; yoksa kapi SESSIZ
     import medya_kapisi as medya_kapisi_modulu
 except Exception:             # noqa: BLE001
@@ -151,6 +156,7 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
             anlatim_bitis_sn: Optional[float] = None,
             benzerlik_okuyucu=None,
             enerji_okuyucu=None,
+            kare_okuyucu=None,
             altyazi_kupleri: Optional[list] = None,
             kunye_kararlari: Optional[list] = None,
             kalite_kapisi: bool = False) -> QaSonucu:
@@ -164,6 +170,11 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
       `anlatim_bitis_sn` : anlatim sesinin bittigi an (olu final olcumu icin).
       `benzerlik_okuyucu`: (yolA, yolB) -> 0..1. Verilmezse gorsel benzerlik
                            `olculemedi` yazilir; "benzer medya yok" DENMEZ.
+      `kare_okuyucu`     : (yol) -> dosyanin KARE SAYISI ya da None.
+                           ⚠ FAZ J-2a: bu modul DOSYA ACMAZ; olcer
+                           DISARIDAN verilir. Verilmezse medya turu
+                           `olculemedi` yazilir; "statik fotograftir"
+                           DENMEZ. YALNIZ RAPOR — kapi/esik URETMEZ.
       `enerji_okuyucu`   : (yol) -> uzamsal enerji (0-255) ya da None.
                            ⚠ FAZ I-44: bu modul GORSEL ACMAZ; olcer
                            DISARIDAN verilir (`benzerlik_okuyucu` ile ayni
@@ -294,6 +305,18 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
                                f"{max(sag, key=sag.get)}",
                          oneri="alternatif saglayici adayi kullan ya da "
                                "coverage_gap birak"))
+
+    # ═══ 4b) MEDYA TURU DAGILIMI (Faz J-2a — YALNIZ RAPOR) ═══
+    # ⚠ HUKUM YOK: hicbir Sorun URETILMEZ, hicbir esik ENFORCE EDILMEZ.
+    # Okuyucu yoksa `olculemedi` yazilir; statik VARSAYILMAZ.
+    q.olcumler["medya_turu"] = _KK.medya_turu_ozeti(
+        [{"beat_id": getattr(c_, "beat_id", ""),
+          "kaynak_turu": getattr(c_, "kaynak_turu", ""),
+          "medya_yolu": ((adaylar_index.get(getattr(c_, "asset_id", "")) or {})
+                         .get("yerel_yol") or ""),
+          "sure_sn": getattr(b_, "sure_sn", 0.0)}
+         for c_, b_ in zip(cekimler, beat_plani.beatler)],
+        kare_okuyucu=kare_okuyucu, motion_specler=motion_specler)
 
     # ═══ 5) EFEKT YOGUNLUGU / RENDERABILITY ═══
     beat_efekt: dict = {}

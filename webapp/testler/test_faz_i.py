@@ -6414,6 +6414,7 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
 
 blok("§40i J-1 — STATIK FOTOGRAF / GERCEK VIDEO ORANI OLCULDU (yalniz tanisal)")
 
+
 # ⚠ YALNIZ TANISAL. Uretim davranisi DEGISMEDI, kapi/esik EKLENMEDI.
 # Ag YOK, ucretli API YOK, rerender/deploy YOK, $0.00.
 #
@@ -6592,6 +6593,175 @@ else:
     kontrol("J-1 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
             len(set(re.findall(r"\{ad: '(\w+)'",
                                oku(KOK, "static/js/api.js")))) == 22)
+
+
+blok("§40j J-2a — MEDYA TURU RAPOR SOZLESMESI (kapi YOK, esik ENFORCE YOK)")
+
+# ⚠ YALNIZ RAPOR/OLCUM SOZLESMESI. Kapi EKLENMEDI, esik ENFORCE EDILMEDI,
+# render davranisi DEGISMEDI (pilot uretilmedi). Ag YOK, $0.00.
+#
+# J-1'de olculen taban `medya_turu_ozeti()` ile UYGULAMAYA raporlaniyor:
+#   olcumler["medya_turu"] -> video_sure_orani / donmus_kadraj_sure_orani
+#
+# ── RED-FIRST HEDEFLERI ──
+# Her iddia, TERSI DOGRU OLSAYDI KIRMIZI yanacak sekilde yazildi:
+#   (1) okuyucu yoksa oranlar 0.0 DEGIL None olmali (0.0 "video yok" DER)
+#   (2) gercek video kaynagi konunca video_sure_orani ARTMALI
+#   (3) referans ENFORCE edilirse denetle'nin fail/warn sayisi DEGISIR
+#   (4) 0.155 PLAN basina uygulanirsa 4 YANLIS POZITIF olusur (olculdu)
+
+_J2_KK = _kk
+
+
+def _j2_okuyucu(yol):
+    """Test okuyucusu: gercek dosyayi ffprobe ile olcer, yoksa None."""
+    return _j1_kare(yol) if _J1_FFPROBE else None
+
+
+# ── (1) OKUYUCU YOKSA: STATIK VARSAYILMIYOR ──
+_J2_SAHNE = [{"beat_id": "b1", "kaynak_turu": "medya",
+              "medya_yolu": "/olmayan/dosya.jpg", "sure_sn": 3.0}]
+_J2_YOK = _J2_KK.medya_turu_ozeti(_J2_SAHNE)
+kontrol("⭐ J-2a: kare okuyucusu YOKKEN oranlar 0.0 DEGIL None — "
+        "'video yok / statiktir' DENMIYOR (EMIN DEGILSEN ENGELLEME)",
+        _J2_YOK["video_sure_orani"] is None
+        and _J2_YOK["donmus_kadraj_sure_orani"] is None
+        and _J2_YOK["olculdu"] is False,
+        {k: _J2_YOK[k] for k in ("video_sure_orani", "olculdu")})
+kontrol("⭐ J-2a: olculemeyen cekim AYRI KALEM olarak raporlaniyor "
+        "(sessizce statige itilmiyor)",
+        _J2_YOK["cekim"]["olculemedi"] == 1
+        and _J2_YOK["cekim"]["donmus"] == 0
+        and _J2_YOK["neden"] == "KARE-OKUYUCU-YOK", _J2_YOK["cekim"])
+kontrol("⭐ J-2a: okuyucu VAR ama dosya okunamiyorsa da `olculemedi` "
+        "(neden AYRISIYOR)",
+        _J2_KK.medya_turu_ozeti(_J2_SAHNE,
+                                kare_okuyucu=lambda y: None)["neden"]
+        == "KAYNAK-OKUNAMADI")
+
+# ── (2) GERCEK KAYITLAR UZERINDE: TABAN RAPORLANIYOR ──
+if _J1_FFPROBE and _J1_PLAN:
+    _J2_ORAN = []
+    for _pl2 in _J1_TEMSIL:
+        _o2 = _J2_KK.medya_turu_ozeti(_pl2, kare_okuyucu=_j2_okuyucu)
+        _J2_ORAN.append(_o2)
+    kontrol("⭐ J-2a: 7 bagimsiz planin HEPSI TAM OLCULDU "
+            "(olculemedi kalemi bos)",
+            all(o["olculdu"] is True for o in _J2_ORAN)
+            and all(o["cekim"]["olculemedi"] == 0 for o in _J2_ORAN),
+            [o["cekim"]["olculemedi"] for o in _J2_ORAN])
+    kontrol("⭐ J-2a TABAN: her planda `video_sure_orani` = 0.0 "
+            "(J-1 ile AYNI sonuc, bagimsiz kod yolundan)",
+            all(o["video_sure_orani"] == 0.0 for o in _J2_ORAN),
+            [o["video_sure_orani"] for o in _J2_ORAN])
+
+    # ── RED-FIRST (2): gercek video konunca oran ARTMALI ──
+    _J2_MP4 = sorted(_g1.glob(os.path.join(os.path.dirname(KOK), "outputs",
+                                           "sample", "*.mp4")))[:1]
+    if _J2_MP4:
+        _J2_SAHTE = [dict(s) for s in _J1_TEMSIL[0]]
+        _J2_SAHTE[0]["medya_yolu"] = _J2_MP4[0]
+        _J2_SAHTE[0]["kaynak_turu"] = "medya"
+        _J2_ART = _J2_KK.medya_turu_ozeti(_J2_SAHTE,
+                                          kare_okuyucu=_j2_okuyucu)
+        kontrol("⭐ J-2a RED-FIRST: GERCEK video kaynagi konunca "
+                "`video_sure_orani` SIFIRDAN BUYUYOR (olcum totolojik degil)",
+                _J2_ART["video_sure_orani"] > 0.0
+                and _J2_ART["cekim"]["video"] == 1,
+                _J2_ART["video_sure_orani"])
+    else:
+        bloke_yaz("J-2a red-first video enjeksiyonu", "outputs/sample yok")
+
+    # ── (4) SEVIYE HATASI OLCULDU: 0.155 PLAN BASINA UYGULANAMAZ ──
+    _J2_DONMUS = [o["donmus_kadraj_sure_orani"] for o in _J2_ORAN]
+    _J2_AGREGA_YP = sum(1 for d in _J2_DONMUS
+                        if d > _J2_KK.DONMUS_KADRAJ_AGREGA_REFERANSI)
+    _J2_PLAN_YP = sum(1 for d in _J2_DONMUS
+                      if d > _J2_KK.DONMUS_KADRAJ_PLAN_REFERANSI)
+    print(f"     [J-2a] plan basina donmus oranlari: "
+          f"{[round(d, 3) for d in sorted(_J2_DONMUS, reverse=True)]}")
+    kontrol("⭐ J-2a BELIRLEYICI: AGREGA referansi (0.155) PLAN basina "
+            "uygulanirsa YANLIS POZITIF veriyor — seviye KARISTIRILAMAZ",
+            _J2_AGREGA_YP == 4, f"{_J2_AGREGA_YP}/7 plan")
+    kontrol("⭐ J-2a: PLAN seviyesi referansi (0.334) mevcut korpusta "
+            "YANLIS POZITIF VERMIYOR (7 planin 7'si altinda)",
+            _J2_PLAN_YP == 0,
+            [round(d, 4) for d in _J2_DONMUS
+             if d > _J2_KK.DONMUS_KADRAJ_PLAN_REFERANSI])
+    kontrol("⭐ J-2a: plan referansi ACIK FORMULLE turetildi — maks gozlenen "
+            "plan orani, 3 haneye YUKARI yuvarlanmis (gevsetme YOK)",
+            _J2_KK.DONMUS_KADRAJ_PLAN_REFERANSI >= max(_J2_DONMUS)
+            and _J2_KK.DONMUS_KADRAJ_PLAN_REFERANSI - max(_J2_DONMUS) < 0.001,
+            f"maks {max(_J2_DONMUS):.4f} -> "
+            f"{_J2_KK.DONMUS_KADRAJ_PLAN_REFERANSI}")
+
+# ── (3) HICBIR SEY ENFORCE EDILMIYOR ──
+kontrol("⭐ J-2a: video orani icin HEDEF UYDURULMADI (pozitif ornek yok)",
+        _J2_KK.VIDEO_SURE_ORANI_HEDEFI is None)
+kontrol("⭐ J-2a: referanslar `enforce: False` ile RAPOR olarak isaretli",
+        _J2_KK.medya_turu_ozeti([])["referans"]["enforce"] is False
+        and _J2_KK.kapsam_ozeti()["rapor_referansi"]["enforce"] is False)
+kontrol("⭐ J-2a: medya turu icin YENI FAIL KODU EKLENMEDI",
+        not any("MEDYA-TUR" in k or "VIDEO-ORAN" in k or "DONMUS" in k
+                for k in _qon.FAIL_KODLARI), _qon.FAIL_KODLARI)
+kontrol("⭐ J-2a: olcum modulu hukum VERMIYOR — donen sozlukte "
+        "fail/warn/seviye ANAHTARI YOK",
+        not ({"fail", "warn", "seviye", "ihlal"}
+             & set(_J2_KK.medya_turu_ozeti([]))),
+        sorted(_J2_KK.medya_turu_ozeti([])))
+
+# ── UCTAN UCA: RAPOR ALANI VAR, HUKUM DEGISMIYOR ──
+# ⚠ Kopru `qa` ozeti indirgenmistir (durum/fail/warn); TAM `olcumler`
+# `editor_qa.json`'a yazilir. Iddia HER IKI yolda da denetleniyor.
+kontrol("⭐ J-2a UCTAN UCA: tam olcum `editor_qa.json`'a yaziliyor "
+        "(QaSonucu.sozluk() `olcumler`i tasiyor, plan.py onu diske yazar)",
+        '"olcumler": self.olcumler' in oku(KOK, "editor", "qa_on.py")
+        and 'editor_qa.json' in oku(KOK, "editor", "plan.py"))
+if "_R9" in dir():
+    _J2_E2E = (_R9["qa"] or {}).get("medya_turu")
+    kontrol("⭐ J-2a UCTAN UCA: `medya_turu` kopru QA ozetinde de VAR",
+            isinstance(_J2_E2E, dict), sorted(_R9["qa"] or {}))
+    kontrol("⭐ J-2a: okuyucu verilmeyen UCTAN UCA kosumda medya turu "
+            "DURUSTCE `olculemedi` — statik VARSAYILMIYOR",
+            _J2_E2E["olculdu"] is False
+            and _J2_E2E["video_sure_orani"] is None
+            and _J2_E2E["neden"] == "KARE-OKUYUCU-YOK", _J2_E2E.get("neden"))
+    kontrol("⭐ J-2a: rapor alani HUKMU DEGISTIRMIYOR — durum yalnizca "
+            "fail/warn sayisindan turuyor",
+            (_R9["qa"]["durum"] == "FAIL") == (_R9["qa"]["fail"] > 0))
+
+# ── KORUNANLAR ──
+kontrol("J-2a GERILEME YOK: I-23/I-24/I-25/I-38 kapilari DURUYOR",
+        "KALITE-MOTION-ACILIS-KAPANIS" in _qon.FAIL_KODLARI
+        and "KALITE-MOTION-ISLEV-TEKRAR" in _qon.FAIL_KODLARI
+        and "KALITE-YAZI-SAHNE-DISI" in _qon.FAIL_KODLARI
+        and "ORAN-UYUMSUZ" in oku(KOK, "medya/edinim.py")
+        and "class DevreKesici" in oku(KOK, "medya/edinim.py"))
+kontrol("J-2a GERILEME YOK: ESIKLER GEVSETILMEDI",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0
+        and abs(_kk.BENZERLIK_ESIGI - 0.86) < 1e-9
+        and abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9
+        and abs(_kk.KENAR_DIS_ESIGI - 6.234) < 1e-9
+        and abs(_kk.MODEL_K - 0.935) < 1e-6)
+kontrol("J-2a GERILEME YOK: lisans/provenance kapilari DURUYOR",
+        "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI
+        and "def lisans_suz" in oku(KOK, "edit_kopru.py"))
+kontrol("J-2a GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("J-2a: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in oku(os.path.dirname(KOK), "app",
+                                            "render-studio", "src",
+                                            "Video.tsx"))
+kontrol("J-2a: deploy.sh DOKUNULMADI (docker commit ile kalicilik duruyor)",
+        "docker commit" in oku(os.path.dirname(KOK), "deploy.sh"))
+kontrol("J-2a: okuyucu sozlesmesi MEVCUT desenle AYNI — modul DOSYA ACMAZ",
+        "kare_okuyucu" in oku(KOK, "editor", "qa_on.py")
+        and "kare_okuyucu" in oku(KOK, "editor", "plan.py")
+        and "kare_okuyucu" in oku(KOK, "edit_kopru.py"))
+kontrol("J-2a: kapsam_ozeti yeni olcumu SAYIYOR (gizli buyume yok)",
+        _kk.kapsam_ozeti()["olcum"] >= 14
+        and "medya_turu_ozeti" in _kk.kapsam_ozeti()["olcum_adlari"])
 
 
 blok("§40h I-58 — IKI ADAY DUZENI KARSI-OLGU OLARAK OLCULDU (yalniz tanisal)")

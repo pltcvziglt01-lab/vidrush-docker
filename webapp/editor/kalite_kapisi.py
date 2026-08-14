@@ -2246,20 +2246,175 @@ def izleyici_kalite_puani(*, optik=None, grammar=None, ritim=None,
     }
 
 
+# ═══════════ MEDYA TURU DAGILIMI (Faz J-2a — YALNIZ RAPOR) ═════════════
+#
+# ⚠ BU BIR KAPI DEGILDIR. Hicbir fail/warn kodu URETMEZ, hicbir esik
+# ENFORCE ETMEZ. Yalnizca "video mu, statik fotograf mi, donmus kadraj mi"
+# sorusunu OLCULEBILIR hale getirir.
+#
+# ── J-1'DE OLCULEN TABAN (7 BAGIMSIZ PLAN, 32 cekim, 118.5 sn) ──
+#   gercek hareketli video   0/32   0.0%   0.0 sn   0.0%
+#   statik + Ken Burns      26/32  81.2%  93.9 sn  79.2%
+#   statik, HAREKETSIZ       4/32  12.5%  18.4 sn  15.5%
+#   sentetik/motion-graphic  2/32   6.2%   6.3 sn   5.3%
+#   olculemedi               0/32   0.0%   0.0 sn   0.0%
+#
+# ── REFERANSLAR: SEVIYE KARISTIRILMAZ ──
+# ⚠ OLCULDU: 0.155 KORPUS AGREGASIDIR (18.4 / 118.5) ve PLAN BASINA
+# uygulanirsa 7 planin 4'unde YANLIS POZITIF verir:
+#     _i15 0.318 · _i16 0.297 · _ses_10sn 0.333 · _smoke_editorv2 0.295
+#     (_i18 / _i20 / lawn = 0.000)
+# Bu yuzden IKI AYRI referans tutulur ve HANGI SEVIYEDE gecerli oldugu
+# alanin adinda yazar. Plan seviyesi referansi ACIK FORMULLE turetilir:
+#     plan_referansi = ceil(maks_gozlenen_plan_orani, 3 hane)
+#                    = ceil(0.3333, 3) = 0.334
+# Bu bir KALITE HEDEFI DEGIL, REGRESYON kilididir: "bugunkunden kotuye
+# gitme" der; mevcut korpusta YANLIS POZITIF sayisi TANIM GEREGI 0'dir.
+DONMUS_KADRAJ_AGREGA_REFERANSI = 0.155
+DONMUS_KADRAJ_PLAN_REFERANSI = 0.334
+
+# ⚠ VIDEO ORANI ICIN HEDEF UYDURULMADI. Korpusta TEK BIR pozitif ornek
+# (gercek video kaynagi) YOKTUR; veriden esik turetilemez. I-34/I-58
+# dersi geregi burasi bilerek None birakildi.
+VIDEO_SURE_ORANI_HEDEFI = None
+
+# Kamera hareketi SAYILAN parametreler — biri gercekten degisiyorsa
+# "Ken Burns", hepsi sabitse "donmus kadraj".
+_HAREKET_PARAMETRELERI = ("zoom", "pan_x", "pan_y")
+
+
+def _kamera_hareketi_var(motionlar) -> bool:
+    for m in motionlar or []:
+        if not isinstance(m, dict):
+            continue
+        p = m.get("parametre") or {}
+        for ad in _HAREKET_PARAMETRELERI:
+            v = p.get(ad)
+            if isinstance(v, (list, tuple)) and len(v) == 2:
+                try:
+                    if abs(float(v[0]) - float(v[1])) > 1e-6:
+                        return True
+                except (TypeError, ValueError):
+                    continue
+    return False
+
+
+def medya_turu_ozeti(sahneler, *, kare_okuyucu: Optional[Callable] = None,
+                     motion_specler: Optional[list] = None) -> dict:
+    """Cekimlerin medya TURU dagilimi — video / statik / donmus / sentetik.
+
+    `kare_okuyucu(yol) -> int | None` DISARIDAN verilir; bu modul DOSYA
+    ACMAZ (`benzerlik_okuyucu` / `enerji_okuyucu` ile ayni sozlesme).
+    Okuyucu yoksa medya cekimleri `olculemedi` yazilir — "statiktir"
+    DENMEZ. ⚠ EMIN DEGILSEN ENGELLEME: olculemeyen hicbir sey varsayilan
+    bir sinifa ITILMEZ ve oranlar None doner.
+
+    ⚠ HUKUM VERMEZ: dondurdugu sozlukte fail/warn YOKTUR. Referanslar
+    yalnizca RAPOR icindir (`enforce: False`).
+    """
+    try:
+        liste = [s for s in (sahneler or []) if isinstance(s, dict)]
+    except TypeError:
+        return {"olculdu": False, "neden": "GIRDI-BOZUK"}
+
+    # motion'lar sahnenin icinde olabilir ya da ayri listeden beat_id ile
+    # eslenir; ikisi de yoksa "hareket bilinmiyor" degil, hareket YOK sayilir
+    # (motion spec'in olmamasi ORTAK bir olgudur, olcum bosluğu degil).
+    beat_motion: dict = {}
+    for sp in motion_specler or []:
+        if isinstance(sp, dict):
+            beat_motion.setdefault(str(sp.get("beat_id") or ""), []).append(sp)
+
+    sinif_say: dict = {"video": 0, "kenburns": 0, "donmus": 0,
+                       "sentetik": 0, "olculemedi": 0}
+    sinif_sure: dict = {k: 0.0 for k in sinif_say}
+    kalemler = []
+    for s in liste:
+        try:
+            sure = float(s.get("sure_sn") or 0.0)
+        except (TypeError, ValueError):
+            sure = 0.0
+        if str(s.get("kaynak_turu") or "") != "medya":
+            k = "sentetik"
+        else:
+            yol = str(s.get("medya_yolu") or s.get("yerel_yol") or "")
+            kare = None
+            if yol and callable(kare_okuyucu):
+                try:
+                    kare = kare_okuyucu(yol)
+                except Exception:
+                    kare = None
+            if kare is None:
+                k = "olculemedi"
+            elif kare > 1:
+                k = "video"
+            else:
+                motionlar = s.get("motion")
+                if motionlar is None:
+                    motionlar = beat_motion.get(str(s.get("beat_id") or ""), [])
+                k = ("kenburns" if _kamera_hareketi_var(motionlar)
+                     else "donmus")
+        sinif_say[k] += 1
+        sinif_sure[k] += sure
+        kalemler.append({"beat_id": s.get("beat_id", ""), "sinif": k,
+                         "sure_sn": round(sure, 3)})
+
+    toplam = sum(sinif_sure.values())
+    tam_olculdu = sinif_say["olculemedi"] == 0 and bool(liste)
+
+    def _oran(ad):
+        if not tam_olculdu or toplam <= 0:
+            return None
+        return round(sinif_sure[ad] / toplam, 4)
+
+    ozet = {
+        "olculdu": tam_olculdu,
+        "cekim": dict(sinif_say),
+        "sure_sn": {k: round(v, 3) for k, v in sinif_sure.items()},
+        "toplam_sn": round(toplam, 3),
+        # ── J-2a SOZLESMESI: iki rapor alani ──
+        "video_sure_orani": _oran("video"),
+        "donmus_kadraj_sure_orani": _oran("donmus"),
+        # statik = Ken Burns + donmus (izleyicinin "slayt" hissi)
+        "statik_sure_orani": (None if not tam_olculdu or toplam <= 0 else
+                              round((sinif_sure["kenburns"]
+                                     + sinif_sure["donmus"]) / toplam, 4)),
+        "olculemedi_sure_orani": (round(sinif_sure["olculemedi"] / toplam, 4)
+                                  if toplam > 0 else None),
+        "kalemler": kalemler,
+        # ── REFERANSLAR (⚠ RAPOR; HICBIRI UYGULANMAZ) ──
+        "referans": {
+            "donmus_kadraj_plan": DONMUS_KADRAJ_PLAN_REFERANSI,
+            "donmus_kadraj_agrega": DONMUS_KADRAJ_AGREGA_REFERANSI,
+            "video_sure_orani_hedefi": VIDEO_SURE_ORANI_HEDEFI,
+            "kaynak": "J-1 tabani — 7 bagimsiz plan, 32 cekim, 118.5 sn",
+            "enforce": False,
+            "not": ("`donmus_kadraj_agrega` KORPUS seviyesindedir; PLAN "
+                    "basina uygulanirsa 7 planin 4'unde yanlis pozitif "
+                    "verir. Plan seviyesinde `donmus_kadraj_plan` gecerli. "
+                    "Video hedefi UYDURULMADI: pozitif ornek yok."),
+        },
+    }
+    if not tam_olculdu:
+        ozet["neden"] = ("KARE-OKUYUCU-YOK" if not callable(kare_okuyucu)
+                         else "KAYNAK-OKUNAMADI")
+    return ozet
+
+
 # ═════════════════════════ KAPSAM OZETI ═════════════════════════════════
 
 def kapsam_ozeti() -> dict:
     """Bu modulun NE OLCTUGU sayilabilir olsun — "her seyi olcuyoruz" yok."""
     return {
         "sema_surum": SEMA_SURUM,
-        "olcum": 13,
+        "olcum": 14,
         "olcum_adlari": ["baslik_olcusu", "kelime_ortasi_kesik",
                          "medya_tekrari", "ritim_olcusu",
                          "ambans_duyulabilirligi", "miks_olcusu",
                          "guvenli_alan_olcusu", "yazi_cakismasi",
                          "altyazi_kupleri", "optik_hareket_olcusu",
                          "motion_grammar_olcusu", "izleyici_kalite_puani",
-                         "kenar_siyahligi_olcusu"],
+                         "kenar_siyahligi_olcusu", "medya_turu_ozeti"],
         "render_sabiti": 7,
         "enjekte_edilen_okuyucu": 1,
         "esik": {
@@ -2279,6 +2434,14 @@ def kapsam_ozeti() -> dict:
             "optik_asiri": OPTIK_ASIRI_ESIGI,
             "kenar_siyah": KENAR_SIYAH_ESIGI,
             "hareket_penceresi": HAREKET_PENCERESI,
+        },
+        # ⚠ J-2a: RAPOR referansi — ESIK DEGIL, hicbir yerde ENFORCE
+        # EDILMEZ. Seviyesi adinda yazar (plan / agrega).
+        "rapor_referansi": {
+            "donmus_kadraj_plan": DONMUS_KADRAJ_PLAN_REFERANSI,
+            "donmus_kadraj_agrega": DONMUS_KADRAJ_AGREGA_REFERANSI,
+            "video_sure_orani_hedefi": VIDEO_SURE_ORANI_HEDEFI,
+            "enforce": False,
         },
         # Kapsam DISI oldugunu acikca yaz — sonraki atomlarin isi.
         # ⚠ I-16'da altyazi, kaynak kunyesi ve 1080p KAPSAMA ALINDI; listeden

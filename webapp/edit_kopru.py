@@ -212,6 +212,7 @@ def plan_kur(*, cumleler, medya_manifest, olgular=None, stil=None,
              destek_matrisi=None, kare_olcu=None,
              anlatim_bitis_sn=None, benzerlik_okuyucu=None,
              enerji_okuyucu=None,
+             kare_okuyucu=None,
              altyazi_kupleri=None, kalite_kapisi=None,
              saglayici_tavani=None) -> dict:
     """Uctan uca: analiz + stil + olgu + medya -> EditorV2 props.
@@ -271,6 +272,7 @@ def plan_kur(*, cumleler, medya_manifest, olgular=None, stil=None,
             kare_olcu=kare_olcu, anlatim_bitis_sn=anlatim_bitis_sn,
             benzerlik_okuyucu=benzerlik_okuyucu,
             enerji_okuyucu=enerji_okuyucu,
+            kare_okuyucu=kare_okuyucu,
             altyazi_kupleri=altyazi_kupleri,
             # ⚠ I-22: varsayilan 4 tavani COK SAGLAYICILI durum icin bir
             # cesitlilik guvencesidir. TEK saglayicili bir iste 4'ten fazla
@@ -337,9 +339,12 @@ def plan_kur(*, cumleler, medya_manifest, olgular=None, stil=None,
         "ok": True,
         "neden": "" if render_edilebilir else "QA-FAIL",
         "render_edilebilir": render_edilebilir,
+        # ⚠ J-2a: `medya_turu` YALNIZ RAPOR alanidir — durum/fail/warn
+        # hesabina GIRMEZ, hicbir esik ENFORCE ETMEZ.
         "qa": {"durum": qa_durum, "fail": qa.get("fail", 0),
                "warn": qa.get("warn", 0),
-               "sorun_sayisi": len(qa.get("sorunlar") or [])},
+               "sorun_sayisi": len(qa.get("sorunlar") or []),
+               "medya_turu": (qa.get("olcumler") or {}).get("medya_turu")},
         "profil_adi": profil_adi, "profil_gerekce": profil_gerekce,
         "stil_kararlari": kararlar,
         "elenen_medya": elenen,

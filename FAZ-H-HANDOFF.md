@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 14 Ağu | **J-2a medya türü rapor sözleşmesi (kapı YOK)** | `PENDING` | ✅ **push edildi**, J-1 tabanı uygulamanın kendi raporuna bağlandı: `olcumler["medya_turu"]` → `video_sure_orani` + `donmus_kadraj_sure_orani` (+ statik/ölçülemedi oranları, kalemler); okuyucu deseni **mevcutla birebir** (`kare_okuyucu` dışarıdan, modül **dosya açmaz**), okuyucu yoksa oranlar **`None`** — 0.0 değil, çünkü 0.0 "video yok" **iddiasıdır**; ⚠ **seviye hatası ölçülüp ayrıştırıldı**: 0.155 **korpus agregası**, plan başına uygulanırsa **7 planın 4'ünde yanlış pozitif** → ayrı `DONMUS_KADRAJ_PLAN_REFERANSI = 0.334` (formül: `ceil(maks_gözlenen, 3)`), mevcut korpusta yanlış pozitif **0/7**; ikisi de **`enforce: False`**, hiçbir yerde uygulanmıyor; `VIDEO_SURE_ORANI_HEDEFI = None` — **uydurulmadı** (pozitif örnek yok); **yeni fail kodu YOK**, ölçüm modülü hüküm vermiyor; **render değişmezliği kanıtlandı** (HEAD worktree ile `render_plan`/`edit_manifest`/`props` SHA **birebir aynı**, QA WARN 0/3 aynı) → **pilot üretilmedi**; ⚠ yol boyunca gerçek kusur: `denetle()` imzasındaki bool `kalite_kapisi` parametresi modül adını **gölgeliyor** (→ `_KK` takma adı); I-23/I-24/I-25/I-38, eşikler, lisans/provenance, 22 alan, kullanıcı seçimleri, `deploy.sh` **korundu**; deploy YOK, $0.00 |
 | 14 Ağu | **J-1 statik fotoğraf / gerçek video oranı ölçüldü (tanısal)** | `ca9ebc1` | ⚠ **push edildi**, kullanıcı önceliğinin 1. atomu, ağsız: 17 koşum → **7 benzersiz plan** (lawn'ın 10 render'ı **tek** örnek), 32 çekim / 118.5 sn; **gerçek hareketli video %0.0**, statik fotoğraf **süre %94.7** (Ken Burns %79.2 + **donmuş kadraj %15.5**), sentetik %5.3, **ölçülemedi %0**; sınıf kararı `medya_turu` alanına DEĞİL `ffprobe -count_frames` ile **dosyanın kendisine** dayanıyor, belirsiz olan varsayılmıyor; yanlış sınıflama payı **24/24 doğru** (4 gerçek MP4 → 4/4 `a_video`, 20 kaynak → 20/20 tek kare) ⚠ ama pozitif örnekler **render çıktısı**, korpusa hiç video kaynağı girmemiş; red-first: sahte korpusa video enjekte edilince iddia **KIRMIZI** yanıyor (totolojik değil); ⚠ kısıt **kod değil** — `avci`/`medya_kopru` varsayılanı zaten `"video"`; J-2 eşiği **önerildi ama ÜRETİME ALINMADI** (pozitif örnek yok, E türetilemez); üretim kodu/eşik değişmedi, rerender/deploy YOK, $0.00 |
 | 14 Ağu | **I-58 iki aday düzeni karşı-olgu olarak ölçüldü (tanısal)** | `855a60c` | ⚠ **push edildi**, ağsız/ücretsiz karşı-olgu: **A** (farklı 2. aday) tekrar kapısından temiz, **B** (aynı adayın farklı kadrajı) **mevcut I-22 kapısını ihlal ediyor** (bitişik aynı varlık → `KALITE-MEDYA-TEKRAR` fail, üretimin kendi manifestinden canlı hesaplandı); B'yi bloke eden şeyin benzerlik **değil** yalnız `asset_id` olduğu **kaynak koddan** gösterildi (`medya_tekrari` aynı-kimlik çiftinde benzerlik bacağını `continue` ile atlıyor; üretimde `benzerlik_okuyucu=None`); ⚠ **belirleyici**: B **semantik kusuru gidermiyor** — b002 1900 arşiv fotoğrafını alıyor, I-47 uyarısı onun için de yanıyor (canlı çağrı); ⚠ çok-beatli sahne 17 koşumun 12'sinde var ama 10'u aynı planın yeniden render'ı → lawn ailesi dışında yalnız **iki** bağımsız iş (`_i20`, `_smoke_editorv2`) → yanlış pozitif payı güvenilir ölçülemez (I-34 dersi); ⚠ **kapanış denetiminde ÜÇ iddia ELENDİ ve silindi** — kadraj varyantı dHash'leri (0.59–0.77), beş varyantın beklenen optiği (2.83–3.48) ve lisans/provenance iddiası: üçü de sabit sözlükten okunup eşikle karşılaştırılıyordu, **yeniden türetilmiyordu** ve dayanağı (dHash uygulaması / E,d girdileri / ilgili kontrol) repoda **yok**; **üretime alınmadı**, üretim kodu değişmedi, rerender/deploy YOK, $0.00 |
 | 14 Ağu | **I-57 b001/b002 seçim zinciri geriye izlendi (tanısal)** | `ab9b09e` | ✅ **push edildi**, üretimin kendi kayıtlarından: s001 cümlesi **ikiye kesilmiş**, b002 sahnenin **2. adayı** (puan 90→80) ve **kendi beat metniyle hiç aranmamış**; ⚠ ölçüldü ki `semantik_puan` varlık çıkmayınca **altı adayda da tam 50.0** (sıfır bilgi) ve `alaka_kapisi` bu korpusta **ters** çalışıyor — **3 yanlış adayın 3'ünü geçiriyor, 3 doğrudan 2'sini reddediyor**; b002'yi ayıran tek sinyal **yapısal** (aynı sahnenin rank≥2 adayı) ama **yanlış pozitif payı ölçülemez** (örnek büyüklüğü 1) → **üretime konmadı**; ⚠ b002 varlığı **yağmurlama değil** (Kanapou-Kahoolawe erozyon sahası; yağmurlama b004 ve **doğru**); üretim/render değişmedi, deploy YOK |
@@ -5672,6 +5673,105 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 78. FAZ J-2a — MEDYA TÜRÜ RAPOR SÖZLEŞMESİ (kapı YOK, eşik ENFORCE YOK, 14 Ağu)
+
+> **Durum: J-1'in ölçtüğü taban artık **uygulamanın kendi raporunda**.
+> `olcumler["medya_turu"]` → `video_sure_orani` + `donmus_kadraj_sure_orani`.
+> **Hiçbir kapı eklenmedi, hiçbir eşik ENFORCE edilmedi.** Render davranışı
+> **değişmedi** (SHA ile kanıtlandı) → **pilot üretilmedi**. A–I yeşil
+> (**3618**, 0 hata, 2 bilinen BLOKE). Ağ YOK, ücretli API YOK, deploy YOK,
+> $0.00.**
+> Değişen: `webapp/editor/kalite_kapisi.py` (+ ölçüm fonksiyonu),
+> `webapp/editor/qa_on.py`, `webapp/editor/plan.py`, `webapp/edit_kopru.py`
+> (üçü de **yalnız parametre geçişi**), `webapp/testler/test_faz_i.py`
+> (§40j, 25 kontrol).
+
+### Sözleşme
+
+`kalite_kapisi.medya_turu_ozeti(sahneler, *, kare_okuyucu=None, motion_specler=None)`
+
+Mevcut okuyucu deseniyle **birebir aynı**: modül **dosya açmaz**, ölçer
+dışarıdan verilir (`benzerlik_okuyucu` / `enerji_okuyucu` gibi). Okuyucu
+yoksa `olculdu: False`, `neden: "KARE-OKUYUCU-YOK"` ve oranlar **`None`** —
+**0.0 değil**, çünkü 0.0 "video yok" **iddiasıdır**. `EMİN DEĞİLSEN
+ENGELLEME`. Zincir: `edit_kopru.plan_kur` → `editor.plan` → `qa_on.denetle`.
+
+Rapor alanları: `video_sure_orani`, `donmus_kadraj_sure_orani`,
+`statik_sure_orani`, `olculemedi_sure_orani`, sınıf bazında çekim/süre ve
+`kalemler`. Tam ölçüm `editor_qa.json`'a, özet köprünün `qa` sözlüğüne yazılır.
+
+### ⚠ SEVİYE HATASI ÖLÇÜLDÜ VE AYRIŞTIRILDI
+
+J-1'in **0.155**'i bir **korpus agregasıdır** (18.4 / 118.5). **Plan başına
+uygulanırsa 7 planın 4'ünde YANLIŞ POZİTİF verir** — ölçüldü:
+
+| Plan | donmuş oranı | 0.155 agrega | 0.334 plan |
+|---|---|---|---|
+| `_ses_10sn` | 0.333 | ⛔ ihlal | ✅ temiz |
+| `_i15` | 0.318 | ⛔ ihlal | ✅ temiz |
+| `_i16` | 0.297 | ⛔ ihlal | ✅ temiz |
+| `_smoke_editorv2` | 0.295 | ⛔ ihlal | ✅ temiz |
+| `_i18` / `_i20` / lawn | 0.000 | ✅ | ✅ |
+| **Yanlış pozitif** | | **4/7** | **0/7** |
+
+Bu yüzden **iki ayrı referans** tutuluyor ve **hangi seviyede geçerli olduğu
+alanın adında yazıyor**:
+
+```
+DONMUS_KADRAJ_AGREGA_REFERANSI = 0.155   # KORPUS seviyesi
+DONMUS_KADRAJ_PLAN_REFERANSI   = 0.334   # PLAN seviyesi
+    formül: ceil(maks_gözlenen_plan_oranı, 3 hane) = ceil(0.3333, 3)
+```
+
+Plan referansı bir **kalite hedefi değil, regresyon kilidi**: "bugünkünden
+kötüye gitme". Mevcut korpusta yanlış pozitif **tanım gereği 0**. İkisi de
+`enforce: False` ile işaretli; **hiçbir yerde uygulanmıyor**.
+
+⚠ `VIDEO_SURE_ORANI_HEDEFI = None` — **uydurulmadı**. Korpusta tek bir
+pozitif örnek yok; veriden eşik türetilemez (I-34/I-58 dersi).
+
+### Red-first doğrulaması
+
+| İddia | Tersi olsaydı |
+|---|---|
+| Okuyucu yoksa oranlar `None` | `0.0` dönseydi sessizce "video yok" denirdi → KIRMIZI |
+| Gerçek video konunca `video_sure_orani > 0` | ölçüm totolojik olsaydı 0 kalırdı → KIRMIZI |
+| `0.155` plan başına 4 yanlış pozitif | seviye hatası tekrarlanırsa yakalanır |
+| `denetle` fail/warn sayısı değişmiyor | referans enforce edilseydi değişirdi |
+
+### Render değişmezliği (kanıt)
+
+HEAD `7d3200f`'ten ayrı bir **git worktree** kurulup aynı fixture iki kodda
+koşuldu:
+
+| | HEAD (öncesi) | Çalışma ağacı (sonrası) |
+|---|---|---|
+| `render_plan` SHA | `c488eb157312a380` | **`c488eb157312a380`** |
+| `edit_manifest` SHA | `34ed2b459b410903` | **`34ed2b459b410903`** |
+| `props` SHA | `db1ff69176149dfa` | **`db1ff69176149dfa`** |
+| QA durum/fail/warn | WARN 0/3 | **WARN 0/3** |
+| `qa.medya_turu` | YOK | **VAR** |
+
+Render çıktısı **bit düzeyinde aynı** → talimat gereği **pilot üretilmedi**.
+
+### ⚠ Yol boyunca bulunan gerçek kusur
+
+`qa_on.denetle()` imzasında **`kalite_kapisi` adında bool bir parametre var**
+ve modül adını **gölgeliyor**; `kk` takma adı da ayrı bir fonksiyonda
+bağlanıyor. İlk bağlama denemesi bu yüzden `AttributeError: 'bool' object has
+no attribute ...` verdi. Modül düzeyinde gölgelenmeyen `_KK` takma adı
+eklendi. ⚠ Bu tuzak **aynı fonksiyona ileride eklenecek her modül çağrısı
+için geçerlidir**.
+
+### Korunanlar
+
+I-23/I-24/I-25/I-38 kapıları, tüm eşikler (optik 2.0 / benzerlik 0.86 /
+enerji 11.589 / kenar_dış 6.234 / k 0.935), lisans-provenance kapıları,
+22 alan sözleşmesi, kullanıcı seçimleri (`Video.tsx` zoom/pan), `deploy.sh`
+— hepsi testle doğrulanarak **dokunulmadı**.
 
 ---
 
