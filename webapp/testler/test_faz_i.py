@@ -8058,6 +8058,185 @@ kontrol("R-1a: imzali_url.py derleniyor",
         _derlenir(os.path.join(KOK, "imzali_url.py")))
 
 
+blok("§40r R-1b — TENANT PROVIDER ZINCIRI (adapter -> motor -> timeline)")
+
+# ⚠ MEDYASIZ + AGSIZ: MCP cagirici, sifre cozucu, olcer ve ucretsiz arayici
+# TEST-DOUBLE'dir. Gercek OAuth YOK, kredi TUKETILMEZ. $0.00.
+#
+# Zincir: planlayici -> provider registry -> job-scope token -> MCP
+#         capability discovery -> edinim -> olcum -> provenance -> timeline
+
+_SM = __import__("medya.saglayici_motoru", fromlist=["saglayici_motoru"])
+
+_SM_KAYIT = {"t1": {"saglayici": "magnific", "aktif": True, "onayli": True,
+                    "sifreli_token": b"ENC", "kredi_onayi": True,
+                    "model_secimi": "auto"}}
+_SM_ISTEK = [_SM.shot_istegi(scene_id="s01", sorgu="lawn sprinkler",
+                             negatifler=["cartoon"], sure_sn=12)]
+_SM_COZ = lambda e: "tok_test"                                   # noqa: E731
+_SM_OLC = lambda h: {"genislik": 1920, "yukseklik": 1080,        # noqa: E731
+                     "bitrate": 8_000_000, "codec": "vp9"}
+_SM_UCR = lambda i: [{"baslik": "lawn sprinkler commons",        # noqa: E731
+                      "medya_turu": "video", "lisans": "cc-by-sa",
+                      "asset_id": "c1"}]
+
+
+def _sm_mcp(yetenekler, adaylar=None):
+    def _c(ad, arg):
+        if ad == "capabilities":
+            return {"capabilities": list(yetenekler)}
+        return {"adaylar": list(adaylar if adaylar is not None else [
+            {"baslik": "lawn sprinkler garden", "medya_turu": "video",
+             "lisans": "cc-by", "orijinal_url": "https://x/1",
+             "eser_sahibi": "A", "asset_id": "m1"}])}
+    return _c
+
+
+def _sm_edin(**ek):
+    v = dict(kayit=_SM_KAYIT, tenant_id="t1", job_id="j1",
+             istekler=_SM_ISTEK, sifre_cozucu=_SM_COZ,
+             ucretsiz_arayici=_SM_UCR, olcer=_SM_OLC)
+    v.update(ek)
+    return _SM.edin(**v)
+
+
+# ── (1) SHOT ISTEGI PLANLAYICIDAN ──
+kontrol("⭐ R-1b: shot istegi semantik sorgu + negatif + oran + sure + "
+        "kalite hedefi tasiyor",
+        set(_SM_ISTEK[0]) >= {"scene_id", "sorgu", "negatifler", "oran",
+                              "sure_sn", "kalite_hedefi"})
+kontrol("⭐ R-1b: istek suresi KAYNAK TAVANINA (8 sn) kirpiliyor",
+        _SM_ISTEK[0]["sure_sn"] == 8.0, _SM_ISTEK[0]["sure_sn"])
+
+# ── (2) REGISTRY + TENANT IZOLASYONU ──
+kontrol("⭐ R-1b BELIRLEYICI: BASKA tenant'in baglantisi SECILMIYOR",
+        _SM.saglayici_sec(_SM_KAYIT, "t2")["saglayici"]
+        == _SM.UCRETSIZ_SAGLAYICI
+        and "BAGLANTI-YOK" in _SM.saglayici_sec(_SM_KAYIT,
+                                                "t2")["fallback_reason"])
+kontrol("⭐ R-1b: onaysiz/kredi onaysiz baglanti KULLANILMIYOR",
+        not _SM.kullanilabilir_mi(
+            dict(_SM_KAYIT["t1"], onayli=False))["kullanilabilir"]
+        and not _SM.kullanilabilir_mi(
+            dict(_SM_KAYIT["t1"], kredi_onayi=False))["kullanilabilir"])
+kontrol("⭐ R-1b: kullanici ACIKCA Magnific dedi ama baglanti yoksa SESSIZ "
+        "gecis YOK — neden GORUNUR",
+        "MAGNIFIC-KULLANILAMIYOR" in _SM.saglayici_sec(
+            {}, "t1", tercih=_SM.TERCIH_MAGNIFIC)["fallback_reason"])
+kontrol("⭐ R-1b BELIRLEYICI: TENANT TOKENI ISTEMCIYE CIKMIYOR",
+        "sifreli_token" not in _SM.baglanti_ozeti(_SM_KAYIT["t1"])
+        and "token" not in _SM.baglanti_ozeti(_SM_KAYIT["t1"])
+        and _SM.baglanti_ozeti(_SM_KAYIT["t1"])["token_var"] is True)
+
+# ── (3) JOB-SCOPE TOKEN: SIFRELEME UYDURULMUYOR ──
+kontrol("⭐ R-1b RED-FIRST: gercek sifre cozucu YOKSA token KULLANILMIYOR "
+        "(duz metin token KABUL EDILMEZ)",
+        _SM.job_scope_token(_SM_KAYIT["t1"])["neden"] == "SIFRE-COZUCU-YOK"
+        and _sm_edin(mcp_cagirici=_sm_mcp(["video.search"]),
+                     sifre_cozucu=None)["provider_used"]
+        == _SM.UCRETSIZ_SAGLAYICI)
+kontrol("⭐ R-1b: cozucu patlarsa da saglayici KULLANILMIYOR",
+        _SM.job_scope_token(
+            _SM_KAYIT["t1"],
+            sifre_cozucu=lambda e: (_ for _ in ()).throw(ValueError())
+        )["hazir"] is False)
+kontrol("⭐ R-1b: modul SIFRELEME UYDURMUYOR (kapsam ozeti beyan ediyor)",
+        _SM.kapsam_ozeti()["sifreleme_uydurur"] is False
+        and _SM.kapsam_ozeti()["duz_metin_token_kabul"] is False
+        and _SM.kapsam_ozeti()["token_istemciye_cikar"] is False)
+
+# ── (4) CAPABILITY DISCOVERY: UYDURMA YOK ──
+_R1 = _sm_edin(mcp_cagirici=_sm_mcp(["video.search", "account.balance"]))
+kontrol("⭐ R-1b: ARAMA yetenegi varsa o yol kullaniliyor, fallback YOK",
+        _R1["provider_used"] == "magnific"
+        and _R1["edinim_yolu"] == _SM.YETENEK_ARAMA
+        and _R1["fallback_reason"] == "", _R1["fallback_reason"])
+_R2 = _sm_edin(mcp_cagirici=_sm_mcp(
+    ["video.generate"],
+    [{"baslik": "lawn sprinkler generated", "medya_turu": "video",
+      "model": "auto", "asset_id": "g1"}]))
+kontrol("⭐ R-1b BELIRLEYICI: stok ARAMA yoksa UYDURULMUYOR — URETIM yoluna "
+        "geciliyor ve NEDEN raporlaniyor",
+        _R2["edinim_yolu"] == _SM.YETENEK_URETIM
+        and _R2["fallback_reason"] == "STOK-ARAMA-YETENEGI-YOK",
+        _R2["fallback_reason"])
+_R3 = _sm_edin(mcp_cagirici=_sm_mcp(["account.balance"]))
+kontrol("⭐ R-1b: HICBIR uygun yetenek yoksa UCRETSIZ STOK fallback ve "
+        "`provider_used` + `fallback_reason` GORUNUR",
+        _R3["provider_used"] == _SM.UCRETSIZ_SAGLAYICI
+        and _R3["fallback_reason"] == "UYGUN-YETENEK-YOK"
+        and bool(_R3["adaylar"]), _R3["fallback_reason"])
+kontrol("⭐ R-1b: kesif CAGIRICISI yoksa 'arama vardir' DENMIYOR",
+        _SM.yetenek_kesfi(None)["olculdu"] is False
+        and _SM.yetenek_kesfi(None)["yetenekler"] == [])
+kontrol("⭐ R-1b: saglayici aday DONDURMEZSE ucretsiz fallback + neden",
+        _sm_edin(mcp_cagirici=_sm_mcp(["video.search"], []))
+        ["fallback_reason"] == "SAGLAYICI-ADAY-DONDURMEDI")
+
+# ── (5) PROVENANCE ──
+_P = _R2["provenance"][0]
+kontrol("⭐ R-1b: auto modda model GARANTI EDILMIYOR — provenance'a "
+        "`model_unknown/auto` yaziliyor",
+        _P["model"] == "model_unknown/auto", _P["model"])
+kontrol("⭐ R-1b: provenance job/tenant/lisans/teknik/ses_kanali tasiyor",
+        _P["job_id"] == "j1" and _P["tenant_id"] == "t1"
+        and _P["ses_kanali"] == "sifir"
+        and _P["teknik"]["genislik"] == 1920, _P["ses_kanali"])
+kontrol("⭐ R-1b: gercek model adi verilirse AYNEN korunuyor",
+        _SM.provenance_kur(saglayici="magnific", yol="video.generate",
+                           istek=_SM_ISTEK[0], ham={"model": "flux-pro"},
+                           olcum={})["model"] == "flux-pro")
+
+# ── (6) TIMELINE: SIRALAMA + TAVAN + NEGATIF ──
+_TL = _SM.timeline_yerlestir(
+    [{"asset_id": "foto", "baslik": "lawn sprinkler", "medya_turu": "image",
+      "teknik": {"genislik": 4000, "yukseklik": 3000, "bitrate": 0}},
+     {"asset_id": "vid", "baslik": "lawn sprinkler", "medya_turu": "video",
+      "teknik": {"genislik": 1920, "yukseklik": 1080, "bitrate": 9e6}}],
+    [_SM.shot_istegi(scene_id="s01", sorgu="lawn sprinkler", sure_sn=6)])
+kontrol("⭐ R-1b: esit semantikte GERCEK VIDEO fotografa TERCIH EDILIYOR",
+        _TL["yerlesim"][0]["aday"]["asset_id"] == "vid",
+        _TL["yerlesim"][0]["aday"]["asset_id"])
+_TL2 = _SM.timeline_yerlestir(
+    [{"asset_id": "m1", "baslik": "lawn sprinkler", "medya_turu": "video",
+      "teknik": {"genislik": 1920, "yukseklik": 1080, "bitrate": 9e6}}],
+    [_SM.shot_istegi(scene_id="s01", sorgu="lawn sprinkler", sure_sn=6),
+     _SM.shot_istegi(scene_id="s01", sorgu="lawn sprinkler", sure_sn=6)])
+kontrol("⭐ R-1b BELIRLEYICI: AYNI kaynak toplam 8 sn'yi ASAMIYOR",
+        _TL2["kaynak_kullanimi"]["m1"] <= _SM.KAYNAK_BASINA_TAVAN_SN + 1e-6,
+        _TL2["kaynak_kullanimi"])
+kontrol("⭐ R-1b: yerlesimde kaynak sesi SIFIR olarak isaretli",
+        all(y["ses_kanali"] == "sifir" for y in _TL2["yerlesim"]
+            if y.get("aday")))
+kontrol("⭐ R-1b RED-FIRST: NEGATIF ihlali olan aday ELENIYOR "
+        "(puanla gizlenmiyor)",
+        _SM.timeline_yerlestir(
+            [{"asset_id": "x", "baslik": "cartoon lawn sprinkler",
+              "medya_turu": "video", "teknik": {}}],
+            [_SM.shot_istegi(scene_id="s01", sorgu="lawn sprinkler",
+                             negatifler=["cartoon"], sure_sn=4)]
+        )["yerlesim"][0]["aday"] is None)
+
+# ── (7) SINIRLAR ──
+kontrol("⭐ R-1b: modul AGA CIKMIYOR / MEDYA ACMIYOR (calisan kodda "
+        "requests/urlopen/ffmpeg/open yok)",
+        not any(a in _kod_yalniz(oku(KOK, "medya", "saglayici_motoru.py"))
+                for a in ("requests", "urlopen", "ffmpeg", "ffprobe",
+                          "open(", "subprocess")))
+kontrol("⭐ R-1b: UI tercihleri sozlesmede sayili (otomatik/magnific/ucretsiz)",
+        set(_SM.TERCIHLER) == {"otomatik", "magnific", "ucretsiz"})
+kontrol("R-1b: saglayici_motoru.py derleniyor",
+        _derlenir(os.path.join(KOK, "medya", "saglayici_motoru.py")))
+kontrol("R-1b GERILEME YOK: K-1/K-2/K-3 ve lisans kapilari DURUYOR",
+        "KALITE-BROLL-CESITLILIK" in _qon.FAIL_KODLARI
+        and "KALITE-SES-GURULTU" in _qon.FAIL_KODLARI
+        and "KALITE-BASLIK-SURESI" in _qon.FAIL_KODLARI
+        and "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI)
+kontrol("R-1b GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+
+
 blok("§40h I-58 — IKI ADAY DUZENI KARSI-OLGU OLARAK OLCULDU (yalniz tanisal)")
 
 # ⚠ YALNIZ TANISAL. Uretim davranisi DEGISMEDI, kapi/esik eklenmedi.

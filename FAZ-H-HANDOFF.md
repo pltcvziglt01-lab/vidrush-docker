@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 14 Ağu | **R-1b tenant provider zinciri (adapter→motor→timeline)** | `PENDING` | ✅ **push edildi**, **gerçek OAuth YOK / kredi TÜKETİLMEDİ** — test-double + ücretsiz stok fallback; yeni `medya/saglayici_motoru.py`: planlayıcı(`shot_istegi`: semantik sorgu+negatifler+oran+süre+kalite hedefi) → **provider registry** (tenant izolasyonlu) → **job-scope token** → **MCP capability discovery** → edinim → ölçüm → **provenance** → **timeline**; dış dünyanın tamamı **enjekte** (modül ağa çıkmaz/medya açmaz, testli); ⚠ **uydurma yok**: stok arama yoksa üretim, o da yoksa dönüşüm, hiçbiri yoksa **ücretsiz stok**, her durumda **`provider_used`+`fallback_reason`** görünür; ⚠ **şifreleme uydurulmadı** — `cryptography` sunucuda **yok**, gerçek çözücü verilmezse token **kullanılmaz** ve **düz metin token kabul edilmez** (R-1c ön koşulu); **tenant tokeni istemciye çıkmıyor** (`baglanti_ozeti` token vermez); başka tenant bağlantısı **asla** seçilmiyor; kullanıcı açıkça Magnific dediyse **sessiz geçiş yok**; provenance auto modda **`model_unknown/auto`** yazıyor; timeline **semantik→gerçek video→piksel→bitrate** ile sıralıyor, **negatif ihlali eleniyor**, **aynı kaynak ≤8 sn**, **kaynak sesi sıfır**; 26 red-first entegrasyon kontrolü; Mac'te medya **üretilmedi**; deploy YOK, $0.00 |
 | 14 Ağu | **R-1a sunucu kapasite ölçümü + imzalı çıktı URL** | `4846264` | ✅ **push edildi**, teslim odağı: sunucu **salt-okunur** denetlendi — ⚠ canlı IP CLAUDE.md'deki değil **185.23.17.240**; konteynerde **bellek/CPU limiti YOK**, `RENDER_MOTOR=ffmpeg`, `EDITOR_V2` **kapalı**, `PEXELS_KEY` boş; **kapasite ölçüldü: 60 sn 1080p30 CRF18 render = 18 sn, tepe RSS 968 MB** → 55–65 sn 1080p **blokaj değil** (önceki bellek endişem yanlıştı); yeni `webapp/imzali_url.py`: `/ciktilar/` ucu **imzasızdı** (dosya adını bilen herkes indirebiliyordu) → **HMAC-SHA256 + sabit zamanlı karşılaştırma + zorunlu TTL**, anahtar env→`veri/.imza_anahtari` (**0600**)→üretilir, **repoda değil/loglanmıyor**, kurulamazsa uç **503** (sessizce korumasız çalışmaz), path traversal kesildi; iş sözleşmesi imzalı `video_url`+`manifest_url` üretiyor, **imzalayıcı yoksa eski davranış korunuyor**; ⚠ imzasız istek artık **403** (404 değil — varlık sızdırılmaz), `test_faz_h` bu gerekçeyle güncellendi; 16 red-first kontrol; Mac'te medya **üretilmedi**; deploy YOK, $0.00 |
 | 14 Ağu | **K-3 açılış başlık/şerit süresi** | `7d58a4e` | ✅ **push edildi**, **MEDYASIZ atom**: açılış başlığı `min(5.5, beat+1.5)` ile kuruluyordu — **metne hiç bakmıyordu** (iki kelimelik başlık da 5.5 sn) ve `+1.5` ile **intro beat'i aşıyordu** (anlatıcı cümlesi bitince yazı **asılı** kalıyordu); artık süre **metinden** türüyor: `max(karakter/CPS, kelime/KPS) × katsayi`, `min_gorunme_sn` alt sınırı ve **üç sert üst sınır** (mutlak tavan · **intro beat sonu** · asılı kalma **0**); gerçek pilot başlığı **5.325 → 1.714 sn**, asılı kalma **1.700 → 0.000 sn**; CPS eşiği **TÜRETİLMİŞ** (`ALTYAZI_MAKS_CPS` ile aynı okuma hızı), diğerleri **beyan edilmiş**; stabil kod **`KALITE-BASLIK-SURESI`**; kısaltma sessiz değil (`kisaltildi` bayrağı); **K-4 kancası gevşek ve geriye uyumlu** — `katsayi` varsayılanı 1.0, üst sınırları **delemez**, `edit_seviyesi` çalışan koda ve 22 alan sözleşmesine **girmedi**; 25 red-first saf timeline kontrolü; ⚠ I-9 tuzağına ikinci kez düşüldü (yorum taraması) ve `olcum` sözlüğü erken kullanıldı — ikisi de düzeltildi; 22 alan, kullanıcı seçimleri, `deploy.sh`, I-38 ve K-1/K-2 kapıları **korundu**; deploy YOK, $0.00 |
 | 14 Ağu | **K-2 arka plan uğultu kapısı + kaynak sesi sıfır** | `200828a` | ✅ **push edildi**, **MEDYASIZ atom** (Mac'te medya/ses/kare/render/QA artefaktı yok, `ffmpeg` çalıştırılmadı): kaynak video sesi **mutlak sıfır** olarak üç katmanda kilitlendi — renderer zaten `muted`, `render_plan` artık **makine okunur** `ses_kanali: "sifir"` yazıyor, `kaynak_ses_sozlesmesi()` denetliyor → ihlal **`KALITE-KAYNAK-SES-SIZINTI`**; TTS dışı sürekli hiss/rumble/wind için yeni `editor/ses_gurultu.py`: öznitelikler (`konusma_disi_lufs`, `sureklilik_orani`, `spektral_duzluk`, `dusuk/yuksek_frekans_orani`, `belirsizlik_db`) **sayı olarak dışarıdan** enjekte edilir (mevcut okuyucu deseni), modül **medya açmaz/ffmpeg çalıştırmaz**; karar **üç koşul birlikte** (duyulabilir + sürekli + spektral iz) — tek başına düşük SNR müzik yatağında da olur; ⚠ SNR eşiği **TÜRETİLMİŞ** (`DUYULABILIR_FARK_DB`=30 dB ters yönde okundu), diğerleri `DUYULABILIR_FARK_DB` ile **aynı dürüstlük etiketiyle** "beyan edilmiş tasarım eşiği" ve `esik_kaynagi` alanında **raporlanıyor**; **güven aralığı**: SNR±belirsizlik eşiği kesiyorsa `supheli` → **WARN, FAIL değil** (emin değilsen temiz içeriği FAIL etme), ölçüm eksikse **hüküm yok**; deterministik akış ölç→**güvenli** filtre öner (rumble `highpass f=80` — konuşma temel frekansının altında; genişbant bastırma **≤6 dB tavanlı**; **konuşma bandı 300–3400 Hz'e dokunulmaz**)→temizlemeyi doğrula (konuşma bandı >1.0 dB geriler **ya da** ASR güveni >0.02 düşerse **filtre reddedilir**, netliği bozan denoise **uygulanmaz**)→temizlenemiyorsa **`KALITE-SES-GURULTU`** FAIL; 38 red-first kontrol; ⚠ testte I-9 tuzağı (ham dize modülün kendi docstring'ini yakaladı) `_kod_yalniz` ile düzeltildi; I-23/I-24/I-25/I-38, eşikler, 22 alan, kullanıcı seçimleri, `deploy.sh`, K-1 B-roll kapısı **korundu**; deploy YOK, $0.00 |
@@ -5680,6 +5681,72 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 86. FAZ R-1b — TENANT PROVIDER ZİNCİRİ (adapter → motor → timeline, 14 Ağu)
+
+> **Durum: Magnific artık yalnız bir ayar/UI kaydı **değil** — planlayıcıdan
+> timeline'a giden medya edinim zincirinin halkası. **Gerçek OAuth YOK,
+> kredi TÜKETİLMEDİ**, her şey test-double + ücretsiz stok fallback.
+> A–I yeşil (**3873**, 0 hata, 2 bilinen BLOKE). Mac'te medya üretilmedi.
+> Deploy YOK. $0.00.**
+> Değişen: **yeni** `webapp/medya/saglayici_motoru.py`,
+> `webapp/testler/test_faz_i.py` (§40r, 26 kontrol).
+
+### Zincir
+
+```
+planlayıcı(shot_istegi) → provider registry → job-scope token
+   → MCP capability discovery → edinim → ölçüm(ffprobe) → provenance → timeline
+```
+
+Dış dünyanın tamamı **enjekte** ediliyor (`mcp_cagirici`, `sifre_cozucu`,
+`olcer`, `ucretsiz_arayici`) — mevcut okuyucu-enjeksiyonu deseni. Modül
+**ağa çıkmaz, medya açmaz** (testle doğrulandı).
+
+### ⚠ Uydurma yok — capability discovery
+
+| Sağlayıcı yeteneği | Sonuç | `fallback_reason` |
+|---|---|---|
+| `video.search` var | magnific / arama | *(boş)* |
+| arama yok, `video.generate` var | magnific / üretim | `STOK-ARAMA-YETENEGI-YOK` |
+| ikisi de yok, `video.transform` var | magnific / dönüşüm | `STOK-ARAMA-VE-URETIM-YOK` |
+| hiçbiri yok | **ücretsiz stok** | `UYGUN-YETENEK-YOK` |
+| aday dönmedi | **ücretsiz stok** | `SAGLAYICI-ADAY-DONDURMEDI` |
+
+Keşif çağırıcısı yoksa **"arama vardır" denmiyor** (`olculdu: False`).
+Rapor her durumda **`provider_used` + `fallback_reason`** taşıyor.
+
+### ⚠ Şifreleme uydurulmadı
+
+`cryptography` **sunucuda kurulu değil**. Bu yüzden şifre çözücü **enjekte
+edilen bir arayüz**: gerçek çözücü verilmezse token **kullanılmaz**
+(`SIFRE-COZUCU-YOK`) ve ücretsiz stok'a düşülür. **Düz metin token kabul
+edilmiyor.** ⚠ Bu, R-1c'nin somut ön koşulu: sunucuya `cryptography` kurulmalı.
+
+### Tenant izolasyonu
+
+- Başka tenant'ın bağlantısı **asla** seçilmiyor
+- Onaysız / kredi onayı olmayan bağlantı **kullanılmıyor**
+- Kullanıcı açıkça Magnific dediyse ve bağlantı yoksa **sessiz geçiş yok** —
+  `MAGNIFIC-KULLANILAMIYOR:<neden>` görünür
+- **Tenant tokeni istemciye çıkmıyor**: `baglanti_ozeti()` yalnız
+  durum/kredi/model/`token_var` döner, token'ı **hiçbir biçimde** vermez
+
+### Provenance
+
+`saglayici · edinim_yolu · scene_id · sorgu · kaynak_url · lisans ·
+lisans_kaydi · eser_sahibi · model · kredi_tuketildi · job_id · tenant_id ·
+teknik · ses_kanali`. ⚠ **Auto mod model adını garanti etmez** →
+`model_unknown/auto` yazılır; gerçek model adı verilirse **aynen** korunur.
+
+### Timeline
+
+Sıralama: **semantik örtüşme → gerçek video tercihi → piksel → bitrate**.
+Eşit semantikte **video fotoğrafa tercih ediliyor**. **Negatif ihlali olan
+aday eleniyor** (puanla gizlenmiyor). **Aynı kaynak toplam ≤8 sn** (J-5b
+şartı) ve yerleşimde **kaynak sesi sıfır** işaretli.
 
 ---
 
