@@ -463,6 +463,26 @@ def stok_provenans_kaydet(hedef: str, *, saglayici: str, asset_id: str,
         }
 
 
+def stok_provenans_isaretle(hedef: str, *, medya_turu: str = "",
+                            lisans: str = "", model: str = "") -> None:
+    """Var olan provenans kaydinin TURUNU/LISANSINI duzelt (R-1d-d).
+
+    ⚠ URETILEN gorseller stok DEGILDIR: `STOK_LISANSLARI`nda karsiligi yok
+    ve `medya_turu` "video" OLAMAZ. Bu yardimci o iki alani ACIKCA yazar;
+    kayit yoksa HICBIR SEY yapmaz (bostan kayit URETMEZ).
+    """
+    with _KULLANILAN_KILIT:
+        k = _STOK_PROVENANS.get(os.path.abspath(hedef))
+        if not k:
+            return
+        if medya_turu:
+            k["medya_turu"] = str(medya_turu)
+        if lisans:
+            k["lisans"] = str(lisans)
+        if model:
+            k["model"] = str(model)
+
+
 def stok_provenans_al(hedef: str) -> dict:
     """Kayit yoksa BOS doner — cagiran taraf 'lisansli' VARSAYMAZ."""
     with _KULLANILAN_KILIT:

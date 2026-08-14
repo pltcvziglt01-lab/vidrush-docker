@@ -234,17 +234,39 @@ def _hareket_sec(cekim_turu: str, indeks: int, yasak: str = "",
 
 def _varlik_sec(beat, adaylar: list, kullanilan_asset: set,
                 son_saglayici: str, saglayici_sayaci: dict,
-                saglayici_tavani: int) -> tuple:
+                saglayici_tavani: int,
+                asset_sure: Optional[dict] = None,
+                kaynak_tavani_sn: float = 0.0) -> tuple:
     """Beat icin en uygun kullanilabilir varligi sec.
 
     Faz B'nin %40 saglayici kotasi BURAYA DA tasinir (kullanicinin istegi):
     kurgu katmani kotayi yok sayarsa Faz B'nin garantisi anlamsiz kalir.
+
+    ⚠ FAZ R-1d-d — AYNI KAYNAK TAVANI SECIM ANINDA UYGULANIR.
+    OLCULEN KUSUR (R-1d-c pilotu): `kaynak_kullanimi` tavani ASILMIS
+    olarak RAPORLUYORDU (`38147426` = 8.052 sn > 8.0). Cunku tavan yalnizca
+    SONRADAN olculuyordu; secim onu HIC bilmiyordu. Artik tavani ASACAK
+    aday havuzdan ELENIR — kapi RAPORLA degil, INSA ILE saglanir.
+    ⚠ Bu bir GEVSETME DEGIL, SIKILASTIRMADIR: hicbir esik degismedi,
+    yalnizca ihlal olusmadan ONLENIYOR.
+    ⚠ Tavan 0/None verilirse davranis ESKISIYLE AYNI (geriye uyumlu).
+
     Doner: (aday | None, gerekce)
     """
     uygun = [a for a in adaylar
              if a.get("render_kullanilabilir") and a.get("asset_id")]
     if not uygun:
         return None, "kullanilabilir aday yok"
+    # 0) AYNI KAYNAK TAVANI: bu beat eklenince tavani asacak varlik ELENIR.
+    if kaynak_tavani_sn and isinstance(asset_sure, dict):
+        _bs = float(getattr(beat, "sure_sn", 0) or 0)
+        _kalan = [a for a in uygun
+                  if asset_sure.get(a["asset_id"], 0.0) + _bs
+                  <= float(kaynak_tavani_sn) + 1e-9]
+        if not _kalan:
+            return None, (f"tum adaylar kaynak tavanini asiyor "
+                          f"({kaynak_tavani_sn} sn/varlik)")
+        uygun = _kalan
     # 1) Daha once kullanilmamis olanlar
     yeni = [a for a in uygun if a["asset_id"] not in kullanilan_asset]
     havuz = yeni or uygun
@@ -271,13 +293,18 @@ def _varlik_sec(beat, adaylar: list, kullanilan_asset: set,
 
 def gramer_uygula(beatler: list, *, sahne_adaylari: dict,
                   kapsam_bosluklari: Optional[dict] = None,
-                  saglayici_tavani: int = 4) -> list:
+                  saglayici_tavani: int = 4,
+                  kaynak_tavani_sn: float = 0.0) -> list:
     """Beat listesini Cekim listesine cevir.
 
     `sahne_adaylari`: {scene_id: [aday_sozlugu, ...]}  (Faz B AdayManifesti'nden)
     `kapsam_bosluklari`: {scene_id: {"onerilen_fallback": {...}}}
+    `kaynak_tavani_sn`: bir varligin TOPLAM ekran suresi tavani (0 = kapali).
+        ⚠ FAZ R-1d-d: verilirse tavani asacak aday SECILMEZ.
     """
     kapsam_bosluklari = kapsam_bosluklari or {}
+    # ⚠ FAZ R-1d-d: varlik basina BIRIKEN sure (kaynak tavani icin).
+    asset_sure: dict = {}
     cikti: list = []
     kullanilan_asset: set = set()
     saglayici_sayaci: dict = {}
@@ -311,7 +338,9 @@ def gramer_uygula(beatler: list, *, sahne_adaylari: dict,
         c = Cekim(beat_id=b.beat_id, scene_id=b.scene_id, fact_id=b.fact_id)
 
         sec, gerekce = _varlik_sec(b, adaylar, kullanilan_asset, son_saglayici,
-                                   saglayici_sayaci, saglayici_tavani)
+                                   saglayici_sayaci, saglayici_tavani,
+                                   asset_sure=asset_sure,
+                                   kaynak_tavani_sn=kaynak_tavani_sn)
         if sec is None:
             # ── COVERAGE GAP: rastgele stok YOK, gerekceli fallback ──
             f = (bosluk or {}).get("onerilen_fallback") or {}
@@ -365,6 +394,10 @@ def gramer_uygula(beatler: list, *, sahne_adaylari: dict,
             c.gerekce = gerekce
             kullanilan_asset.add(c.asset_id)
             saglayici_sayaci[c.saglayici] = saglayici_sayaci.get(c.saglayici, 0) + 1
+            # ⚠ FAZ R-1d-d: bu varligin toplam ekran suresi BIRIKTIRILIR;
+            # bir sonraki beat tavani asacaksa bu varlik SECILEMEZ.
+            asset_sure[c.asset_id] = (asset_sure.get(c.asset_id, 0.0)
+                                      + float(getattr(b, "sure_sn", 0) or 0))
 
         # ── SUREKLILIK KURALLARI ──
         if c.asset_id and c.asset_id == son_asset:

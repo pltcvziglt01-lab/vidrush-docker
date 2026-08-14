@@ -4238,44 +4238,47 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         nonlocal bakiye_bitti, uretim_durdu
         if bakiye_bitti or uretim_durdu:
             return None
+        # ⚠ FAZ R-1d-b: avci basarisiz olursa nedeni TUTULUR ama bosluk
+        # HEMEN yazilmaz — gercek medya yolu bu sahneyi kurtarabilir.
+        # ⚠ FAZ R-1d-d: yardimcilar footage blogunun DISINA alindi. Icerde
+        # tanimliyken URETILEN GORSEL yolundan cagrilamiyorlardi (o yol
+        # footage `if`inin DISINDA) — non-footage sahne NameError alirdi.
+        _avci_bosluk_neden = ""
+
+        def _kopru_yaz(_yol):
+            """Gercek medya yolundaki secimi avci butcesine kopruler.
+
+            ⚠ FAIL-CLOSED: provenans/lisans/kare dogrulamasi eksikse
+            kayit YAPILMAZ; sahne kapsam BOSLUGU olarak yazilir.
+            """
+            if _avci_butce is None:
+                return
+            _pv = kaynak.stok_provenans_al(_yol)
+            _kp = medya_kopru.stok_secimi_kaydet(
+                _avci_butce, hedef_yol=_yol,
+                scene_id=str(s.get("scene_id") or f"s{n:03d}"),
+                provenans=_pv, fact_id=str(s.get("fact_id") or ""),
+                sahne_amaci=str(s.get("sahne_amaci") or ""),
+                sorgu=str(s.get("footage_sorgu") or "").strip())
+            if _kp["kaydedildi"]:
+                print(f"  sahne {n}: KOPRU -> butceye secim yazildi "
+                      f"({_pv.get('saglayici')}/{_pv.get('lisans')})",
+                      file=sys.stderr)
+            else:
+                _avci_butce.bosluk_ekle(
+                    str(s.get("scene_id") or f"s{n:03d}"),
+                    f"stok koprusu: {_kp['neden']}")
+
+        def _bosluk_yaz(_neden):
+            """Footage yolundan CIKARKEN kapsam boslugunu yaz."""
+            if _avci_butce is not None:
+                _avci_butce.bosluk_ekle(
+                    str(s.get("scene_id") or f"s{n:03d}"),
+                    _avci_bosluk_neden or _neden)
+
         # 1) Footage sahnesi mi?
         if footage_acik and str(s.get("kaynak")) == "footage" and str(s.get("footage_sorgu", "")).strip():
             vyol_full = os.path.join(PUBLIC, "isler", is_adi, f"sahne_{n}.mp4")
-            # ⚠ FAZ R-1d-b: avci basarisiz olursa nedeni TUTULUR ama bosluk
-            # HEMEN yazilmaz — gercek medya yolu bu sahneyi kurtarabilir.
-            _avci_bosluk_neden = ""
-
-            def _kopru_yaz(_yol):
-                """Gercek medya yolundaki secimi avci butcesine kopruler.
-
-                ⚠ FAIL-CLOSED: provenans/lisans/kare dogrulamasi eksikse
-                kayit YAPILMAZ; sahne kapsam BOSLUGU olarak yazilir.
-                """
-                if _avci_butce is None:
-                    return
-                _pv = kaynak.stok_provenans_al(_yol)
-                _kp = medya_kopru.stok_secimi_kaydet(
-                    _avci_butce, hedef_yol=_yol,
-                    scene_id=str(s.get("scene_id") or f"s{n:03d}"),
-                    provenans=_pv, fact_id=str(s.get("fact_id") or ""),
-                    sahne_amaci=str(s.get("sahne_amaci") or ""),
-                    sorgu=s["footage_sorgu"].strip())
-                if _kp["kaydedildi"]:
-                    print(f"  sahne {n}: KOPRU -> butceye secim yazildi "
-                          f"({_pv.get('saglayici')}/{_pv.get('lisans')})",
-                          file=sys.stderr)
-                else:
-                    _avci_butce.bosluk_ekle(
-                        str(s.get("scene_id") or f"s{n:03d}"),
-                        f"stok koprusu: {_kp['neden']}")
-
-            def _bosluk_yaz(_neden):
-                """Footage yolundan CIKARKEN kapsam boslugunu yaz."""
-                if _avci_butce is not None:
-                    _avci_butce.bosluk_ekle(
-                        str(s.get("scene_id") or f"s{n:03d}"),
-                        _avci_bosluk_neden or _neden)
-
             # ── FAZ I-6: MEDYA AVCISI (OPT-IN, VARSAYILAN KAPALI) ──
             # ⚠ Kapaliyken bu blok hicbir sey yapmaz ve asagidaki MEVCUT yol
             # aynen calisir. Acikken bile basarisiz olursa yine eski yola
@@ -4369,6 +4372,27 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             return None
         if not uretildi:
             return None
+        # ── FAZ R-1d-d: URETILEN GORSEL DE GERCEK MEDYADIR ──
+        # ⚠ OLCULEN KUSUR (R-1d-c pilotu): `kapsam_orani 0.25`. Kopru YALNIZ
+        # stok klipleri kaydediyordu; AI ile URETILEN sahne gorselleri
+        # hicbir adaya baglanmiyordu ve o beat'ler GARANTILI `fallback`
+        # oluyordu. Oysa bu gorsel GERCEKTEN uretildi, diskte duruyor ve
+        # lisansi BIZE ait.
+        # ⚠ UYDURMA YOK: `medya_turu` "image" yazilir (VIDEO DENMEZ), boylece
+        # `gercek_video_orani` olcumu SISIRILMEZ.
+        try:
+            kaynak.stok_provenans_kaydet(
+                gyol_full,
+                saglayici=(SAGLAYICI or "openai"),
+                asset_id=f"{is_adi}_s{n:03d}", url="",
+                baslik=str(sp)[:80],
+                sorgu=str(s.get("footage_sorgu") or "")[:120],
+                sure_sn=0.0, kare_dogrulandi=True)
+            kaynak.stok_provenans_isaretle(
+                gyol_full, medya_turu="image", lisans="uretilmis-eser",
+                model=str(gorsel_model or ""))
+        except Exception:                                    # noqa: BLE001
+            pass                       # provenans yazilamazsa uretim DURMAZ
         renk_uydur(gyol_full, olcum_hedef, f"sahne {n}")
         if mag_profil and s.get("hd"):   # OTOMATIK: sadece plan HD isaretlediyse
             kaynak.magnific_upscale(gyol_full, optimized_for=mag_profil, scale="2x")
@@ -4391,6 +4415,9 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             print(f"  sahne {n}: video klip olmadi, efektli fotografla devam", file=sys.stderr)
         # Hiz limiti: her ISCI kendi isteginden sonra bekler (toplam hiz = paralel/(uretim+bekleme))
         time.sleep(gorsel_bekle)
+        # ⚠ FAZ R-1d-d: uretilen gorsel de avci butcesine YAZILIR; aksi halde
+        # bu sahnenin beat'leri GARANTILI `fallback` olurdu.
+        _kopru_yaz(gyol_full)
         return ("image", f"isler/{is_adi}/sahne_{n}.png")
 
     # ── FAZ A+B tek fonksiyonda: thread'de kosar, SESLENDIRME ile AYNI ANDA ──

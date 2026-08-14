@@ -2294,6 +2294,16 @@ def izleyici_kalite_puani(*, optik=None, grammar=None, ritim=None,
 # Bu bir KALITE HEDEFI DEGIL, REGRESYON kilididir: "bugunkunden kotuye
 # gitme" der; mevcut korpusta YANLIS POZITIF sayisi TANIM GEREGI 0'dir.
 DONMUS_KADRAJ_AGREGA_REFERANSI = 0.155
+# ⚠ FAZ R-1d-d — AYNI KAYNAK TAVANI (J-5b kullanici sarti).
+# Sayi UYDURULMADI: `medya.saglayici_motoru.KAYNAK_BASINA_TAVAN_SN` ile AYNI
+# tek kaynaktan okunur. Iki yerde ayri sabit tutulursa sessizce ayrisirlar
+# (R-1d-c'de `edit_kopru` de ayni kaynaktan okumaya baglanmisti).
+try:                                                         # pragma: no cover
+    from medya.saglayici_motoru import (
+        KAYNAK_BASINA_TAVAN_SN as KAYNAK_BASINA_TAVAN_SN_PLAN)
+except Exception:                                            # noqa: BLE001
+    KAYNAK_BASINA_TAVAN_SN_PLAN = 8.0
+
 DONMUS_KADRAJ_PLAN_REFERANSI = 0.334
 
 # ⚠ VIDEO ORANI ICIN HEDEF UYDURULMADI. Korpusta TEK BIR pozitif ornek

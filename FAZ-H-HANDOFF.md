@@ -9195,3 +9195,69 @@ Kalan FAIL'lerin **çoğu bunun türevi**:
 %25. Doğru atom **beat başına aday üretmek** — ya köprü sahne başına
 birden çok aday yazmalı, ya plan beat sayısını gerçek aday sayısına göre
 türetmeli.
+
+---
+
+## 67. FAZ R-1d-d — `kapsam_orani: 0.25` KÖK NEDENİ (14 Ağu)
+
+> **Durum: kök neden ÜÇ bileşene ayrıştırıldı ve üçü de kapatıldı.
+> A–I yeşil. Eşik GEVŞETİLMEDİ (biri SIKILAŞTIRMA).
+> Mac'te medya ÜRETİLMEDİ. $0.00.**
+> Değişen: `webapp/editor/gramer.py`, `webapp/editor/plan.py`,
+> `webapp/editor/kalite_kapisi.py` (1 sabit), `webapp/kaynak.py`,
+> `webapp/pipeline.py`, `webapp/testler/test_faz_i.py`.
+> `server.py`, `teslim.py`, `kimlik.py`, `kutuphane.py`, `imzali_url.py`,
+> `medya_kopru.py`, `edit_kopru.py`, `deploy.sh`, `Video.tsx` ve **22 alan
+> sözleşmesi DOKUNULMADI**.
+
+### ⛔ Ölçülen kusur — üç bileşen
+
+`job_1786715884600`: `kapsam {cekim:16, medya:4, fallback:12,
+kapsam_orani:0.25}` · `kaynak_kullanimi` **en uzun 8.052 sn > 8.0**.
+
+**(1) Sağlayıcı kotası tek sağlayıcıda DEJENERE.** Kota (varsayılan **4**)
+*çeşitlilik* içindir: "tek sağlayıcı planı ele geçirmesin". Manifestte
+**tek** sağlayıcı varsa kota çeşitlilik **sağlayamaz** — yalnızca 4'üncü
+çekimden sonrasını **garantili fallback**'e iter. Ölçüldü: 16 beat'in **tam
+4'ü** medya aldı. ⚠ `edit_kopru` I-22 notu bu tuzağı **zaten yazmıştı**
+("çağıran taraf tavanı planın gerçek beat sayısıyla eşleştirebilir").
+
+**(2) Kaynak tavanı yalnızca SONRADAN ölçülüyordu.** Seçim tavanı
+bilmiyordu → **8.052 sn ihlali oluşabiliyordu**.
+
+**(3) Üretilen AI görselleri hiçbir adaya bağlanmıyordu** → o sahnelerin
+beat'leri **garantili fallback**.
+
+### Düzeltmeler
+
+**(1) `plan.uret`:** manifestte **tek** sağlayıcı varsa ve kota beat
+sayısından küçükse, kota beat sayısına çıkarılır — **gerekçesi yazılı**
+(`TEK-SAGLAYICI`).
+⚠ **Bu bir eşik gevşetmesi DEĞİLDİR:** çok sağlayıcılı manifestte koşul
+sağlanmaz, davranış **bit-bit aynı** (test kilitliyor); tek sağlayıcı
+durumu **gizlenmiyor** — `SAGLAYICI-TEKEL` kapısı **aynı %40 eşiğiyle**
+ölçmeye ve uyarmaya devam ediyor (test bunu da kilitliyor).
+
+**(2) `gramer._varlik_sec` — SIKILAŞTIRMA:** aynı kaynak tavanı artık
+**seçim anında** uygulanıyor; tavanı aşacak aday havuzdan **elenir**. Kapı
+raporla değil **inşa ile** sağlanıyor. Tavan `saglayici_motoru` ile **aynı
+tek kaynaktan** okunuyor. Tavan `0` verilirse davranış eskisiyle **aynı**.
+
+**(3) `kaynak.stok_provenans_isaretle()` + `pipeline`:** üretilen görsel de
+köprüye yazılıyor. ⚠ **UYDURMA YOK** — `medya_turu: "image"` (video
+**DENMEZ**, `gercek_video_orani` şişirilmez), `lisans: "uretilmis-eser"`,
+gerçek model adı. İşaretlenmeden köprüden **geçemez** (`LISANS-YOK`).
+
+⚠ **Ek düzeltme:** köprü yardımcıları footage bloğunun **içinde**
+tanımlıydı; üretilen görsel yolu o bloğun **dışında** olduğu için
+non-footage sahne **`NameError`** alırdı. Yardımcılar fonksiyon başına
+alındı ve `footage_sorgu` yokken de güvenli hale getirildi.
+
+### Red-first — dört bileşen ayrı ayrı ölçüldü
+
+| geri alınan | sonuç |
+|---|---|
+| `editor/plan.py` | **4 kırmızı**; kapsam `{medya:4, fallback:4, oran:0.5}` |
+| `pipeline.py` | **6 kırmızı** |
+| `editor/gramer.py` | test **çöktü** (`KeyError: 'durum'` — plan üretilemiyor) |
+| `kaynak.py` | **`AttributeError: stok_provenans_isaretle`** — API yoktu |

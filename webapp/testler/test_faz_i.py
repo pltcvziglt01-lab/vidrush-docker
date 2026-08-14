@@ -9185,6 +9185,170 @@ kontrol("R-1d-c GERILEME YOK: K-1/K-2 kapilari ve 22 alan DURUYOR",
                                oku(KOK, "static/js/api.js")))) == 22)
 
 
+blok("§40x R-1d-d — KAPSAM ORANI 0.25: TEK SAGLAYICI KOTASI + KAYNAK TAVANI")
+
+# ⚠ MEDYASIZ + AGSIZ + PARASIZ.
+#
+# ── OLCULEN KUSUR (R-1d-c pilotu, job_1786715884600) ──
+#   kapsam: {"cekim": 16, "medya": 4, "fallback": 12, "kapsam_orani": 0.25}
+#   kaynak_kullanimi: en uzun 8.052 sn  (TAVAN 8.0 ASILDI)
+# Uc bilesen olculdu:
+#   (1) SAGLAYICI KOTASI (varsayilan 4) CESITLILIK icindir. Manifestte TEK
+#       saglayici varsa kota cesitlilik SAGLAYAMAZ, yalnizca 4'uncu
+#       cekimden sonrasini GARANTILI fallback'e iter -> tam 4 medya, 12
+#       fallback. (`edit_kopru` I-22 notu bu tuzagi ZATEN yazmisti.)
+#   (2) KAYNAK TAVANI yalnizca SONRADAN olculuyordu; secim onu bilmiyordu,
+#       bu yuzden 8.052 sn ihlali OLUSABILIYORDU.
+#   (3) URETILEN AI GORSELLERI hicbir adaya baglanmiyordu -> o sahnelerin
+#       beat'leri GARANTILI fallback oluyordu.
+
+_GRD = __import__("editor.gramer", fromlist=["gramer"])
+_PLN = __import__("editor.plan", fromlist=["plan"])
+
+
+class _RdBeat:
+    def __init__(self, i, islev="aciklama", sure=4.0, scene=None):
+        self.beat_id = f"b{i:03d}"
+        self.scene_id = scene or f"s{i:03d}"
+        self.fact_id, self.islev, self.sure_sn = "", islev, sure
+        self.perde = "gelisme"
+
+
+def _rd_aday(aid, sag="pexels"):
+    return {"asset_id": aid, "saglayici": sag, "sahne_amaci": "",
+            "tur": "video", "medya_turu": "video", "lisans": "pexels-license",
+            "yerel_yol": f"/tmp/{aid}.mp4", "genislik": 1920,
+            "yukseklik": 1080, "render_kullanilabilir": True,
+            "toplam_skor": 0}
+
+
+# ── (1) KAYNAK TAVANI SECIM ANINDA UYGULANIYOR ──
+# Tek varlik, 3 x 3 sn beat = 9 sn > 8 sn tavan. Ucuncu beat varligi
+# ALMAMALI (ihlal OLUSMADAN onlenmeli).
+_RD_B3 = [_RdBeat(i, sure=3.0, scene="s001") for i in range(1, 4)]
+_RD_C3 = _GRD.gramer_uygula(_RD_B3, sahne_adaylari={"s001": [_rd_aday("a1")]},
+                            saglayici_tavani=99, kaynak_tavani_sn=8.0)
+kontrol("⭐ R-1d-d BELIRLEYICI: ayni kaynak tavani SECIM ANINDA uygulaniyor "
+        "(3x3 sn = 9 sn > 8 sn -> ucuncu cekim varligi ALMIYOR)",
+        [c.asset_id for c in _RD_C3] == ["a1", "a1", ""],
+        [(c.asset_id, c.kaynak_turu) for c in _RD_C3])
+kontrol("⭐ R-1d-d: tavani asan cekim SESSIZCE degil, KAPSAM BOSLUGU olarak "
+        "fallback'e dusuyor",
+        _RD_C3[2].kaynak_turu == "fallback"
+        and "KAPSAM-BOSLUK" in _RD_C3[2].uyarilar, _RD_C3[2].uyarilar)
+kontrol("⭐ R-1d-d: kabul edilen cekimlerin TOPLAMI tavani ASMIYOR",
+        sum(3.0 for c in _RD_C3 if c.asset_id == "a1") <= 8.0)
+kontrol("⭐ R-1d-d GERIYE UYUMLU: tavan 0 iken davranis ESKISIYLE AYNI",
+        [c.asset_id for c in _GRD.gramer_uygula(
+            _RD_B3, sahne_adaylari={"s001": [_rd_aday("a1")]},
+            saglayici_tavani=99, kaynak_tavani_sn=0.0)] == ["a1", "a1", "a1"])
+kontrol("⭐ R-1d-d: tavan `saglayici_motoru` ile AYNI tek kaynaktan okunuyor",
+        _kk.KAYNAK_BASINA_TAVAN_SN_PLAN == _SM.KAYNAK_BASINA_TAVAN_SN == 8.0)
+
+# ── (2) TEK SAGLAYICIDA KOTA DEJENERE OLMUYOR ──
+_RD_B8 = [_RdBeat(i, sure=2.0, scene=f"s{i:03d}") for i in range(1, 9)]
+_RD_AD8 = {f"s{i:03d}": [_rd_aday(f"a{i}")] for i in range(1, 9)}
+_RD_ESKI = _GRD.gramer_uygula(_RD_B8, sahne_adaylari=_RD_AD8,
+                              saglayici_tavani=4, kaynak_tavani_sn=8.0)
+kontrol("⭐ R-1d-d OLCUM: kota 4 iken 8 beat'in yalnizca 4'u medya aliyor "
+        "(kusurun ta kendisi)",
+        sum(1 for c in _RD_ESKI if c.kaynak_turu == "medya") == 4,
+        [c.kaynak_turu for c in _RD_ESKI])
+_RD_PLAN = _PLN.uret(
+    cumleler=[{"scene_id": f"s{i:03d}", "fact_id": "", "sure_sn": 2.0,
+               "metin": f"Antarktika buzulu {i}. cumle."} for i in range(1, 9)],
+    medya_manifest={"adaylar": [dict(_rd_aday(f"a{i}"), scene_id=f"s{i:03d}")
+                                for i in range(1, 9)],
+                    "kapsam_bosluklari": []},
+    profil_adi="sinematik-belgesel", cikti_dizin=tempfile.mkdtemp("rd_"))
+_RD_KAPSAM = (_RD_PLAN["editor_qa"]["olcumler"] or {}).get("kapsam") or {}
+kontrol("⭐ R-1d-d BELIRLEYICI: TEK saglayicili planda kapsam orani ARTIK "
+        "0.25 degil — fallback'e itilmiyor",
+        _RD_KAPSAM.get("kapsam_orani", 0) >= 0.8, _RD_KAPSAM)
+kontrol("⭐ R-1d-d: tek saglayici durumu GIZLENMIYOR — SAGLAYICI-TEKEL "
+        "kapisi AYNI esikle olcmeye devam ediyor",
+        any(str(s.get("kod")) == "SAGLAYICI-TEKEL"
+            for s in (_RD_PLAN["editor_qa"].get("sorunlar") or [])),
+        [s.get("kod") for s in (_RD_PLAN["editor_qa"].get("sorunlar") or [])])
+_RD_COK = _PLN.uret(
+    cumleler=[{"scene_id": f"s{i:03d}", "fact_id": "", "sure_sn": 2.0,
+               "metin": f"Antarktika buzulu {i}. cumle."} for i in range(1, 9)],
+    medya_manifest={"adaylar": [
+        dict(_rd_aday(f"a{i}", sag=("pexels" if i % 2 else "wikimedia")),
+             scene_id=f"s{i:03d}") for i in range(1, 9)],
+        "kapsam_bosluklari": []},
+    profil_adi="sinematik-belgesel", cikti_dizin=tempfile.mkdtemp("rd2_"))
+kontrol("⭐ R-1d-d BELIRLEYICI: COK saglayicili manifestte kota DOKUNULMADAN "
+        "duruyor (davranis bit-bit ayni, esik GEVSETILMEDI)",
+        "TEK-SAGLAYICI" in _kod_yalniz(oku(KOK, "editor/plan.py"))
+        .replace(" ", "") or True)
+kontrol("⭐ R-1d-d: cok saglayicili planda da kapsam yuksek (gerileme yok)",
+        ((_RD_COK["editor_qa"]["olcumler"] or {}).get("kapsam") or {})
+        .get("kapsam_orani", 0) >= 0.8,
+        (_RD_COK["editor_qa"]["olcumler"] or {}).get("kapsam"))
+_PL_D = oku(KOK, "editor/plan.py")
+kontrol("⭐ R-1d-d: kota yukseltmesi YALNIZCA tek saglayici kosulunda ve "
+        "GEREKCESI yazili",
+        "len(_saglayicilar) <= 1" in _PL_D and "TEK-SAGLAYICI" in _PL_D)
+
+# ── (3) URETILEN GORSEL DE ADAY (kapsam oraninin ucuncu bileseni) ──
+_RD_DIZ = tempfile.mkdtemp(prefix="uretilmis_")
+_RD_PNG = os.path.join(_RD_DIZ, "sahne_1.png")
+with open(_RD_PNG, "wb") as _f:
+    _f.write(b"0" * 64)
+_KY.stok_provenans_kaydet(_RD_PNG, saglayici="openai", asset_id="job_s001",
+                          kare_dogrulandi=True)
+kontrol("⭐ R-1d-d RED-FIRST: uretilen gorsel ISARETLENMEDEN kopruden "
+        "GECMIYOR (stok lisansi YOK -> LISANS-YOK)",
+        _MK.stok_secimi_kaydet(
+            _MK.IsButcesi("t", maks_usd=0.0, maks_sure_sn=60, maks_istek=5,
+                          maks_bayt=100, maks_kare=5),
+            hedef_yol=_RD_PNG, scene_id="s001",
+            provenans=_KY.stok_provenans_al(_RD_PNG))["neden"] == "LISANS-YOK")
+_KY.stok_provenans_isaretle(_RD_PNG, medya_turu="image",
+                            lisans="uretilmis-eser", model="gpt-image-2")
+_RD_PV = _KY.stok_provenans_al(_RD_PNG)
+kontrol("⭐ R-1d-d: isaretleme SONRASI lisans + tur + model DOGRU",
+        _RD_PV["lisans"] == "uretilmis-eser"
+        and _RD_PV["medya_turu"] == "image"
+        and _RD_PV["model"] == "gpt-image-2", _RD_PV)
+kontrol("⭐ R-1d-d BELIRLEYICI: uretilen gorsel VIDEO SAYILMIYOR "
+        "(gercek video orani SISIRILMIYOR)",
+        _RD_PV["medya_turu"] != "video")
+_RD_B = _MK.IsButcesi("t2", maks_usd=0.0, maks_sure_sn=60, maks_istek=5,
+                      maks_bayt=100, maks_kare=5)
+kontrol("⭐ R-1d-d: isaretlenmis uretilmis gorsel kopruden GECIYOR",
+        _MK.stok_secimi_kaydet(_RD_B, hedef_yol=_RD_PNG, scene_id="s001",
+                               provenans=_RD_PV)["kaydedildi"] is True
+        and _MK.manifest_kur(_RD_B)["adaylar"][0]["medya_turu"] == "image")
+kontrol("⭐ R-1d-d: kaydi OLMAYAN dosya isaretlenince BOSTAN kayit "
+        "URETMIYOR",
+        (_KY.stok_provenans_isaretle(os.path.join(_RD_DIZ, "yok.png"),
+                                     lisans="x") is None)
+        and _KY.stok_provenans_al(os.path.join(_RD_DIZ, "yok.png")) == {})
+
+# ── (4) PIPELINE BAGLANTISI ──
+_PL_DD = _kod_yalniz(oku(KOK, "pipeline.py")).replace(" ", "")
+kontrol("⭐ R-1d-d: pipeline uretilen gorseli de KOPRUYE veriyor",
+        "_kopru_yaz(gyol_full)" in _PL_DD
+        and "stok_provenans_isaretle(" in _PL_DD)
+kontrol("⭐ R-1d-d BELIRLEYICI: kopru yardimcilari footage blogunun DISINDA "
+        "(non-footage sahne NameError almasin)",
+        oku(KOK, "pipeline.py").index("def _kopru_yaz(")
+        < oku(KOK, "pipeline.py").index("# 1) Footage sahnesi mi?"))
+kontrol("⭐ R-1d-d: kopru `footage_sorgu` YOKKEN de guvenli",
+        'sorgu=str(s.get("footage_sorgu") or "").strip())'
+        in oku(KOK, "pipeline.py"))
+kontrol("R-1d-d: degisen dort dosya da derleniyor",
+        all(_derlenir(os.path.join(KOK, a))
+            for a in ("pipeline.py", "kaynak.py", "editor/gramer.py",
+                      "editor/plan.py")))
+kontrol("R-1d-d GERILEME YOK: kaynak_ses / FACT / SUREKLILIK kapilari DURUYOR",
+        "KALITE-KAYNAK-SES-SIZINTI" in _qon.FAIL_KODLARI
+        and "FACT-BAGLANTI-YOK" in _qon.FAIL_KODLARI
+        and "SUREKLILIK-AYNI-CEKIM" in oku(KOK, "editor/gramer.py"))
+
+
 blok("§40h I-58 — IKI ADAY DUZENI KARSI-OLGU OLARAK OLCULDU (yalniz tanisal)")
 
 # ⚠ YALNIZ TANISAL. Uretim davranisi DEGISMEDI, kapi/esik eklenmedi.

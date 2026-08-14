@@ -16,6 +16,7 @@ import os
 import re
 from typing import Optional
 
+from .kalite_kapisi import KAYNAK_BASINA_TAVAN_SN_PLAN as KAYNAK_BASINA_TAVAN_SN
 from . import (adapter, beat, gramer, kalite_kapisi, motion, profil, qa_on,
                ses, tipografi, ses_gurultu)
 from .profil import EditProfili
@@ -424,10 +425,33 @@ def uret(*, cumleler: list, medya_manifest: dict,
 
     # 1) BEAT
     bplan = beat.plan_yap(cumleler, profil_=p)
+    # ── FAZ R-1d-d: TEK SAGLAYICILI ISTE KOTA DEJENERE OLUYOR ──
+    # ⚠ OLCULEN KUSUR (R-1d-c pilotu): `kapsam {cekim:16, medya:4,
+    # fallback:12, kapsam_orani:0.25}`. Saglayici kotasi (varsayilan 4)
+    # CESITLILIK icindir: "tek bir saglayici plani ele gecirmesin". Manifestte
+    # SADECE BIR saglayici varsa kota cesitlilik SAGLAYAMAZ — yalnizca
+    # 4'uncu cekimden sonrasini GARANTILI fallback'e iter. Olculdu: 16
+    # beat'in tam 4'u medya aldi, 12'si fallback oldu.
+    # ⚠ BU BIR ESIK GEVSETMESI DEGILDIR:
+    #   · Cok saglayicili manifestte davranis BIT-BIT AYNI (kosul saglanmaz).
+    #   · Tek saglayici durumu GIZLENMIYOR: `SAGLAYICI-TEKEL` kapisi ayni
+    #     esikle (%40) olcmeye ve UYARMAYA devam ediyor.
+    #   · Cagirici acikca bir tavan verdiyse ona DOKUNULMAZ.
+    _saglayicilar = {str(a.get("saglayici") or "")
+                     for lst in sahne_adaylari.values() for a in lst
+                     if a.get("render_kullanilabilir")}
+    _tavan = int(saglayici_tavani)
+    _tavan_gerekce = ""
+    if len(_saglayicilar) <= 1 and _tavan < len(bplan.beatler):
+        _tavan_gerekce = (f"TEK-SAGLAYICI: kota cesitlilik saglayamaz, "
+                          f"{_tavan} -> {len(bplan.beatler)} (beat sayisi)")
+        _tavan = len(bplan.beatler)
     # 2) GRAMER
     cekimler = gramer.gramer_uygula(
         bplan.beatler, sahne_adaylari=sahne_adaylari,
-        kapsam_bosluklari=bosluklar, saglayici_tavani=saglayici_tavani)
+        kapsam_bosluklari=bosluklar, saglayici_tavani=_tavan,
+        # ⚠ FAZ R-1d-d: ayni kaynak tavani ARTIK SECIM ANINDA uygulanir.
+        kaynak_tavani_sn=KAYNAK_BASINA_TAVAN_SN)
     # 3) MOTION
     _kare_gen = (kare_olcu or (None,))[0]
     specler = _motion_kur(cekimler, bplan.beatler, p, _kare_gen,
