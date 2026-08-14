@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 14 Ağu | **I-58 iki aday düzeni karşı-olgu olarak ölçüldü (tanısal)** | `PENDING` | ⚠ **push edildi**, ağsız/ücretsiz karşı-olgu: **A** (farklı 2. aday) tekrar kapısından temiz, **B** (aynı adayın farklı kadrajı) **mevcut I-22 kapısını ihlal ediyor** (bitişik aynı varlık → `KALITE-MEDYA-TEKRAR` fail, üretimin kendi manifestinden canlı hesaplandı); B'yi bloke eden şeyin benzerlik **değil** yalnız `asset_id` olduğu **kaynak koddan** gösterildi (`medya_tekrari` aynı-kimlik çiftinde benzerlik bacağını `continue` ile atlıyor; üretimde `benzerlik_okuyucu=None`); ⚠ **belirleyici**: B **semantik kusuru gidermiyor** — b002 1900 arşiv fotoğrafını alıyor, I-47 uyarısı onun için de yanıyor (canlı çağrı); ⚠ çok-beatli sahne 17 koşumun 12'sinde var ama 10'u aynı planın yeniden render'ı → lawn ailesi dışında yalnız **iki** bağımsız iş (`_i20`, `_smoke_editorv2`) → yanlış pozitif payı güvenilir ölçülemez (I-34 dersi); ⚠ **kapanış denetiminde ÜÇ iddia ELENDİ ve silindi** — kadraj varyantı dHash'leri (0.59–0.77), beş varyantın beklenen optiği (2.83–3.48) ve lisans/provenance iddiası: üçü de sabit sözlükten okunup eşikle karşılaştırılıyordu, **yeniden türetilmiyordu** ve dayanağı (dHash uygulaması / E,d girdileri / ilgili kontrol) repoda **yok**; **üretime alınmadı**, üretim kodu değişmedi, rerender/deploy YOK, $0.00 |
 | 14 Ağu | **I-57 b001/b002 seçim zinciri geriye izlendi (tanısal)** | `ab9b09e` | ✅ **push edildi**, üretimin kendi kayıtlarından: s001 cümlesi **ikiye kesilmiş**, b002 sahnenin **2. adayı** (puan 90→80) ve **kendi beat metniyle hiç aranmamış**; ⚠ ölçüldü ki `semantik_puan` varlık çıkmayınca **altı adayda da tam 50.0** (sıfır bilgi) ve `alaka_kapisi` bu korpusta **ters** çalışıyor — **3 yanlış adayın 3'ünü geçiriyor, 3 doğrudan 2'sini reddediyor**; b002'yi ayıran tek sinyal **yapısal** (aynı sahnenin rank≥2 adayı) ama **yanlış pozitif payı ölçülemez** (örnek büyüklüğü 1) → **üretime konmadı**; ⚠ b002 varlığı **yağmurlama değil** (Kanapou-Kahoolawe erozyon sahası; yağmurlama b004 ve **doğru**); üretim/render değişmedi, deploy YOK |
 | 14 Ağu | **I-56 bağımsız kenar ölçüm hattı üretime alındı** | `ae438bd` | ✅ **push edildi**, I-54 yapılandırması + I-55 eşiği **uygulandı**: `kenar_ornek_komutu` (384×216 @ **8 fps**, optik 64×36@4fps sözleşmesinden **bağımsız**) + `kenar_dis_olcusu` (**dört yön**, en dış sütun/satır, eşik **6.234**); POST-QA'ya **geriye uyumlu** bağlandı (`kenar_dis` alanı + `POST-KENAR-DIS` fail kodu; eski `kenar`/`POST-KENAR-SIYAH` **aynen** duruyor); kabul ölçütü sağlandı: I-52 karşı-örneği **FAIL**, **17 temiz videonun 17'si PASS** → **kaçırma 0, yanlış pozitif 0**; 25.2 sn 1080p pilot **POST-QA PASS**, 11/11 kare SHA-256 aynı, **kabul edilmiş MP4 DEĞİL** (b001/b002 semantik), deploy YOK |
 | 14 Ağu | **I-55 kenar eşiği türetildi (train→formül, held-out tek bakış)** | `e9f90c8` | ✅ **push edildi**, I-54'ün **ön-kayıtlı** bölünmesi değiştirilmeden okundu; eşik **yalnız TRAIN**'den açık formülle (`eşik = temiz_alt / 2` = **6.234**) türetildi ve TRAIN bandının içinde olduğu doğrulandı; **held-out'a tek bakış**: 4 kusurlu örneğin **4'ü yakalandı**, 7 temiz örneğin **7'si temiz** → **kaçırma 0, yanlış pozitif 0**; duyarlılık: güvenlik katı ~1.25–2494 aralığında sonuç değişmiyor; ⚠ ölçüm betiğinde pencere hatası bulunup düzeltildi (kusur 20.431→0.046, render değişmedi); **üretim kodu değişmedi** (eşik uygulanmadı, `KENAR_SIYAH_ESIGI` 16 duruyor), geçici varlıklar (345 MB) temizlendi, deploy YOK |
@@ -5670,6 +5671,73 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 76. FAZ I-58 — İKİ ADAY DÜZENİ KARŞI-OLGU OLARAK ÖLÇÜLDÜ (yalnız tanısal, 14 Ağu)
+
+> **Durum: I-57'nin bıraktığı 1. açık atom ("ikinci beat için ayrı sorgu mu,
+> aynı adayın farklı kadrajı mı?") ağsız/ücretsiz karşı-olgu ile ölçüldü ve
+> öneri (düzen B) **ELENDİ**. Üretim davranışı **DEĞİŞMEDİ**. A–I yeşil
+> (**3581**, 0 hata, 2 BLOKE — faz-h `QA_TEST_VIDEO` opsiyonel + faz-i I-33
+> görsel inceleme). Rerender YOK, deploy YOK, kabul edilmiş MP4 YOK. $0.00.**
+> Değişen: **yalnızca** `webapp/testler/test_faz_i.py` (§40h, 16 kontrol) ve
+> bu handoff. `medya/*`, `medya_kapisi.py`, `editor/*`, `Video.tsx`,
+> `deploy.sh`, **eşikler**, **22 alan sözleşmesi** ve I-23/I-24/I-25/I-38
+> kapıları **dokunulmadı**. I-23…I-57 **korundu**.
+
+### Karşılaştırılan iki düzen
+
+| | b002'ye atanan | Sonuç |
+|---|---|---|
+| **A (mevcut)** | farklı 2. aday `s01y1_9559294` | tekrar kapısından **TEMİZ** |
+| **B (öneri)** | `s01_5156581`'in farklı kadrajı | **I-22 kapısını İHLAL EDİYOR** |
+
+### Ölçülenler (hepsi canlı hesaplanıyor)
+
+1. **Tekrar kapısı** — üretimin kendi `_i37_calisma/edit_manifest.json`'u
+   `kalite_kapisi.medya_tekrari()`'ye verildi: A'da `bitisik_ayni_asset=[]`;
+   B'de indeks 1'de bitişik aynı varlık + 2 kez tekrar →
+   **`KALITE-MEDYA-TEKRAR`** fail kodu tetiklenir.
+2. **Bloke eden bacak** — kaynak koddan gösterildi: `medya_tekrari` görsel
+   benzerliği **aynı `asset_id` çiftinde hiç ölçmez** (`continue`), üretim
+   yolu da okuyucuyu zaten vermiyor (`qa_on: benzerlik_okuyucu=None`).
+   Yani B'yi bloke eden **benzerlik değil, yalnız `asset_id`**.
+3. **BELİRLEYİCİ — B semantik kusuru gidermiyor**: b002 o düzende b001'in
+   varlığını alır; o varlık **1900 tarihli arşiv fotoğrafıdır**
+   (`kunye.json` başlığı ile doğrulandı) ve `medya_kapisi.donem_uyarisi()`
+   **b002 için de yanar**. B, kusuru çözmüyor; **başka bir kusurla
+   değiştiriyor**.
+4. **Genellenebilirlik payı (dürüst sınır)** — 17 kayıtlı koşumun 12'sinde
+   çok-beatli sahne var, ama **10'u aynı lawn planının yeniden render'ı**
+   (tek bağımsız iş). Lawn ailesi dışında yalnız **iki** bağımsız iş:
+   `_i20` (düzen A; rank-1 varlığı I-33'ün vitrin kusuru — yine semantik) ve
+   `_smoke_editorv2` (**düzen B'nin doğal örneği**; ölçüldü ki bitişik aynı
+   varlık **tetikleniyor** — o koşumda kalite kapısı kapalı olduğu için
+   sorun üretilmemişti). Örnek büyüklüğü **2** → yanlış pozitif payı
+   **güvenilir ölçülemez** (I-34 dersi).
+
+### ⚠ Kapanış denetiminde ELENDİ ve SİLİNDİ (3 iddia)
+
+Taslakta "ölçüldü" diye yazılmış üç iddia, kapanış denetiminde
+**yeniden türetilemedi** — üçü de sabit sözlükten okunup eşikle
+karşılaştırılıyordu (totoloji) ve dayanağı repoda yok:
+
+| Silinen iddia | Neden elendi |
+|---|---|
+| Kadraj varyantı dHash'leri **0.59–0.77 < 0.86** | Repoda **dHash uygulaması yok** (ölçer her zaman dışarıdan verilir), `cikti/_i58*` ölçüm dizini yok, betik yok |
+| Beş varyantın beklenen optiği **2.83–3.48 > 2.0** | `beklenen_optik_olcusu()` ile **yeniden hesaplanmıyordu**; türetildiği E/d girdileri hiçbir yerde kayıtlı değil |
+| "Lisans/provenance bozulmuyor" | Testi iddiayla ilgisiz bir şeye bakıyordu (`KALITE-KUNYE-EKSIK` fail kodunun **varlığı**) |
+
+⚠ Bunların silinmesi **hükmü değiştirmez**: B zaten (1) tekrar kapısını
+ihlal ettiği ve (3) semantik kusuru gidermediği için elenmiştir. ⚠ "B'nin
+hareketi yetersiz" **denmemektedir** — ölçülmemiştir.
+
+### Hüküm
+
+**Düzen B üretime ALINMADI.** I-57'nin 1. açık atomu **kapandı** (öneri
+elendi); 2. ve 3. atomlar (semantik skorun atıl hâli, alaka kapısının
+kapsam raporu) **açık kalıyor**.
 
 ---
 

@@ -6412,6 +6412,194 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
         "KaynakEtiketi" in _GRAFIK_TSX
         and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
 
+blok("§40h I-58 — IKI ADAY DUZENI KARSI-OLGU OLARAK OLCULDU (yalniz tanisal)")
+
+# ⚠ YALNIZ TANISAL. Uretim davranisi DEGISMEDI, kapi/esik eklenmedi.
+# Ucretli API YOK, AG YOK, rerender/deploy YOK, $0.00.
+#
+# ── SORU ── I-57'de olculdu: bolunmus ikinci beat (b002) KENDI metniyle
+# aranmadan, sahnenin rank-2 adayini aliyor. Iki duzen karsilastirildi:
+#   A) MEVCUT : b002 -> FARKLI ikinci aday (s01y1_9559294, Kanapou-Kahoolawe)
+#   B) ONERI  : b002 -> AYNI secilen adayin (s01_5156581) FARKLI KADRAJI
+#               (kota/ag artisi YOK — yeni indirme yok)
+#
+# ── OLCUM 1: TEKRAR KAPISI (I-22) ──
+#   A: bitisik_ayni_asset = []            -> kapi TEMIZ
+#   B: bitisik_ayni_asset = [{'indeks':1, 's01_5156581'}], tekrar_eden 2 kez
+#      -> `KALITE-MEDYA-TEKRAR` (FAIL kodu) TETIKLENIR
+# ⚠ Yani B, MEVCUT I-22 sozlesmesini IHLAL EDER; uygulanmasi o kapiyi
+# degistirmeyi gerektirir (bu atomda ve talimatta KORUNMASI istendi).
+#
+# ── OLCUM 2: BLOKE EDEN BACAK — KOD UZERINDEN ──
+# `medya_tekrari` gorsel benzerligi AYNI asset_id ciftlerinde HIC olcmez
+# (o cift (a) bacaginda zaten yakalanmistir; `continue` ile atlanir) ve
+# uretim yolu okuyucuyu ZATEN vermez (`qa_on` icinde benzerlik_okuyucu=None).
+# Yani B'yi bloke eden sey GORSEL BENZERLIK DEGIL, YALNIZCA asset_id bacagi.
+# ⚠ ELENDI (2026-08-14, I-58 kapanisi): onceki taslakta kadraj varyantlarinin
+# dHash degerleri (0.59-0.77 < 0.86) "olculdu" diye yaziliydi. DENETIMDE
+# DOGRULANAMADI: repoda dHash uygulamasi YOK (olcer her zaman disaridan
+# verilir), `cikti/_i58*` olcum dizini YOK, betik YOK — sayilar yalnizca
+# sabit sozlukte duruyordu ve test onlari YENIDEN TURETMIYORDU. Iddia
+# SILINDI; yerine yalnizca KAYNAK KODDAN dogrulanabilen hukum birakildi.
+#
+# ── OLCUM 3 — ELENDI: HAREKET YETERLILIGI DOGRULANAMADI ──
+# Onceki taslak bes kadraj varyanti icin beklenen optik degerler (2.83-3.48)
+# tasiyordu. DENETIMDE DOGRULANAMADI: degerler `beklenen_optik_olcusu` ile
+# YENIDEN HESAPLANMIYOR, sabit sozlukten okunup esikle karsilastiriliyordu
+# (totoloji) ve turetildikleri E/d girdileri hicbir yerde kayitli DEGIL.
+# Iddia SILINDI. ⚠ Bu, "B'nin hareketi yetersiz" demek DEGILDIR; olculmedi.
+# Zaten HUKMU degistirmez: B asagidaki OLCUM 4 nedeniyle elenmistir.
+#
+# ── OLCUM 4 (BELIRLEYICI): B SEMANTIK KUSURU GIDERMIYOR ──
+# B'de b002, b001'in varligini alir; o varlik 1900 tarihli arsiv fotografidir
+# ve I-47 donem uyarisi b002 icin de TETIKLENIR (isaretler ['1900','1900']).
+# Yani B, b002'nin semantik kusurunu COZMEZ — yalnizca BASKA bir semantik
+# kusurla DEGISTIRIR.
+#
+# ── OLCUM 5 — ELENDI: LISANS/PROVENANCE IDDIASI OLCULMEDI ──
+# Onceki taslak "ayni varlik -> ayni lisans, provenance BOZULMAZ" diyordu ama
+# testi yalnizca `KALITE-KUNYE-EKSIK` fail kodunun VARLIGINA bakiyordu —
+# iddiayla ilgisi olmayan bir kontrol. Iddia SILINDI (kunye kapilarinin
+# durdugu asagida GERILEME blogunda zaten ayrica dogrulaniyor).
+#
+# ── OLCUM 6: GENELLENEBILIRLIK PAYI (DURUST SINIR) ──
+# 17 kayitli kosumun 12'sinde COK-BEATLI sahne var; bunlarin 10'u incelenen
+# lawn planinin YENIDEN RENDER'idir (ayni b001/b002 varlik cifti) -> TEK
+# bagimsiz is. Geriye kalan IKI bagimsiz is:
+#   `_i20`            : s001 -> IKI FARKLI aday (duzen A); rank-1 varligi
+#                       `s01_11066148` = I-33'un VITRIN kusuru (yine semantik)
+#   `_smoke_editorv2` : s001 -> AYNI varlik iki beat'te (duzen B'nin DOGAL
+#                       ornegi); olculdu ki bitisik_ayni_asset TETIKLENIR
+#                       (o kosumda kalite kapisi KAPALIYDI, bu yuzden
+#                       sorun uretilmemisti)
+# (Kalan 10 lawn kosumu AYNI planin yeniden render'idir, bagimsiz ornek
+# degildir.) Ornek buyuklugu IKI -> yanlis pozitif payi GUVENILIR SEKILDE
+# OLCULEMEZ; I-34 dersi geregi genellenebilir sonuc DEGILDIR.
+#
+# ⚠ HUKUM: B, tekrar kapisini ihlal ediyor VE semantik kusuru gidermiyor.
+# Uretime ALINMADI.
+
+_I58 = {
+    "A_bitisik": 0, "B_bitisik": 1, "B_tekrar_sayisi": 2,
+    "B_donem_uyarisi": True,
+}
+
+# ── OLCUM 1: tekrar kapisi ──
+_MF58 = os.path.join(os.path.dirname(KOK), "cikti", "_i37_calisma",
+                     "edit_manifest.json")
+if os.path.isfile(_MF58):
+    _c58 = [{"beat_id": c["beat_id"], "asset_id": c.get("asset_id", ""),
+             "medya_yolu": ""} for c in
+            json.load(open(_MF58, encoding="utf-8"))["cekimler"]]
+    _A58 = _kk.medya_tekrari(_c58)
+    _B58c = [dict(x) for x in _c58]
+    _B58c[1]["asset_id"] = _B58c[0]["asset_id"]
+    _B58 = _kk.medya_tekrari(_B58c)
+    kontrol("⭐ I-58: DUZEN A tekrar kapisindan TEMIZ geciyor",
+            not _A58["bitisik_ayni_asset"] and not _A58["tekrar_eden_asset"],
+            _A58["bitisik_ayni_asset"])
+    kontrol("⭐ I-58 BELIRLEYICI: DUZEN B mevcut I-22 tekrar kapisini "
+            "IHLAL EDIYOR (bitisik ayni varlik)",
+            len(_B58["bitisik_ayni_asset"]) == _I58["B_bitisik"]
+            and _B58["tekrar_eden_asset"].get(_B58c[0]["asset_id"])
+            == _I58["B_tekrar_sayisi"], _B58["bitisik_ayni_asset"])
+    kontrol("⭐ I-58: bu ihlal FAIL uretir (`KALITE-MEDYA-TEKRAR` fail kodu)",
+            "KALITE-MEDYA-TEKRAR" in _qon.FAIL_KODLARI)
+else:
+    bloke_yaz("I-58 tekrar kapisi olcumu", "cikti/_i37_calisma yok")
+
+# ── OLCUM 2: bloke eden bacak KAYNAK KODDAN ──
+# (dHash iddiasi ELENDI — yukaridaki nota bak.)
+_KK58 = _sikistir(oku(KOK, "editor", "kalite_kapisi.py")).replace(" ", "")
+kontrol("⭐ I-58: benzerlik bacagi AYNI asset_id ciftini HIC olcmez "
+        "(kodda `continue` ile atlanir) -> B'yi bloke eden BENZERLIK DEGIL",
+        "ifkimlikler[i]andkimlikler[i]==kimlikler[j]:continue" in _KK58)
+kontrol("⭐ I-58: uretim yolu benzerlik okuyucusunu ZATEN vermiyor "
+        "(qa_on: benzerlik_okuyucu=None) -> geriye YALNIZ asset_id kaliyor",
+        "benzerlik_okuyucu=None" in _sikistir(
+            oku(KOK, "editor", "qa_on.py")).replace(" ", ""))
+
+# ── OLCUM 4: semantik kusur GIDERILMIYOR ──
+_MK58 = __import__("medya_kapisi")
+kontrol("⭐ I-58 BELIRLEYICI: DUZEN B semantik kusuru GIDERMIYOR — b002 "
+        "1900 arsiv fotografini alir ve I-47 uyarisi ONUN icin de yanar",
+        _MK58.donem_uyarisi(
+            "seed on my garage shelf right now.",
+            "Vegetable, grass and flower seeds, 1900 (1900) "
+            "(20532148836).jpg").get("uyari") is _I58["B_donem_uyarisi"])
+
+# (OLCUM 5 ELENDI — yukaridaki nota bak.)
+
+# ── OLCUM 6: genellenebilirlik payi — KAYITLARDAN SAYILARAK ──
+import glob                                            # noqa: E402
+_MANI58 = sorted(glob.glob(os.path.join(os.path.dirname(KOK), "cikti", "*",
+                                        "edit_manifest.json")))
+_COK58 = []
+for _p58 in _MANI58:
+    try:
+        _mm58 = json.load(open(_p58, encoding="utf-8"))
+    except Exception:
+        continue
+    _say58: dict = {}
+    for _c in _mm58.get("cekimler", []):
+        _s = _c.get("scene_id")
+        _say58[_s] = _say58.get(_s, 0) + 1
+    if any(_n > 1 for _n in _say58.values()):
+        _COK58.append(os.path.basename(os.path.dirname(_p58)))
+# 10 "lawn" kosumu AYNI planin yeniden render'idir (ayni b001/b002 varlik
+# cifti) -> TEK bagimsiz is sayilir; ustune `_i20` ve `_smoke_editorv2`.
+_LAWN58 = [d for d in _COK58 if d not in ("_i20", "_smoke_editorv2")]
+kontrol("⭐ I-58 DURUSTLUK: cok-beatli sahne, incelenen lawn ailesi DISINDA "
+        "yalniz IKI bagimsiz iste var -> yanlis pozitif payi GUVENILIR "
+        "OLCULEMEZ (I-34 dersi)",
+        sorted(d for d in _COK58 if d not in _LAWN58)
+        == ["_i20", "_smoke_editorv2"] and len(_LAWN58) >= 1, _COK58)
+_SMK58 = os.path.join(os.path.dirname(KOK), "cikti", "_smoke_editorv2",
+                      "edit_manifest.json")
+if os.path.isfile(_SMK58):
+    _s58 = [{"beat_id": c["beat_id"], "asset_id": c.get("asset_id", ""),
+             "medya_yolu": ""} for c in
+            json.load(open(_SMK58, encoding="utf-8"))["cekimler"]]
+    kontrol("⭐ I-58: DOGAL karsi-ornek (`_smoke_editorv2`) duzen B'yi ZATEN "
+            "iceriyor ve tekrar kapisi TETIKLENIYOR",
+            bool(_kk.medya_tekrari(_s58)["bitisik_ayni_asset"]),
+            _kk.medya_tekrari(_s58)["bitisik_ayni_asset"])
+
+# ── URETIM DEGISMEDI ──
+kontrol("⭐ I-58: tekrar kapisi esigi ve sozlesmesi DEGISMEDI (0.86)",
+        abs(_kk.BENZERLIK_ESIGI - 0.86) < 1e-9)
+kontrol("⭐ I-58: kadraj olcekleri DEGISMEDI (tam/punch-1.35/punch-1.6/ust/alt)",
+        all(f'"{a}": {b}' in oku(KOK, "editor/motion.py")
+            for a, b in (("tam", 1.0), ("punch-1.35", 1.35),
+                         ("punch-1.6", 1.6))))
+kontrol("⭐ I-58: beat/aday atama kodu DEGISMEDI (tanisal atom)",
+        "def semantik_puan" in oku(KOK, "medya/siralama.py")
+        and "def medya_tekrari" in oku(KOK, "editor/kalite_kapisi.py"))
+
+# ── GERILEME YOK ──
+kontrol("⭐ I-58: ESIKLER GEVSETILMEDI (optik 2.0 / enerji 11.589 / "
+        "kenar_dis 6.234 / k 0.935)",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0
+        and abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9
+        and abs(_kk.KENAR_DIS_ESIGI - 6.234) < 1e-9
+        and abs(_kk.MODEL_K - 0.935) < 1e-6)
+kontrol("I-58 GERILEME YOK: I-23/I-24/I-25/I-38 kapilari DURUYOR",
+        "KALITE-MOTION-ACILIS-KAPANIS" in _qon.FAIL_KODLARI
+        and "KALITE-MOTION-ISLEV-TEKRAR" in _qon.FAIL_KODLARI
+        and "KALITE-YAZI-SAHNE-DISI" in _qon.FAIL_KODLARI
+        and "ORAN-UYUMSUZ" in oku(KOK, "medya/edinim.py")
+        and "class DevreKesici" in oku(KOK, "medya/edinim.py"))
+kontrol("I-58 GERILEME YOK: lisans/provenance kapilari DURUYOR",
+        "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI
+        and "def lisans_suz" in oku(KOK, "edit_kopru.py"))
+kontrol("I-58 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("I-58: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in oku(os.path.dirname(KOK), "app",
+                                            "render-studio", "src",
+                                            "Video.tsx"))
+
 blok("§40g I-57 — b001/b002 SECIM ZINCIRI GERIYE IZLENDI (yalniz tanisal)")
 
 # ⚠ YALNIZ TANISAL. Uretim davranisi DEGISMEDI; kapi/esik/sozlesme
