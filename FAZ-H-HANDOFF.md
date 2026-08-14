@@ -9261,3 +9261,52 @@ alındı ve `footage_sorgu` yokken de güvenli hale getirildi.
 | `pipeline.py` | **6 kırmızı** |
 | `editor/gramer.py` | test **çöktü** (`KeyError: 'durum'` — plan üretilemiyor) |
 | `kaynak.py` | **`AttributeError: stok_provenans_isaretle`** — API yoktu |
+
+### R-1d-d PİLOTU — iki hedef ölçülerek kapandı, örnek KABUL EDİLMEDİ
+
+`job_1786717796777_r1dasm_9f1dda` · **8/8 sahne köprüden geçti**
+(5 `pexels/pexels-license` + 3 `openai/uretilmis-eser`).
+
+| ölçüm | R-1d-c pilotu | R-1d-d pilotu |
+|---|---|---|
+| `kapsam_orani` | **0.25** (medya 4) | **0.50** (medya **8**) ⬆ |
+| aynı kaynak ≤ 8.0 sn | ⛔ **8.052 sn İHLAL** | ✅ **PASS** — en uzun **7.716 sn**, **5 varlık** |
+| sağlayıcı çeşitliliği | tek (`pexels` %100) | **iki** (`pexels` %38.7 + `openai`) |
+| B-roll işlev/tür tekrarı | `[]` | `[]` (korundu) |
+| `kaynak_ses` | `sifir`, ihlal `[]` | `sifir`, ihlal `[]` (korundu) |
+
+**Teknik PASS:** 1920×1080 · h264 · **63.74 sn** · aac 48 kHz ·
+**LUFS −14.0** · **TP −1.5 dBTP** · **LRA 3.2** · sessiz oran **%0.0** ·
+ölü final 0.0 sn · hiss 20.6 dB altta · **8 kesme** · siyah 0 · donmuş 0 ·
+**12 kare** · POST-QA **WARN** (FAIL yok).
+**Semantik PASS:** tipografi · künye/atıf · motion · geçiş `hard_cut 0.688` ·
+hook `{hook:4, kanit:3, aciklama:8, sonuc:1}` · kapanış · tekrar/benzerlik.
+**Signed URL:** kendi oturumu **200** · oturumsuz **401** · **başka tenant 403**.
+
+**FAIL (8):** PRE-QA FAIL · kapsam 0.5 · J/L-cut `ducking_araligi: 0` ·
+olgu bağı 5/8 · `pix_fmt` yuv444p · rumble 18.4 dB (⚠ eşik benim, kalibre
+değil) · teslim RED · kütüphanede yok.
+
+### ⛔ SONRAKİ TEK GERÇEK BLOKAJ — beat sayısı aday sayısının İKİ KATI
+
+```
+kapsam: {"cekim": 16, "medya": 8, "fallback": 8, "kapsam_orani": 0.5}
+PRE-QA: SHOT-TAVAN: b011 8.075 sn (tavan 8.0)
+```
+
+Plan **8 cümleden 16 beat** üretiyor; köprü **sahne başına 1 aday** yazıyor
+→ **8 aday / 16 beat**. Her sahnenin tek varlığı ilk beat'ini alıyor,
+**ikinci beat zorunlu fallback** oluyor. Kalan `kapsam 0.5` tam olarak bu.
+
+⚠ İkinci beat'in varlığı **tekrar kullanması** artık `≤8 sn` tavanı
+tarafından **doğru şekilde** engelleniyor — yani bu, R-1d-d'nin
+sıkılaştırmasının **beklenen** sonucu, gerileme değil.
+
+⚠ Ayrıca **yapısal çelişki ölçüldü**: `b011` tek başına **8.075 sn** —
+kaynak tavanının (**8.0 sn**) üstünde. Böyle bir beat **hiçbir** varlık
+alamaz (ve `SHOT-TAVAN` kapısı da onu ayrıca fail ediyor).
+
+**Doğru atom (R-1d-e):** ya köprü **sahne başına ≥2 gerçek aday** üretsin
+(sağlayıcıdan ikinci klip), ya da **beat süreleri/sayısı** mevcut aday
+sayısı ve `≤8 sn` tavanıyla **uyumlu türetilsin**. ⚠ Eşik gevşetmek
+YANLIŞ olur: kapsam gerçekten %50 ve `b011` gerçekten tavanın üstünde.
