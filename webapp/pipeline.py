@@ -4797,6 +4797,25 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # gercek render MEVCUT `VidrushVideo` yoluyla zaten yapildi.
     # ⚠ Manifest YALNIZCA avci GERCEKTEN lisansli + kare-dogrulanmis aday
     # verdiyse kurulur; aksi halde plan denenmez (uydurma manifest yok).
+    def _kare_sayisi_oku(yol):
+        """ffprobe ile kare sayisi. ⚠ UCRETSIZ + YEREL; ag/kredi YOK.
+
+        ⚠ Okunamazsa None doner — "statiktir" DENMEZ; olcum tarafi
+        `olculemedi` yazar (uydurma sinif ATANMAZ).
+        """
+        try:
+            if not yol or not os.path.exists(yol):
+                return None
+            r = subprocess.run(
+                ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                 "-count_packets", "-show_entries", "stream=nb_read_packets",
+                 "-of", "csv=p=0", yol],
+                capture_output=True, text=True, timeout=25)
+            ham = (r.stdout or "").strip().rstrip(",")
+            return int(ham) if ham.isdigit() else None
+        except Exception:                                    # noqa: BLE001
+            return None
+
     _ed_acik, _ed_gerekce = edit_kopru.acik_mi(_is_ayar)
     if _ed_acik:
         try:
@@ -4817,6 +4836,13 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                                "metin": str(x.get("anlatim") or "")}
                               for x in props_sahneler],
                     medya_manifest=_manifest,
+                    # ⚠ FAZ R-1d-c: GERCEK VIDEO ORANI icin KARE OKUYUCU.
+                    # Medya turu olcumu dosya ACMAZ; kare
+                    # sayisini DISARIDAN ister. Okuyucu verilmeyince olcum
+                    # `KARE-OKUYUCU-YOK` ile duruyordu ve "gercek video
+                    # orani" HIC olculemiyordu (R-1d-b pilot 3'te olculdu).
+                    # ⚠ UCRETSIZ ve YEREL: yalnizca ffprobe; ag/kredi YOK.
+                    kare_okuyucu=_kare_sayisi_oku,
                     olgular=list(getattr(arastirma_sonuc, "olgular", None)
                                  or []),
                     stil=None, cikti_dizin=CIKTI_DIR, is_ayar=_is_ayar)

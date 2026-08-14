@@ -9013,6 +9013,178 @@ kontrol("R-1d-b GERILEME YOK: avci yolu + lisans duvari + kare kapisi DURUYOR",
         and "render_kullanilabilir" in oku(KOK, "medya_kopru.py"))
 
 
+blok("§40w R-1d-c — B-ROLL CESITLENDIRMESI + PRE-QA OZETI KIRPILMIYOR")
+
+# ⚠ MEDYASIZ + AGSIZ + PARASIZ: hicbir klip/render URETILMEZ.
+#
+# ── OLCULEN KUSUR (57.88 sn remote ornegi, R-1d-b pilot 3) ──
+# (1) K-1 kapisi GERCEK ihlal buldu: `video_islev_tur_tekrari` ->
+#     b008 `aciklama/medium` (ilk 6) ve b009 `kanit/document` (ilk 3).
+#     Kok neden: aday `sahne_amaci` hicbir tercihe uymayinca gramer DAIMA
+#     `ISLEV_CEKIM[islev][0]`i seciyordu -> ayni islevin HER cekimi ayni
+#     turu aliyordu. Kopru kayitlarinda `sahne_amaci` bos oldugu icin bu
+#     yol KURAL haline gelmisti.
+# (2) `edit_kopru` PRE-QA ozetini KIRPIYORDU: kapsam/tipografi/gecis/ses/
+#     islev/kaynak_ses ve SORUN KOD LISTESI is kaydina hic ulasmiyordu;
+#     teslim raporu 6 kriteri "OLCULEMEDI" yazmak zorunda kaliyordu.
+# (3) `medya_turu` olcumu KARE OKUYUCU almadigi icin "gercek video orani"
+#     HIC olculemiyordu (`KARE-OKUYUCU-YOK`).
+
+_GR = __import__("editor.gramer", fromlist=["gramer"])
+_EK = __import__("edit_kopru")
+
+
+class _RcBeat:
+    def __init__(self, i, islev):
+        self.beat_id, self.scene_id = f"b{i:03d}", f"s{i:03d}"
+        self.fact_id, self.islev, self.sure_sn = "", islev, 4.0
+        self.perde = "gelisme"
+
+
+def _rc_aday(i):
+    # ⚠ `sahne_amaci` BOS — kopruden gelen stok kaydinin GERCEK hali.
+    return [{"asset_id": f"a{i}", "saglayici": "pexels", "sahne_amaci": "",
+             "tur": "video", "medya_turu": "video", "lisans": "pexels-license",
+             "yerel_yol": f"/tmp/a{i}.mp4", "genislik": 1920,
+             "yukseklik": 1080, "render_kullanilabilir": True}]
+
+
+def _rc_cekimler(islevler):
+    beatler = [_RcBeat(i + 1, isl) for i, isl in enumerate(islevler)]
+    adaylar = {b.scene_id: _rc_aday(i + 1) for i, b in enumerate(beatler)}
+    return _GR.gramer_uygula(beatler, sahne_adaylari=adaylar,
+                             saglayici_tavani=99)
+
+
+# ── (1) AYNI ISLEV ARTIK AYNI TURU TEKRARLAMIYOR ──
+_RC4 = _rc_cekimler(["aciklama"] * 4)
+kontrol("⭐ R-1d-c BELIRLEYICI: ayni islevin ardil cekimleri ARTIK ayni "
+        "cekim turunu almiyor (once hepsi `medium` idi)",
+        len({c.cekim_turu for c in _RC4}) >= 3,
+        [c.cekim_turu for c in _RC4])
+kontrol("⭐ R-1d-c: secim ISLEV_CEKIM havuzunun DISINA cikmiyor",
+        all(c.cekim_turu in _GR.ISLEV_CEKIM["aciklama"] for c in _RC4),
+        [c.cekim_turu for c in _RC4])
+_RCK = _rc_cekimler(["kanit"] * 4)
+kontrol("⭐ R-1d-c: `kanit` islevinde de tur DONUYOR (b009 document "
+        "tekrari kok nedeni)",
+        len({c.cekim_turu for c in _RCK}) >= 3,
+        [c.cekim_turu for c in _RCK])
+kontrol("⭐ R-1d-c: ILK cekim ESKISIYLE AYNI tur (gerileme yok; cesitlenme "
+        "IKINCI cekimde basliyor)",
+        _RC4[0].cekim_turu == _GR.ISLEV_CEKIM["aciklama"][0]
+        and _RCK[0].cekim_turu == _GR.ISLEV_CEKIM["kanit"][0])
+kontrol("⭐ R-1d-c: secim DETERMINISTIK (ayni girdi -> ayni cikti, "
+        "rastgelelik YOK)",
+        [c.cekim_turu for c in _rc_cekimler(["aciklama"] * 4)]
+        == [c.cekim_turu for c in _RC4]
+        and [c.cekim_turu for c in _rc_cekimler(["kanit"] * 4)]
+        == [c.cekim_turu for c in _RCK])
+kontrol("⭐ R-1d-c: farkli islevler BIRBIRININ sayacini bozmuyor",
+        _rc_cekimler(["aciklama", "kanit", "aciklama"])[2].cekim_turu
+        != _rc_cekimler(["aciklama", "kanit", "aciklama"])[0].cekim_turu)
+
+# ── (2) K-1 KAPISI ARTIK TEMIZ (kusurun OLCULDUGU kapi) ──
+_RC_SAHNE = [{"beat_id": c.beat_id, "kaynak_turu": "medya",
+              "asset_id": c.asset_id, "saglayici": c.saglayici,
+              "cekim_turu": c.cekim_turu, "islev": isl, "medya_turu": "video",
+              "lisans": "pexels-license", "ses_kanali": "sifir",
+              "medya_yolu": f"/tmp/{c.asset_id}.mp4", "sure_sn": 4.0}
+             for c, isl in zip(_rc_cekimler(["aciklama"] * 3 + ["kanit"] * 3),
+                               ["aciklama"] * 3 + ["kanit"] * 3)]
+_RC_BR = _kk.broll_cesitliligi_ozeti(_RC_SAHNE)
+kontrol("⭐ R-1d-c BELIRLEYICI: K-1 `video_islev_tur_tekrari` ARTIK BOS "
+        "(remote ornekte 2 ihlal vardi)",
+        (_RC_BR.get("video_islev_tur_tekrari") or []) == [],
+        _RC_BR.get("video_islev_tur_tekrari"))
+
+# ── (3) PRE-QA OZETI KIRPILMIYOR ──
+_RC_QA = {"durum": "WARN", "fail": 0, "warn": 2,
+          "sorunlar": [{"kod": "KALITE-BROLL-CESITLILIK", "seviye": "fail",
+                        "beat_id": "b008", "detay": "x" * 400}],
+          "olcumler": {"kapsam": {"kapsam_orani": 0.9},
+                       "tipografi": {"a": 1}, "gecis": {"hard_cut_orani": 0.7},
+                       "ses": {"ducking_araligi": 3}, "islev": {"kanit": 2},
+                       "kaynak_ses": {"olculdu": True, "ihlal": []},
+                       "baslik_suresi": {"temiz": True}, "efekt": {"n": 1},
+                       "pacing": {"ort": 4.0},
+                       "medya_turu": {"olculdu": True,
+                                      "video_sure_orani": 0.62},
+                       "broll_cesitliligi": {"olculdu": True}}}
+_EK_HAM = oku(KOK, "edit_kopru.py")
+_EK_KOD = _EK_HAM.replace(" ", "")
+for _a in ("kapsam", "tipografi", "gecis", "ses", "islev", "kaynak_ses",
+           "sorunlar", "gercek_video_orani", "kaynak_kullanimi"):
+    kontrol(f"⭐ R-1d-c: PRE-QA ozeti `{_a}` alanini TASIYOR",
+            f'"{_a}":' in _EK_KOD, _a)
+kontrol("⭐ R-1d-c BELIRLEYICI: SORUN KOD LISTESI ozete giriyor "
+        "(once yalnizca SAYISI vardi)",
+        '"sorun_sayisi":' in _EK_KOD and '"kod":str(s.get(' in _EK_KOD)
+kontrol("⭐ R-1d-c: sorun detayi KIRPILIYOR ama KOD/SEVIYE tam",
+        '[:160]' in _EK_KOD and '"seviye":str(s.get(' in _EK_KOD)
+kontrol("⭐ R-1d-c: gercek video orani `medya_turu`den OKUNUYOR, yeniden "
+        "HESAPLANMIYOR",
+        'video_sure_orani' in _EK_KOD)
+
+# ── (4) AYNI KAYNAK <= 8 SN OLCUMU ──
+kontrol("⭐ R-1d-c: tavan `saglayici_motoru` ile AYNI degerden okunuyor "
+        "(iki yerde ayri sabit YOK)",
+        _EK.KAYNAK_BASINA_TAVAN_SN == _SM.KAYNAK_BASINA_TAVAN_SN == 8.0)
+
+
+class _RcPlan:
+    def __init__(self, beatler):
+        self.beatler = beatler
+
+
+def _rc_kk(sureler, assetler):
+    b = [_RcBeat(i + 1, "kanit") for i in range(len(sureler))]
+    for x, sn in zip(b, sureler):
+        x.sure_sn = sn
+    c = [type("C", (), {"asset_id": a})() for a in assetler]
+    return _EK.kaynak_kullanimi({"cekimler": c, "beat_plani": _RcPlan(b)})
+
+
+_RC_K1 = _rc_kk([4.0, 3.0, 2.0], ["a1", "a2", "a1"])
+kontrol("⭐ R-1d-c: ayni kaynagin TOPLAM suresi hesaplaniyor",
+        _RC_K1["olculdu"] is True and _RC_K1["kullanim"]["a1"] == 6.0
+        and _RC_K1["en_uzun_sn"] == 6.0 and _RC_K1["temiz"] is True, _RC_K1)
+_RC_K2 = _rc_kk([5.0, 5.0], ["a1", "a1"])
+kontrol("⭐ R-1d-c BELIRLEYICI: tavani ASAN kaynak RAPORLANIYOR "
+        "(10 sn > 8 sn)",
+        _RC_K2["temiz"] is False
+        and _RC_K2["asan"] == [{"asset_id": "a1", "sure_sn": 10.0}], _RC_K2)
+kontrol("⭐ R-1d-c RED-FIRST: cekim/beat SAYISI ESLESMIYORSA olcum "
+        "YAPILMIYOR (sure TAHMIN EDILMEZ)",
+        _EK.kaynak_kullanimi(
+            {"cekimler": [type("C", (), {"asset_id": "a"})()],
+             "beat_plani": _RcPlan([])})["olculdu"] is False)
+kontrol("⭐ R-1d-c: varliksiz (fallback/sentetik) cekim kaynak sayilmiyor",
+        _rc_kk([4.0, 4.0], ["", "a1"])["kullanim"] == {"a1": 4.0})
+kontrol("⭐ R-1d-c: olcum HUKUM VERMIYOR (fail/warn URETMIYOR)",
+        not any(k in _RC_K2 for k in ("fail", "warn", "seviye")))
+
+# ── (5) KARE OKUYUCU BAGLANDI (gercek video orani olculebilsin) ──
+_PL_C = _kod_yalniz(oku(KOK, "pipeline.py")).replace(" ", "")
+kontrol("⭐ R-1d-c BELIRLEYICI: pipeline `kare_okuyucu` GECIYOR "
+        "(once `KARE-OKUYUCU-YOK` ile olcum duruyordu)",
+        "kare_okuyucu=_kare_sayisi_oku" in _PL_C
+        and "def_kare_sayisi_oku(" in _PL_C)
+kontrol("⭐ R-1d-c: kare okuyucu UCRETSIZ ve YEREL (yalniz ffprobe)",
+        '"ffprobe"' in oku(KOK, "pipeline.py").split(
+            "def _kare_sayisi_oku")[1][:900])
+kontrol("⭐ R-1d-c: okunamayan dosyada None doner ('statiktir' DENMEZ)",
+        "returnNone" in _PL_C.split("def_kare_sayisi_oku(")[1][:600])
+kontrol("R-1d-c: degisen uc dosya da derleniyor",
+        all(_derlenir(os.path.join(KOK, a))
+            for a in ("edit_kopru.py", "pipeline.py", "editor/gramer.py")))
+kontrol("R-1d-c GERILEME YOK: K-1/K-2 kapilari ve 22 alan DURUYOR",
+        "KALITE-BROLL-CESITLILIK" in _qon.FAIL_KODLARI
+        and "KALITE-KAYNAK-SES-SIZINTI" in _qon.FAIL_KODLARI
+        and len(set(re.findall(r"\{ad: '(\w+)'",
+                               oku(KOK, "static/js/api.js")))) == 22)
+
+
 blok("§40h I-58 — IKI ADAY DUZENI KARSI-OLGU OLARAK OLCULDU (yalniz tanisal)")
 
 # ⚠ YALNIZ TANISAL. Uretim davranisi DEGISMEDI, kapi/esik eklenmedi.

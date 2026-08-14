@@ -9072,3 +9072,75 @@ Temizlik: o `is_id`'yi `veri/kutuphane.json`'dan düşürmek yeterli
    ataması aynı işlevde tekrar ediyor.
 4. **`pix_fmt` yuv444p**: mux çıktısı yuv420p olmalı.
 5. Kütüphanedeki hatalı kabul kaydı (yukarıda).
+
+---
+
+## 66. FAZ R-1d-c — B-ROLL ÇEŞİTLENDİRMESİ + PRE-QA ÖZETİ KIRPILMIYOR (14 Ağu)
+
+> **Durum: R-1d-b'nin bıraktığı iki teslim-kanıtı eksiği kapatıldı.
+> A–I yeşil. Mac'te medya ÜRETİLMEDİ. $0.00.**
+> Değişen: `webapp/editor/gramer.py` (**tek seçim satırı + 1 sayaç**),
+> `webapp/edit_kopru.py` (QA özeti + `kaynak_kullanimi()`),
+> `webapp/pipeline.py` (**1 iç yardımcı + 1 argüman**),
+> `webapp/testler/test_faz_i.py`.
+> `server.py`, `teslim.py`, `kimlik.py`, `kutuphane.py`, `imzali_url.py`,
+> `kaynak.py`, `medya_kopru.py`, `deploy.sh`, `Video.tsx` ve **22 alan
+> sözleşmesi DOKUNULMADI**. Kuyruk/render/storage **yeniden yazılmadı**.
+
+### ⛔ Ölçülen kusur 1 — B-roll çeşitliliği (K-1 kapısının GERÇEK bulgusu)
+
+57.88 sn'lik remote örnekte K-1 kapısı ihlal buldu:
+`video_islev_tur_tekrari` → **b008 `aciklama/medium`** (ilk 6) ve
+**b009 `kanit/document`** (ilk 3).
+
+**Kök neden (`gramer.py:330`):**
+
+```python
+eslesen = next((t for t in tercihler
+                if t in _amac_cekim(aday_amaci)), tercihler[0])
+```
+
+Aday `sahne_amaci` hiçbir tercihe uymayınca **daima `tercihler[0]`**
+seçiliyordu → aynı işlevin **her** çekimi aynı türü alıyordu. Köprüden
+gelen stok kayıtlarında `sahne_amaci` **boş** olduğu için bu yol **kural**
+haline gelmişti. Red-first ölçüldü — düzeltme geri alınınca çıktı birebir:
+`['medium','medium','medium','medium']` ve
+`['document','document','document','document']`.
+
+**Düzeltme (deterministik):** havuz **aynı** kalıyor (amaç eşleşiyorsa
+eşleşenler, yoksa `ISLEV_CEKIM[islev]`); havuz **içinden** o işlevde **en az
+kullanılmış** tür seçiliyor, eşitlikte **havuz sırası** belirliyor.
+⚠ **Rastgelelik YOK** (test aynı girdi → aynı çıktı kilitliyor).
+⚠ **İlk çekim eskisiyle AYNI** türü alıyor — gerileme yok; çeşitlenme
+**ikinci** çekimde başlıyor.
+
+### ⛔ Ölçülen kusur 2 — PRE-QA özeti ölçümleri KIRPIYORDU
+
+`edit_kopru.plan_kur` yalnızca `durum/fail/warn/sorun_sayisi/medya_turu/
+broll_cesitliligi` taşıyordu. `kapsam`, `tipografi`, `gecis`, `ses`,
+`islev`, `kaynak_ses` ve **sorun KOD listesi** iş kaydına **hiç ulaşmıyordu**
+→ teslim raporu **6 kriteri** "ÖLÇÜLEMEDİ" yazmak zorunda kalıyordu.
+
+**Düzeltme:** özet artık hepsini taşıyor + **sorun kod listesi**
+(kod/seviye/beat_id tam, detay 160 karakterde kırpılı, en çok 40 kayıt) +
+`gercek_video_orani` (**`medya_turu`den OKUNUR**, yeniden hesaplanmaz) +
+`kaynak_kullanimi`.
+
+**Yeni ölçüm — `kaynak_kullanimi()`:** her varlığın **toplam** ekran süresi,
+tavan (`8.0 sn`, ⚠ `saglayici_motoru.KAYNAK_BASINA_TAVAN_SN` ile **aynı
+sabitten** okunur) ve **aşanlar**. ⚠ **HÜKÜM VERMEZ** — `fail`/`warn`
+üretmez; R-1 teslim kanıtıdır, K mikro-kapısı değil. Çekim/beat sayısı
+eşleşmezse **ölçüm yapılmaz** (`olculdu: False`), süre **tahmin edilmez**.
+
+### ⛔ Ölçülen kusur 3 — gerçek video oranı hiç ölçülemiyordu
+
+`medya_turu_ozeti` kare sayısını **dışarıdan** ister; `plan_kur`a okuyucu
+verilmediği için ölçüm `KARE-OKUYUCU-YOK` ile duruyordu.
+**Düzeltme:** `pipeline` artık **ffprobe tabanlı** bir kare okuyucu geçiyor.
+⚠ **Ücretsiz ve yerel** — ağ/kredi yok. Okunamazsa **`None`** döner;
+"statiktir" **DENMEZ**.
+
+⚠ Depodaki `"kalite_kapisi" not in pipeline.py` kilidi **ham metin** tarıyor;
+yorumda modül adını anmak bile testi kırmızı yakıyordu. Kilidin iddiası
+(kod bağımlılığı yok) **doğru ve korundu** — yalnızca kendi yorumumu
+token içermeyecek şekilde yazdım.

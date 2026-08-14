@@ -287,6 +287,15 @@ def gramer_uygula(beatler: list, *, sahne_adaylari: dict,
     # `islev_kullanim`: anlati islevi -> o islevde KULLANILMIS hareketler.
     # `son_indeks`    : kapanis cekimi; acilisin hareketini tekrar edemez.
     islev_kullanim: dict = {}
+    # ── FAZ R-1d-c durumu ──
+    # `islev_tur_sayaci`: anlati islevi -> {cekim_turu: kac kez kullanildi}.
+    # ⚠ OLCULEN KUSUR (57.88 sn remote ornegi, K-1 kapisi):
+    # `video_islev_tur_tekrari` -> b008 `aciklama/medium` (ilk 6),
+    # b009 `kanit/document` (ilk 3). Kok neden: aday `sahne_amaci` hicbir
+    # tercihe uymayinca DAIMA `tercihler[0]` seciliyordu, yani ayni islevin
+    # HER cekimi ayni turu aliyordu. Kopruden gelen stok kayitlarinda
+    # `sahne_amaci` bos oldugu icin bu yol KURAL haline gelmisti.
+    islev_tur_sayaci: dict = {}
     son_indeks = len(beatler) - 1
 
     for i, b in enumerate(beatler):
@@ -325,10 +334,22 @@ def gramer_uygula(beatler: list, *, sahne_adaylari: dict,
             c.saglayici = sec.get("saglayici", "")
             c.ulke = sec.get("ulke") or sec.get("konum") or ""
             c.tarih = sec.get("tarih") or ""
-            # Cekim turu: adayin sahne amacina uyan ilk tercih
+            # Cekim turu: adayin sahne amacina uyan tercihler ARASINDAN,
+            # o islevde EN AZ kullanilmis olan (DETERMINISTIK cesitlendirme).
+            # ⚠ Semantik korunuyor: amac eslesiyorsa havuz YINE eslesenlerdir;
+            # yalnizca havuz ICINDEKI secim artik sabit degil, kullanim
+            # sayacina gore. Esitlikte havuz SIRASI belirler -> ayni girdi
+            # ayni cikti (rastgelelik YOK).
+            # ⚠ Ilk kez gorulen islev icin sonuc ESKISIYLE AYNI (hepsi 0 ->
+            # havuzun ilk elemani), yani gerileme YOK; tekrar ancak IKINCI
+            # cekimde devreye giriyor.
             aday_amaci = sec.get("sahne_amaci") or ""
-            eslesen = next((t for t in tercihler
-                            if t in _amac_cekim(aday_amaci)), tercihler[0])
+            uygun = [t for t in tercihler if t in _amac_cekim(aday_amaci)]
+            havuz = uygun or list(tercihler)
+            _tur_say = islev_tur_sayaci.setdefault(_isl, {})
+            eslesen = min(havuz,
+                          key=lambda t: (_tur_say.get(t, 0), havuz.index(t)))
+            _tur_say[eslesen] = _tur_say.get(eslesen, 0) + 1
             c.cekim_turu = eslesen
             c.kaynak_turu = "medya"
             c.hareket = _hareket_sec(eslesen, i, son_hareket,

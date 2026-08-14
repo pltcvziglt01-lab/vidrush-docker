@@ -204,6 +204,54 @@ def stil_kararlari(stil_profili_sozlugu) -> dict:
     }
 
 
+# ⚠ FAZ R-1d-c — AYNI KAYNAK TAVANI. J-5b kullanici sarti: bir varlik
+# videoda TOPLAM bu kadar saniyeden fazla gorunemez. Sayi UYDURULMADI;
+# `medya.saglayici_motoru.KAYNAK_BASINA_TAVAN_SN` ile AYNI degerdir ve
+# oradan okunur (iki yerde ayri sabit tutulursa sessizce ayrisirlar).
+try:
+    from medya.saglayici_motoru import KAYNAK_BASINA_TAVAN_SN
+except Exception:                                            # noqa: BLE001
+    KAYNAK_BASINA_TAVAN_SN = 8.0
+
+
+def kaynak_kullanimi(cikti: dict) -> dict:
+    """Her varligin TOPLAM ekran suresi + tavan ihlalleri.
+
+    ⚠ OLCUM, HUKUM DEGIL: bu fonksiyon `fail`/`warn` URETMEZ; yalnizca
+    sayilari ve tavani asanlari raporlar (K mikro-kapisi degil, R-1
+    TESLIM KANITI).
+    ⚠ Sure `beat_plani`ndan gelir; cekim ile beat AYNI SIRADADIR (plan.py
+    `zip(cekimler, bplan.beatler)` ile eslestiriyor). Sureler eslesmiyorsa
+    olcum YAPILMAZ ve `olculdu: False` yazilir — TAHMIN EDILMEZ.
+    """
+    try:
+        cekimler = list((cikti or {}).get("cekimler") or [])
+        bplan = (cikti or {}).get("beat_plani")
+        beatler = list(getattr(bplan, "beatler", None) or [])
+    except Exception:                                        # noqa: BLE001
+        return {"olculdu": False, "neden": "GIRDI-BOZUK"}
+    if not cekimler or len(cekimler) != len(beatler):
+        return {"olculdu": False, "neden": "CEKIM-BEAT-ESLESMIYOR",
+                "cekim": len(cekimler), "beat": len(beatler)}
+    kullanim: dict = {}
+    for c, b in zip(cekimler, beatler):
+        aid = str(getattr(c, "asset_id", "") or "")
+        if not aid:
+            continue                      # fallback/sentetik cekim: varlik YOK
+        try:
+            kullanim[aid] = kullanim.get(aid, 0.0) + float(
+                getattr(b, "sure_sn", 0) or 0)
+        except (TypeError, ValueError):
+            return {"olculdu": False, "neden": "SURE-OKUNAMADI"}
+    asan = [{"asset_id": a, "sure_sn": round(v, 3)}
+            for a, v in sorted(kullanim.items()) if v > KAYNAK_BASINA_TAVAN_SN]
+    return {"olculdu": True, "tavan_sn": KAYNAK_BASINA_TAVAN_SN,
+            "varlik_sayisi": len(kullanim),
+            "kullanim": {a: round(v, 3) for a, v in sorted(kullanim.items())},
+            "en_uzun_sn": round(max(kullanim.values()), 3) if kullanim else 0.0,
+            "asan": asan, "temiz": not asan}
+
+
 def plan_kur(*, cumleler, medya_manifest, olgular=None, stil=None,
              analiz=None, cikti_dizin: str = ".", is_ayar=None,
              ambience: str = "", muzik: str = "", beklenen_ulke: str = "",
@@ -335,18 +383,53 @@ def plan_kur(*, cumleler, medya_manifest, olgular=None, stil=None,
     if not render_edilebilir:
         uyarilar.append(f"on-render QA '{qa_durum}' — RENDER BASLATILMAZ")
 
+    # ── 8) FAZ R-1d-c: PRE-QA OZETI ARTIK KIRPILMIYOR ──
+    # ⚠ OLCULEN KUSUR: ozet yalnizca durum/fail/warn/sorun_sayisi +
+    # medya_turu + broll_cesitliligi tasiyordu. `kapsam`, `tipografi`,
+    # `gecis`, `ses`, `islev`, `kaynak_ses` ve SORUN KOD LISTESI is kaydina
+    # HIC ULASMIYORDU; PRE-QA onlari OLCUYOR ama teslim raporu 6 kriteri
+    # "OLCULEMEDI" yazmak zorunda kaliyordu (R-1d-b pilot 3'te olculdu).
+    _olc = qa.get("olcumler") or {}
+    _kaynak_kullanimi = kaynak_kullanimi(cikti)
+    qa_ozet = {
+        "durum": qa_durum, "fail": qa.get("fail", 0),
+        "warn": qa.get("warn", 0),
+        "sorun_sayisi": len(qa.get("sorunlar") or []),
+        # ⚠ SORUN KOD LISTESI: hangi kapinin neden dustugu GORUNUR olmali.
+        # Detay 160 karakterde kirpilir (kayit sismesin), KOD ve SEVIYE tam.
+        "sorunlar": [{"kod": str(s.get("kod") or ""),
+                      "seviye": str(s.get("seviye") or ""),
+                      "beat_id": str(s.get("beat_id") or ""),
+                      "detay": str(s.get("detay") or "")[:160]}
+                     for s in (qa.get("sorunlar") or [])[:40]],
+        # ⚠ J-2a: `medya_turu` YALNIZ RAPOR alanidir — durum/fail/warn
+        # hesabina GIRMEZ, hicbir esik ENFORCE ETMEZ.
+        "medya_turu": _olc.get("medya_turu"),
+        "broll_cesitliligi": _olc.get("broll_cesitliligi"),
+        # ── R-1 TESLIM KANITI icin ZORUNLU olcumler (K mikro-kapisi DEGIL) ──
+        "kapsam": _olc.get("kapsam"),
+        "tipografi": _olc.get("tipografi"),
+        "gecis": _olc.get("gecis"),
+        "ses": _olc.get("ses"),
+        "islev": _olc.get("islev"),
+        "kaynak_ses": _olc.get("kaynak_ses"),
+        "baslik_suresi": _olc.get("baslik_suresi"),
+        "efekt": _olc.get("efekt"),
+        "pacing": _olc.get("pacing"),
+        # ⚠ GERCEK VIDEO ORANI: `medya_turu`den OKUNUR, yeniden hesaplanmaz.
+        "gercek_video_orani": ((_olc.get("medya_turu") or {})
+                               .get("video_sure_orani")
+                               if isinstance(_olc.get("medya_turu"), dict)
+                               else None),
+        # ⚠ AYNI KAYNAK TAVANI: asagida cekim surelerinden TURETILIR.
+        "kaynak_kullanimi": _kaynak_kullanimi,
+    }
+
     return {
         "ok": True,
         "neden": "" if render_edilebilir else "QA-FAIL",
         "render_edilebilir": render_edilebilir,
-        # ⚠ J-2a: `medya_turu` YALNIZ RAPOR alanidir — durum/fail/warn
-        # hesabina GIRMEZ, hicbir esik ENFORCE ETMEZ.
-        "qa": {"durum": qa_durum, "fail": qa.get("fail", 0),
-               "warn": qa.get("warn", 0),
-               "sorun_sayisi": len(qa.get("sorunlar") or []),
-               "medya_turu": (qa.get("olcumler") or {}).get("medya_turu"),
-               "broll_cesitliligi": (qa.get("olcumler") or {})
-               .get("broll_cesitliligi")},
+        "qa": qa_ozet,
         "profil_adi": profil_adi, "profil_gerekce": profil_gerekce,
         "stil_kararlari": kararlar,
         "elenen_medya": elenen,
