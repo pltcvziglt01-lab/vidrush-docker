@@ -31,6 +31,7 @@ karar mantigi; bolme uygulamasi cagiran tarafin isidir.
 from __future__ import annotations
 
 import math
+import re
 
 SEMA_SURUM = "1.0.0"
 
@@ -42,6 +43,7 @@ except Exception:                                            # noqa: BLE001
 # ── STABIL KODLAR ──
 KOD_VARLIK_YOK = "KAYNAK-TAVANI-VARLIK-YOK"
 KOD_SURE_BOZUK = "KAYNAK-TAVANI-SURE-BOZUK"
+KOD_SORGU_YOK = "KAYNAK-TAVANI-SORGU-TURETILEMEDI"
 
 # Kayan nokta toleransi: 8.000000001 "asti" sayilmasin.
 EPS = 1e-9
@@ -152,6 +154,81 @@ def dogrula(kullanim: dict, *,
             "kod": "" if not asan else KOD_VARLIK_YOK}
 
 
+# ⚠ FAZ R-1d-i — SORGU TURETME.
+# OLCULEN KUSUR (R-1d-h pilotu, job_1786727121434): `..._s001` bir AI
+# URETILMIS GORSEL sahnesiydi (openai/uretilmis-eser), 8.172 sn ile tavani
+# ASIYORDU ama BOLUNEMIYORDU: bolme yolu ek varligi YALNIZCA `footage_sorgu`
+# uzerinden ucretsiz stok klip cekerek buluyor ve uretilmis-gorsel
+# sahnesinde o sorgu BOS. Aday havuzu bos kalinca fail-closed devreye girip
+# sahne bolunmuyor ve kapi ihlali SURUYORDU.
+#
+# ⚠ Sorgu SAHNENIN KENDI INGILIZCE gorsel tarifinden (`scene_prompt`)
+# turetilir — LLM cagrisi YOK, ucret YOK, rastgelelik YOK.
+# ⚠ Ayni gorseli kadrajlayip "farkli asset" gibi gostermek YAPILMAZ; amac
+# GERCEKTEN farkli kaynakli bir stok klip bulmaktir.
+
+# Sorguya katkisi olmayan yaygin kelimeler (deterministik, sabit liste).
+_ETKISIZ = frozenset("""
+a an the of in on at to for with and or but from by as is are was were be
+been being this that these those it its into over under near very more most
+no not none some any each other another while during before after above
+below up down out off again further then once here there all both few
+scene shot view image picture photo camera frame background foreground
+cinematic wide close detail medium angle lighting light dark color colour
+16:9 aspect ratio high quality realistic photo-realistic
+""".split())
+
+# Sorgu basina en fazla kelime (stok aramalari uzun sorguda bosa duser).
+SORGU_KELIME_TAVANI = 3
+# En fazla kac aday sorgu turetilir.
+SORGU_TAVANI = 4
+
+
+def _kelimeler(metin: str) -> list:
+    ham = re.findall(r"[a-zA-Z][a-zA-Z\-]{2,}", str(metin or ""))
+    out, gorulen = [], set()
+    for k in ham:
+        d = k.lower().strip("-")
+        if len(d) < 3 or d in _ETKISIZ or d in gorulen:
+            continue
+        gorulen.add(d)
+        out.append(d)
+    return out
+
+
+def stok_sorgulari(gorsel_tarif: str, *, mevcut_sorgu: str = "") -> dict:
+    """Sahnenin INGILIZCE gorsel tarifinden DETERMINISTIK stok sorgulari.
+
+    ⚠ Kelime sirasi TARIFTEKI ILK GECIS sirasidir (frekans/rastgelelik YOK)
+    -> ayni girdi AYNI cikti.
+    ⚠ Kullanilabilir kelime yoksa `ok=False` + STABIL KOD
+    `KAYNAK-TAVANI-SORGU-TURETILEMEDI`; UYDURMA sorgu URETILMEZ.
+    """
+    if str(mevcut_sorgu or "").strip():
+        return {"ok": True, "kod": "", "kaynak": "mevcut_sorgu",
+                "sorgular": [str(mevcut_sorgu).strip()]}
+    kel = _kelimeler(gorsel_tarif)
+    if not kel:
+        return {"ok": False, "kod": KOD_SORGU_YOK, "kaynak": "gorsel_tarif",
+                "sorgular": [], "neden": "kullanilabilir kelime yok"}
+    sorgular, gorulen = [], set()
+    # En genisten en dara: 3 kelime -> 2 kelime -> 1 kelime, sonra kaydirma.
+    for n in range(min(SORGU_KELIME_TAVANI, len(kel)), 0, -1):
+        q = " ".join(kel[:n])
+        if q not in gorulen:
+            gorulen.add(q)
+            sorgular.append(q)
+    for i in range(1, len(kel)):
+        if len(sorgular) >= SORGU_TAVANI:
+            break
+        q = " ".join(kel[i:i + 2]) if i + 1 < len(kel) else kel[i]
+        if q and q not in gorulen:
+            gorulen.add(q)
+            sorgular.append(q)
+    return {"ok": True, "kod": "", "kaynak": "gorsel_tarif",
+            "sorgular": sorgular[:SORGU_TAVANI]}
+
+
 def kimlik_normalize(provenans) -> str:
     """Provenanstan NORMALIZE kaynak kimligi. ⚠ Eksikse BOS doner.
 
@@ -254,7 +331,9 @@ def kapsam_ozeti() -> dict:
         "tavan_yukseltilir": False,
         "ayni_kaynak_tekrar_ile_asilir": False,
         "deterministik": True, "rastgelelik": False,
-        "stabil_kodlar": [KOD_VARLIK_YOK, KOD_SURE_BOZUK],
+        "stabil_kodlar": [KOD_VARLIK_YOK, KOD_SURE_BOZUK, KOD_SORGU_YOK],
+        "sorgu_llm_kullanir": False, "sorgu_ucret": False,
+        "ayni_gorseli_kadrajlayip_farkli_asset_sayar": False,
         "provenanssiz_varlik_atanir": False,
         "aga_cikar": False, "medya_acar": False, "dosya_yazar": False,
         "render_eder": False,

@@ -14253,8 +14253,9 @@ kontrol("⭐ R-1d-g BELIRLEYICI (denetim-2/3): SES KESIMI ONCE, EDINIM SONRA "
         < _PL_H.index("kaynak_tavani.ek_varlik_edin("))
 kontrol("⭐ R-1d-g (denetim-2/3): basarisiz yolda YARIM ses dilimleri "
         "TEMIZLENIYOR (artik birakilmiyor)",
-        _PL_H.count("for _y in _ses_yollari:") == 2
-        and _PL_H.count("os.remove(os.path.join(PUBLIC, _y))") == 2)
+        _PL_H.count("for _y in _ses_yollari:") >= 2
+        and (_PL_H.count("for _y in _ses_yollari:")
+             == _PL_H.count("os.remove(os.path.join(PUBLIC, _y))")))
 
 kontrol("⭐ R-1d-g BELIRLEYICI (pilot kok nedeni): ses kaynagi ffmpeg'e "
         "MUTLAK yolla veriliyor (`syol` GORELI; pilotta dosya bulunamiyordu)",
@@ -14264,7 +14265,7 @@ kontrol("⭐ R-1d-g: props `ses` alani GORELI kaliyor (renderer sozlesmesi)",
         "_ses_yollari.append(_goreli)" in _PL_H
         and 'yeni["ses"] = _ses_yollari[j]' in _PL_H)
 kontrol("⭐ R-1d-g: temizlik de MUTLAK yolla siliyor",
-        _PL_H.count("os.remove(os.path.join(PUBLIC, _y))") == 2)
+        _PL_H.count("os.remove(os.path.join(PUBLIC, _y))") >= 2)
 
 kontrol("R-1d-g GERILEME YOK: kaynak_ses / yuv420p / tenant imza kapilari "
         "DURUYOR",
@@ -14441,6 +14442,84 @@ kontrol("R-1d-h: katman_olcum.py derleniyor",
 kontrol("R-1d-h GERILEME YOK: pix_fmt kapisi + kaynak tavani + tenant imza",
         _HR.TESLIM_PIX_FMT == "yuv420p"
         and _KT2.KAYNAK_BASINA_TAVAN_SN == 8.0
+        and _IU.kapsam_ozeti()["tenant_baglanabilir"] is True)
+
+blok("§40ac R-1d-i — URETILMIS GORSEL SAHNESI ICIN STOK SORGUSU TURETILIR")
+
+# ⚠ MEDYASIZ. Olculen kusur (R-1d-h pilotu, job_1786727121434):
+#   RENDER-QA FAIL -> GERCEK-KAYNAK-TAVANI: ..._s001 8.172 sn (tavan 8.0)
+# `..._s001` bir AI URETILMIS GORSEL sahnesiydi (openai/uretilmis-eser).
+# Bolme yolu ek varligi YALNIZCA `footage_sorgu` uzerinden ariyordu ve
+# uretilmis-gorsel sahnesinde o sorgu BOS -> aday havuzu BOS -> sahne
+# BOLUNEMIYOR -> kapi ihlali SURUYOR.
+
+_TARIF = ("A vivid wide cinematic view of Antarctic ice sheet cracking "
+          "under bright daylight")
+_SQ = _KT2.stok_sorgulari(_TARIF)
+
+kontrol("⭐ R-1d-i BELIRLEYICI: `footage_sorgu` BOSKEN sahnenin INGILIZCE "
+        "gorsel tarifinden sorgu TURETILIYOR (once havuz BOS kaliyordu)",
+        _SQ["ok"] is True and _SQ["kaynak"] == "gorsel_tarif"
+        and len(_SQ["sorgular"]) >= 2, _SQ["sorgular"])
+kontrol("⭐ R-1d-i: turetilen sorgular ICERIK kelimelerinden olusuyor "
+        "(etkisiz kelime YOK)",
+        all(not set(q.split()) & {"a", "the", "of", "view", "cinematic",
+                                  "wide", "under"}
+            for q in _SQ["sorgular"]), _SQ["sorgular"])
+kontrol("⭐ R-1d-i: DETERMINISTIK (ayni girdi -> ayni cikti, rastgelelik YOK)",
+        _KT2.stok_sorgulari(_TARIF)["sorgular"] == _SQ["sorgular"]
+        and _KT2.kapsam_ozeti()["rastgelelik"] is False)
+kontrol("⭐ R-1d-i: MEVCUT sorgu varsa O kullanilir (gereksiz turetme YOK)",
+        _KT2.stok_sorgulari(_TARIF, mevcut_sorgu="antarctic ice")
+        == {"ok": True, "kod": "", "kaynak": "mevcut_sorgu",
+            "sorgular": ["antarctic ice"]})
+kontrol("⭐ R-1d-i RED-FIRST: kullanilabilir kelime YOKSA sorgu "
+        "UYDURULMUYOR — stabil kod ile fail-closed",
+        _KT2.stok_sorgulari("")["ok"] is False
+        and _KT2.stok_sorgulari("")["kod"]
+        == "KAYNAK-TAVANI-SORGU-TURETILEMEDI"
+        and _KT2.stok_sorgulari("the a of and")["ok"] is False)
+kontrol("⭐ R-1d-i RED-FIRST: yalniz RAKAM/NOKTALAMA iceren tarif de "
+        "fail-closed",
+        _KT2.stok_sorgulari("16:9 --- 2026 ... !!!")["kod"]
+        == "KAYNAK-TAVANI-SORGU-TURETILEMEDI")
+kontrol("⭐ R-1d-i: sorgu uretimi LLM/UCRET KULLANMIYOR",
+        _KT2.kapsam_ozeti()["sorgu_llm_kullanir"] is False
+        and _KT2.kapsam_ozeti()["sorgu_ucret"] is False
+        and not any(a in _kod_yalniz(oku(KOK, "kaynak_tavani.py"))
+                    for a in ("openai", "requests", "urllib", "subprocess")))
+kontrol("⭐ R-1d-i BELIRLEYICI: AYNI gorseli kadrajlayip 'farkli asset' "
+        "SAYMA yolu YOK (kapsam ozeti beyan ediyor)",
+        _KT2.kapsam_ozeti()[
+            "ayni_gorseli_kadrajlayip_farkli_asset_sayar"] is False)
+
+# ── EDINIM ZINCIRI: turetilen sorgu FARKLI KAYNAK getirmezse fail-closed ──
+kontrol("⭐ R-1d-i: turetilen sorgudan gelen aday AYNI kaynaksa yine "
+        "REDDEDILIYOR (tavan bu yolla asilamaz)",
+        _ev(["/ayni.mp4"])["ok"] is False
+        and _ev(["/ayni.mp4"])["kod"] == "KAYNAK-TAVANI-VARLIK-YOK")
+kontrol("⭐ R-1d-i: turetilen sorgudan FARKLI kaynak gelirse kabul "
+        "(lisans+provenans dolu)",
+        _ev(["/b.mp4"])["ok"] is True
+        and _ev(["/b.mp4"])["kabul"][0]["lisans"] == "pixabay-content-license")
+
+# ── URETIM ENTEGRASYONU (scratch DEGIL) ──
+_PL_I = oku(KOK, "pipeline.py")
+kontrol("⭐ R-1d-i BELIRLEYICI: pipeline sorguyu `scene_prompt`ten "
+        "turetiyor ve bunu bolme yolunda KULLANIYOR",
+        "kaynak_tavani.stok_sorgulari(" in _PL_I
+        and '_s.get("scene_prompt") or _s.get("anlatim")' in _PL_I
+        and '_sorgular = list(_sq["sorgular"])' in _PL_I)
+kontrol("⭐ R-1d-i: sorgu turetilemezse sahne BOLUNMUYOR ve stabil kod "
+        "raporlaniyor (fail-closed)",
+        '"kod": _sq["kod"]' in _PL_I)
+kontrol("⭐ R-1d-i: basarisiz yolda ses dilimleri TEMIZLENIYOR "
+        "(transactional korundu)",
+        _PL_I.count("os.remove(os.path.join(PUBLIC, _y))") == 3)
+kontrol("R-1d-i GERILEME YOK: tavan / kaynak sesi / pix_fmt / tenant imza",
+        _KT2.KAYNAK_BASINA_TAVAN_SN == 8.0
+        and "GERCEK-KAYNAK-SES-SIZINTI" in _GQ.FAIL_KODLARI
+        and _HR.TESLIM_PIX_FMT == "yuv420p"
         and _IU.kapsam_ozeti()["tenant_baglanabilir"] is True)
 
 print(f"\n{'=' * 60}")

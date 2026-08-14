@@ -9897,3 +9897,58 @@ ikinci varlık** üretilebilmeli — ya sahne metninden **ücretsiz stok** sorgu
 türetilsin, ya da bölme **görsel düzeyinde** (aynı sahnenin farklı kadraj/
 çerçevesi ayrı `asset_id` ile) çözülsün. ⚠ Tavanı yükseltmek **YANLIŞ**;
 ⚠ ücretli yeni görsel üretmek de **kapsam dışı**.
+
+---
+
+## 72. FAZ R-1d-i — ÜRETİLMİŞ-GÖRSEL SAHNESİ İÇİN STOK SORGUSU (14 Ağu)
+
+> **Durum: teslim-engelleyici kusur kapatıldı. A–I yeşil.
+> Mac'te medya/kare/QA artefaktı ÜRETİLMEDİ. $0.00.**
+> Değişen: `webapp/kaynak_tavani.py`, `webapp/pipeline.py`,
+> `webapp/testler/test_faz_i.py`.
+
+### ⛔ Ölçülen kusur
+
+R-1d-h pilotu (`job_1786727121434`):
+`RENDER-QA FAIL → GERCEK-KAYNAK-TAVANI: ..._s001 8.172 sn (tavan 8.0)`.
+`..._s001` bir **AI üretilmiş görsel** sahnesi (`openai/uretilmis-eser`).
+Bölme yolu ek varlığı **yalnızca `footage_sorgu`** üzerinden arıyordu;
+üretilmiş-görsel sahnesinde bu sorgu **boş** → aday havuzu **boş** →
+`KAYNAK-TAVANI-VARLIK-YOK` fail-closed → sahne **bölünmüyor** → kapı
+ihlali **sürüyordu**.
+
+### Yapılan — `kaynak_tavani.stok_sorgulari()`
+
+Sorgu, sahnenin **kendi İngilizce görsel tarifinden** (`scene_prompt`,
+yoksa `anlatim`) **deterministik** türetilir:
+* kelimeler **ilk geçiş sırasıyla** alınır (frekans/rastgelelik **yok**);
+* sabit **etkisiz kelime** listesi (`the/of/view/cinematic/wide/…`) elenir;
+* en genişten en dara sorgular üretilir (3 → 2 → 1 kelime, sonra kaydırma),
+  en çok **4** aday.
+
+⚠ **LLM yok, ücret yok.** ⚠ Mevcut `footage_sorgu` varsa **o kullanılır**
+(gereksiz türetme yok). ⚠ Kullanılabilir kelime yoksa **uydurma sorgu
+üretilmez** → **`KAYNAK-TAVANI-SORGU-TURETILEMEDI`** ile fail-closed.
+⚠ **Aynı görseli kadrajlayıp "farklı asset" sayma yolu YOK** (kapsam özeti
+bunu açıkça beyan ediyor, test kilitliyor).
+
+Türetilen sorgudan gelen aday da **aynı kimlik kontrolünden** geçer:
+aynı `saglayici|asset_id` ise **reddedilir**, köprü kaydı başarısızsa
+**timeline'a girmez** — tavan bu yolla **aşılamaz**.
+
+### Red-first — MEDYASIZ davranış testleri
+
+* boş tarif / yalnız etkisiz kelime / yalnız rakam-noktalama →
+  **`KAYNAK-TAVANI-SORGU-TURETILEMEDI`**;
+* aynı girdi → **aynı çıktı**;
+* mevcut sorgu varsa `kaynak="mevcut_sorgu"`;
+* türetilen sorgudan **aynı kaynak** gelirse yine
+  **`KAYNAK-TAVANI-VARLIK-YOK`**.
+
+Modül fonksiyonu geri alınınca:
+**`AttributeError: … has no attribute 'stok_sorgulari'`**.
+
+⚠ Bir mevcut test **düzeltildi, gevşetilmedi**: başarısız yol sayısı 2'den
+3'e çıktığı için sabit `== 2` sayacı kod **doğruyken** kırmızı yanıyordu;
+iddia "**her** başarısız yolda temizlik var" olarak (sayaç eşitliği)
+kilitlendi.

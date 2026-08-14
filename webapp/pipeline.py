@@ -4659,10 +4659,30 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             # (saglayici|asset_id) MEVCUT parcadan ve birbirinden FARKLI
             # olmali, lisans/saglayici/asset_id DOLU olmali ve KOPRU KAYDI
             # BASARILI olmali. Aksi halde aday REDDEDILIR, siradaki denenir.
+            # ⚠ FAZ R-1d-i: URETILMIS GORSEL sahnesinde `footage_sorgu`
+            # BOSTUR; eski kod bu durumda aday havuzunu BOS birakiyor ve
+            # sahne BOLUNEMIYORDU (olculdu: `..._s001` 8.172 sn ihlali
+            # suruyordu). Sorgu artik sahnenin KENDI INGILIZCE gorsel
+            # tarifinden (`scene_prompt`) DETERMINISTIK turetilir.
+            # ⚠ LLM/ucret YOK. Turetilemezse STABIL KOD ile fail-closed.
             _sorgu = str(_s.get("footage_sorgu") or "").strip()
-            _sorgular = ([_sorgu] +
-                         list(kaynak.genel_yedek_sorgular(_sorgu))[:4]
-                         if _sorgu else [])
+            _sq = kaynak_tavani.stok_sorgulari(
+                str(_s.get("scene_prompt") or _s.get("anlatim") or ""),
+                mevcut_sorgu=_sorgu)
+            if not _sq["ok"]:
+                sorunlar.append({"kod": _sq["kod"],
+                                 "scene_id": sh.get("scene_id"),
+                                 "detay": _sq.get("neden", "")})
+                for _y in _ses_yollari:
+                    try:
+                        os.remove(os.path.join(PUBLIC, _y))
+                    except OSError:
+                        pass
+                yeni_liste.append(sh)
+                continue
+            _sorgular = list(_sq["sorgular"])
+            if _sorgu:
+                _sorgular += list(kaynak.genel_yedek_sorgular(_sorgu))[:3]
 
             def _aday(sira, _n=h["n"], _sorg=_sorgular):
                 if sira >= len(_sorg):
