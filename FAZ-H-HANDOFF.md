@@ -10599,3 +10599,29 @@ Bu, durdurulan pilotlardaki **gerçek** gözlemle uyuşuyor:
 
 ⚠ **Kabul edilmiş video hâlâ YOK.** UI-4 arayüz kablosunu düzeltti,
 video kabulünü değiştirmedi.
+
+### UI-4 STAGING DOĞRULAMASI (uzak, Mac'e artefakt YOK)
+
+Deploy `b03209e` → **8 uç 200, smoke PASS**, imaja basıldı. Rollback
+`bedosaho:pre-ui3-20260814` hazırdı, **kullanılmadı**.
+
+```
+servis edilen ui1.js md5  = b0c02fd0…  (yerel ile BİREBİR aynı)
+EDIT_HARITASI             = az:sinematik-belgesel · orta:anlati-video-essay
+                            yuksek:hizli-explainer
+fd.append("edit", editKimligi())                         ✅ ham değer YOK
+/api/saglik  durum=hazir · uretim_mumkun=True
+```
+
+Uzak Chromium (gerçek istekten YAKALANAN `edit` değeri, istek sunucuya
+**gitmedi**, iş **başlatılmadı**, **$0.00**), masaüstü **ve** mobil:
+
+```
+{"az":"sinematik-belgesel","orta":"anlati-video-essay","yuksek":"hizli-explainer"}
+üç kimlik BİRBİRİNDEN FARKLI — sessiz varsayılana düşme YOK       ✅
+GEÇEN 62 · FAIL 0 · ÖLÇÜLEMEDİ 0
+```
+
+⚠ Bu kapı (`UI4-EDIT-SEVIYESI-GECERSIZ`) artık uzak hatta **kalıcı**:
+gelecekte biri geçersiz bir `edit` değerine dönerse gerçek tarayıcı
+koşusu bunu yakalar.

@@ -275,8 +275,10 @@ async function pastaKos(tarayici, pasta, olcu) {
     }
     if (!istek.url.includes("/api/generate")) return;
     generateSayaci += 1;
+    const _e = (istek.postData || "").match(/name="edit"\r\n\r\n([^\r]*)/);
     yakalandi = {
       url: istek.url,
+      edit: _e ? _e[1] : null,
       alanlar: [...new Set([...(istek.postData || "")
           .matchAll(/name="([^"]+)"/g)].map((x) => x[1]))],
     };
@@ -510,6 +512,36 @@ async function pastaKos(tarayici, pasta, olcu) {
   ok(`${pasta}: akis uygulamasinda konsol hatasi YOK`,
      konsolHatalari.length === 0, "UI2-KONSOL-HATASI",
      konsolHatalari.slice(0, 2).join(" | "));
+
+  /* ── 10.5) FAZ UI-4: uc konum -> UC GECERLI STIL KIMLIGI ──
+   * ⚠ GERCEK istekten okunur (iddia edilmez) ve istek sunucuya GITMEZ.
+   * Eskiden ucu de `sinematik-belgesel`e sessizce dusuyordu.        */
+  const UI4_BEKLENEN = {az: "sinematik-belgesel",
+                        orta: "anlati-video-essay",
+                        yuksek: "hizli-explainer"};
+  const ui4 = {};
+  for (const seg of ["az", "orta", "yuksek"]) {
+    yakalandi = null;
+    await s.deger(`(() => {
+      const e = document.querySelector('#akis-edit');
+      e.value = '${seg}';
+      e.dispatchEvent(new Event('change', {bubbles: true}));
+      document.querySelector('#akis-form').requestSubmit();
+      return true;
+    })()`);
+    const bitis = Date.now() + 20000;
+    while (Date.now() < bitis && !yakalandi) await uyu(200);
+    ui4[seg] = yakalandi ? yakalandi.edit : null;
+  }
+  hukum.ui4_edit = ui4;
+  ok(`${pasta}: uc konum UC GECERLI stil kimligi gonderiyor `
+     + `(${JSON.stringify(ui4)})`,
+     ["az", "orta", "yuksek"].every((k) => ui4[k] === UI4_BEKLENEN[k]),
+     "UI4-EDIT-SEVIYESI-GECERSIZ", JSON.stringify(ui4));
+  ok(`${pasta}: gonderilen kimlikler BIRBIRINDEN FARKLI `
+     + `(sessiz varsayilana dusme YOK)`,
+     new Set(Object.values(ui4)).size === 3,
+     "UI4-EDIT-SEVIYESI-GECERSIZ", JSON.stringify(ui4));
 
   /* ── 11) FAIL-OPEN SINAMASI (en sonda: kasitli 500 konsolu kirletir) ──
    * ⚠ Tercih yazimi basarisizken uretime DEVAM ETMEK, isi ESKI tercihle
