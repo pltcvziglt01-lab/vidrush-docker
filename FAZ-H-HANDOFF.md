@@ -10226,3 +10226,133 @@ için kullanıcı kuralı gereği **kabul sayılmaz**.
 API/kredi **yok**; canlı kütüphanedeki eski kayıt **değiştirilmez**
 (silme kuyruğunda `TAVAN-ASILDI` ile duruyor, gerçek silme işi **hâlâ
 yok**); tam teknik+semantik PASS olmadan **kabul video denmez**.
+
+---
+
+## 76. FAZ UI-2 — UZAK GERÇEK TARAYICI KANIT HATTI (14 Ağu)
+
+> **Durum: `/akis` İLK KEZ gerçek bir tarayıcıda, gerçek staging uçlarına
+> karşı uçtan uca koştu. Masaüstü + mobil görsel kanıt ÜRETİLDİ.
+> Uzak koşu 47/47 · FAIL 0 · ÖLÇÜLEMEDİ 0 · BULGU 1. A–I 4282/4282 +
+> UI-2 71/71. Maliyet $0.00.**
+> Değişen üretim kodu: `webapp/server.py` (`_AKIS_HTML` → `min-height:44px`).
+> Yeni ölçüm hattı: `webapp/testler/{ui2_onkontrol.py, ui2_uzak_akis.mjs,
+> ui2_kos.sh, test_faz_ui2.py}` — ⚠ `deploy.sh` `testler/` dizinini canlıya
+> **göndermez**, hat üretim imajına GİRMEZ.
+
+### Neden bu atom
+
+UI-1'in kapanışında iki şey açıkta kalmıştı: (a) `/akis` yalnızca **kaynak
+dizesi** düzeyinde doğrulanmıştı, (b) staging tarafında bir **görüntü
+yakalama işi kurulmamıştı**. UI-2 tam olarak bunu kapatır.
+
+### Blokaj sanılan üç şey — ölçüldü, blokaj DEĞİLmiş
+
+| sanılan blokaj | gerçek ölçüm |
+|---|---|
+| uzak tarayıcı yok | konteynerde `/usr/bin/chromium` 151 + Node 22 (global `WebSocket`/`fetch`) → **bağımlılıksız CDP** yeterli, npm kurulumu gerekmedi |
+| CI/object storage yok | doğru: **S3/R2/CI yok**. Kanıt konteynerde üretilip `docker cp` ile **staging host diskine** (`/root/ui2_kanit/<koşu>`) taşınıyor — uzak, kalıcı, Mac'e **inmiyor** |
+| gerçek credential şart | hayır: oturum **sunucu tarafında** `kimlik.oturum_uret` + diskteki **mevcut** anahtarla üretiliyor (`anahtar_kur(..., uret=False)` — yeni anahtar **üretilmez**, canlı oturumlar bozulmaz) |
+
+### Kredi sınırı: ölçüldü, varsayılmadı
+
+Paranın harcandığı **tek** sınır `POST /api/generate`. Hat bu isteği
+tarayıcı içinde **CDP `Fetch`** ile yakalar ve **`fulfillRequest`** ile
+karşılar — istek sunucuya **ulaşmaz**. Yerine **zaten bitmiş, gerçek** bir
+işin kimliği döner; zincirin geri kalanı (**iş izleme · QA · imzalı
+indirme · son-3**) **gerçek** sunucudan ölçülür.
+
+```
+is_sayisi_once = 57   is_sayisi_sonra = 57   → yeni iş OLUŞMADI ($0.00)
+```
+
+⚠ `Fetch.continueRequest` bu hatta **hiç kullanılmaz** (kullanılsaydı kredi
+yanardı); test bunu kilitler.
+
+### Ölçülen ve DÜZELTİLEN kusur
+
+**`UI2-DOKUNMA-HEDEFI-KUCUK`** — `/akis` birincil düğmesi masaüstü **ve**
+mobilde **37 px** idi; 44 px dokunma hedefi sözleşmesi ihlal ediliyordu.
+UI-1'in "mobil-önce CSS" iddiası bunu **yakalamamıştı** (kaynak dizesi
+araması yükseklik ölçemez). `min-height:44px` eklendi, deploy edildi,
+**gerçek tarayıcıda yeniden ölçüldü**: iki pastada da yeşil.
+
+### ⛔ ÖLÇÜLEN AÇIK BULGU (düzeltilmedi — UI-3'e)
+
+**`UI2-KAYNAK-TERCIHI-SUNUCUYA-GITMIYOR`** — Kullanıcının seçtiği medya
+kaynağı **istekte yok**. Yakalanan gövdenin alanları:
+
+```
+session · story · tur · edit · sure_dk · altyazi     (kaynak_tercihi YOK)
+```
+
+Arayüz "Ücretsiz stok" seçilince **"Kredi harcanmaz"** yazıyor, ama seçim
+sunucuya **ulaşmıyor**; `/api/generate` sağlayıcı kararını yalnızca
+**tenant kaydından** veriyor (`saglayici_karari(..., tercih=` varsayılan).
+Bugün pratikte ücretsiz stoğa düşüyor — **ama vaat uygulanmıyor**: onaylı+
+kredili bir bağlantısı olan tenant "ücretsiz" seçse de kredi harcanabilir.
+⚠ Düzeltmesi `/api/generate` sözleşmesine dokunur (22 alan) → **ayrı atom**.
+Bu turda **bilerek düzeltilmedi**, PASS da **sayılmadı**.
+
+### Uzak koşu hükmü (koşu `ui2-20260814-220729`, kimlikler MASKELİ)
+
+```
+tenant ef… maskeli 8328ffcc · iş maskeli ef0291b3
+masaüstü 1280x800 · mobil 390x844 (dsf 3, dokunma emülasyonu)
+
+kimliksiz /akis  -> giriş formu                    ✅ iki pastada
+geçersiz giriş   -> STABIL 401                     ✅ (uydurma kullanıcı adı;
+                                                       gerçek hesabın hız
+                                                       sınırı kirletilmedi)
+6 adım · 3 alan = 3 label[for] · progressbar 1     ✅
+yatay taşma 0 px · dokunma hedefi 44 px            ✅
+HttpOnly çerez JS'ten OKUNAMIYOR · token izi 0     ✅
+kaynak seçimi kredi metnini CANLI değiştiriyor     ✅
+/api/generate YAKALANDI, sunucuya GİTMEDİ          ✅ ($0.00)
+gerçek iş izlendi (aria-valuenow) · QA teslim_ok   ✅
+imzalı URL: oturumla 200 · oturumsuz 401/403 ·
+            imza bozulunca 403                     ✅
+son-3 gerçek /api/kutuphane'den · her satırda
+      kredi durumu                                 ✅
+akış uygulamasında konsol hatası 0                 ✅
+
+GEÇEN 47 · FAIL 0 · ÖLÇÜLEMEDİ 0 · BULGU 1
+KANIT 10 png + sonuc.json (1.3 MB) -> /root/ui2_kanit/ui2-20260814-220729
+```
+
+⚠ **Ölçüm dürüstlüğü düzeltmesi:** ilk koşuda konsol hatası kırmızıydı;
+sebep **kendi negatif testimin** kasıtlı 401'i ve favicon 404'üydü. Ölçüm
+penceresi akış uygulaması aşamasına daraltıldı, favicon hariç tutuldu —
+**kapı gevşetilmedi**, ölçüm doğrultuldu.
+
+### Değişmez kurallar (test KİLİTLİYOR — `test_faz_ui2.py`, 71 kontrol)
+
+* Mac'e screenshot/medya/QA artefaktı **yok**: kaynakta `/Users/` hedefi
+  yok, uzaktan-yerele `scp`/`rsync` yok, `docker cp` **tek yön**.
+* Jetonu taşıyan `ayar.json` **kanıt dizinine yazılmaz** ve koşum sonunda
+  **silinir** (kanıt host'a taşınırken jeton gitmez).
+* `uret=False` — yeni oturum anahtarı **üretilmez**.
+* Parola/hash/anahtar/jeton **hiçbir yerde yazdırılmaz**; tenant ve iş
+  kimliği raporda **sha256[:8] maskeli**.
+* 21 **stabil hata kodu** dondurulmuş küme; ad değiştirmek **gerilemedir**.
+* `olculemedi` **ayrı sayılır**, asla PASS sayılmaz.
+
+### Deploy
+
+`HEAD=origin=92d0b8b`, repo temiz, aktif render 0, rollback
+`bedosaho:pre-ui2-20260814` (+ `rollback-20260814`, `pre-r1da-20260814`).
+Deploy → **8 uç 200, smoke PASS**, imaja basıldı.
+
+### ⏭ SIRADAKİ
+
+1. **UI-3**: `UI2-KAYNAK-TERCIHI-SUNUCUYA-GITMIYOR` — ya seçim `/api/generate`e
+   gerçekten taşınsın (`tercih` → `saglayici_karari`), ya da arayüz
+   uygulanamayan kredi vaadini **vermesin**. ⚠ Vaadi olduğu gibi bırakmak
+   **kabul edilemez**.
+2. **R-1d-j'nin 4 yapısal boşluğu** hâlâ açık (rumble/hiss kalibrasyonu,
+   B-roll çekim türü, ducking zarfı) — UI-2 bunlara **dokunmadı**.
+3. Object storage hâlâ **yok**: kanıt staging host diskinde duruyor. Gerçek
+   bir kova (S3/R2) veya CI artefaktı gerekiyorsa ayrı atom.
+
+⚠ **Kabul edilmiş video hâlâ YOK** — UI-2 arayüz hattını doğruladı, video
+kabulünü değiştirmedi.
