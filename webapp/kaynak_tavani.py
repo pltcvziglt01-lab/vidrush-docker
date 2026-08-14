@@ -169,7 +169,7 @@ def kimlik_normalize(provenans) -> str:
 
 def ek_varlik_edin(*, adet: int, mevcut_kimlikler,
                    aday_uretici, provenans_okuyucu, kopru_yazici,
-                   maks_deneme: int = 6) -> dict:
+                   maks_deneme: int = 6, mevcut_zorunlu: bool = True) -> dict:
     """Bolme icin `adet` tane FARKLI kaynakli varlik edin. FAIL-CLOSED.
 
     ⚠ OLCULEN KUSUR (bagimsiz denetim, cd3a5b5): ek klip edinimi
@@ -192,7 +192,17 @@ def ek_varlik_edin(*, adet: int, mevcut_kimlikler,
     Aksi halde aday REDDEDILIR ve SIRADAKI denenir; secenek tukenirse
     `ok=False` + `KAYNAK-TAVANI-VARLIK-YOK`.
     """
-    gorulen = {str(k) for k in (mevcut_kimlikler or []) if str(k or "")}
+    # ⚠ MEVCUT PARCANIN KIMLIGI ZORUNLU (bagimsiz denetim bulgusu):
+    # kimlik yoksa yeni adayin mevcut klipten FARKLI oldugu KANITLANAMAZ.
+    # Bos liste ya da bos kimlik iceren liste -> FAIL-CLOSED.
+    ham_mevcut = list(mevcut_kimlikler or [])
+    if mevcut_zorunlu and (not ham_mevcut
+                           or any(not str(k or "").strip()
+                                  for k in ham_mevcut)):
+        return {"ok": False, "kabul": [], "kod": KOD_VARLIK_YOK,
+                "istenen": int(adet), "bulunan": 0,
+                "red": [{"neden": "MEVCUT-KIMLIK-YOK"}]}
+    gorulen = {str(k) for k in ham_mevcut if str(k or "")}
     kabul, red = [], []
     sira = 0
     while len(kabul) < int(adet) and sira < int(maks_deneme):

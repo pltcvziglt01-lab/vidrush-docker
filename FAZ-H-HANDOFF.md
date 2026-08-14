@@ -9709,3 +9709,21 @@ Modül geri alınınca: **`AttributeError: ... has no attribute 'ek_varlik_edin'
 
 ⚠ ffmpeg dilimleme yolu **yalnızca uzak worker'da** koşar; Mac'te medya/QA
 artefaktı **üretilmedi**.
+
+### R-1d-g (devam 3) — İKİNCİ BAĞIMSIZ DENETİMİN ÜÇ BULGUSU
+
+| # | bulgu | düzeltme |
+|---|---|---|
+| 1 | `_mevcut_kimlik` **boşken** `mevcut_kimlikler=[]` ile devam ediliyordu → yeni adayın mevcut klipten farklı olduğu **kanıtlanamaz** | kimlik zorunluluğu **yardımcının içine** alındı: `mevcut_zorunlu=True`; liste boş **ya da** boş kimlik içeriyorsa **`MEVCUT-KIMLIK-YOK`** → `KAYNAK-TAVANI-VARLIK-YOK`, **aday üretici hiç çağrılmaz** |
+| 2 | `.mp3` hedefte `-q:a` yine MP3 encoder seçebilir; **uzantı varsayımı** yeterli değil | **`-c:a pcm_s16le` + `.wav`** — her ffmpeg derlemesinde var. Hata **stderr ile raporlanıyor** (`ses dilimlenemedi: …`), pilot kök nedeni kanıtlanabilir |
+| 3 | Ses kesimi başarısız olunca daha önce köprüye yazılmış ek adaylar **bütçe/provenans ölçümünü kirletiyordu** | **işlem sırası değişti → doğal transactional**: **(B) ses kesimi ÖNCE**, **(C) edinim SONRA**. Kesim başarısızsa **hiçbir** ek varlık edinilmez ve köprüye **hiçbir şey** yazılmaz; yarım dilimler **silinir** |
+
+### Red-first — DAVRANIŞ (string değil)
+
+* mevcut kimlik **boş** → `ok=False`, `kabul=[]`, `MEVCUT-KIMLIK-YOK`;
+* mevcut liste **boş** → aday üretici **hiç çağrılmıyor** (üretici
+  `AssertionError` fırlatacak şekilde kuruldu, çağrılmadığı için geçti);
+* `kimlik_normalize`: lisans **veya** sağlayıcı eksikse **boş** kimlik.
+
+Sıra ve temizlik kontrolleri kod üzerinden; geri alınınca
+**`ValueError: substring not found`** (blok yok).

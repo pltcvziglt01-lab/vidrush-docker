@@ -14185,7 +14185,7 @@ kontrol("⭐ R-1d-g: IKI ek parca istenince IKISI de BIRBIRINDEN farkli "
         == ["pexels|A1", "pixabay|B1"])
 kontrol("⭐ R-1d-g: aday URETICI patlarsa cokmez, siradakine gecer",
         _KT2.ek_varlik_edin(
-            adet=1, mevcut_kimlikler=[],
+            adet=1, mevcut_kimlikler=["pexels|MEV"],
             aday_uretici=lambda i: (_ for _ in ()).throw(OSError())
             if i == 0 else "/a.mp4",
             provenans_okuyucu=lambda y: _EV_PV.get(y, {}),
@@ -14194,10 +14194,67 @@ kontrol("⭐ R-1d-g: pipeline ARTIK bu yardimciyi kullaniyor "
         "(kabul karari orada)",
         "kaynak_tavani.ek_varlik_edin(" in oku(KOK, "pipeline.py")
         and "kopru_yazici=lambda y: _kopru_kaydet(" in oku(KOK, "pipeline.py"))
-kontrol("⭐ R-1d-g: ses dilimleme kodeki UZANTIDAN tureyor (pilotta sabit "
-        "libmp3lame ile 3 parca atanamamisti)",
+kontrol("⭐ R-1d-g: ses dilimleme kodeki ACIKCA PCM WAV — sabit libmp3lame "
+        "de UZANTI VARSAYIMI da YOK",
         '"-c:a", "libmp3lame"' not in oku(KOK, "pipeline.py")
-        and '"-q:a", "2", hedef]' in oku(KOK, "pipeline.py"))
+        and '"-c:a", "pcm_s16le"' in oku(KOK, "pipeline.py"))
+
+# ── (8) DENETIM 2: KIMLIKSIZ MEVCUT PARCA / KODEK / TRANSACTIONAL ──
+# ⚠ Ek bagimsiz denetim uc kusur daha buldu:
+#   (1) `_mevcut_kimlik` BOS iken `mevcut_kimlikler=[]` ile devam ediliyordu;
+#       yeni adayin mevcut klipten FARKLI oldugu KANITLANAMAZDI.
+#   (2) `.mp3` hedefte `-q:a` yine MP3/libmp3lame encoder secebilir; uzanti
+#       VARSAYIMIYLA "duzeldi" DENEMEZ.
+#   (3) Ses kesimi basarisiz olursa daha once kopruye yazilmis ek adaylar
+#       timeline disi kaldigi halde butce/provenans olcumunu KIRLETIYORDU.
+
+_EV_KY = _ev(["/a.mp4"], mevcut=[""])
+kontrol("⭐ R-1d-g BELIRLEYICI (denetim-2/1): MEVCUT parcanin kimligi BOS "
+        "ise HICBIR aday kabul edilmiyor (fail-closed, MEVCUT-KIMLIK-YOK)",
+        _EV_KY["ok"] is False and _EV_KY["kabul"] == []
+        and _EV_KY["kod"] == "KAYNAK-TAVANI-VARLIK-YOK"
+        and _EV_KY["red"][0]["neden"] == "MEVCUT-KIMLIK-YOK", _EV_KY)
+kontrol("⭐ R-1d-g (denetim-2/1): mevcut kimlik listesi BOS olsa da "
+        "fail-closed (aday URETICI hic cagrilmaz)",
+        _KT2.ek_varlik_edin(
+            adet=1, mevcut_kimlikler=[],
+            aday_uretici=lambda i: (_ for _ in ()).throw(
+                AssertionError("cagrilmamaliydi")),
+            provenans_okuyucu=lambda y: {}, kopru_yazici=lambda y: True
+        )["kod"] == "KAYNAK-TAVANI-VARLIK-YOK")
+kontrol("⭐ R-1d-g (denetim-2/1): pipeline kimliksiz mevcut parcada "
+        "KAYNAK-TAVANI-VARLIK-YOK ile DURUYOR (bolmeyi denemiyor)",
+        "farklilik \n                                           \"kanitlanamaz\")})"
+        in oku(KOK, "pipeline.py")
+        or ("kimligi YOK -> farklilik" in oku(KOK, "pipeline.py")
+            and '"kod": kaynak_tavani.KOD_VARLIK_YOK' in oku(KOK, "pipeline.py")))
+kontrol("⭐ R-1d-g (denetim-2/1): kimlik uretilemeyen provenans BOS kimlik "
+        "veriyor (uydurma kimlik YOK)",
+        _KT2.kimlik_normalize({"saglayici": "pexels", "asset_id": "A"}) == ""
+        and _KT2.kimlik_normalize({"asset_id": "A",
+                                   "lisans": "x"}) == ""
+        and _KT2.kimlik_normalize({"saglayici": "p", "asset_id": "A",
+                                   "lisans": "x"}) == "p|A")
+
+_PL_H = oku(KOK, "pipeline.py")
+kontrol("⭐ R-1d-g BELIRLEYICI (denetim-2/2): ses kodeki ACIKCA PCM WAV "
+        "(uzanti VARSAYIMI degil)",
+        '"-c:a", "pcm_s16le"' in _PL_H and '_p{j}.wav"' in _PL_H
+        and '"-q:a"' not in _PL_H)
+kontrol("⭐ R-1d-g (denetim-2/2): kesim hatasi stderr ile RAPORLANIYOR "
+        "(pilot kok nedeni kanitlanabilsin)",
+        "return ok, (r.stderr or \"\")[-300:]" in _PL_H
+        and "ses dilimlenemedi: {_kesim_hata}" in _PL_H)
+
+kontrol("⭐ R-1d-g BELIRLEYICI (denetim-2/3): SES KESIMI ONCE, EDINIM SONRA "
+        "(transactional: basarisiz kesimde kopruye HICBIR SEY yazilmaz)",
+        _PL_H.index("(B) SES DILIMLERI ONCE") < _PL_H.index("(C) EK VARLIKLAR")
+        and _PL_H.index("(C) EK VARLIKLAR")
+        < _PL_H.index("kaynak_tavani.ek_varlik_edin("))
+kontrol("⭐ R-1d-g (denetim-2/3): basarisiz yolda YARIM ses dilimleri "
+        "TEMIZLENIYOR (artik birakilmiyor)",
+        _PL_H.count("for _y in _ses_yollari:") == 2
+        and _PL_H.count("os.remove(_y)") == 2)
 
 kontrol("R-1d-g GERILEME YOK: kaynak_ses / yuv420p / tenant imza kapilari "
         "DURUYOR",

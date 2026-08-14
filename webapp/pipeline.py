@@ -4555,20 +4555,26 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         return False
 
     def _ses_dilimle(kaynak_ses, bas_sn, uzunluk_sn, hedef):
-        """Sesi ffmpeg ile KES. ⚠ UCRETSIZ + YEREL; ag/kredi YOK."""
+        """Sesi ffmpeg ile KES. ⚠ UCRETSIZ + YEREL; ag/kredi YOK.
+
+        ⚠ TASINABILIR + DETERMINISTIK KODEK: `pcm_s16le` + `.wav`.
+        Once sabit `libmp3lame` kullaniliyordu; bazi ffmpeg derlemelerinde o
+        encoder YOK ve dilimleme SESSIZCE basarisiz oluyordu (pilotta
+        olculdu: "3 parca atanamadi -> KAYNAK-TAVANI-SURE-BOZUK").
+        Uzantidan kodek TURETMEK de yeterli DEGIL — `.mp3` hedefte yine
+        MP3 encoder secilir. PCM WAV her derlemede vardir.
+        ⚠ Doner: (ok, stderr) — basarisizlik SEBEBI raporlanabilsin.
+        """
         try:
             r = subprocess.run(
                 ["ffmpeg", "-y", "-loglevel", "error", "-ss", f"{bas_sn:.3f}",
                  "-t", f"{uzunluk_sn:.3f}", "-i", kaynak_ses,
-                 # ⚠ Kodek UZANTIDAN turer; sabit `libmp3lame`
-                 # bazi ffmpeg derlemelerinde YOK ve dilimleme sessizce
-                 # basarisiz oluyordu (pilotta olculdu:
-                 # "3 parca atanamadi -> KAYNAK-TAVANI-SURE-BOZUK").
-                 "-q:a", "2", hedef],
+                 "-c:a", "pcm_s16le", "-ar", "44100", hedef],
                 capture_output=True, text=True, timeout=180)
-            return r.returncode == 0 and os.path.exists(hedef)
-        except Exception:                                    # noqa: BLE001
-            return False
+            ok = r.returncode == 0 and os.path.exists(hedef)
+            return ok, (r.stderr or "")[-300:]
+        except Exception as e:                               # noqa: BLE001
+            return False, f"{type(e).__name__}: {str(e)[:160]}"
 
     def _kelime_dilimle(kelimeler, bas_sn, bitis_sn):
         """Kelime zaman damgalarini pencereye kirp ve SIFIRA tasi."""
@@ -4598,19 +4604,59 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             if n_parca <= 1 or not h:
                 yeni_liste.append(sh)
                 continue
-            # ── Ek varliklar: FARKLI KAYNAKLI ucretsiz stok klipler ──
+            _s = h.get("s") or {}
+            p_sure = round(sure / n_parca, 3)
+
+            # ── (A) MEVCUT PARCANIN KIMLIGI ZORUNLU ──
+            # ⚠ Mevcut klibin provider+asset_id+lisans kimligi YOKSA yeni
+            # adayin ondan FARKLI oldugu KANITLANAMAZ -> FAIL-CLOSED.
+            _mevcut_kimlik = kaynak_tavani.kimlik_normalize(
+                kaynak.stok_provenans_al(
+                    os.path.join(PUBLIC, str(sh.get("medya") or ""))))
+            if not _mevcut_kimlik:
+                sorunlar.append({"kod": kaynak_tavani.KOD_VARLIK_YOK,
+                                 "scene_id": sh.get("scene_id"),
+                                 "detay": ("mevcut parcanin provider/asset_id/"
+                                           "lisans kimligi YOK -> farklilik "
+                                           "kanitlanamaz")})
+                yeni_liste.append(sh)
+                continue
+
+            # ── (B) SES DILIMLERI ONCE (transactional sira) ──
+            # ⚠ Kesim basarisizsa HICBIR ek varlik EDINILMEZ ve kopruye
+            # HICBIR SEY yazilmaz; butce/provenans olcumu KIRLENMEZ.
+            _ses_yollari, _kesim_hata = [], ""
+            for j in range(n_parca):
+                _bas = round(j * p_sure, 3)
+                _hedef = os.path.join(
+                    os.path.dirname(h["syol"]),
+                    f"{os.path.basename(h['syol']).rsplit('.', 1)[0]}_p{j}.wav")
+                _ok, _err = _ses_dilimle(h["syol"], _bas, p_sure, _hedef)
+                if not _ok:
+                    _kesim_hata = _err or "bilinmeyen"
+                    break
+                _ses_yollari.append(_hedef)
+            if _kesim_hata:
+                sorunlar.append({"kod": kaynak_tavani.KOD_SURE_BOZUK,
+                                 "scene_id": sh.get("scene_id"),
+                                 "detay": f"ses dilimlenemedi: {_kesim_hata}"})
+                for _y in _ses_yollari:            # yarim kalan dilimleri sil
+                    try:
+                        os.remove(_y)
+                    except OSError:
+                        pass
+                yeni_liste.append(sh)
+                continue
+
+            # ── (C) EK VARLIKLAR: FARKLI KAYNAKLI ucretsiz stok klipler ──
             # ⚠ Kabul karari `kaynak_tavani.ek_varlik_edin`e aittir: kimlik
             # (saglayici|asset_id) MEVCUT parcadan ve birbirinden FARKLI
             # olmali, lisans/saglayici/asset_id DOLU olmali ve KOPRU KAYDI
-            # BASARILI olmali. Aksi halde aday REDDEDILIR, sirdaki denenir.
-            _s = h.get("s") or {}
+            # BASARILI olmali. Aksi halde aday REDDEDILIR, siradaki denenir.
             _sorgu = str(_s.get("footage_sorgu") or "").strip()
             _sorgular = ([_sorgu] +
                          list(kaynak.genel_yedek_sorgular(_sorgu))[:4]
                          if _sorgu else [])
-            _mevcut_kimlik = kaynak_tavani.kimlik_normalize(
-                kaynak.stok_provenans_al(
-                    os.path.join(PUBLIC, str(sh.get("medya") or ""))))
 
             def _aday(sira, _n=h["n"], _sorg=_sorgular):
                 if sira >= len(_sorg):
@@ -4622,8 +4668,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                 return None
 
             _ed = kaynak_tavani.ek_varlik_edin(
-                adet=n_parca - 1,
-                mevcut_kimlikler=[_mevcut_kimlik] if _mevcut_kimlik else [],
+                adet=n_parca - 1, mevcut_kimlikler=[_mevcut_kimlik],
                 aday_uretici=_aday,
                 provenans_okuyucu=kaynak.stok_provenans_al,
                 kopru_yazici=lambda y: _kopru_kaydet(y, _s, h["n"]),
@@ -4636,36 +4681,30 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                                            f"kaynak gerekti, {_ed['bulunan']} "
                                            f"bulundu; red: "
                                            f"{[r.get('neden') for r in _ed['red']][:4]}")})
+                for _y in _ses_yollari:
+                    try:
+                        os.remove(_y)
+                    except OSError:
+                        pass
                 yeni_liste.append(sh)
                 continue
             ek_yollar = [os.path.relpath(k["yol"], PUBLIC)
                          for k in _ed["kabul"]]
-            # ── Ses + altyazi SENKRON bolunur ──
-            p_sure = round(sure / n_parca, 3)
-            parcalar, kesim_ok = [], True
+
+            # ── (D) PARCALARI KUR ──
+            parcalar = []
             for j in range(n_parca):
-                bas = round(j * p_sure, 3)
-                ses_hedef = os.path.join(
-                    os.path.dirname(h["syol"]),
-                    f"{os.path.basename(h['syol']).rsplit('.', 1)[0]}_p{j}.mp3")
-                if not _ses_dilimle(h["syol"], bas, p_sure, ses_hedef):
-                    kesim_ok = False
-                    break
+                _bas = round(j * p_sure, 3)
                 yeni = dict(sh)
                 yeni["sure"] = p_sure
-                yeni["ses"] = ses_hedef
+                yeni["ses"] = _ses_yollari[j]
                 yeni["scene_id"] = f"{sh.get('scene_id')}p{j + 1}"
                 yeni["medya"] = (sh.get("medya") if j == 0
                                  else ek_yollar[j - 1])
                 yeni["altyazi"] = uretmod.altyazi_parcala(
-                    _kelime_dilimle(h["kelimeler"], bas, bas + p_sure), p_sure)
+                    _kelime_dilimle(h["kelimeler"], _bas, _bas + p_sure),
+                    p_sure)
                 parcalar.append(yeni)
-            if not kesim_ok:
-                sorunlar.append({"kod": kaynak_tavani.KOD_SURE_BOZUK,
-                                 "scene_id": sh.get("scene_id"),
-                                 "detay": "ses dilimlenemedi"})
-                yeni_liste.append(sh)
-                continue
             bolunen += 1
             yeni_liste.extend(parcalar)
         sahneler[:] = yeni_liste
