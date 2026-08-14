@@ -10181,3 +10181,48 @@ yakaladı — hepsi düzgün Türkçeye çevrildi (kilit **doğru çalıştı**)
 * R-1d-j'nin **4 yapısal ölçüm boşluğu** (rumble/hiss kalibrasyonu,
   B-roll çekim türü, ducking zarfı) **PASS sayılmadı** ve **kapsam dışına
   çıkarılmadı** — hâlâ açık.
+
+### UI-1 STAGING DOĞRULAMASI (uzak, Mac'e artefakt YOK)
+
+```
+kimliksiz /akis  -> giriş formu (1)          ✅ kimlik kapısı `/` ile aynı
+girişli  /akis   -> 6 adım · 3 etiket · role="progressbar" 1   ✅
+GET /ui/js/ui1.js -> 200                      ✅ allowlist'ten servis
+token sızıntısı   -> 0                        ✅ (sifreli_token/parola_hash/anahtar yok)
+smoke            -> TAM PASS
+```
+
+⚠ **Masaüstü/mobil GÖRSEL kanıt bu turda ALINMADI**: Mac'e screenshot/QA
+artefaktı yasağı var ve staging tarafında bir görüntü yakalama işi
+kurulmadı. Görsel denetim **açık kalan** iştir.
+
+---
+
+## 75. DEVİR — YENİ OTURUM İÇİN GİRİŞ NOKTASI (14 Ağu, context sınırı)
+
+**Durum:** repo temiz, `HEAD=origin=e764b62` (+ bu handoff commit'i),
+**A–I 4282/4282**, deploy + smoke **PASS**, rollback hazır
+(`bedosaho:rollback-20260814`, `bedosaho:pre-r1da-20260814`, duran
+`bedosaho_pre_r1da`).
+
+**Kabul edilmiş video YOK.** En iyi pilot
+`job_1786729772370_r1dasm_2d4c01` (59.18 sn, 1080p, yuv420p, signed URL
+200/401/403, delivery **KABUL**, **FAIL 0**) ama **ÖLÇÜLEMEDİ 4** olduğu
+için kullanıcı kuralı gereği **kabul sayılmaz**.
+
+**Sıradaki iki iş (kullanıcı kararı gerektiren birincisi):**
+
+1. **R-1d-j'nin 4 yapısal boşluğu** — rumble/hiss **kalibrasyonu yok**,
+   B-roll `GERCEK-TIMELINE-CEKIM-TURU-YOK`, ducking
+   `GERCEK-TIMELINE-DUCKING-VERISI-YOK`. Ya gerçek hat bu verileri
+   **üretsin** ve eşikler **ölçülerek** kalibre edilsin, ya da teslim
+   sözleşmesi bunları **kapsam dışı** ilan etsin. ⚠ Eşik uydurmak veya
+   "ölçülemedi"yi PASS saymak **yasak**.
+2. **UI-2**: `/akis` için staging üzerinden **masaüstü + mobil görsel
+   kanıt** (object storage'a yazan uzak bir yakalama işi) ve gerçek uçtan
+   uca akış denemesi.
+
+⚠ **Değişmez kurallar:** Mac'te medya/kare/QA/screenshot **yok**; ücretli
+API/kredi **yok**; canlı kütüphanedeki eski kayıt **değiştirilmez**
+(silme kuyruğunda `TAVAN-ASILDI` ile duruyor, gerçek silme işi **hâlâ
+yok**); tam teknik+semantik PASS olmadan **kabul video denmez**.
