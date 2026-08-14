@@ -49,6 +49,20 @@ KUTUPHANE_DOSYA = os.path.join(VERI, "kutuphane.json")
 # ACIK bir karardir ve `/api/saglik`ta GORUNUR — sessizce korumasiz calismaz.
 ZORUNLU_OTURUM = os.environ.get("ZORUNLU_OTURUM", "1").lower() not in (
     "0", "false", "hayir", "off")
+# ⚠ COOKIE `Secure` BAYRAGI — VARSAYILAN ACIK (kimlik.COOKIE_BAYRAKLARI).
+# OLCULEN SORUN: bu kurulum HTTPS'siz (duz HTTP, IP uzerinden). Tarayici ve
+# uzak istemciler `Secure` cerezi duz HTTP'de SAKLAMAZ; giris 200 doner ama
+# sonraki istek 401 alir — yani oturum HIC KURULAMAZ (olculdu: uzak IP'den
+# korumali uc 401).
+# ⚠ Bayragi kapatmak oturum cerezinin duz metin tasinmasi demektir; bu ACIK
+# bir karardir, SESSIZ bir zayiflama DEGIL: `/api/saglik` `cookie_secure`
+# alanini ve baslangic logu uyariyi GOSTERIR. Kalici cozum HTTPS'tir.
+COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "1").lower() not in (
+    "0", "false", "hayir", "off")
+COOKIE_BAYRAKLARI = dict(kimlik.COOKIE_BAYRAKLARI, secure=COOKIE_SECURE)
+if not COOKIE_SECURE:
+    print("  ⚠ KIMLIK: COOKIE_SECURE=0 — oturum cerezi duz HTTP'de de "
+          "gonderilecek. Bu GECICI bir kurulum tavizidir; HTTPS sart.")
 # Signed URL omru (R-1a varsayilani).
 IMZA_TTL_SN = imzali_url.VARSAYILAN_TTL_SN
 
@@ -290,10 +304,11 @@ async def giris(istek: Request, kullanici: str = Form(...),
     cevap = JSONResponse({"ok": True, "tenant_id": kayit["tenant_id"]})
     cevap.set_cookie(kimlik.OTURUM_COOKIE, jeton,
                      max_age=kimlik.OTURUM_OMRU_SN, path="/",
-                     **kimlik.COOKIE_BAYRAKLARI)
+                     **COOKIE_BAYRAKLARI)
     # ⚠ CSRF cerezi JS tarafindan OKUNABILIR olmali (double-submit).
     cevap.set_cookie(kimlik.CSRF_COOKIE, csrf, max_age=kimlik.OTURUM_OMRU_SN,
-                     path="/", httponly=False, samesite="lax", secure=True)
+                     path="/", httponly=False, samesite="lax",
+                     secure=COOKIE_SECURE)
     return cevap
 
 
@@ -423,6 +438,9 @@ def saglik():
         "kdf_hazir": kimlik.kdf_hazir(),
         "hesap_sayisi": len(_kullanicilar()),
         "kutuphane_tavani": kutuphane.TAVAN,
+        # ⚠ Cerez `Secure` bayragi KAPALIYSA bunu GIZLEME — denetlenebilir
+        # olsun. false gorunuyorsa kurulum HTTPS'e tasinmali.
+        "cookie_secure": COOKIE_SECURE,
     }
 
 

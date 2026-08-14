@@ -682,6 +682,17 @@ if FASTAPI_VAR:
                 all(b in str(_gr.headers.get("set-cookie", "")).lower()
                     for b in ("httponly", "samesite=lax", "secure")),
                 _gr.headers.get("set-cookie", "")[:120])
+        # ⚠ `Secure` VARSAYILAN ACIK olmali. HTTPS'siz kurulumda ACIKCA
+        # kapatilabilir ama bu SESSIZ olamaz: saglik ucu bunu bildirir.
+        kontrol("⭐ R-1d-a: COOKIE_SECURE varsayilani ACIK",
+                _srv.COOKIE_SECURE is True
+                and _srv.COOKIE_BAYRAKLARI["secure"] is True)
+        kontrol("⭐ R-1d-a: cerez Secure durumu /api/saglik'ta GORUNUR "
+                "(sessiz zayiflama YOK)",
+                c.get("/api/saglik").json().get("cookie_secure") is True)
+        kontrol("⭐ R-1d-a: Secure kapatilirsa BASLANGICTA uyari basiliyor",
+                "COOKIE_SECURE=0" in oku(KOK, "server.py")
+                and "HTTPS sart" in oku(KOK, "server.py"))
         kontrol("⭐ R-1d-a: parola cevapta/cerezde SIZMIYOR",
                 _TEST_PAR not in _gr.text
                 and _TEST_PAR not in str(_gr.headers))
