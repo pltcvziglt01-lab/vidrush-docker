@@ -35,7 +35,7 @@ const KOSU = `ui2-${process.pid}`;
 const hukum = {
   kosu: KOSU, taban: TABAN,
   tenant_maske: AYAR.tenant_maske, is_maske: AYAR.is_maske,
-  gecen: 0, basarisiz: [], olculemedi: [], bulgular: [],
+  gecen: 0, basarisiz: [], olculemedi: [],
   is_sayisi_once: 0, is_sayisi_sonra: 0, kanitlar: [],
 };
 
@@ -52,11 +52,6 @@ function ok(ad, kosul, kod, detay = "") {
 function olculemedi(ad, kod, sebep) {
   hukum.olculemedi.push({ad, kod, sebep: String(sebep).slice(0, 200)});
   console.log(`  --   OLCULEMEDI ${ad}  [${kod}] ${sebep}`);
-}
-
-function bulgu(kod, aciklama) {
-  hukum.bulgular.push({kod, aciklama});
-  console.log(`  !!   BULGU [${kod}] ${aciklama}`);
 }
 
 const uyu = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -247,6 +242,12 @@ async function pastaKos(tarayici, pasta, olcu) {
     name: AYAR.cerez_adi, value: AYAR.jeton, domain: "127.0.0.1",
     path: "/", httpOnly: true, secure: false, sameSite: "Lax",
   });
+  /* ⚠ CSRF cerezi: gercek giris gibi JS'ten OKUNABILIR kurulur
+   * (double-submit sartı). Yetki hala HttpOnly oturum cerezindedir. */
+  await s.g("Network.setCookie", {
+    name: AYAR.csrf_cerez_adi, value: AYAR.csrf, domain: "127.0.0.1",
+    path: "/", httpOnly: false, secure: false, sameSite: "Lax",
+  });
 
   /* ⚠ Konsol olcumu BURADAN baslar: yukaridaki 401 KASITLIDIR (gecersiz
    * giris negatif testi) ve uygulama hatasi olarak sayilmaz. */
@@ -254,12 +255,27 @@ async function pastaKos(tarayici, pasta, olcu) {
 
   /* ── 4) UCRETLI SINIR: /api/generate YAKALANIR, gecirilmez ── */
   await s.g("Fetch.enable", {
-    patterns: [{urlPattern: "*/api/generate*", requestStage: "Request"}],
+    patterns: [{urlPattern: "*/api/generate*", requestStage: "Request"},
+               {urlPattern: "*/api/kaynak-tercihi*", requestStage: "Request"}],
   });
   let yakalandi = null;
+  let generateSayaci = 0;
+  let tercihYazimiBozuk = false;
   tarayici.cdp.dinle(async (m) => {
     if (m.method !== "Fetch.requestPaused" || m.sessionId !== oturum) return;
     const istek = m.params.request;
+    /* ⚠ FAIL-OPEN SINAMASI: tercih yazimi 500 dondurulur. Uretim
+     * DURMALIDIR; `/api/generate` HIC gitmemelidir. */
+    if (tercihYazimiBozuk && istek.url.includes("/api/kaynak-tercihi")) {
+      await tarayici.cdp.gonder("Fetch.fulfillRequest", {
+        requestId: m.params.requestId, responseCode: 500,
+        responseHeaders: [{name: "Content-Type", value: "application/json"}],
+        body: Buffer.from('{"detail":"sinama"}', "utf8").toString("base64"),
+      }, oturum);
+      return;
+    }
+    if (!istek.url.includes("/api/generate")) return;
+    generateSayaci += 1;
     yakalandi = {
       url: istek.url,
       alanlar: [...new Set([...(istek.postData || "")
@@ -323,6 +339,21 @@ async function pastaKos(tarayici, pasta, olcu) {
   ok(`${pasta}: canli sayfa kaynaginda token/parola izi YOK`,
      yapi.kaynak_izi === false, "UI2-TOKEN-SIZINTISI", "kaynakta iz var");
 
+  /* ⚠ `/api/kaynak-tercihi` YAKALANMAZ: ucretsizdir ve GERCEK sunucuya
+   * gitmelidir — kaydin gercekten yazildigini ancak boyle olceriz. */
+  let tercihCevabi = null;
+  tarayici.cdp.dinle(async (m) => {
+    if (m.method !== "Network.responseReceived" || m.sessionId !== oturum) return;
+    if (!m.params.response.url.endsWith("/api/kaynak-tercihi")) return;
+    if (m.params.response.status !== 200) return;
+    try {
+      const r = await tarayici.cdp.gonder("Network.getResponseBody",
+                                          {requestId: m.params.requestId},
+                                          oturum);
+      tercihCevabi = JSON.parse(r.body);
+    } catch { /* govde henuz hazir degil */ }
+  });
+
   /* ── 6) AYARLAR: metin + kurgu + kaynak; kredi metni CANLI degismeli ── */
   const kredi = await s.deger(`(() => {
     const d = (el, t) => el.dispatchEvent(new Event(t, {bubbles: true}));
@@ -343,11 +374,23 @@ async function pastaKos(tarayici, pasta, olcu) {
     }, adim: document.querySelector('[data-adim="kaynak"]')
              ?.getAttribute('aria-current')};
   })()`);
+  /* ⚠ FAZ UI-3: metin artik SUNUCUNUN gercek cevabindan yazilir; bu bir
+   * ag gidis-donusudur, beklenir. */
+  const krediYazildi = await bekle(s,
+      `document.querySelector('#akis-kredi')?.dataset.tercih === 'ucretsiz'`,
+      20);
+  const krediSon = await s.deger(`(() => {
+    const e = document.querySelector('#akis-kredi');
+    return {metin: e.textContent, onay: e.dataset.kredi_onayi || '',
+            tercih: e.dataset.tercih || ''};
+  })()`);
   await s.kanit(pasta, "04", "ayarlar");
   ok(`${pasta}: kaynak secimi kredi metnini CANLI degistiriyor`,
-     kredi.once.metin !== kredi.sonra.metin
-       && kredi.sonra.onay === "gerekmez",
-     "UI2-KREDI-METNI-DEGISMIYOR", JSON.stringify(kredi.sonra));
+     kredi.once.metin !== krediSon.metin && krediSon.onay === "gerekmez",
+     "UI2-KREDI-METNI-DEGISMIYOR", JSON.stringify(krediSon));
+  ok(`${pasta}: kredi metni SUNUCUNUN karari (istemci tahmini degil)`,
+     krediYazildi && krediSon.tercih === "ucretsiz",
+     "UI2-KREDI-METNI-DEGISMIYOR", JSON.stringify(krediSon));
   ok(`${pasta}: adim gostergesi secime gore ilerliyor`,
      kredi.adim === "step", "UI2-ADIM-EKSIK", `aria-current=${kredi.adim}`);
 
@@ -368,19 +411,23 @@ async function pastaKos(tarayici, pasta, olcu) {
      "UI2-GENERATE-SUNUCUYA-SIZDI",
      `once=${hukum.is_sayisi_once} sonra=${hukum.is_sayisi_sonra}`);
 
-  if (yakalandi && pasta === "masaustu") {
-    /* Istemci sozlesmesi OLCULUR (iddia edilmez). */
+  if (yakalandi) {
+    /* ⚠ FAZ UI-3: 22 alanlik sozlesme BUYUMEMELI. Kaynak secimi uretim
+     * istegine EKLENMEZ; ayri `/api/kaynak-tercihi` ucuna yazilir ve
+     * `/api/generate` onu tenant kaydindan okur. */
     const bekleniyor = ["session", "story", "tur", "edit", "sure_dk", "altyazi"];
     ok(`${pasta}: generate govdesi 22 alan sozlesmesinin ALT KUMESI`,
        bekleniyor.every((a) => yakalandi.alanlar.includes(a)),
        "UI2-GENERATE-SUNUCUYA-SIZDI", yakalandi.alanlar.join(","));
-    if (!yakalandi.alanlar.includes("kaynak_tercihi")) {
-      bulgu("UI2-KAYNAK-TERCIHI-SUNUCUYA-GITMIYOR",
-            "Kullanicinin sectigi medya kaynagi (`kaynak_tercihi`) istekte "
-            + "YOK: arayuz 'Kredi harcanmaz' diyor ama secim sunucuya "
-            + "ULASMIYOR; saglayici karari yalnizca tenant kaydindan "
-            + `veriliyor. Gonderilen alanlar: ${yakalandi.alanlar.join(",")}`);
-    }
+    ok(`${pasta}: generate govdesine YENI ALAN EKLENMEDI `
+       + `(kaynak_tercihi govdede YOK)`,
+       !yakalandi.alanlar.includes("kaynak_tercihi"),
+       "UI2-KAYNAK-TERCIHI-SUNUCUYA-GITMIYOR", yakalandi.alanlar.join(","));
+    ok(`${pasta}: kaynak secimi GERCEK sunucuya ayri uctan ULASTI `
+       + `(/api/kaynak-tercihi)`,
+       tercihCevabi && tercihCevabi.tercih === "ucretsiz"
+         && tercihCevabi.kredi_tuketilir === false,
+       "UI2-KAYNAK-TERCIHI-SUNUCUYA-GITMIYOR", JSON.stringify(tercihCevabi));
   }
 
   /* ── 8) IZLEME + QA (GERCEK /api/job/{id}) ── */
@@ -464,6 +511,34 @@ async function pastaKos(tarayici, pasta, olcu) {
   ok(`${pasta}: akis uygulamasinda konsol hatasi YOK`,
      konsolHatalari.length === 0, "UI2-KONSOL-HATASI",
      konsolHatalari.slice(0, 2).join(" | "));
+
+  /* ── 11) FAIL-OPEN SINAMASI (en sonda: kasitli 500 konsolu kirletir) ──
+   * ⚠ Tercih yazimi basarisizken uretime DEVAM ETMEK, isi ESKI tercihle
+   * baslatir ve kullanicinin secimini SESSIZCE ihlal eder. Bu adim
+   * uretimin GERCEKTEN durdugunu tarayicida kanitlar.                   */
+  tercihYazimiBozuk = true;
+  const genOnce = generateSayaci;
+  await s.deger(`(() => {
+    const k = document.querySelector('#akis-kaynak');
+    k.value = 'magnific';
+    k.dispatchEvent(new Event('change', {bubbles: true}));
+    return true;
+  })()`);
+  await uyu(1500);
+  await s.deger(`(document.querySelector('#akis-form').requestSubmit(), true)`);
+  await uyu(3000);
+  const durdu = await s.deger(
+      `(document.querySelector('#akis-durum')?.textContent || '')`);
+  ok(`${pasta}: tercih yazilamayinca /api/generate HIC GITMEDI `
+     + `(fail-open YOK)`,
+     generateSayaci === genOnce, "UI2-TERCIH-YAZILAMADI-FAIL-OPEN",
+     `once=${genOnce} sonra=${generateSayaci}`);
+  ok(`${pasta}: durus STABIL KODLA gorunur `
+     + `(UI3-KAYNAK-TERCIHI-YAZILAMADI)`,
+     durdu.includes("UI3-KAYNAK-TERCIHI-YAZILAMADI"),
+     "UI2-TERCIH-YAZILAMADI-FAIL-OPEN", durdu.slice(0, 80));
+  await s.kanit(pasta, "06", "fail-closed");
+  tercihYazimiBozuk = false;
   return konsolHatalari;
 }
 
@@ -482,10 +557,8 @@ fs.writeFileSync(path.join(KANIT, "sonuc.json"),
                  JSON.stringify(hukum, null, 2));
 console.log(`\n${"=".repeat(60)}`);
 console.log(`GECEN: ${hukum.gecen}   BASARISIZ: ${hukum.basarisiz.length}   `
-            + `OLCULEMEDI: ${hukum.olculemedi.length}   `
-            + `BULGU: ${hukum.bulgular.length}`);
+            + `OLCULEMEDI: ${hukum.olculemedi.length}`);
 console.log(`KANIT: ${hukum.kanitlar.length} png + sonuc.json -> ${KANIT}`);
 for (const b of hukum.basarisiz) console.log(`  XX [${b.kod}] ${b.ad}`);
 for (const b of hukum.olculemedi) console.log(`  -- [${b.kod}] ${b.ad}`);
-for (const b of hukum.bulgular) console.log(`  !! [${b.kod}]`);
 process.exit(hukum.basarisiz.length ? 1 : 0);

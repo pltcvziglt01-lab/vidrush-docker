@@ -155,7 +155,7 @@ kontrol("UI-2: mobil pasta GERCEK mobil emulasyonu var "
 kontrol("UI-2: her iki pastada da ekran goruntusu alinir "
         "(`Page.captureScreenshot`)",
         "Page.captureScreenshot" in HAT)
-_asamalar = ("kimliksiz", "akis", "ayarlar", "sonuc")
+_asamalar = ("kimliksiz", "akis", "ayarlar", "sonuc", "fail-closed")
 for _a in _asamalar:
     kontrol(f"UI-2: `{_a}` asamasinin ekran goruntusu var",
             f'"{_a}"' in HAT or f"'{_a}'" in HAT, _a)
@@ -208,7 +208,11 @@ kontrol("UI-2: canli sayfa kaynaginda token/parola izi ARANIR",
         "sifreli_token" in HAT and "parola_hash" in HAT)
 kontrol("UI-2: oturum cerezi HttpOnly kurulur "
         "(JS'ten okunamadigi dogrulanir)",
-        "httpOnly" in HAT and "document.cookie" in HAT)
+        "httpOnly: true" in HAT and "document.cookie" in HAT)
+kontrol("⭐ UI-2/UI-3: CSRF cerezi gercek giris gibi JS'ten OKUNABILIR "
+        "kurulur (double-submit calisabilsin)",
+        "csrf_cerez_adi" in HAT and "httpOnly: false" in HAT
+        and "csrf_cerez_adi" in ON)
 
 # ═══════════ (8) STABIL HATA KODLARI ═══════════
 blok("8) STABIL HATA KODLARI")
@@ -237,6 +241,9 @@ KODLAR = (
     "UI2-KONSOL-HATASI",
     "UI2-TOKEN-SIZINTISI",
     "UI2-KAYNAK-TERCIHI-SUNUCUYA-GITMIYOR",
+    # ⚠ FAZ UI-3 ile eklendi: tercih yazilamazken uretime devam etmek
+    # (fail-open) kullanicinin secimini SESSIZCE ihlal eder.
+    "UI2-TERCIH-YAZILAMADI-FAIL-OPEN",
 )
 for _k in KODLAR:
     kontrol(f"UI-2 kod: `{_k}` tanimli", _k in HEPSI, _k)

@@ -104,10 +104,16 @@ if not teslim.oturum_kapisi(jeton)["izin"]:
 # ── 4) AYAR dosyasi (0600) — jeton YALNIZ burada ─────────────────────────
 os.makedirs(KANIT, exist_ok=True)
 os.makedirs(os.path.dirname(AYAR_YOLU), exist_ok=True)
+# ⚠ CSRF: mutasyon uclari double-submit ISTER. Gercek giris nasil iki
+# cerez kuruyorsa hat da oyle kurar; aksi halde `/api/kaynak-tercihi`
+# 403 doner ve zincir FAIL-CLOSED ile kesilir (dogru ama yanlis sebeple).
+# ⚠ `vr_csrf` BILEREK JS'ten okunabilir; YETKI onda DEGIL.
 ayar = {
     "taban": TABAN,
     "cerez_adi": kimlik.OTURUM_COOKIE,
     "jeton": jeton,
+    "csrf_cerez_adi": kimlik.CSRF_COOKIE,
+    "csrf": kimlik.csrf_uret(),
     "is_id": is_id,
     "durumlar_dizini": DURUMLAR,
     "kanit_dizini": KANIT,

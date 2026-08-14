@@ -14683,8 +14683,15 @@ kontrol("⭐ UI-1 BELIRLEYICI: KREDI ONAYI durumu GORUNUR "
 kontrol("⭐ UI-1 BELIRLEYICI: istemci kodu TOKEN/PAROLA/ANAHTAR OKUMUYOR",
         not any(a in _UI_JS for a in ("sifreli_token", "parola_hash",
                                       "IMZA_ANAHTARI", "OTURUM_ANAHTARI")))
-kontrol("⭐ UI-1: oturum cerezi JS'ten OKUNMUYOR (HttpOnly korunuyor)",
-        "document.cookie" not in _UI_JS)
+# ⚠ FAZ UI-3 ile KESKINLESTIRILDI: kural "hicbir cerez okunmasin" DEGIL,
+# "YETKI cerezi okunmasin"dir. Double-submit CSRF, `vr_csrf` cerezinin
+# JS'ten OKUNABILIR olmasini ZORUNLU kilar; yetki hala HttpOnly oturum
+# cerezindedir ve bu dosya onu okumaz (adini bile tasimaz).
+kontrol("⭐ UI-1/UI-3: OTURUM cerezi JS'ten OKUNMUYOR (HttpOnly korunuyor; "
+        "cerez okumasi YALNIZ CSRF icin ve TEK yerde)",
+        "vr_oturum" not in _UI_JS
+        and len(re.findall(r"document\.cookie", _UI_JS)) == 1
+        and "vr_csrf" in _UI_JS)
 kontrol("⭐ UI-1: saglayici ozeti token TASIMIYOR (R-1b sozlesmesi)",
         _SM.kapsam_ozeti()["token_istemciye_cikar"] is False)
 

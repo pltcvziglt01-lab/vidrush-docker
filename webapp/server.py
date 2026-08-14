@@ -28,6 +28,7 @@ import girdi_analizi # Faz H: otomatik girdi analizi (LLM YOK, ucretsiz)
 import kimlik        # Faz R-1c-a: Argon2id parola + oturum + tenant izolasyonu
 import kutuphane     # Faz R-1c-b: tenant basina son 3 kabul edilmis video
 import teslim        # Faz R-1d-a: zinciri UCTAN UCA baglayan teslim atomu
+from medya import saglayici_motoru   # Faz UI-3: kaynak tercihi sozlesmesi
 
 KOK = os.path.dirname(os.path.abspath(__file__))
 STATIC = os.path.join(KOK, "static")
@@ -219,6 +220,19 @@ def _saglayici_kayitlari():
     return _json_oku(os.path.join(VERI, "saglayicilar.json"), {})
 
 
+# ⚠ FAZ UI-3: tercih tenant'in SAGLAYICI KAYDINDA yasar — yonettigi
+# baglantinin yaninda. Kayit yoksa ya da deger taninmiyorsa `otomatik`:
+# bu, tercih kavramindan ONCEKI davranisin TA KENDISIDIR.
+_saglayici_kilidi = threading.Lock()
+
+
+def _tenant_tercihi(kayitlar: dict, tenant_id: str) -> str:
+    t = str(((kayitlar or {}).get(tenant_id) or {}).get("tercih")
+            or "").strip().lower()
+    return t if t in saglayici_motoru.TERCIHLER \
+        else saglayici_motoru.TERCIH_OTOMATIK
+
+
 def _provizyon():
     """Ilk hesabi env'den ac (`VIDRUSH_ADMIN_KULLANICI`/`_PAROLA`).
 
@@ -327,6 +341,63 @@ def oturum_durumu(istek: Request):
     return {"girisli": d["izin"], "tenant_id": d["tenant_id"],
             "neden": d["neden"], "zorunlu": ZORUNLU_OTURUM,
             "kdf": kimlik.kdf_adi(), "kdf_hazir": kimlik.kdf_hazir()}
+
+
+@app.post("/api/kaynak-tercihi")
+def kaynak_tercihi_kaydet(istek: Request, tercih: str = Form(...)):
+    """Bu tenant'in medya kaynagi tercihi (otomatik | magnific | ucretsiz).
+
+    ⚠ `/api/generate` SOZLESMESI DEGISMEZ ve BUYUMEZ (tam 22 alan).
+    Tercih uretim istegine DEGIL, tenant'in saglayici kaydina yazilir;
+    `saglayici_sec` onu zaten oradan okur.
+    ⚠ Bu uc YALNIZCA `tercih` anahtarini yazar: baglanti/token/onay
+    alanlarina DOKUNMAZ, dolayisiyla yetki YUKSELTMEZ. Tercih yazmak
+    "Magnific bagli" ANLAMINA GELMEZ — baglanti kullanilamiyorsa cevap
+    ucretsiz stoga dusuldugunu ve NEDENINI soyler.
+    ⚠ Cevapta token/baglanti YOKTUR.
+    """
+    tenant_id = _tenant(istek)
+    if not tenant_id:
+        raise HTTPException(401, "giris gerekli")
+    # ⚠ MUTASYON UCU: double-submit CSRF ZORUNLU. Oturum cerezi
+    # SameSite=Lax'tir ama bu tek basina yetmez — cerez JS'ten okunamadigi
+    # icin yetki cerezde, dogrulama ise AYRI ve JS'ten OKUNABILIR
+    # `vr_csrf` cerezinin `x-csrf-token` basligiyla ESLESMESINDEDIR.
+    # Fail-closed: eksik ya da uyusmaz jeton STABIL kodla reddedilir.
+    if not kimlik.csrf_dogrula(istek.cookies.get(kimlik.CSRF_COOKIE, ""),
+                               istek.headers.get(kimlik.CSRF_BASLIK, "")):
+        raise HTTPException(403, "UI3-CSRF-GECERSIZ")
+    t = (tercih or "").strip().lower()
+    if t not in saglayici_motoru.TERCIHLER:
+        # ⚠ Burada SESSIZ DUSUS YOK: kullanici acikca bir sey secti,
+        # tanimadigimizi soyleriz (uretim yolundan farki budur).
+        raise HTTPException(400, "gecersiz kaynak tercihi")
+    with _saglayici_kilidi:
+        depo = _saglayici_kayitlari()
+        kayit = dict(depo.get(tenant_id) or {})
+        kayit["tercih"] = t
+        depo[tenant_id] = kayit
+        _json_yaz_0600(os.path.join(VERI, "saglayicilar.json"), depo)
+    karar = teslim.saglayici_karari(depo, tenant_id, tercih=t)
+    return {"ok": True, "tercih": t,
+            "saglayici": karar["provider_used"],
+            "saglayici_fallback": karar["fallback_reason"],
+            "kredi_tuketilir": karar["kredi_tuketildi"]}
+
+
+@app.get("/api/kaynak-tercihi")
+def kaynak_tercihi_oku(istek: Request):
+    """Kayitli tercih + o tercihin SU ANKI gercek sonucu."""
+    tenant_id = _tenant(istek)
+    if not tenant_id:
+        raise HTTPException(401, "giris gerekli")
+    kayitlar = _saglayici_kayitlari()
+    t = _tenant_tercihi(kayitlar, tenant_id)
+    karar = teslim.saglayici_karari(kayitlar, tenant_id, tercih=t)
+    return {"tercih": t, "secenekler": list(saglayici_motoru.TERCIHLER),
+            "saglayici": karar["provider_used"],
+            "saglayici_fallback": karar["fallback_reason"],
+            "kredi_tuketilir": karar["kredi_tuketildi"]}
 
 
 @app.get("/api/kutuphane")
@@ -1142,7 +1213,15 @@ async def uret_baslat(istek: Request,
     # is TENANT'a muhurlenir ve bu tenant'in SAGLAYICI KARARI (R-1b) yazilir.
     # Tenant'in onayli+kredili bir baglantisi yoksa (gercek OAuth/kredi YOK)
     # UCRETSIZ STOK'a duser ve `fallback_reason` GORUNUR kalir.
-    _sag = teslim.saglayici_karari(_saglayici_kayitlari(), tenant_id)
+    # ⚠ FAZ UI-3: KULLANICININ KAYNAK SECIMI ARTIK KARARA GIRIYOR.
+    # ⚠ SOZLESME BUYUMEDI: `/api/generate` ust-seviye alan sayisi TAM 22'dir
+    # ve 23. alan EKLENMEDI. Tercih, bu ucun ZATEN okudugu ic yapiya —
+    # tenant'in SAGLAYICI KAYDINA — yazilir (`POST /api/kaynak-tercihi`) ve
+    # `saglayici_sec` onu zaten oradan okur. Kayitta tercih yoksa davranis
+    # ESKISIYLE AYNIDIR (`otomatik`), yani eski istemciler bozulmaz.
+    _kayitlar = _saglayici_kayitlari()
+    _tercih = _tenant_tercihi(_kayitlar, tenant_id)
+    _sag = teslim.saglayici_karari(_kayitlar, tenant_id, tercih=_tercih)
     _dmg = teslim.is_damgala(isler[is_id], tenant_id=tenant_id,
                              metin=story, saglayici=_sag)
     if not _dmg["ok"] and ZORUNLU_OTURUM:
@@ -1189,7 +1268,11 @@ async def uret_baslat(istek: Request,
                   # ⚠ Saglayici karari BASTAN GORUNUR: kullanici videonun
                   # hangi kaynaktan cekilecegini uretim bitmeden bilir.
                   "saglayici": _sag["provider_used"],
-                  "saglayici_fallback": _sag["fallback_reason"]})
+                  "saglayici_fallback": _sag["fallback_reason"],
+                  # ⚠ Kullanici NE ISTEDIGINI geri gorur: istegi sessizce
+                  # yok sayilmis olsa bile bu alan gercegi soyler.
+                  # ⚠ Token/baglanti BU CEVABA GIRMEZ (R-1b sozlesmesi).
+                  "saglayici_tercih": _sag["tercih"]})
     return cevap
 
 

@@ -76,6 +76,54 @@ function krediUyarisiGuncelle() {
   }
 }
 
+/* ── KAYNAK TERCIHI: SUNUCUYA YAZ, GERCEGI GERI OKU ──
+ * ⚠ FAZ UI-3: UI-2 arayuzun "Kredi harcanmaz" dedigini ama secimin
+ * sunucuya HIC ulasmadigini olctu (`UI2-KAYNAK-TERCIHI-SUNUCUYA-GITMIYOR`).
+ * Artik secim tenant'in saglayici kaydina yazilir ve ekrana SUNUCUNUN
+ * verdigi gercek karar yazilir — tahmin DEGIL.
+ * ⚠ `/api/generate` sozlesmesi (22 alan) DEGISMEDI.                     */
+/* ⚠ Double-submit CSRF: `vr_csrf` cerezi BILEREK JS'ten okunabilir.
+ * YETKI o cerezde DEGILDIR — yetki HttpOnly OTURUM cerezindedir ve bu
+ * dosya ONU HIC OKUMAZ (adini bile tasimaz). Burada okunan YALNIZCA
+ * CSRF jetonudur ve cerez okumasi YALNIZ burada yapilir.               */
+function csrfJetonu() {
+  return (document.cookie.match(/(?:^|;\s*)vr_csrf=([^;]*)/) || [])[1] || "";
+}
+
+async function kaynakTercihiYaz() {
+  const k = $("#akis-kaynak")?.value || "otomatik";
+  const u = $("#akis-kredi");
+  const fd = new FormData();
+  fd.append("tercih", k);
+  try {
+    const r = await fetch("/api/kaynak-tercihi", {
+      method: "POST", body: fd,
+      headers: {"x-csrf-token": csrfJetonu()},
+    });
+    if (!r.ok) throw new Error(String(r.status));
+    const d = await r.json();
+    if (u) {
+      u.textContent =
+        `Kaynak: ${d.saglayici}` +
+        (d.saglayici_fallback ? ` (düşüş: ${d.saglayici_fallback})` : "") +
+        ` — ${d.kredi_tuketilir ? "kredi harcanabilir" : "kredi harcanmaz"}`;
+      u.dataset.kredi_onayi = d.kredi_tuketilir ? "gerekli" : "gerekmez";
+      u.dataset.tercih = d.tercih;
+    }
+    return d;
+  } catch (e) {
+    // ⚠ SESSIZ BASARI YOK: yazilamadiysa kullanici bunu GORUR.
+    if (u) {
+      u.textContent =
+        "Kaynak tercihi sunucuya YAZILAMADI — üretim BAŞLATILMADI " +
+        "(seçimin sessizce yok sayılmasın diye). Sayfayı yenileyip " +
+        "tekrar deneyin.";
+      u.dataset.kredi_onayi = "bilinmiyor";
+    }
+    return null;
+  }
+}
+
 /* ── URETIM BASLAT ── */
 async function uretimBaslat(ev) {
   ev.preventDefault();
@@ -93,6 +141,20 @@ async function uretimBaslat(ev) {
   fd.append("edit", $("#akis-edit")?.value || "orta");
   fd.append("sure_dk", "1");
   fd.append("altyazi", "1");
+  // ⚠ FAZ UI-3: kaynak secimi BU ISTEGE EKLENMEZ — 22 alanlik sozlesme
+  // buyumez. Secim `POST /api/kaynak-tercihi` ile tenant'in saglayici
+  // kaydina yazilir ve `/api/generate` onu ORADAN okur.
+  // ⚠ FAIL-OPEN YASAK: yazma basarisizsa uretime DEVAM EDILMEZ. Devam
+  // etmek isi ESKI (kayitli) tercihle baslatirdi ve kullanicinin secimini
+  // SESSIZCE ihlal ederdi — "ucretsiz" secen kullanicinin kredisi
+  // yanabilirdi. Durus DETERMINISTIKTIR ve kodu GORUNURDUR.
+  const tercihSonuc = await kaynakTercihiYaz();
+  if (!tercihSonuc) {
+    yaz("UI3-KAYNAK-TERCIHI-YAZILAMADI — kaynak seçimin sunucuya "
+        + "yazılamadı, üretim BAŞLATILMADI (seçimin yok sayılmasın diye). "
+        + "Bağlantını kontrol edip tekrar dene.", true);
+    return;
+  }
 
   adimAktif("uretim");
   yaz("Üretim başlatılıyor…");
@@ -250,7 +312,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (!(await oturumKontrol())) return;
   adimAktif("metin");
   krediUyarisiGuncelle();
-  $("#akis-kaynak")?.addEventListener("change", krediUyarisiGuncelle);
+  $("#akis-kaynak")?.addEventListener("change", () => {
+    krediUyarisiGuncelle();      // aninda geri bildirim
+    kaynakTercihiYaz();          // sonra SUNUCUNUN gercek karari
+  });
   $("#akis-edit")?.addEventListener("change", () => adimAktif("stil"));
   $("#akis-kaynak")?.addEventListener("change", () => adimAktif("kaynak"));
   $("#akis-form")?.addEventListener("submit", uretimBaslat);

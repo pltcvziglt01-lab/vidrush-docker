@@ -10356,3 +10356,129 @@ Deploy → **8 uç 200, smoke PASS**, imaja basıldı.
 
 ⚠ **Kabul edilmiş video hâlâ YOK** — UI-2 arayüz hattını doğruladı, video
 kabulünü değiştirmedi.
+
+---
+
+## 77. FAZ UI-3 — KAYNAK TERCİHİ KABLOSU (UI-2 bulgusunun kapatılması, 14 Ağu)
+
+> **Durum: UI-2'nin ölçtüğü `UI2-KAYNAK-TERCIHI-SUNUCUYA-GITMIYOR` bulgusu
+> KAPANDI. `/api/generate` üst-seviye alan sayısı **TAM 22** kaldı.
+> A–I 4282/4282 + UI-2 74/74 + UI-3 51/51 = **4407, 0 hata**. Maliyet $0.00.**
+> Değişen üretim kodu: `webapp/server.py`, `webapp/static/js/ui1.js`.
+> Değişen ölçüm: `test_faz_i.py` (kural keskinleştirildi), `test_faz_ui2.py`,
+> `ui2_onkontrol.py`, `ui2_uzak_akis.mjs`; yeni `test_faz_ui3.py`.
+
+### Kapatılan kusur
+
+UI-2 gerçek tarayıcıda şunu ölçmüştü: arayüz "Ücretsiz stok → **Kredi
+harcanmaz**" diyor, ama seçim `/api/generate`e **hiç ulaşmıyor**; sağlayıcı
+kararı yalnızca tenant kaydından veriliyordu. Yani **uygulanamayan bir kredi
+vaadi** vardı: onaylı+kredili bağlantısı olan bir tenant "ücretsiz" seçse de
+kredisi yanabilirdi.
+
+### 22 alan sözleşmesi: BOZULMADI ve BÜYÜMEDİ
+
+⚠ İlk denemede `kaynak_tercihi` **23. üst-seviye alan** olarak eklenmişti.
+Bu **geri alındı**. Önce sözleşme testi yazıldı ve ihlali yakaladı:
+
+```
+⭐ /api/generate ust-seviye alan sayisi TAM 22   XX  fazla=['kaynak_tercihi']
+```
+
+Tercih artık `/api/generate`in **zaten okuduğu iç yapıya** — tenant'ın
+sağlayıcı kaydına (`veri/saglayicilar.json`) — yazılıyor; `saglayici_sec`
+onu zaten oradan okuyor. Yeni uçlar: `POST/GET /api/kaynak-tercihi`.
+
+```
+UI (#akis-kaynak) → POST /api/kaynak-tercihi → tenant kaydı{tercih}
+                  → /api/generate okur → saglayici_karari(tercih=)
+                  → saglayici_sec(tercih=) → iş damgası + cevap
+```
+
+**Geriye uyumluluk ölçüldü:** kayıtta tercih yokken karar `otomatik` —
+yani tercih kavramından **önceki davranışın tam aynısı**. Alanı hiç
+göndermeyen eski istemciler etkilenmez. `api.js`'in 22 alanı ve endpoint
+imzasındaki 22 isim **birebir** korunuyor (test küme eşitliğiyle kilitliyor).
+
+### Fail-closed: sessiz ihlal yok
+
+⚠ İlk kablolamada tercih yazımı başarısızken üretime **devam ediliyordu**.
+Bu **fail-open**tur: iş **eski (kayıtlı)** tercihle başlar ve kullanıcının
+seçimi **sessizce ihlal** edilir — "ücretsiz" seçenin kredisi yanabilir.
+Düzeltildi:
+
+* yazma başarısızsa `/api/generate` **hiç çağrılmaz**, akış `return` ile
+  kesilir (test kaynak sırasını da doğruluyor: kapı çağrıdan **önce**);
+* kullanıcı **stabil kodla** görür: `UI3-KAYNAK-TERCIHI-YAZILAMADI`;
+* uzak hat bunu **gerçek tarayıcıda** sınıyor: `/api/kaynak-tercihi`
+  500'e zorlanır → `generate` sayacı **değişmemeli** → `06-fail-closed`
+  ekran kanıtı. Kod: `UI2-TERCIH-YAZILAMADI-FAIL-OPEN`.
+* ⚠ Hata metnindeki "üretim kayıtlı tercihle başlar" ifadesi fail-closed
+  ile **çelişiyordu**; "üretim **BAŞLATILMADI**" olarak düzeltildi.
+
+### CSRF (double-submit) — mutasyon ucu korumalı
+
+`kimlik.py` zaten `csrf_uret/csrf_dogrula`, `vr_csrf`, `x-csrf-token`
+sağlıyordu ama yeni mutasyon ucu bunu **doğrulamıyordu**. Artık:
+
+```
+eksik başlık   -> 403 UI3-CSRF-GECERSIZ
+uyuşmaz başlık -> 403
+doğru başlık   -> 200
+geçersiz değer -> 400 (sessiz düşüş YOK: üretim yolundan farkı budur)
+kimliksiz      -> 401
+```
+
+`ui1.js` token'ı `vr_csrf` çerezinden okuyup `x-csrf-token` başlığında
+gönderiyor.
+
+**Değişmez kural keskinleştirildi:** "JS hiçbir çerez okumaz" → **"JS YETKİ
+çerezini okumaz"**. Double-submit, CSRF çerezinin JS'ten **okunabilir**
+olmasını zorunlu kılar. Kilit: `ui1.js` içinde `vr_oturum` **geçmez**,
+`document.cookie` erişimi **tek** ve yalnız CSRF içindir. ⚠ `test_faz_i.py`
+bu yüzden önce **kırmızıya döndü** — gerileme sinyali doğru çalıştı, kural
+gevşetilmedi, **daraltıldı**.
+
+### Yetki yükseltme yok
+
+Tercih ucu **yalnızca** `tercih` anahtarını yazar; `aktif/onayli/
+kredi_onayi/sifreli_token` alanlarına dokunmaz. Test bunu kanıtlıyor:
+tercih yazdıktan sonra `kullanilabilir_mi(kayit) is False` ve
+`set(kayit) <= {"tercih"}`. "magnific" yazmak "Magnific bağlı" **anlamına
+gelmez**: bağlantı kullanılamıyorsa cevap ücretsiz stoğa düşüldüğünü ve
+**nedenini** söyler. Hiçbir cevapta `token`/`baglanti` anahtarı yok.
+
+### Test izolasyonu (yanlış yeşil önlendi)
+
+⚠ `server.VERI` her zaman repo içindeki `webapp/veri`dir (`VIDRUSH_KOK` onu
+taşımaz). UI-3 testi ilk koşumda oraya gerçek `saglayicilar.json` yazdı ve
+**bir sonraki koşum** o dosyayı "eski davranış" sanıp yanlış yeşil verecekti
+— nitekim `otomatik` beklenen yerde `ucretsiz` görüldü. Test artık dosyayı
+**yedekleyip aynen geri koyuyor** (yoksa siliyor), iz bırakmıyor.
+
+### Ölçüm
+
+```
+a 125 · b 200 · c 152 · d 95 · e 127 · f 247 · g 219 · h 280 · i 2837
+  → A–I 4282/4282 (2 bloke, ikisi de UI-3 ÖNCESİNDEN var)
+ui2 74/74 · ui3 51/51            TOPLAM 4407 · BASARISIZ 0
+kuyruğa gerçek iş düşmedi · $0.00
+```
+
+### ⛔ AÇIK KUSUR (bilinçli, kapsam dışı)
+
+**`UI3-CSRF-KAPSAMI-EKSIK`** — CSRF doğrulaması **yalnız**
+`/api/kaynak-tercihi` ucundadır. `/api/generate`, `/api/profil`
+(POST/DELETE), `/api/cikis` hâlâ **doğrulamıyor**. `/api/generate`e eklemek
+başlığı göndermeyen **eski wizard istemcisini kırar**; bu yüzden ayrı bir
+atom gerektirir (istemci + uç birlikte taşınmalı). ⚠ Bu kusur **PASS
+sayılmadı** ve kapsam dışına **çıkarılmadı**.
+
+### ⏭ SIRADAKİ
+
+1. **Genel CSRF kapsamı**: kalan mutasyon uçları + eski wizard istemcisi
+   birlikte taşınsın (`UI3-CSRF-KAPSAMI-EKSIK`).
+2. **R-1d-j'nin 4 yapısal boşluğu** hâlâ açık — UI-3 bunlara dokunmadı.
+3. Object storage hâlâ yok; kanıt staging host diskinde.
+
+⚠ **Kabul edilmiş video hâlâ YOK.**
