@@ -371,6 +371,117 @@ document.getElementById('h').textContent=d.detail||('hata '+r.status);}};
 </script></html>"""
 
 
+# ═════════ FAZ UI-1 — TEK AKIS SAYFASI ═════════
+# ⚠ Mevcut arayuz (`static/index.html`, `wizard.js`) DOKUNULMADI. Bu AYRI
+# ve SADE bir akistir; `/ui/js/ui1.js` allowlist'ten servis edilir.
+# ⚠ Zorunlu oturum kapisi `/` ile AYNI: kimliksiz kullaniciya GIRIS formu.
+_AKIS_HTML = """<!doctype html><html lang="tr"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BEDOSAHO AI — Tek Akış</title>
+<style>
+:root{color-scheme:dark}
+body{background:#0f1115;color:#e8eaed;font:15px/1.5 system-ui,sans-serif;
+margin:0;padding:20px}
+main{max-width:760px;margin:0 auto}
+h1{font-size:19px;margin:0 0 4px}
+ol.adimlar{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;
+margin:12px 0 20px}
+ol.adimlar li{padding:6px 10px;border-radius:999px;background:#171a21;
+font-size:13px;color:#9aa3b2}
+ol.adimlar li[aria-current="step"]{background:#3b82f6;color:#fff}
+fieldset{border:1px solid #2c313c;border-radius:10px;margin:0 0 16px;
+padding:14px}
+legend{padding:0 6px;font-weight:600;font-size:14px}
+label{display:block;margin:10px 0 4px;font-size:14px}
+textarea,select{width:100%;box-sizing:border-box;padding:10px;
+border-radius:8px;border:1px solid #2c313c;background:#0f1115;color:#e8eaed}
+textarea{min-height:110px}
+button{margin-top:12px;padding:11px 16px;border:0;border-radius:8px;
+background:#3b82f6;color:#fff;font-weight:600;cursor:pointer;width:100%}
+#akis-ilerleme{height:10px;border-radius:999px;background:#2c313c;
+overflow:hidden;margin:8px 0}
+#akis-ilerleme::after{content:"";display:block;height:100%;
+width:var(--yuzde,0%);background:#3b82f6;transition:width .3s}
+[data-hata="1"]{color:#f87171}
+ul{padding-left:18px}
+small{color:#9aa3b2}
+@media(min-width:720px){body{padding:32px}h1{font-size:22px}}
+</style>
+<main>
+<h1>Tek akış</h1>
+<p id="akis-tenant"><small>Hesap yükleniyor…</small></p>
+<ol class="adimlar">
+  <li data-adim="metin">1 Metin</li><li data-adim="stil">2 Stil</li>
+  <li data-adim="kaynak">3 Kaynak</li><li data-adim="uretim">4 Üretim</li>
+  <li data-adim="kalite">5 Kalite</li><li data-adim="indirme">6 İndirme</li>
+</ol>
+
+<form id="akis-form">
+  <fieldset><legend>Metin</legend>
+    <label for="akis-metin">Anlatılacak metin (en az 20 karakter)</label>
+    <textarea id="akis-metin" name="story" required minlength="20"
+      aria-describedby="akis-metin-not"></textarea>
+    <small id="akis-metin-not">Bu metinden plan, seslendirme ve görseller
+      türetilir.</small>
+  </fieldset>
+
+  <fieldset><legend>Stil</legend>
+    <label for="akis-edit">Kurgu yoğunluğu</label>
+    <select id="akis-edit" name="edit">
+      <option value="az">Az — sakin, uzun çekimler</option>
+      <option value="orta" selected>Orta — dengeli</option>
+      <option value="yuksek">Yüksek — hızlı kesme</option>
+    </select>
+  </fieldset>
+
+  <fieldset><legend>Kaynak</legend>
+    <label for="akis-kaynak">Medya kaynağı</label>
+    <select id="akis-kaynak" name="kaynak_tercihi">
+      <option value="otomatik" selected>Otomatik</option>
+      <option value="magnific">Magnific (onaylı bağlantı gerekir)</option>
+      <option value="ucretsiz">Ücretsiz stok</option>
+    </select>
+    <p id="akis-kredi" aria-live="polite"><small>…</small></p>
+  </fieldset>
+
+  <button type="submit">Üretimi başlat</button>
+</form>
+
+<fieldset><legend>Üretim</legend>
+  <p id="akis-durum" aria-live="polite">Hazir.</p>
+  <div id="akis-ilerleme" role="progressbar" aria-valuemin="0"
+       aria-valuemax="100" aria-valuenow="0"
+       aria-label="Üretim ilerlemesi"></div>
+  <p id="akis-ilerleme-metin"><small>—</small></p>
+  <p id="akis-saglayici" aria-live="polite"><small>Sağlayıcı: —</small></p>
+  <p id="akis-provenans"><small>Provenance: —</small></p>
+</fieldset>
+
+<fieldset><legend>Kalite</legend>
+  <p id="akis-kalite" aria-live="polite">Henüz ölçülmedi.</p>
+</fieldset>
+
+<fieldset><legend>İndirme</legend>
+  <p id="akis-indirme">—</p>
+</fieldset>
+
+<fieldset><legend>Son 3 kabul edilmiş video</legend>
+  <ul id="akis-kutuphane" aria-label="Son üç kabul edilmiş video"></ul>
+</fieldset>
+</main>
+<script type="module" src="/ui/js/ui1.js"></script>
+</html>"""
+
+
+@app.get("/akis", response_class=HTMLResponse)
+def akis_sayfasi(istek: Request):
+    """⚠ Kimliksiz kullaniciya GIRIS formu (`/` ile AYNI kapi)."""
+    if ZORUNLU_OTURUM and not teslim.oturum_kapisi(
+            _oturum_jetonu(istek))["izin"]:
+        return _GIRIS_HTML
+    return _AKIS_HTML
+
+
 @app.get("/", response_class=HTMLResponse)
 def anasayfa(istek: Request):
     # ⚠ Zorunlu oturum acikken girisi olmayan kullaniciya uygulama DEGIL

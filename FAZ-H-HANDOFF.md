@@ -10119,3 +10119,65 @@ ducking zarfı) ve rumble/hiss eşiği **ölçülerek kalibre edilsin**; ya da
 (b) teslim sözleşmesi bu dördünü **kapsam dışı** ilan etsin — ama bu, o
 kriterlerden **vazgeçmek** demektir ve **kullanıcı kararıdır**.
 ⚠ Eşik uydurmak ya da "ölçülemedi"yi PASS saymak **yanlış** olur.
+
+---
+
+## 74. FAZ UI-1 — TEK AKIŞ (14 Ağu)
+
+> **Durum: sade tek akış gerçek staging uçlarına bağlandı. A–I yeşil.
+> Mac'te medya/kare/QA/screenshot artefaktı ÜRETİLMEDİ. $0.00.**
+> Değişen: yeni `webapp/static/js/ui1.js`, `webapp/server.py` (`/akis`
+> rotası + sayfa), `webapp/testler/test_faz_i.py`.
+> ⚠ **Mevcut arayüz DOKUNULMADI** (`index.html`, `wizard.js`, `api.js`).
+
+### Akış: Metin → Stil → Kaynak → Üretim → Kalite → İndirme
+
+**CSS-only değil** — her adım gerçek uca bağlı:
+`/api/oturum` · `/api/generate` · `/api/job/{id}` (5 sn poll) ·
+`/api/kutuphane`.
+
+| bileşen | durum |
+|---|---|
+| edit segmenti | **az / orta / yüksek** (işlevsel `select`) |
+| kaynak seçimi | **Otomatik / Magnific / Ücretsiz** — R-1b `TERCIHLER` ile **aynı küme** (test kilitliyor) |
+| kredi onayı görünürlüğü | seçime göre canlı metin + `data-kredi_onayi`; `/api/generate` cevabındaki **gerçek** `saglayici` + `fallback` yazılır |
+| iş ilerlemesi | `role="progressbar"`, `aria-valuenow`, aşama adı |
+| QA sonucu | `kalite` + **`teslim_ok`** (KABUL / KABUL EDİLMEDİ + neden) |
+| provenance/maliyet | `provider_used` · atıf sayısı · araştırma USD (yoksa **"ölçülmedi"**) |
+| son-3 | süre · QA durumu · sağlayıcı · **kredi harcandı/harcanmadı** + imzalı indirme |
+
+### Güvenlik ve sözleşme
+
+⚠ **22 alan sözleşmesi DEĞİŞMEDİ** — akış onun bir **alt kümesini**
+gönderir, yeni alan **eklemez** (test kilitliyor).
+⚠ `/akis` **kimliksiz açılmıyor**: `/` ile **aynı** zorunlu oturum kapısı,
+kimliksize **giriş formu**.
+⚠ **Token istemciye çıkmıyor**: `ui1.js` `sifreli_token`/`parola_hash`/
+anahtar **okumaz**; oturum çerezi **HttpOnly** ve JS'ten **hiç okunmaz**.
+⚠ İndirme **her zaman** sunucudan gelen **signed `video_url`**; ham
+`ciktilar/...` yolu istemcide **kurulmaz**.
+
+### Erişilebilirlik
+
+Her form alanı `<label for=…>` ile bağlı (3 alan = 3 etiket) ·
+`<fieldset>/<legend>` grupları · `aria-live` durum bölgeleri ·
+`role="progressbar"` + `aria-valuenow`/`aria-valuetext` ·
+`aria-current="step"` adım göstergesi · mobil-önce CSS + `@media(min-width:720px)`
+masaüstü uyarlaması.
+
+### Red-first + gerileme
+
+Testler **üretim kodundan önce** yazıldı; `ui1.js` yokken
+`FileNotFoundError` ile kırmızı. ⚠ **Faz F Türkçe tipografi kilidi**
+kullanıcıya görünen ASCII metinleri (`Uretim`, `alinamadi`, `kimligi`)
+yakaladı — hepsi düzgün Türkçeye çevrildi (kilit **doğru çalıştı**).
+
+**A–I 4240 → 4282, 0 hata.**
+
+### ⛔ AÇIK KALAN (UI-1 kapsamı dışı, bilinçli)
+
+* Masaüstü/mobil **görsel kanıt** yalnız staging üzerinden alınmalı;
+  bu turda **screenshot alınmadı** (Mac'e artefakt yasağı).
+* R-1d-j'nin **4 yapısal ölçüm boşluğu** (rumble/hiss kalibrasyonu,
+  B-roll çekim türü, ducking zarfı) **PASS sayılmadı** ve **kapsam dışına
+  çıkarılmadı** — hâlâ açık.

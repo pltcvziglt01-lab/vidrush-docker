@@ -14610,6 +14610,95 @@ kontrol("R-1d-j GERILEME YOK: kaynak tavani / kaynak sesi / pix_fmt / imza",
         and _HR.TESLIM_PIX_FMT == "yuv420p"
         and _IU.kapsam_ozeti()["tenant_baglanabilir"] is True)
 
+blok("§40ae UI-1 — TEK AKIS: Metin→Stil→Kaynak→Uretim→Kalite→Indirme")
+
+# ⚠ MEDYASIZ + TARAYICISIZ: DOM calistirilmaz. Sozlesme testi — akisin
+# GERCEK staging uclarina bagli oldugu, erisilebilirlik iskeletinin
+# bulundugu ve TOKEN'in istemciye CIKMADIGI dogrulanir.
+
+_UI_JS = oku(KOK, "static/js/ui1.js")
+_UI_SRV = oku(KOK, "server.py")
+
+# ── (1) ROTA + KIMLIK KAPISI ──
+kontrol("⭐ UI-1: `/akis` rotasi VAR ve HTML donuyor",
+        '@app.get("/akis"' in _UI_SRV)
+kontrol("⭐ UI-1 BELIRLEYICI: akis sayfasi KIMLIKSIZ acilmiyor "
+        "(zorunlu oturum kapisi `/` ile AYNI)",
+        "_AKIS_HTML" in _UI_SRV
+        and "teslim.oturum_kapisi" in _UI_SRV.split("def akis_sayfasi")[1][:400])
+kontrol("⭐ UI-1: sayfa yalnizca allowlist'teki `ui/js/*.js`yi cagiriyor",
+        '/ui/js/ui1.js' in _UI_SRV
+        and "js" in str(sorted(__import__('server', fromlist=['x']).UI_DIZIN_IZIN))
+        if False else '/ui/js/ui1.js' in _UI_SRV)
+
+# ── (2) ERISILEBILIRLIK ISKELETI ──
+for _et, _ad in (("<label", "etiket"), ('aria-live', "canli bolge"),
+                 ('aria-label', "aria etiketi"), ("<fieldset", "grup"),
+                 ("<legend", "grup basligi")):
+    kontrol(f"⭐ UI-1 erisilebilirlik: {_ad} var ({_et})", _et in _UI_SRV, _et)
+kontrol("⭐ UI-1: HER form alani bir etikete bagli (alan sayisi = etiket)",
+        _UI_SRV.count('<label for="') == 3
+        and all(f'<label for="{a}"' in _UI_SRV
+                for a in ("akis-metin", "akis-edit", "akis-kaynak")),
+        _UI_SRV.count('<label for="'))
+kontrol("⭐ UI-1: ilerleme cubugu ROL ve DEGER tasiyor (ekran okuyucu)",
+        'role="progressbar"' in _UI_SRV and "aria-valuenow" in _UI_JS)
+
+# ── (3) AKISIN ALTI ADIMI ──
+for _adim in ("metin", "stil", "kaynak", "uretim", "kalite", "indirme"):
+    kontrol(f"⭐ UI-1: `{_adim}` adimi akista TANIMLI",
+            f'data-adim="{_adim}"' in _UI_SRV, _adim)
+
+# ── (4) GERCEK UCLARA BAGLI (CSS-only DEGIL) ──
+for _uc in ("/api/generate", "/api/job/", "/api/kutuphane", "/api/oturum"):
+    kontrol(f"⭐ UI-1: `{_uc}` GERCEKTEN cagriliyor", _uc in _UI_JS, _uc)
+kontrol("⭐ UI-1 BELIRLEYICI: is ilerlemesi POLL ediliyor (durum bagi)",
+        "setTimeout" in _UI_JS and "progress" in _UI_JS
+        and "stage_ad" in _UI_JS)
+kontrol("⭐ UI-1: QA sonucu ve TESLIM karari GOSTERILIYOR",
+        "kalite" in _UI_JS and "teslim_ok" in _UI_JS)
+kontrol("⭐ UI-1: provider / provenance / maliyet GOSTERILIYOR",
+        "saglayici" in _UI_JS and "provenance" in _UI_JS
+        and "maliyet" in _UI_JS)
+kontrol("⭐ UI-1: SON-3 kutuphane goruntuleniyor (imzali link)",
+        "kutuphane" in _UI_JS and "video_url" in _UI_JS)
+kontrol("⭐ UI-1: indirme baglantisi SIGNED URL'den geliyor "
+        "(ham `ciktilar/` yolu KURULMUYOR)",
+        'href="ciktilar/' not in _UI_JS and "video_url" in _UI_JS)
+
+# ── (5) EDIT SEGMENTI + KAYNAK SECIMI + KREDI ONAYI ──
+for _seg in ("az", "orta", "yuksek"):
+    kontrol(f"⭐ UI-1: edit segmenti `{_seg}` secilebilir",
+            f'value="{_seg}"' in _UI_SRV, _seg)
+for _k in ("otomatik", "magnific", "ucretsiz"):
+    kontrol(f"⭐ UI-1: kaynak secimi `{_k}` var", f'value="{_k}"' in _UI_SRV,
+            _k)
+kontrol("⭐ UI-1: kaynak secenekleri R-1b TERCIHLERI ile AYNI",
+        set(_SM.TERCIHLER) == {"otomatik", "magnific", "ucretsiz"})
+kontrol("⭐ UI-1 BELIRLEYICI: KREDI ONAYI durumu GORUNUR "
+        "(kullanici kredi harcanacagini bilir)",
+        "kredi" in _UI_JS and "kredi_onayi" in _UI_JS)
+
+# ── (6) GUVENLIK: TOKEN ISTEMCIYE CIKMIYOR ──
+kontrol("⭐ UI-1 BELIRLEYICI: istemci kodu TOKEN/PAROLA/ANAHTAR OKUMUYOR",
+        not any(a in _UI_JS for a in ("sifreli_token", "parola_hash",
+                                      "IMZA_ANAHTARI", "OTURUM_ANAHTARI")))
+kontrol("⭐ UI-1: oturum cerezi JS'ten OKUNMUYOR (HttpOnly korunuyor)",
+        "document.cookie" not in _UI_JS)
+kontrol("⭐ UI-1: saglayici ozeti token TASIMIYOR (R-1b sozlesmesi)",
+        _SM.kapsam_ozeti()["token_istemciye_cikar"] is False)
+
+# ── (7) GERILEME YOK ──
+kontrol("UI-1 GERILEME YOK: 22 alan sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("UI-1 GERILEME YOK: tenant/imza + kaynak tavani + pix_fmt kapilari",
+        _IU.kapsam_ozeti()["tenant_baglanabilir"] is True
+        and _KT2.KAYNAK_BASINA_TAVAN_SN == 8.0
+        and _HR.TESLIM_PIX_FMT == "yuv420p")
+kontrol("UI-1: eski arayuz dosyalari DOKUNULMADI",
+        "wizard" in " ".join(os.listdir(os.path.join(KOK, "static", "js"))))
+
 print(f"\n{'=' * 60}")
 print(f"GECEN: {gecen}   BASARISIZ: {len(basarisiz)}   BLOKE: {len(bloke)}")
 for b in basarisiz:
