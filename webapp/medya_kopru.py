@@ -530,6 +530,82 @@ def sahne_medyasi(*, sorgu: str, hedef_yol: str, sahne_amaci: str = "",
                 "tum adaylar denendi; son sebep yukarida", scene_id)]}
 
 
+def stok_secimi_kaydet(butce, *, hedef_yol: str, scene_id: str,
+                       provenans: dict, fact_id: str = "",
+                       sahne_amaci: str = "", sorgu: str = "") -> dict:
+    """FAZ R-1d-b — `kaynak.py`nin GERCEK medya yolundan gelen secimi
+    avci butcesine YAZ (kopru).
+
+    ⚠ NEDEN VAR (R-1d-a staging olcumu): uretimde medya `kaynak.py` ->
+    Pexels/Pixabay/Coverr/Freepik yolundan geliyor, avci ise cogu sahnede
+    aday veremiyor. `manifest_kur()` YALNIZCA `butce.secimler()`e baktigi
+    icin manifest BOS kaliyor, `edit_kopru.plan_kur()` denenmiyor ve
+    PRE-QA HIC KOSMUYOR (`edit_plani=MEDYA-YOK`). Sonucta teslim zinciri
+    `pre_qa` halkasini kanitsiz gorup videoyu REDDEDIYOR.
+
+    ⚠ FAIL-CLOSED — asagidakilerden BIRI eksikse kayit YAPILMAZ ve NEDEN
+    doner ("herhalde lisanslidir" DENMEZ):
+      · provenans kaydi yok (saglayici bilinmiyor)
+      · lisans kimligi yok
+      · kare kapisi dogrulamasi YAPILMAMIS
+      · dosya diskte yok
+    ⚠ Bu fonksiyon AG ACMAZ, MEDYA INDIRMEZ, dosya DEGISTIRMEZ.
+    ⚠ `render_kullanilabilir` yalnizca ucu de saglandiginda True yazilir —
+    `manifest_kur` zaten bu bayragi bir kez daha dogruluyor.
+    """
+    p = provenans if isinstance(provenans, dict) else {}
+    eksik = []
+    if not str(p.get("saglayici") or "").strip():
+        eksik.append("SAGLAYICI-YOK")
+    if not str(p.get("lisans") or "").strip():
+        eksik.append("LISANS-YOK")
+    if p.get("kare_dogrulandi") is not True:
+        eksik.append("KARE-DOGRULANMADI")
+    if not (hedef_yol and os.path.exists(hedef_yol)):
+        eksik.append("DOSYA-YOK")
+    if eksik:
+        return {"kaydedildi": False, "neden": "+".join(eksik)}
+
+    kayit = {
+        "scene_id": str(scene_id or ""),
+        "fact_id": str(fact_id or ""),
+        "asset_id": str(p.get("asset_id") or ""),
+        "saglayici": str(p.get("saglayici") or ""),
+        "lisans": str(p.get("lisans") or ""),
+        "orijinal_url": str(p.get("orijinal_url") or ""),
+        # ⚠ Stok lisanslari eser sahibi adini GARANTI ETMIYOR; bilinmiyorsa
+        # BOS kalir, UYDURULMAZ.
+        "eser_sahibi": str(p.get("eser_sahibi") or ""),
+        # ⚠ ATIF METNI UYDURULMAZ. Bu lisanslar atif ZORUNLU KILMIYOR;
+        # `atif_gerekli=False` ve atif metni BOS birakilir. (CC/YouTube yolu
+        # atfini `kaynak.atif_al()` uzerinden AYRICA tasimaya devam eder.)
+        "atif_metni": "",
+        "atif_gerekli": False,
+        "sorgu": str(sorgu or p.get("sorgu") or ""),
+        "medya_yolu": hedef_yol,
+        # ⚠ `editor.plan` medya yolunu `yerel_yol`dan OKUR (plan.py:203).
+        "yerel_yol": hedef_yol,
+        "medya_turu": str(p.get("medya_turu") or "video"),
+        "tur": str(p.get("medya_turu") or "video"),
+        "sahne_amaci": str(sahne_amaci or ""),
+        "baslik": str(p.get("baslik") or ""),
+        "genislik": int(p.get("genislik") or 0),
+        "yukseklik": int(p.get("yukseklik") or 0),
+        "sure_sn": float(p.get("sure_sn") or 0.0),
+        "toplam_skor": 0,
+        # ⚠ Lisans kimligi VAR ve kare kapisi GECILDI (yukarida dogrulandi).
+        "render_kullanilabilir": True,
+        # ⚠ Bu secimin AVCI zincirinden DEGIL, gercek medya yolundan
+        # geldigi GORUNUR kalir — koken gizlenmez.
+        "koken": "kaynak.py",
+    }
+    try:
+        butce.secildi(kayit)
+    except Exception as e:                                   # noqa: BLE001
+        return {"kaydedildi": False, "neden": f"BUTCE-HATASI:{type(e).__name__}"}
+    return {"kaydedildi": True, "neden": "", "kayit": kayit}
+
+
 def manifest_kur(butce, *, kapsam_bosluklari=None) -> dict:
     """Is butcesindeki SECIMLERI `editor.plan` medya manifestine cevir (I-10).
 

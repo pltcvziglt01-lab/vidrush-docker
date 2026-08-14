@@ -416,6 +416,58 @@ def _tekrara_izin_var():
 # yapmaz — Content ID yine talep acar. Bu yuzden youtube_sahne CC disina CIKMAZ.
 _ATIFLAR = {}                # {hedef_dosya_yolu: {"kanal":..,"baslik":..,"url":..,"lisans":..}}
 
+# ⚠ FAZ R-1d-b — STOK PROVENANSI.
+# OLCULEN KUSUR: `_ATIFLAR` YALNIZCA YouTube/CC yolunda doluyordu; Pexels /
+# Pixabay / Coverr / Freepik kabul noktalarinda HICBIR kayit tutulmuyordu.
+# Bu yuzden gercek medya yolu (`footage_getir`) ile calisan bir isin
+# saglayici / asset / lisans / olcu bilgisi HICBIR YERDE yoktu ve
+# `medya_kopru.manifest_kur()` bu sahneleri GORMUYORDU -> PRE-QA hic
+# kosmuyordu (R-1d-a staging olcumu: `edit_plani=MEDYA-YOK`).
+# ⚠ Bu kayit ATIF DEGILDIR: `atif_listesi()` semantigi (ekran kunyesi +
+# aciklama atfi) DEGISMEDI. Burasi yalnizca PROVENANS/QA icin.
+_STOK_PROVENANS = {}         # {hedef_dosya_yolu: {...}}
+
+# Stok saglayicilarin lisans KIMLIKLERI. ⚠ Lisans METNI burada YORUMLANMAZ;
+# yalnizca hangi lisans altinda alindigi KAYDEDILIR.
+STOK_LISANSLARI = {
+    "pexels": "pexels-license",
+    "pixabay": "pixabay-content-license",
+    "coverr": "coverr-license",
+    "freepik": "freepik-license",
+}
+
+
+def stok_provenans_kaydet(hedef: str, *, saglayici: str, asset_id: str,
+                          url: str = "", baslik: str = "", sorgu: str = "",
+                          genislik: int = 0, yukseklik: int = 0,
+                          sure_sn: float = 0.0,
+                          kare_dogrulandi: bool = False) -> None:
+    """Kabul edilmis stok klibin GERCEK provenansini kaydet.
+
+    ⚠ YALNIZCA kare kapisindan GECMIS klip icin cagrilir; `kare_dogrulandi`
+    bayragi UYDURULMAZ, cagiran taraf gercekten dogruladiysa True verir.
+    """
+    with _KULLANILAN_KILIT:
+        _STOK_PROVENANS[os.path.abspath(hedef)] = {
+            "saglayici": str(saglayici or ""),
+            "asset_id": str(asset_id or ""),
+            "orijinal_url": str(url or ""),
+            "baslik": str(baslik or "")[:120],
+            "sorgu": str(sorgu or "")[:120],
+            "lisans": STOK_LISANSLARI.get(str(saglayici or ""), ""),
+            "genislik": int(genislik or 0),
+            "yukseklik": int(yukseklik or 0),
+            "sure_sn": float(sure_sn or 0.0),
+            "kare_dogrulandi": bool(kare_dogrulandi),
+            "medya_turu": "video",
+        }
+
+
+def stok_provenans_al(hedef: str) -> dict:
+    """Kayit yoksa BOS doner — cagiran taraf 'lisansli' VARSAYMAZ."""
+    with _KULLANILAN_KILIT:
+        return dict(_STOK_PROVENANS.get(os.path.abspath(hedef)) or {})
+
 
 def klip_gecmisi_sifirla():
     """Yeni is baslarken cagrilir — onceki videonun klip gecmisi tasinmasin."""
@@ -426,6 +478,7 @@ def klip_gecmisi_sifirla():
     with _KULLANILAN_KILIT:
         _KULLANILAN.clear()
         _ATIFLAR.clear()
+        _STOK_PROVENANS.clear()
     # Faz H: biyom kapisinin is-basina durumu da sifirlanir
     _KAPI_REDLERI.clear()
     # Faz I-1: kare kapisinin butcesi/onbellegi de is basina sifirlanir.
@@ -481,6 +534,7 @@ def _kapi_gecti_mi(bilgi: dict, sorgu: str, saglayici: str = "") -> bool:
     with _KULLANILAN_KILIT:
         _KULLANILAN.clear()
         _ATIFLAR.clear()
+        _STOK_PROVENANS.clear()
 
 
 def _klip_kullanildi_mi(kimlik: str) -> bool:
@@ -1192,6 +1246,13 @@ def coverr_video(sorgu: str, hedef: str) -> bool:
                     except Exception:
                         pass
                     continue
+                stok_provenans_kaydet(
+                    hedef, saglayici="coverr",
+                    asset_id=str(h.get("id") or ""), url=_coverr_mp4(h),
+                    baslik=str(h.get("title") or ""), sorgu=q,
+                    genislik=int(h.get("max_width") or 0),
+                    yukseklik=int(h.get("max_height") or 0),
+                    kare_dogrulandi=True)
                 print(f"  coverr OK [{q}]: {str(h.get('title'))[:40]} "
                       f"({h.get('max_width')}x{h.get('max_height')})", file=sys.stderr)
                 return True
@@ -1301,6 +1362,15 @@ def pexels_video(sorgu: str, hedef: str) -> bool:
                             pass
                         continue
                     _klip_isaretle(v.get("id"))
+                    # ⚠ FAZ R-1d-b: kare kapisi GECILDI -> provenans KAYDA GECER.
+                    stok_provenans_kaydet(
+                        hedef, saglayici="pexels", asset_id=str(v.get("id")),
+                        url=str(v.get("url") or ""),
+                        baslik=_slug_kelimeleri(v.get("url")), sorgu=q,
+                        genislik=int(f.get("width") or 0),
+                        yukseklik=int(f.get("height") or 0),
+                        sure_sn=float(v.get("duration") or 0),
+                        kare_dogrulandi=True)
                     print(f"  pexels OK [{q}/{boyut}]: {_slug_kelimeleri(v.get('url'))[:44]} "
                           f"({f.get('width')}x{f.get('height')})", file=sys.stderr)
                     return True
@@ -1364,6 +1434,11 @@ def pixabay_video(sorgu: str, hedef: str) -> bool:
                     except Exception:
                         pass
                     continue
+                stok_provenans_kaydet(
+                    hedef, saglayici="pixabay", asset_id=str(url), url=str(url),
+                    baslik=str(etiket or ""), sorgu=q,
+                    genislik=int(w or 0), yukseklik=int(h or 0),
+                    kare_dogrulandi=True)
                 print(f"  pixabay OK [{q}]: {etiket[:44]} ({w}x{h})", file=sys.stderr)
                 return True
     print(f"  pixabay: uygun klip yok ({sorgu[:44]})", file=sys.stderr)
@@ -1433,6 +1508,9 @@ def freepik_video(sorgu: str, hedef: str) -> bool:
                         except Exception:
                             pass
                         continue
+                    stok_provenans_kaydet(
+                        hedef, saglayici="freepik", asset_id=str(vid),
+                        url=str(url), sorgu=sorgu, kare_dogrulandi=True)
                     return True
             else:
                 return False       # aramada sonuc vardi ama hicbiri inmedi: anahtar sorunu degil

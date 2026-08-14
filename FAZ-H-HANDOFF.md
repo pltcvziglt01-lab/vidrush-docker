@@ -8883,3 +8883,71 @@ somut ölçümüdür. ⚠ **Eşik gevşetilmedi**: `pre_qa` halkasını zincirde
 2. **`pix_fmt` yuv420p**: render/mux çıktısı yuv444p veriyor.
 3. **HTTPS**: `COOKIE_SECURE=1`e dönebilmek için.
 4. **Silme kuyruğu işlenmiyor** (R-1c-b'den devrediyor).
+
+---
+
+## 65. FAZ R-1d-b — GERÇEK MEDYA YOLU AVCI BÜTÇESİNE BAĞLANDI (köprü, 14 Ağu)
+
+> **Durum: R-1d-a'nın TEK SOMUT BLOKAJI kapatıldı. A–I yeşil.
+> Mac'te medya ÜRETİLMEDİ. $0.00.**
+> Değişen: `webapp/kaynak.py` (provenans kaydı + 4 kabul noktası),
+> `webapp/medya_kopru.py` (`stok_secimi_kaydet` köprüsü),
+> `webapp/pipeline.py` (**iki iç yardımcı + 4 çağrı**),
+> `webapp/testler/test_faz_i.py`.
+> `server.py`, `teslim.py`, `kimlik.py`, `kutuphane.py`, `imzali_url.py`,
+> `editor/*`, `hizli_render.py`, `deploy.sh`, `Video.tsx` ve **22 alan
+> sözleşmesi DOKUNULMADI**. Kuyruk/render/storage mimarisi **yeniden
+> yazılmadı**.
+
+### ⛔ Ölçülen kusur (R-1d-a staging pilotundan)
+
+Üretimde medya `kaynak.py` → Pexels/Pixabay/Coverr/Freepik yolundan geliyor.
+Ama:
+
+1. **Stok sağlayıcıların hiçbiri provenans kaydetmiyordu.** `_ATIFLAR`
+   YALNIZCA YouTube/CC yolunda doluyordu — bu yüzden pilotta `atiflar: []`.
+   Sağlayıcı / asset / lisans / ölçü bilgisi **hiçbir yerde yoktu**.
+2. **Seçim avcı bütçesine hiç yazılmıyordu.** `manifest_kur()` yalnızca
+   `butce.secimler()`e bakar → manifest **boş** → `edit_kopru.plan_kur()`
+   denenmiyor → **PRE-QA hiç koşmuyor** (`edit_plani = MEDYA-YOK`) →
+   teslim zinciri `pre_qa` halkasını kanıtsız görüp videoyu **reddediyor**.
+3. **Kapsam boşluğu YANLIŞ yazılıyordu**: avcı aday veremeyince hemen
+   `bosluk_ekle` çağrılıyordu, oysa gerçek yol hemen ardından **lisanslı +
+   kare doğrulanmış** bir klip getirebiliyordu.
+
+### Düzeltme — en ince köprü
+
+**`kaynak.py`**: `_STOK_PROVENANS` (atıftan **AYRI** — `atif_listesi()`
+semantiği değişmedi) + `stok_provenans_kaydet/al`. Dört sağlayıcının da
+**kare kapısını geçtikten SONRAKİ** kabul noktasına tek çağrı. Lisans
+kimlikleri `STOK_LISANSLARI`'nda; lisans metni **yorumlanmıyor**, yalnızca
+hangi lisans altında alındığı **kaydediliyor**.
+
+**`medya_kopru.stok_secimi_kaydet()`**: provenansı `editor.plan`'ın beklediği
+seçim kaydına çevirir. ⚠ **FAIL-CLOSED** — şu dördünden biri eksikse **kayıt
+YAPILMAZ** ve neden kapsam boşluğu olarak yazılır: sağlayıcı yok · lisans
+kimliği yok · **kare doğrulanmamış** · dosya diskte yok. `render_kullanilabilir`
+yalnızca üçü de sağlandığında `True`. Seçimin `koken: "kaynak.py"` alanı
+kökeni **gizlemez** (avcı zincirinden gelmiş gibi gösterilmez).
+
+⚠ **ATIF UYDURULMUYOR**: bu stok lisansları atfı zorunlu kılmıyor →
+`atif_metni: ""`, `atif_gerekli: False`, `eser_sahibi: ""`. CC/YouTube yolu
+atfını `kaynak.atif_al()` üzerinden **aynen taşımaya devam ediyor**.
+
+**`pipeline.py`**: `_sahne_medya()` içine iki küçük yardımcı — `_kopru_yaz()`
+(footage başarısının **4 çıkışında** çağrılır) ve `_bosluk_yaz()`. Kapsam
+boşluğu artık **footage yolundan çıkarken** (AI görsele düşerken) yazılıyor.
+
+### Red-first — ölçüldü
+
+| geri alınan | sonuç |
+|---|---|
+| köprünün tamamı | `AttributeError: module 'kaynak' has no attribute 'STOK_LISANSLARI'` — **API yoktu** |
+| yalnız `pipeline.py` | **3 kontrol kırmızı** (köprü çağrısı yok, boşluk hâlâ erken yazılıyor, yedek yollar köprüsüz) |
+
+⚠ **Gevşetilen eşik YOK.** Bir mevcut test düzeltildi ve **gerekçesi
+yazıldı**: "iş başında bütçe sıfırlanıyor" kontrolü `def
+klip_gecmisi_sifirla`'dan sonraki **sabit 600 karakteri** tarıyordu; tek satır
+eklenince `kare_butce_kur()` **605.** karaktere kaydı ve kod DOĞRUYKEN test
+kırmızı yandı. İddia "ilk 600 karakterde" değil "**bu fonksiyonun
+gövdesinde**" — kapsam bir sonraki üst düzey `def`e kadar genişletildi.

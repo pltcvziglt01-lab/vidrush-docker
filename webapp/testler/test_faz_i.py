@@ -392,8 +392,14 @@ kontrol("eski _vision_yer_uygun cagri noktalari kaldirildi (tek giris)",
         str(ks.count("_vision_yer_uygun(")))
 kontrol("kapi uygulanamayinca ESKI katmana dusuluyor (gerileme yok)",
         'kod in ("BEKLENTI-YOK", "BUTCE", "OKUMA-HATASI", "OKUYUCU-YOK")' in ks)
+# ⚠ FAZ R-1d-b: pencere SABIT 600 KARAKTERDI ve fonksiyona tek satir
+# eklenince (`_STOK_PROVENANS.clear()`) `kare_butce_kur()` 605. karaktere
+# kayip test KIRMIZI yandi — kod DOGRUYKEN. Iddia "ilk 600 karakterde"
+# degil "BU FONKSIYONUN GOVDESINDE"; kapsam artik bir sonraki ust duzey
+# `def`e kadar. Iddia GEVSETILMEDI, DOGRU kapsama alindi.
 kontrol("is basinda butce sifirlaniyor",
-        "kare_butce_kur()" in ks.split("def klip_gecmisi_sifirla")[1][:600])
+        "kare_butce_kur()" in
+        ks.split("def klip_gecmisi_sifirla")[1].split("\ndef ")[0])
 kontrol("kare durumu KILITLI (paralel thread)",
         "_KARE_KILIT" in ks and "with _KARE_KILIT:" in ks)
 kontrol("reddedilen klip diskten siliniyor",
@@ -8804,6 +8810,153 @@ kontrol("R-1d-a GERILEME YOK: 22 alan sozlesmesi + R-1a/R-1b/R-1c kapilari",
 kontrol("R-1d-a GERILEME YOK: pipeline/render/deploy hatti DOKUNULMADI",
         "docker commit" in oku(_DEPO_KOK, "deploy.sh")
         and "def uret(" in oku(KOK, "pipeline.py"))
+
+
+blok("§40v R-1d-b — GERCEK MEDYA YOLU AVCI BUTCESINE BAGLANDI (kopru)")
+
+# ⚠ MEDYASIZ + AGSIZ + PARASIZ: hicbir klip indirilmez, hicbir saglayiciya
+# baglanilmaz. Kopru KARAR MANTIGI olarak test edilir; dosya varligi gereken
+# yerde BOS bir gecici dosya kullanilir (medya DEGIL).
+#
+# ── OLCULEN KUSUR (R-1d-a staging, 14 Agu) ──
+# Uretimde medya `kaynak.py` -> Pexels yolundan geliyordu ama secim avci
+# butcesine HIC yazilmiyordu. `manifest_kur()` YALNIZCA `butce.secimler()`e
+# baktigi icin manifest BOS kaliyor, `edit_kopru.plan_kur()` denenmiyor ve
+# PRE-QA HIC KOSMUYORDU (`edit_plani = MEDYA-YOK`). Sonucta teslim zinciri
+# `pre_qa` halkasini kanitsiz gorup videoyu REDDEDIYORDU.
+
+_MK = __import__("medya_kopru")
+_KY = __import__("kaynak")
+_RB_DIZ = tempfile.mkdtemp(prefix="kopru_")
+_RB_DOSYA = os.path.join(_RB_DIZ, "sahne_1.mp4")
+with open(_RB_DOSYA, "wb") as _f:
+    _f.write(b"0" * 64)                      # ⚠ MEDYA DEGIL, yalniz dosya varligi
+
+
+def _rb_prov(**ek):
+    p = {"saglayici": "pexels", "asset_id": "12345",
+         "orijinal_url": "https://www.pexels.com/video/x-12345/",
+         "baslik": "antarctic ice sheet", "sorgu": "antarctic ice",
+         "lisans": "pexels-license", "genislik": 1920, "yukseklik": 1080,
+         "sure_sn": 12.0, "kare_dogrulandi": True, "medya_turu": "video"}
+    p.update(ek)
+    return p
+
+
+def _rb_butce():
+    return _MK.IsButcesi("kopru_testi", maks_usd=0.0, maks_sure_sn=60,
+                         maks_istek=10, maks_bayt=1000, maks_kare=10)
+
+
+# ── (1) STOK PROVENANSI GERCEKTEN KAYDEDILIYOR ──
+kontrol("⭐ R-1d-b BELIRLEYICI: kaynak.py stok provenansi TUTUYOR "
+        "(once YALNIZCA YouTube/CC yolunda kayit vardi)",
+        callable(getattr(_KY, "stok_provenans_kaydet", None))
+        and callable(getattr(_KY, "stok_provenans_al", None)))
+kontrol("⭐ R-1d-b: dort stok saglayicinin da LISANS KIMLIGI tanimli",
+        set(_KY.STOK_LISANSLARI) == {"pexels", "pixabay", "coverr", "freepik"},
+        sorted(_KY.STOK_LISANSLARI))
+_KY.stok_provenans_kaydet(_RB_DOSYA, saglayici="pexels", asset_id="12345",
+                          url="https://x/1", baslik="ice", sorgu="ice",
+                          genislik=1920, yukseklik=1080, sure_sn=9.0,
+                          kare_dogrulandi=True)
+_RB_P = _KY.stok_provenans_al(_RB_DOSYA)
+kontrol("⭐ R-1d-b: kayit saglayici + asset + lisans + olcu tasiyor",
+        _RB_P["saglayici"] == "pexels" and _RB_P["asset_id"] == "12345"
+        and _RB_P["lisans"] == "pexels-license"
+        and (_RB_P["genislik"], _RB_P["yukseklik"]) == (1920, 1080), _RB_P)
+kontrol("⭐ R-1d-b: KAYDI OLMAYAN dosya icin BOS doner "
+        "('herhalde lisanslidir' DENMEZ)",
+        _KY.stok_provenans_al(os.path.join(_RB_DIZ, "yok.mp4")) == {})
+# ⚠ `_kod_yalniz` token'lari BOSLUKLA birlestirir ("f (" olur); bosluklar
+# atilarak aranir — yorumdaki gecisler boylece sayilmaz.
+_RB_KY_KOD = _kod_yalniz(oku(KOK, "kaynak.py")).replace(" ", "")
+kontrol("⭐ R-1d-b: kabul noktalarinin DORDU de provenans yaziyor "
+        "(1 tanim + 4 cagri)",
+        _RB_KY_KOD.count("stok_provenans_kaydet(") >= 5,
+        _RB_KY_KOD.count("stok_provenans_kaydet("))
+kontrol("⭐ R-1d-b: ATIF semantigi DEGISMEDI (provenans ATIF DEGILDIR)",
+        "_STOK_PROVENANS" in oku(KOK, "kaynak.py")
+        and "def atif_listesi" in oku(KOK, "kaynak.py"))
+
+# ── (2) KOPRU: BUTCEYE SECIM YAZILIYOR ──
+_RB_B = _rb_butce()
+_RB_R = _MK.stok_secimi_kaydet(_RB_B, hedef_yol=_RB_DOSYA, scene_id="s001",
+                               provenans=_rb_prov(), fact_id="f001",
+                               sahne_amaci="kanit", sorgu="antarctic ice")
+kontrol("⭐ R-1d-b BELIRLEYICI: gercek medya yolundan gelen secim BUTCEYE "
+        "yaziliyor (once HIC yazilmiyordu)",
+        _RB_R["kaydedildi"] is True and len(_RB_B.secimler()) == 1,
+        _RB_R.get("neden"))
+_RB_K = _RB_B.secimler()[0]
+kontrol("⭐ R-1d-b: secim kaydi editor.plan sozlesmesini karsiliyor "
+        "(`yerel_yol` + `render_kullanilabilir` + scene/fact bagi)",
+        _RB_K["yerel_yol"] == _RB_DOSYA
+        and _RB_K["render_kullanilabilir"] is True
+        and _RB_K["scene_id"] == "s001" and _RB_K["fact_id"] == "f001"
+        and _RB_K["medya_turu"] == "video", _RB_K)
+kontrol("⭐ R-1d-b: secimin KOKENI gizlenmiyor (avci degil kaynak.py)",
+        _RB_K["koken"] == "kaynak.py")
+kontrol("⭐ R-1d-b: ATIF METNI UYDURULMUYOR (stok lisansi atif ZORUNLU "
+        "kilmiyor -> bos + atif_gerekli False)",
+        _RB_K["atif_metni"] == "" and _RB_K["atif_gerekli"] is False)
+kontrol("⭐ R-1d-b: ESER SAHIBI bilinmiyorsa UYDURULMUYOR",
+        _RB_K["eser_sahibi"] == "")
+
+# ── (3) FAIL-CLOSED: eksik kanitla KAYIT YOK (red-first) ──
+for _ek, _bek in (({"lisans": ""}, "LISANS-YOK"),
+                  ({"saglayici": ""}, "SAGLAYICI-YOK"),
+                  ({"kare_dogrulandi": False}, "KARE-DOGRULANMADI")):
+    _b = _rb_butce()
+    _r = _MK.stok_secimi_kaydet(_b, hedef_yol=_RB_DOSYA, scene_id="s1",
+                                provenans=_rb_prov(**_ek))
+    kontrol(f"⭐ R-1d-b RED-FIRST: {_bek} ise secim KAYDEDILMIYOR",
+            _r["kaydedildi"] is False and _bek in _r["neden"]
+            and _b.secimler() == [], _r)
+_RB_B2 = _rb_butce()
+kontrol("⭐ R-1d-b RED-FIRST: DOSYA DISKTE YOKSA secim KAYDEDILMIYOR",
+        _MK.stok_secimi_kaydet(
+            _RB_B2, hedef_yol=os.path.join(_RB_DIZ, "yok.mp4"),
+            scene_id="s1", provenans=_rb_prov())["neden"] == "DOSYA-YOK"
+        and _RB_B2.secimler() == [])
+kontrol("⭐ R-1d-b RED-FIRST: PROVENANSSIZ cagri secim URETMIYOR",
+        _MK.stok_secimi_kaydet(_rb_butce(), hedef_yol=_RB_DOSYA,
+                               scene_id="s1", provenans={})["kaydedildi"]
+        is False)
+kontrol("⭐ R-1d-b: kopru AG ACMIYOR / MEDYA INDIRMIYOR / DOSYA SILMIYOR",
+        not any(a in _kod_yalniz(oku(KOK, "medya_kopru.py")).split(
+            "def stok_secimi_kaydet")[1].split("def manifest_kur")[0]
+            for a in ("requests", "urllib", "os.remove", "subprocess")))
+
+# ── (4) MANIFEST ARTIK DOLUYOR (kusurun ta kendisi) ──
+_RB_M = _MK.manifest_kur(_RB_B)
+kontrol("⭐ R-1d-b BELIRLEYICI: manifest ARTIK BOS DEGIL "
+        "(`edit_plani=MEDYA-YOK` kok nedeni)",
+        len(_RB_M["adaylar"]) == 1
+        and _RB_M["adaylar"][0]["asset_id"] == "12345", _RB_M["ozet"])
+kontrol("⭐ R-1d-b: manifest lisans/kare kapisi bayragini KORUYOR",
+        _RB_M["adaylar"][0]["render_kullanilabilir"] is True
+        and _RB_M["adaylar"][0]["lisans"] == "pexels-license")
+kontrol("⭐ R-1d-b: kaydedilmeyen secim manifeste GIRMIYOR",
+        _MK.manifest_kur(_RB_B2)["adaylar"] == [])
+
+# ── (5) PIPELINE BAGLANTISI + KAPSAM BOSLUGU DOGRULUGU ──
+_PL = _kod_yalniz(oku(KOK, "pipeline.py")).replace(" ", "")
+kontrol("⭐ R-1d-b: pipeline gercek medya basarisinda KOPRUYU cagiriyor",
+        "_kopru_yaz(vyol_full)" in _PL
+        and "medya_kopru.stok_secimi_kaydet(" in _PL)
+kontrol("⭐ R-1d-b BELIRLEYICI: kapsam boslugu ARTIK avci basarisiz olur "
+        "olmaz YAZILMIYOR — gercek yol da basarisizsa yaziliyor",
+        "_avci_bosluk_neden=_av.get(" in _PL and "_bosluk_yaz(" in _PL)
+kontrol("⭐ R-1d-b: yedek/tekrar klip yollari da kopruden geciyor",
+        _PL.count("_kopru_yaz(") >= 4)
+kontrol("R-1d-b: degisen uc dosya da derleniyor",
+        all(_derlenir(os.path.join(KOK, a))
+            for a in ("kaynak.py", "medya_kopru.py", "pipeline.py")))
+kontrol("R-1d-b GERILEME YOK: avci yolu + lisans duvari + kare kapisi DURUYOR",
+        "def sahne_medyasi" in oku(KOK, "medya_kopru.py")
+        and "_kare_dogrula" in oku(KOK, "kaynak.py")
+        and "render_kullanilabilir" in oku(KOK, "medya_kopru.py"))
 
 
 blok("§40h I-58 — IKI ADAY DUZENI KARSI-OLGU OLARAK OLCULDU (yalniz tanisal)")

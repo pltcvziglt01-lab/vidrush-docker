@@ -4241,6 +4241,41 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         # 1) Footage sahnesi mi?
         if footage_acik and str(s.get("kaynak")) == "footage" and str(s.get("footage_sorgu", "")).strip():
             vyol_full = os.path.join(PUBLIC, "isler", is_adi, f"sahne_{n}.mp4")
+            # ⚠ FAZ R-1d-b: avci basarisiz olursa nedeni TUTULUR ama bosluk
+            # HEMEN yazilmaz — gercek medya yolu bu sahneyi kurtarabilir.
+            _avci_bosluk_neden = ""
+
+            def _kopru_yaz(_yol):
+                """Gercek medya yolundaki secimi avci butcesine kopruler.
+
+                ⚠ FAIL-CLOSED: provenans/lisans/kare dogrulamasi eksikse
+                kayit YAPILMAZ; sahne kapsam BOSLUGU olarak yazilir.
+                """
+                if _avci_butce is None:
+                    return
+                _pv = kaynak.stok_provenans_al(_yol)
+                _kp = medya_kopru.stok_secimi_kaydet(
+                    _avci_butce, hedef_yol=_yol,
+                    scene_id=str(s.get("scene_id") or f"s{n:03d}"),
+                    provenans=_pv, fact_id=str(s.get("fact_id") or ""),
+                    sahne_amaci=str(s.get("sahne_amaci") or ""),
+                    sorgu=s["footage_sorgu"].strip())
+                if _kp["kaydedildi"]:
+                    print(f"  sahne {n}: KOPRU -> butceye secim yazildi "
+                          f"({_pv.get('saglayici')}/{_pv.get('lisans')})",
+                          file=sys.stderr)
+                else:
+                    _avci_butce.bosluk_ekle(
+                        str(s.get("scene_id") or f"s{n:03d}"),
+                        f"stok koprusu: {_kp['neden']}")
+
+            def _bosluk_yaz(_neden):
+                """Footage yolundan CIKARKEN kapsam boslugunu yaz."""
+                if _avci_butce is not None:
+                    _avci_butce.bosluk_ekle(
+                        str(s.get("scene_id") or f"s{n:03d}"),
+                        _avci_bosluk_neden or _neden)
+
             # ── FAZ I-6: MEDYA AVCISI (OPT-IN, VARSAYILAN KAPALI) ──
             # ⚠ Kapaliyken bu blok hicbir sey yapmaz ve asagidaki MEVCUT yol
             # aynen calisir. Acikken bile basarisiz olursa yine eski yola
@@ -4265,18 +4300,25 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                           f"{_av['aday'].get('lisans')}", file=sys.stderr)
                     return ("video", f"isler/{is_adi}/sahne_{n}.mp4")
                 # Basarisizlik SESSIZ degil; sebep dususlere yaziliyor.
-                # ⚠ FAZ I-10: kapsam boslugu KAYDA GECER. Eski yol klip
-                # bulsa bile bu sahne AVCI zincirinden gecmemistir; edit
-                # plani bunu bosluk olarak gormeli (rastgele stok sayilmaz).
-                if _avci_butce is not None:
-                    _avci_butce.bosluk_ekle(
-                        str(s.get("scene_id") or f"s{n:03d}"),
-                        _av.get("neden") or "avci aday veremedi")
+                # ⚠ FAZ R-1d-b: kapsam boslugu ARTIK HEMEN yazilmiyor.
+                # Eskiden avci aday veremeyince bosluk kaydediliyordu; ama
+                # gercek medya yolu (`footage_getir`) hemen ardindan
+                # LISANSLI + KARE DOGRULANMIS bir klip getirebiliyor. O
+                # durumda "kapsam boslugu" YANLIS bir iddiadir. Bosluk artik
+                # YALNIZCA gercek yol da basarisiz olursa yaziliyor.
+                _avci_bosluk_neden = _av.get("neden") or "avci aday veremedi"
             if kaynak.footage_getir(s["footage_sorgu"].strip(), vyol_full, yt_once=yt_once):
                 # CC klip geldiyse ekrana kucuk kaynak yazisi — lisans ATIF ISTIYOR.
                 atif = kaynak.atif_al(vyol_full)
                 if atif.get("kanal"):
                     s["kaynakYazi"] = atif["kanal"]
+                # ── FAZ R-1d-b: GERCEK MEDYA YOLU -> AVCI BUTCESI KOPRUSU ──
+                # ⚠ OLCULEN KUSUR (R-1d-a staging): uretimde medya BU yoldan
+                # geliyor ama secim butceye HIC yazilmiyordu; `manifest_kur`
+                # bos manifest uretiyor, `edit_kopru.plan_kur` denenmiyor ve
+                # PRE-QA HIC KOSMUYORDU (`edit_plani=MEDYA-YOK`) -> teslim
+                # zinciri `pre_qa` kanitsiz kalip videoyu REDDEDIYORDU.
+                _kopru_yaz(vyol_full)
                 return ("video", f"isler/{is_adi}/sahne_{n}.mp4")
             # 1b) GORSEL YASAK STILLERDE (belgesel) AI gorsele DUSMUYORUZ.
             # Kullanici karari 11 Agu 2026: "belgesel stilinde gorsel kullanma, 0 gorsel".
@@ -4289,14 +4331,19 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                         if atif.get("kanal"):
                             s["kaynakYazi"] = atif["kanal"]
                         print(f"  sahne {n}: genel yedek klip '{yedek_sorgu}'", file=sys.stderr)
+                        _kopru_yaz(vyol_full)       # R-1d-b: yedek klip de kopruden gecer
                         return ("video", f"isler/{is_adi}/sahne_{n}.mp4")
                 # Son care: tekrar yasagini gecici olarak kaldir
                 if kaynak.footage_getir(s["footage_sorgu"].strip(), vyol_full,
                                         yt_once=yt_once, tekrara_izin=True):
                     print(f"  sahne {n}: klip TEKRARI (gorsel yasak)", file=sys.stderr)
+                    _kopru_yaz(vyol_full)
                     return ("video", f"isler/{is_adi}/sahne_{n}.mp4")
                 print(f"  sahne {n}: footage YOK ve gorsel yasak -> AI gorsele mecbur",
                       file=sys.stderr)
+            # ⚠ FAZ R-1d-b: footage yolundan CIKIYORUZ (AI gorsele dusuluyor)
+            # -> kapsam boslugu BURADA yazilir, RASTGELE STOKLA KAPANMAZ.
+            _bosluk_yaz("footage bulunamadi; AI gorsele dusuldu")
         # 2) AI gorsel (footage yoksa/basarisizsa)
         sp = str(s.get("scene_prompt", "")).strip() or str(s.get("footage_sorgu", "")).strip()
         # BEYAZ TUVAL sahnesi: gorsel, beyaz zemine YALITILMIS konu olarak uretilmeli.
