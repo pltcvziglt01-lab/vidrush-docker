@@ -34,6 +34,7 @@ import arastirma_kopru  # Faz H: arastirma motorunu bu hatta baglar (bkz. modul 
 import qa_kopru         # Faz H: render sonrasi kalite kapisi (bkz. modul basligi)
 import medya_kopru      # Faz I-6: Faz B medya avcisi (OPT-IN, varsayilan KAPALI)
 import edit_kopru       # Faz I-10: EditorV2 plan orkestrasyonu (OPT-IN, KAPALI)
+import kaynak_tavani    # Faz R-1d-g: ayni kaynak <=8 sn bolme plani
 
 # ⚠ FAZ I-2c — BILESIK STIL PROFILI KOPRUSU (OPSIYONEL, HATTI COKERTMEZ).
 # `stil_profili.py` (Faz I-2b) surumlu/bilesik profil kaydidir. Bu hat onu
@@ -4525,6 +4526,133 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     except Exception as e:
         print(f"  hiz kalibrasyonu atlandi: {str(e)[:80]}", file=sys.stderr)
 
+    # ⚠ FAZ R-1d-g: bolme icin sahne basina HAM veri (props indeksiyle).
+    _sahne_ham = {}
+
+    def _kopru_kaydet(_yol, _sahne, _n):
+        """Gercek medya secimini avci butcesine kopruler (ORTAK kaydedici).
+
+        ⚠ FAIL-CLOSED: provenans/lisans/kare dogrulamasi eksikse kayit
+        YAPILMAZ; sahne kapsam BOSLUGU olarak yazilir.
+        """
+        if _avci_butce is None:
+            return False
+        _pv = kaynak.stok_provenans_al(_yol)
+        _kp = medya_kopru.stok_secimi_kaydet(
+            _avci_butce, hedef_yol=_yol,
+            scene_id=str((_sahne or {}).get("scene_id") or f"s{_n:03d}"),
+            provenans=_pv, fact_id=str((_sahne or {}).get("fact_id") or ""),
+            sahne_amaci=str((_sahne or {}).get("sahne_amaci") or ""),
+            sorgu=str((_sahne or {}).get("footage_sorgu") or "").strip())
+        if _kp["kaydedildi"]:
+            print(f"  sahne {_n}: KOPRU -> butceye secim yazildi "
+                  f"({_pv.get('saglayici')}/{_pv.get('lisans')})",
+                  file=sys.stderr)
+            return True
+        _avci_butce.bosluk_ekle(
+            str((_sahne or {}).get("scene_id") or f"s{_n:03d}"),
+            f"stok koprusu: {_kp['neden']}")
+        return False
+
+    def _ses_dilimle(kaynak_ses, bas_sn, uzunluk_sn, hedef):
+        """Sesi ffmpeg ile KES. ⚠ UCRETSIZ + YEREL; ag/kredi YOK."""
+        try:
+            r = subprocess.run(
+                ["ffmpeg", "-y", "-loglevel", "error", "-ss", f"{bas_sn:.3f}",
+                 "-t", f"{uzunluk_sn:.3f}", "-i", kaynak_ses,
+                 "-c:a", "libmp3lame", "-q:a", "2", hedef],
+                capture_output=True, text=True, timeout=180)
+            return r.returncode == 0 and os.path.exists(hedef)
+        except Exception:                                    # noqa: BLE001
+            return False
+
+    def _kelime_dilimle(kelimeler, bas_sn, bitis_sn):
+        """Kelime zaman damgalarini pencereye kirp ve SIFIRA tasi."""
+        out = []
+        for k in (kelimeler or []):
+            t0, t1 = float(k.get("t0", 0)), float(k.get("t1", 0))
+            if t1 <= bas_sn or t0 >= bitis_sn:
+                continue
+            out.append(dict(k, t0=round(max(0.0, t0 - bas_sn), 3),
+                            t1=round(min(bitis_sn, t1) - bas_sn, 3)))
+        return out
+
+    def _kaynak_tavani_uygula(sahneler, ham):
+        """Tavani asan sahneyi BOL, her parcaya FARKLI varlik ata.
+
+        ⚠ FAIL-CLOSED: ikinci ucretsiz stok varlik EDINILEMEZSE sahne
+        BOLUNMEZ ve `KAYNAK-TAVANI-VARLIK-YOK` raporlanir — ayni kaynak
+        tekrar kullanilip tavan ASILMAZ, tavan YUKSELTILMEZ.
+        ⚠ Ses ve altyazi SUNUCUDA senkron kesilir (ffmpeg; ucretsiz).
+        """
+        sorunlar, bolunen = [], 0
+        yeni_liste = []
+        for idx, sh in enumerate(list(sahneler)):
+            h = ham.get(idx) or {}
+            sure = float(sh.get("sure") or 0)
+            n_parca = kaynak_tavani.parca_sayisi(sure)
+            if n_parca <= 1 or not h:
+                yeni_liste.append(sh)
+                continue
+            # ── Ek varliklar: her ek parca icin FARKLI ucretsiz stok klip ──
+            ek_yollar = []
+            _s = h.get("s") or {}
+            _sorgu = str(_s.get("footage_sorgu") or "").strip()
+            for j in range(1, n_parca):
+                hedef = os.path.join(PUBLIC, "isler", is_adi,
+                                     f"sahne_{h['n']}_p{j}.mp4")
+                alindi = False
+                if _sorgu:
+                    for _q in ([_sorgu] +
+                               list(kaynak.genel_yedek_sorgular(_sorgu))[:2]):
+                        if kaynak.footage_getir(_q, hedef, yt_once=False):
+                            alindi = True
+                            break
+                if alindi:
+                    _kopru_kaydet(hedef, _s, h["n"])
+                    ek_yollar.append(f"isler/{is_adi}/sahne_{h['n']}_p{j}.mp4")
+                else:
+                    ek_yollar.append(None)
+            if any(y is None for y in ek_yollar):
+                # ⚠ FAIL-CLOSED: bolme YAPILMAZ; kapi ihlali GORUNUR kalir.
+                sorunlar.append({"kod": kaynak_tavani.KOD_VARLIK_YOK,
+                                 "scene_id": sh.get("scene_id"),
+                                 "detay": f"{n_parca - 1} ek varlik gerekti, "
+                                          f"edinilemedi"})
+                yeni_liste.append(sh)
+                continue
+            # ── Ses + altyazi SENKRON bolunur ──
+            p_sure = round(sure / n_parca, 3)
+            parcalar, kesim_ok = [], True
+            for j in range(n_parca):
+                bas = round(j * p_sure, 3)
+                ses_hedef = os.path.join(
+                    os.path.dirname(h["syol"]),
+                    f"{os.path.basename(h['syol']).rsplit('.', 1)[0]}_p{j}.mp3")
+                if not _ses_dilimle(h["syol"], bas, p_sure, ses_hedef):
+                    kesim_ok = False
+                    break
+                yeni = dict(sh)
+                yeni["sure"] = p_sure
+                yeni["ses"] = ses_hedef
+                yeni["scene_id"] = f"{sh.get('scene_id')}p{j + 1}"
+                yeni["medya"] = (sh.get("medya") if j == 0
+                                 else ek_yollar[j - 1])
+                yeni["altyazi"] = uretmod.altyazi_parcala(
+                    _kelime_dilimle(h["kelimeler"], bas, bas + p_sure), p_sure)
+                parcalar.append(yeni)
+            if not kesim_ok:
+                sorunlar.append({"kod": kaynak_tavani.KOD_SURE_BOZUK,
+                                 "scene_id": sh.get("scene_id"),
+                                 "detay": "ses dilimlenemedi"})
+                yeni_liste.append(sh)
+                continue
+            bolunen += 1
+            yeni_liste.extend(parcalar)
+        sahneler[:] = yeni_liste
+        return {"bolunen_sahne": bolunen, "sorunlar": sorunlar,
+                "tavan_sn": kaynak_tavani.KAYNAK_BASINA_TAVAN_SN}
+
     # Ard arda ayni kamera hareketi olmasin diye bir onceki sahnenin kurgusu tutulur
     _son_kurgu = {}
     # Montaj: orijinal sahne sirasi korunur (paralellik sirayi bozamaz)
@@ -4591,7 +4719,18 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                 "bolumYeri": ("ust" if str(s.get("bolum_yeri")) == "ust" else "orta")}
                if str(s.get("bolum") or "").strip() else {}),
         })
+        # ⚠ FAZ R-1d-g: bolme icin gereken HAM veriler (ses/kelime/sorgu).
+        _sahne_ham[len(props_sahneler) - 1] = {
+            "n": n, "s": s, "syol": syol, "kelimeler": kelimeler,
+            "sure": sure, "medya": medya, "tur": tur}
         kumulatif_sn += sure
+
+    # ── FAZ R-1d-g: AYNI KAYNAK <= 8.0 sn — PLAN GERCEK HATTA UYGULANIR ──
+    _tavan_rapor = _kaynak_tavani_uygula(props_sahneler, _sahne_ham)
+    if _tavan_rapor.get("sorunlar"):
+        print(f"  KAYNAK TAVANI: {len(_tavan_rapor['sorunlar'])} parca "
+              f"atanamadi -> {_tavan_rapor['sorunlar'][0].get('kod')}",
+              file=sys.stderr)
 
     if not props_sahneler:
         # Hicbir sahne yoksa: sebebi bakiye ise NET soyle (kullanici 'neden' bilsin)

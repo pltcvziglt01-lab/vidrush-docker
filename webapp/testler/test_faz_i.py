@@ -14064,6 +14064,71 @@ kontrol("⭐ R-1d-g: modul MEDYA/AG/DOSYA/RENDER'a DOKUNMUYOR",
         and _KT2.kapsam_ozeti()["render_eder"] is False)
 kontrol("R-1d-g: kaynak_tavani.py derleniyor",
         _derlenir(os.path.join(KOK, "kaynak_tavani.py")))
+# ── (5) URETIM HATTINA BAGLANDI (R-1d-g entegrasyon) ──
+# ⚠ MEDYASIZ: kod sozlesmesi + saf fonksiyon davranisi test edilir.
+_PL_G = oku(KOK, "pipeline.py")
+kontrol("⭐ R-1d-g BELIRLEYICI: pipeline bolme planini GERCEK HATTA "
+        "uyguluyor (scratch karar mantigi DEGIL)",
+        "_kaynak_tavani_uygula(props_sahneler, _sahne_ham)" in _PL_G
+        and "import kaynak_tavani" in _PL_G)
+kontrol("⭐ R-1d-g: tavani asan sahne icin IKINCI ucretsiz stok klip "
+        "ediniliyor (footage_getir)",
+        "kaynak.footage_getir(_q, hedef, yt_once=False)" in _PL_G
+        and "genel_yedek_sorgular" in _PL_G)
+kontrol("⭐ R-1d-g: ek klip de KOPRUDEN geciyor (lisans/provenans kaydi)",
+        "_kopru_kaydet(hedef, _s, h[\"n\"])" in _PL_G)
+kontrol("⭐ R-1d-g BELIRLEYICI: SES sunucuda ffmpeg ile SENKRON kesiliyor",
+        "def _ses_dilimle(" in _PL_G and '"-ss", f"{bas_sn:.3f}"' in _PL_G
+        and '"-t", f"{uzunluk_sn:.3f}"' in _PL_G)
+kontrol("⭐ R-1d-g BELIRLEYICI: ALTYAZI zaman dilimleri de bolunuyor ve "
+        "SIFIRA tasiniyor",
+        "def _kelime_dilimle(" in _PL_G
+        and "t0=round(max(0.0, t0 - bas_sn), 3)" in _PL_G
+        and 'uretmod.altyazi_parcala(\n                    _kelime_dilimle('
+        in _PL_G)
+kontrol("⭐ R-1d-g BELIRLEYICI: ek varlik EDINILEMEZSE sahne BOLUNMUYOR ve "
+        "KAYNAK-TAVANI-VARLIK-YOK raporlaniyor (fail-closed)",
+        '"kod": kaynak_tavani.KOD_VARLIK_YOK' in _PL_G
+        and "ek varlik gerekti" in _PL_G
+        and "tekrar kullanilip tavan ASILMAZ" in _PL_G)
+kontrol("⭐ R-1d-g: her parca AYRI scene_id aliyor (olcum ayirt edebilsin)",
+        'yeni["scene_id"] = f"{sh.get(\'scene_id\')}p{j + 1}"' in _PL_G)
+kontrol("⭐ R-1d-g: parca 1 MEVCUT medyayi korur, sonrakiler EK varligi alir",
+        'yeni["medya"] = (sh.get("medya") if j == 0' in _PL_G)
+
+# ── (6) BOLUNMUS ZAMAN CIZGISI GERCEK KAPIDAN GECIYOR ──
+# ⚠ Pilotun 8.508 sn'lik sahnesi bolununce `gercek_qa` tavan kapisi TEMIZ.
+_G_BOL = _GQ.olc(_GQ.sahneleri_cevir(
+    [{"scene_id": "s001p1", "tur": "video", "medya": "a.mp4", "sure": 4.254},
+     {"scene_id": "s001p2", "tur": "video", "medya": "b.mp4", "sure": 4.254}],
+    provenans_okuyucu=lambda y: {
+        "a.mp4": {"saglayici": "pexels", "lisans": "pexels-license",
+                  "asset_id": "a1", "medya_turu": "video"},
+        "b.mp4": {"saglayici": "pixabay", "lisans": "pixabay-content-license",
+                  "asset_id": "b1", "medya_turu": "video"}}.get(y, {})))
+kontrol("⭐ R-1d-g BELIRLEYICI: 8.508 sn sahne bolununce GERCEK kapi TEMIZ "
+        "(GERCEK-KAYNAK-TAVANI YOK)",
+        _G_BOL["kaynak_kullanimi"]["temiz"] is True
+        and not [x for x in _G_BOL["sorunlar"]
+                 if x["kod"] == "GERCEK-KAYNAK-TAVANI"],
+        _G_BOL["kaynak_kullanimi"])
+kontrol("⭐ R-1d-g RED-FIRST: AYNI varlik iki parcada kullanilirsa kapi "
+        "YINE ihlal veriyor (tekrar-kaynak kacamagi KAPALI)",
+        [x["kod"] for x in _GQ.olc(_GQ.sahneleri_cevir(
+            [{"scene_id": "s1p1", "tur": "video", "medya": "a.mp4",
+              "sure": 4.5},
+             {"scene_id": "s1p2", "tur": "video", "medya": "a.mp4",
+              "sure": 4.5}],
+            provenans_okuyucu=lambda y: {
+                "saglayici": "pexels", "lisans": "pexels-license",
+                "asset_id": "a1", "medya_turu": "video"}))["sorunlar"]
+         ].count("GERCEK-KAYNAK-TAVANI") == 1)
+kontrol("R-1d-g GERILEME YOK: kaynak_ses / yuv420p / tenant imza kapilari "
+        "DURUYOR",
+        "GERCEK-KAYNAK-SES-SIZINTI" in _GQ.FAIL_KODLARI
+        and _HR.TESLIM_PIX_FMT == "yuv420p"
+        and _IU.kapsam_ozeti()["tenant_baglanabilir"] is True)
+
 kontrol("R-1d-g GERILEME YOK: gercek-timeline kapisi ve pix_fmt kapisi DURUYOR",
         "GERCEK-KAYNAK-TAVANI" in _GQ.FAIL_KODLARI
         and _HR.TESLIM_PIX_FMT == "yuv420p")

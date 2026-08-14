@@ -9630,3 +9630,38 @@ aynen tekrarlar.
 ⚠ **Bu yüzden bu turda ücretli pilot KOŞULMADI**: sonucu önceden belli bir
 render kredi harcaması olurdu. Kapı zaten fail-closed çalışıyor — video
 üretilir ama **kabul edilmez**.
+
+### R-1d-g (devam) — PLAN GERÇEK ÜRETİM HATTINA BAĞLANDI
+
+⚠ Önceki turda yalnız **karar mantığı** yazılmıştı; kullanıcı şartına göre
+**bağlanmamış mantık atomu kapatmaz**. Bu turda **aynı atom** üretim hattına
+bağlandı (yeni atom sayılmadı).
+
+`webapp/pipeline.py` — props kurulduktan **sonra**, render'dan **önce**:
+
+1. **`_kaynak_tavani_uygula(props_sahneler, _sahne_ham)`** — tavanı aşan her
+   sahne `kaynak_tavani.parca_sayisi()` kadar parçaya bölünür.
+2. **İkinci ücretsiz stok klip**: her ek parça için `kaynak.footage_getir`
+   (önce özgün sorgu, sonra `genel_yedek_sorgular`) → **farklı `asset_id` /
+   lisans / provenans**. Ek klip de **köprüden** geçer (`_kopru_kaydet`),
+   yani lisans+kare doğrulaması olmadan **kayda girmez**.
+3. **Ses sunucuda senkron kesilir** — `_ses_dilimle()` ffmpeg `-ss/-t`
+   (ücretsiz, yerel).
+4. **Altyazı zaman dilimleri** `_kelime_dilimle()` ile pencereye kırpılır ve
+   **sıfıra taşınır**; her parça kendi `altyazi_parcala` çıktısını alır.
+5. Her parça **ayrı `scene_id`** alır (`s001p1`, `s001p2` …) → ölçüm
+   parçaları ayırt eder. Parça 1 **mevcut** medyayı korur.
+6. ⚠ **FAIL-CLOSED**: ek varlık **edinilemezse** sahne **bölünmez**,
+   `KAYNAK-TAVANI-VARLIK-YOK` raporlanır. **Aynı kaynak tekrar kullanılıp
+   tavan AŞILMAZ; tavan YÜKSELTİLMEZ.** Kapı ihlali **görünür** kalır.
+
+⚠ `_kopru_kaydet` **ortak kaydedici** olarak `uret()` kapsamına eklendi
+(`_sahne_medya` içindeki nested sürüm bölme pasından erişilemiyordu).
+
+### Red-first (medyasız) — entegrasyon
+
+`pipeline.py` geri alınınca **16 kontrol kırmızı**. Ayrıca saf kapı ölçümü:
+* 8.508 sn sahne **bölününce** `gercek_qa` tavan kapısı **TEMİZ**
+  (`GERCEK-KAYNAK-TAVANI` yok).
+* **Aynı** varlık iki parçada kullanılırsa kapı **yine ihlal** veriyor —
+  tekrar-kaynak kaçamağı **kapalı**.
