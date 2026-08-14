@@ -9460,8 +9460,8 @@ kontrol("⭐ R-1d-e BELIRLEYICI: gercek hat `cekim_turu` ATAMADIGI icin "
 kontrol("⭐ R-1d-e: hicbir sahneye SAHTE cekim turu yazilmiyor",
         all(x["cekim_turu"] == "" for x in _re_cevir(_RE_8)))
 kontrol("⭐ R-1d-e: stabil kodlar kapsam ozetinde BEYAN EDILIYOR",
-        set(_GQ.kapsam_ozeti()["stabil_kodlar"])
-        == {_GQ.KOD_CEKIM_TURU_YOK, _GQ.KOD_PROVENANS_YOK, _GQ.KOD_SAHNE_YOK})
+        {_GQ.KOD_CEKIM_TURU_YOK, _GQ.KOD_PROVENANS_YOK, _GQ.KOD_SAHNE_YOK}
+        <= set(_GQ.kapsam_ozeti()["stabil_kodlar"]))
 
 # ── (5) ZINCIR: GERCEK KANIT KABUL, PLAN KANITI RED ──
 def _re_is(**ek):
@@ -14517,6 +14517,94 @@ kontrol("⭐ R-1d-i: basarisiz yolda ses dilimleri TEMIZLENIYOR "
         "(transactional korundu)",
         _PL_I.count("os.remove(os.path.join(PUBLIC, _y))") == 3)
 kontrol("R-1d-i GERILEME YOK: tavan / kaynak sesi / pix_fmt / tenant imza",
+        _KT2.KAYNAK_BASINA_TAVAN_SN == 8.0
+        and "GERCEK-KAYNAK-SES-SIZINTI" in _GQ.FAIL_KODLARI
+        and _HR.TESLIM_PIX_FMT == "yuv420p"
+        and _IU.kapsam_ozeti()["tenant_baglanabilir"] is True)
+
+blok("§40ad R-1d-j — GECIS + SES-KURGU OLCUMU GERCEK TIMELINE'DAN")
+
+# ⚠ MEDYASIZ. Olculen BOSLUK (R-1d-i pilotu, job_1786728166599):
+#   `gecis hard_cut_orani` = None  ·  `J/L-cut ducking_araligi` = None
+# R-1d-e'de PRE-QA kaniti gercek zaman cizgisine tasinirken bu iki olcum
+# TASINMADI. `props_sahneler` gecis kararini `gecisImza` olarak tasiyor
+# (YOKSA hizli_render 2 karelik fade = SERT KESME uygular) ama `gercek_qa`
+# bundan metrik TURETMIYORDU.
+
+def _gj(sid, imza=None, sure=6.0):
+    d = {"scene_id": sid, "tur": "video", "medya": f"{sid}.mp4", "sure": sure}
+    if imza is not None:
+        d["gecisImza"] = imza
+    return d
+
+
+_GJ_PV = {"saglayici": "pexels", "lisans": "pexels-license",
+          "asset_id": "a", "medya_turu": "video"}
+_gj_cevir = (lambda lst: _GQ.sahneleri_cevir(
+    lst, provenans_okuyucu=lambda y: dict(_GJ_PV, asset_id=y)))
+
+# ── (1) GECIS: hard-cut orani GERCEK karardan turer ──
+_G4 = _GQ.gecis_olcumu(_gj_cevir([_gj("s1"), _gj("s2"), _gj("s3"),
+                                  _gj("s4", imza="karartma")]))
+kontrol("⭐ R-1d-j BELIRLEYICI: hard_cut_orani ARTIK olculuyor "
+        "(R-1d-i pilotunda None idi)",
+        _G4["olculdu"] is True and _G4["gecis"] == 3
+        and _G4["hard_cut"] == 2 and _G4["hard_cut_orani"] == 0.667, _G4)
+kontrol("⭐ R-1d-j: `gecisImza` YOKSA SERT KESME sayilir "
+        "(hizli_render 2 karelik fade uygular)",
+        _GQ.gecis_olcumu(_gj_cevir([_gj("s1"), _gj("s2")]))["hard_cut_orani"]
+        == 1.0)
+kontrol("⭐ R-1d-j: imzali gecisler EFEKT sayilir ve TURU raporlanir",
+        _GQ.gecis_olcumu(_gj_cevir(
+            [_gj("s1"), _gj("s2", imza="flash"), _gj("s3", imza="whip")]
+        ))["imza_dagilimi"] == {"flash": 1, "whip": 1})
+kontrol("⭐ R-1d-j RED-FIRST: TEK sahnede gecis YOKTUR — oran UYDURULMAZ "
+        "(stabil kod, fail-closed)",
+        _GQ.gecis_olcumu(_gj_cevir([_gj("s1")]))["olculdu"] is False
+        and _GQ.gecis_olcumu(_gj_cevir([_gj("s1")]))["kod"]
+        == "GERCEK-TIMELINE-GECIS-YOK")
+kontrol("⭐ R-1d-j RED-FIRST: BOS timeline'da sabit PASS YOK",
+        _GQ.gecis_olcumu([])["olculdu"] is False)
+
+# ── (2) SES KURGUSU: J/L-cut ve ducking ──
+_S3 = _GQ.ses_kurgu_olcumu(_gj_cevir([_gj("s1"), _gj("s2"), _gj("s3")]))
+kontrol("⭐ R-1d-j BELIRLEYICI: J/L-cut OLCULUYOR — gercek hatta ses ve "
+        "video sinirlari AYNI (`acrossfade` = `xfade`) -> 0",
+        _S3["olculdu"] is True and _S3["j_l_cut"] == 0
+        and _S3["ses_gecis"] == 2
+        and "acrossfade" in str(_S3.get("gerekce", "")), _S3)
+kontrol("⭐ R-1d-j BELIRLEYICI RED-FIRST: DUCKING verisi gercek timeline'da "
+        "YOK — 0 ya da PASS UYDURULMUYOR, stabil kod",
+        _S3["ducking"]["olculdu"] is False
+        and _S3["ducking"]["kod"] == "GERCEK-TIMELINE-DUCKING-VERISI-YOK")
+kontrol("⭐ R-1d-j: ducking `olculemedi` oldugu icin ses kurgusu TAM PASS "
+        "SAYILMIYOR",
+        _S3["tam"] is False)
+kontrol("⭐ R-1d-j RED-FIRST: tek sahnede ses gecisi YOKTUR (fail-closed)",
+        _GQ.ses_kurgu_olcumu(_gj_cevir([_gj("s1")]))["olculdu"] is False)
+
+# ── (3) TAM QA SOZLESMESINE TASINDI ──
+_GJ_R = _GQ.olc(_gj_cevir([_gj("s1"), _gj("s2", imza="karartma"),
+                           _gj("s3")]))
+kontrol("⭐ R-1d-j BELIRLEYICI: `olc()` ciktisi `gecis` ve `ses` alanlarini "
+        "TASIYOR (teslim raporu artik olcebilir)",
+        isinstance(_GJ_R.get("gecis"), dict)
+        and isinstance(_GJ_R.get("ses"), dict)
+        and _GJ_R["gecis"]["hard_cut_orani"] is not None,
+        {k: _GJ_R.get(k) for k in ("gecis", "ses")})
+kontrol("⭐ R-1d-j: `olcumler` sozlugunde de yer aliyor",
+        "gecis" in (_GJ_R.get("olcumler") or {})
+        and "ses" in (_GJ_R.get("olcumler") or {}))
+kontrol("⭐ R-1d-j: `gecisImza` cevirici tarafindan TASINIYOR",
+        _gj_cevir([_gj("s1", imza="flash")])[0]["gecis_imza"] == "flash"
+        and _gj_cevir([_gj("s1")])[0]["gecis_imza"] == "")
+kontrol("⭐ R-1d-j: stabil kodlar kapsam ozetinde BEYAN EDILIYOR",
+        {"GERCEK-TIMELINE-GECIS-YOK",
+         "GERCEK-TIMELINE-DUCKING-VERISI-YOK"}
+        <= set(_GQ.kapsam_ozeti()["stabil_kodlar"]))
+kontrol("⭐ R-1d-j: olcum UYDURMUYOR (kapsam ozeti beyan ediyor)",
+        _GQ.kapsam_ozeti()["uydurma_cekim_turu"] is False)
+kontrol("R-1d-j GERILEME YOK: kaynak tavani / kaynak sesi / pix_fmt / imza",
         _KT2.KAYNAK_BASINA_TAVAN_SN == 8.0
         and "GERCEK-KAYNAK-SES-SIZINTI" in _GQ.FAIL_KODLARI
         and _HR.TESLIM_PIX_FMT == "yuv420p"

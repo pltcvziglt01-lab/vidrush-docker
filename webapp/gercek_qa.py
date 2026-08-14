@@ -46,6 +46,8 @@ SEMA_SURUM = "1.0.0"
 KOD_CEKIM_TURU_YOK = "GERCEK-TIMELINE-CEKIM-TURU-YOK"
 KOD_PROVENANS_YOK = "GERCEK-TIMELINE-PROVENANS-YOK"
 KOD_SAHNE_YOK = "GERCEK-TIMELINE-SAHNE-YOK"
+KOD_GECIS_YOK = "GERCEK-TIMELINE-GECIS-YOK"
+KOD_DUCKING_YOK = "GERCEK-TIMELINE-DUCKING-VERISI-YOK"
 
 # Kapilar. ⚠ Esikler MEVCUT kaynaklardan OKUNUR, burada YENIDEN TANIMLANMAZ.
 KAYNAK_TAVANI_SN = _kk.KAYNAK_BASINA_TAVAN_SN_PLAN
@@ -112,9 +114,73 @@ def sahneleri_cevir(props_sahneler: list, *, kok_dizin: str = "",
             "sure_sn": _f(s.get("sure")),
             # ⚠ CEKIM TURU URETILMEZ (gercek hat atamiyor) — bos birakilir.
             "cekim_turu": "",
+            # ⚠ FAZ R-1d-j: gercek hattin GECIS KARARI. `hizli_render`
+            # imza YOKSA 2 karelik fade (= SERT KESME) uygular; imza VARSA
+            # `GECIS_IMZA_FFMPEG` efektini uygular.
+            "gecis_imza": _s(s.get("gecisImza")),
             "olgu_boslugu": str(i + 1) in bosluk_sahneler,
         })
     return cikti
+
+
+def gecis_olcumu(sahneler: list) -> dict:
+    """FAZ R-1d-j — GECIS METRIGI, gercek zaman cizgisinden.
+
+    ⚠ OLCULEN BOSLUK (R-1d-i pilotu): `hard_cut_orani` = None idi.
+    ⚠ Kaynak UYDURMA DEGIL: `hizli_render._xfade_zincir` gecis TURUNU
+    sahnenin `gecisImza` alanindan secer; imza YOKSA gecis suresini 2 kareye
+    kirpar — bu GOZLE SERT KESMEDIR. Metrik tam bu karardan turer.
+    ⚠ Iki sahneden az varsa GECIS YOKTUR: oran UYDURULMAZ, stabil kod doner.
+    """
+    liste = [x for x in (sahneler or []) if isinstance(x, dict)]
+    gecis = max(0, len(liste) - 1)
+    if gecis < 1:
+        return {"olculdu": False, "kod": KOD_GECIS_YOK,
+                "neden": "en az iki sahne gerekir", "gecis": gecis}
+    # Gecis, GELEN sahnenin imzasiyla belirlenir (ilk sahnenin gecisi yoktur).
+    gelenler = liste[1:]
+    imzalar = [_s(x.get("gecis_imza")) for x in gelenler]
+    hard = sum(1 for i in imzalar if not i)
+    dagilim: dict = {}
+    for i in imzalar:
+        if i:
+            dagilim[i] = dagilim.get(i, 0) + 1
+    return {"olculdu": True, "kod": "", "gecis": gecis, "hard_cut": hard,
+            "efektli": gecis - hard,
+            "hard_cut_orani": round(hard / gecis, 3),
+            "imza_dagilimi": dagilim}
+
+
+def ses_kurgu_olcumu(sahneler: list) -> dict:
+    """FAZ R-1d-j — SES KURGUSU (J/L-cut + ducking), gercek zaman cizgisinden.
+
+    ⚠ J/L-CUT OLCULUR, UYDURULMAZ: gercek hatta her gecis
+    `xfade=...:duration=g:offset=o` ile BIRLIKTE `acrossfade=d=g` uygular —
+    yani ses ve video sinirlari AYNI noktadadir. J/L-cut tanimi geregi ses
+    ve goruntu sinirlarinin FARKLI olmasidir; bu hatta boyle bir ayrim
+    URETILMEZ, dolayisiyla olculen deger 0'dir (varsayim degil, YAPISAL).
+    ⚠ DUCKING: gercek zaman cizgisi (props) muzik/ambiyans ducking zarfi
+    TASIMAZ. Bu yuzden 0 ya da PASS UYDURULMAZ — `olculdu: False` +
+    STABIL KOD doner ve `tam` False kalir.
+    """
+    liste = [x for x in (sahneler or []) if isinstance(x, dict)]
+    ses_gecis = max(0, len(liste) - 1)
+    if ses_gecis < 1:
+        return {"olculdu": False, "kod": KOD_GECIS_YOK,
+                "neden": "en az iki sahne gerekir", "tam": False,
+                "ducking": {"olculdu": False, "kod": KOD_DUCKING_YOK}}
+    return {
+        "olculdu": True, "kod": "",
+        "ses_gecis": ses_gecis,
+        "j_l_cut": 0,
+        "gerekce": ("her gecis `acrossfade=d=g` ile `xfade=duration=g` "
+                    "AYNI g ve AYNI offset'te uygulanir; ses/video siniri "
+                    "AYRISMAZ -> J/L-cut yok"),
+        # ⚠ Ducking VERISI YOK -> uydurulmaz.
+        "ducking": {"olculdu": False, "kod": KOD_DUCKING_YOK,
+                    "neden": "gercek zaman cizgisi ducking zarfi tasimiyor"},
+        "tam": False,
+    }
 
 
 def olc(sahneler: list, *, kare_okuyucu: Optional[Callable] = None) -> dict:
@@ -206,6 +272,10 @@ def olc(sahneler: list, *, kare_okuyucu: Optional[Callable] = None) -> dict:
     # ── 8) UYGULANAMAYAN OLCUM — STABIL KODLA BILDIRILIR ──
     # ⚠ Gercek hat sahneye `cekim_turu` ATAMAZ (zoom/pan kararlari var).
     # Sahte tur URETMEK yerine olcum ACIKCA yapilamadi denir.
+    # ── 8b) FAZ R-1d-j: GECIS + SES KURGUSU ──
+    gecis = gecis_olcumu(liste)
+    ses_kurgu = ses_kurgu_olcumu(liste)
+
     broll = {"olculdu": False, "neden": KOD_CEKIM_TURU_YOK,
              "video_cekim_sayisi": sum(1 for s in medya
                                        if _s(s.get("medya_turu")) == "video"),
@@ -227,10 +297,13 @@ def olc(sahneler: list, *, kare_okuyucu: Optional[Callable] = None) -> dict:
         "kaynak_kullanimi": kaynak_kullanimi,
         "saglayici": sag,
         "broll_cesitliligi": broll,
+        # ⚠ FAZ R-1d-j: teslim raporunun olcebilmesi icin UST SEVIYEDE de.
+        "gecis": gecis, "ses": ses_kurgu,
         "olcumler": {"kapsam": kapsam, "medya_turu": medya_turu,
                      "kaynak_ses": kaynak_ses,
                      "kaynak_kullanimi": kaynak_kullanimi,
-                     "saglayici": sag, "broll_cesitliligi": broll},
+                     "saglayici": sag, "broll_cesitliligi": broll,
+                     "gecis": gecis, "ses": ses_kurgu},
     }
 
 
@@ -242,7 +315,7 @@ def kapsam_ozeti() -> dict:
         "olcum_modulleri_degismedi": True,
         "uydurma_cekim_turu": False,
         "stabil_kodlar": [KOD_CEKIM_TURU_YOK, KOD_PROVENANS_YOK,
-                          KOD_SAHNE_YOK],
+                          KOD_SAHNE_YOK, KOD_GECIS_YOK, KOD_DUCKING_YOK],
         "fail_kodlari": list(FAIL_KODLARI),
         "kaynak_tavani_sn": KAYNAK_TAVANI_SN,
         "tek_saglayici_tavani": TEK_SAGLAYICI_TAVANI,

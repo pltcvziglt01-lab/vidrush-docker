@@ -10010,3 +10010,60 @@ Bu üç ölçüm kapanmadan **savunulabilir bir TAM PASS** verilemez.
 
 ⚠ Rumble eşiği ayrıca **kalibre edilmeli** (şu an bana ait, projeye ait
 değil) — ya ölçülerek türetilmeli ya da rapordan **çıkarılmalı**.
+
+---
+
+## 73. FAZ R-1d-j — GEÇİŞ + SES-KURGU ÖLÇÜMÜ GERÇEK TIMELINE'DAN (14 Ağu)
+
+> **Durum: teslimi bloke eden ölçüm boşluğu kapatıldı. A–I yeşil.
+> Mac'te medya/kare/QA artefaktı ÜRETİLMEDİ. $0.00.**
+> Değişen: `webapp/gercek_qa.py`, `webapp/testler/test_faz_i.py`.
+> Üretim hattı (`pipeline`, `hizli_render`, `teslim`) **dokunulmadı**.
+
+### ⛔ Ölçülen boşluk
+
+R-1d-i pilotu (`job_1786728166599`): `geçiş hard_cut_orani` = **None**,
+`J/L-cut ducking_araligi` = **None**. R-1d-e'de PRE-QA kanıtı gerçek zaman
+çizgisine taşınırken bu iki ölçüm **taşınmamıştı**.
+
+### Yapılan — deterministik, uydurmasız
+
+**`gecis_olcumu()`** — kaynak **uydurma değil**: `hizli_render._xfade_zincir`
+geçiş türünü sahnenin **`gecisImza`** alanından seçer; **imza yoksa** geçiş
+süresini **2 kareye kırpar** — bu **gözle sert kesmedir**. Metrik tam bu
+karardan türer: `hard_cut_orani = imzasız_geçiş / toplam_geçiş`, ayrıca
+`imza_dagilimi`. ⚠ İki sahneden az varsa geçiş **yoktur** → oran
+**uydurulmaz**, **`GERCEK-TIMELINE-GECIS-YOK`**.
+`sahneleri_cevir` artık `gecis_imza` alanını **taşıyor**.
+
+**`ses_kurgu_olcumu()`** — **J/L-cut ÖLÇÜLÜR**: gerçek hatta her geçiş
+`xfade=duration=g:offset=o` ile **birlikte** `acrossfade=d=g` uygular; ses
+ve video sınırları **aynı** noktadadır. J/L-cut tanımı gereği bu sınırların
+**farklı** olmasıdır → bu hatta böyle bir ayrışma **üretilmez**, ölçülen
+değer **0**'dır (varsayım değil, **yapısal** — gerekçe çıktıya yazılır).
+⚠ **Ducking**: gerçek zaman çizgisi (props) **ducking zarfı taşımaz** →
+**0 ya da PASS UYDURULMAZ**: `olculdu: False` +
+**`GERCEK-TIMELINE-DUCKING-VERISI-YOK`**, `tam: False`.
+
+İkisi de `olc()` çıktısının **üst seviyesinde** ve `olcumler` sözlüğünde.
+
+### ⚠ RUMBLE — yeni eşik İCAT EDİLMEDİ
+
+Önceki raporlarda kullandığım **20 dB** eşiği **tamamen benim uydurduğum**
+bir sayıydı; projede karşılığı **yok**. Artık rumble/hiss **hüküm
+üretmiyor**: sayılar **raporlanıyor**, `PASS/FAIL` **verilmiyor**,
+"**projede kalibre edilmiş eşik YOK**" diye açıkça **ölçülemedi** olarak
+ayrılıyor.
+
+### Red-first
+
+Testler **üretim kodundan ÖNCE** yazıldı ve kırmızı doğrulandı:
+**`AttributeError: module 'gercek_qa' has no attribute 'gecis_olcumu'`**.
+Kapsanan davranışlar: imzasız geçiş → hard cut · imza dağılımı ·
+tek sahne → **`GERCEK-TIMELINE-GECIS-YOK`** · boş timeline'da **sabit PASS
+yok** · J/L-cut = 0 **gerekçeli** · ducking **stabil kodla fail-closed** ve
+`tam=False` · `gecis`/`ses` **tam QA sözleşmesinde**.
+
+⚠ Bir mevcut test **düzeltildi, gevşetilmedi**: stabil kod listesi
+`== {3 kod}` yerine **alt küme** olarak kilitlendi (iddia "bu üçü beyan
+ediliyor"du, "tam olarak üç tane" değil).
