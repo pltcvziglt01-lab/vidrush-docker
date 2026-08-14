@@ -9144,3 +9144,54 @@ verilmediği için ölçüm `KARE-OKUYUCU-YOK` ile duruyordu.
 yorumda modül adını anmak bile testi kırmızı yakıyordu. Kilidin iddiası
 (kod bağımlılığı yok) **doğru ve korundu** — yalnızca kendi yorumumu
 token içermeyecek şekilde yazdım.
+
+### R-1d-c PİLOTU — hedeflenen iki kusur KAPANDI, örnek KABUL EDİLMEDİ
+
+`job_1786715884600_r1dasm_682d2c` · 8 sahne · **16 beat** · PRE-QA
+`QA=FAIL sahne=16` → zincir **RED** (`ZINCIR-EKSIK:pre_qa`).
+
+**Atomun hedefi — ikisi de ölçülerek kapandı:**
+
+| hedef | önce (57.88 sn örneği) | şimdi |
+|---|---|---|
+| B-roll işlev/tür tekrarı | **2 ihlal** (b008, b009) | `video_islev_tur_tekrari: []` · `video_pencere_tur_tekrari: []` · `video_cekim_turu_cesidi: 4` ✅ |
+| PRE-QA ölçümleri iş kaydında | **9 kriter ÖLÇÜLEMEDİ** | **ÖLÇÜLEMEDİ: 0** ✅ |
+
+Artık iş kaydında **ölçülü** duruyor: `kapsam` · `tipografi {katman:1, sorun:0}` ·
+`gecis {hard_cut_orani: 0.688}` · `ses` · `islev {hook:3, kanit:4, aciklama:8, sonuc:1}` ·
+`kaynak_ses {politika: sifir, video_cekim: 4, ihlal: [], temiz: true}` ·
+**`gercek_video_orani: 0.259`** · `kaynak_kullanimi {2 varlık, en uzun 8.052 sn}` ·
+**sorun kodları** (`FACT-BAGLANTI-YOK`, `SAGLAYICI-TEKEL`, `SUREKLILIK-AYNI-CEKIM`,
+`SUREKLILIK-AYNI-SAGLAYICI`).
+
+**Teknik PASS:** 1920×1080 · h264 · **57.98 sn** · aac 48 kHz ·
+**LUFS −14.0** · **TP −1.4 dBTP** · **LRA 3.7** · sessiz oran **%0.0** ·
+ölü final 0.0 sn · hiss 21.0 dB altta · **19 kesme** · siyah **0** ·
+donmuş **0** · **12 kare** · POST-QA **WARN**, FAIL yok ·
+signed URL: kendi oturumu **200** / oturumsuz **401** / **başka tenant 403**.
+
+**FAIL (9):** PRE-QA FAIL · **medya kapsam oranı 0.25** · J/L-cut
+(`ducking_araligi: 0`) · **aynı kaynak 8.052 sn > 8.0** · olgu bağı 4/8 ·
+`pix_fmt` yuv444p · rumble 19.5 dB (⚠ eşik benim, kalibre değil) ·
+teslim RED · kütüphanede yok.
+
+### ⛔ SONRAKİ TEK GERÇEK BLOKAJ — beat sayısı ile aday sayısı uyuşmuyor
+
+```
+kapsam: {"cekim": 16, "medya": 4, "fallback": 12, "kapsam_orani": 0.25}
+```
+
+Plan **8 cümleden 16 beat** üretiyor, köprü ise **sahne başına 1 aday**
+yazıyor (5 aday). Beatlerin **%75'i medyasız** kalıp `fallback`e düşüyor.
+Kalan FAIL'lerin **çoğu bunun türevi**:
+
+* `gercek_video_orani 0.259` — yalnızca 4 video çekim var
+* `SAGLAYICI-TEKEL %100` — 4 çekimin hepsi tek sağlayıcıdan
+* `SUREKLILIK-AYNI-CEKIM` ×2 — aynı varlık tekrar tekrar kullanılıyor
+* **`aynı kaynak 8.052 sn > 8.0`** — 2 varlık 16 beat'e yayıldığı için
+* `FACT-BAGLANTI-YOK` ×4
+
+⚠ Bunu "eşik gevşeterek" kapatmak YANLIŞ olur: kapsam oranı gerçekten
+%25. Doğru atom **beat başına aday üretmek** — ya köprü sahne başına
+birden çok aday yazmalı, ya plan beat sayısını gerçek aday sayısına göre
+türetmeli.
