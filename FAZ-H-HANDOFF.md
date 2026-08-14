@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 14 Ağu | **J-5a ilk gerçek video edinimi + pilot** | `PENDING` | ⚠ **push edildi**, J-4 kapısı edinim hattına **bağlandı**; Wikimedia Commons'tan **tam 1** gerçek video indi (`Irrigation sprinkler 7`, **1920×1080 vp9 52.2 Mbps** 12.47 sn 81.4 MB, **cc-by-sa**, F ASTILY, lisans **kaydı** API'den — izleme sayfası değil, indirme zamanı kayıtlı, **$0.00**); tavanlar **1 dosya / 300 MB**, NASA **devreye girmedi** (sorgu uzay değil), konu dışı fallback **yok**, PEXELS/PIXABAY anahtarı **aranmadı**; kapı **iki kez** koştu (indirme öncesi + ffprobe ölçümüyle sonrası, red → dosya silinir); **25.30 sn 1080p pilot**: POST-QA **PASS**, kalite **100/100**, `video_sure_orani` **0.0 → 0.2123**, statik **1.0 → 0.7877**, LUFS −14.2 (aynı), LRA 2.5 (aynı), TP −2.6 dBFS, **0** sessizlik bölütü, **11 kare**, benzersiz varlık 1.0 / tekrar 0.0 (gerileme yok); ⚠ gerçek video **iki yapısal kısıt** ortaya çıkardı ve düzeltildi: (1) 1080p kaynak 1080p karede **sıfır punch payı** → video kaynakta dijital zoom **yok** (`VIDEO-KAMERA-NOTR`), (2) `static` süre kapısı hareketli kaynakta **geçersiz tahmin** → statik bacağı video atlıyor (enerji bacağındaki **mevcut** desenin aynısı); ⚠ **kapılar gevşetilmedi**, `KALITE-PUNCH-BUYUTME` ve `KALITE-OPTIK-DURGUN` duruyor, POST-QA optiği b004'te **4.366** ölçtü (eşik 2.0) → muafiyet bypass **değil**; (3) `girdi_kur` medya türünü sabit `"image"` yazıyordu — J-1'deki %0'ın **mekanik nedeni**, düzeltildi; ⚠ **KABUL EDİLMİŞ MP4 DEĞİL** — teknik tam PASS ama **semantik değil** (b001 hâlâ 1900 arşiv fotoğrafı, `KALITE-SEMANTIK-DONEM`); ⚠ ilk koşum `teknoloji_i20_rapor.json` + `i20_kare_*.png` üzerine yazdı, rapor git'ten **geri yüklendi**, smoke çıktı adları **parametrelendi**; 34 red-first **ağsız** test; deploy YOK |
 | 14 Ağu | **J-4 video provenance/lisans sözleşmesi (YALNIZ ENGELLER)** | `4440a81` | ✅ **push edildi**, ağsız/indirmesiz koruyucu sözleşme: yeni `medya/video_lisans.py`, video kabulü için **8 zorunlu kanıt** (`kaynak_url`, `saglayici`, `lisans_turu`, **`lisans_kaydi`** — beyan değil, `indirme_zamani`, ffprobe ile ölçülen `codec`/`cozunurluk`/`bitrate`); biri eksikse **RED** ve eksik alan **adıyla** raporlanıyor; ⚠ **YouTube/Vimeo/TikTok/X vb.**: video **açıklamasındaki lisans beyanı TEK BAŞINA YETMİYOR** (`beyan_tek_basina_yeterli: False`), ayrıca `indirme_izni`+`tos_uyumu`+`hak_sahibi_dogrulandi` **üçü birden** şart, eksikse `PLATFORM-IZIN-KANITI-YOK` → RED; izinler açık olsa **bile** lisans kaydı videonun kendi sayfasıysa **beyan sayılıp** RED → ToS/telif ihlali yolu kapalı; **mevcut kapılar gevşetilmedi**: `lisans_karari()` **sarmalanıyor**, ARR/NC/ND/Getty reddi **asla çevrilmiyor**, görsel yolu **hiç değişmedi** (PD beyanı hâlâ geçiyor); red-first **kabul tabanıyla** kuruldu (temiz Commons videosu KABUL) ki kapı totolojik olmasın; ⚠ **bilerek edinim hattına bağlanmadı** ve **ağa çıkmıyor** → seçim/render davranışı değişmedi (HEAD worktree ile `render_plan`/`edit_manifest`/`props` SHA **birebir aynı**), **pilot üretilmedi**; I-23/I-24/I-25/I-38, eşikler, 22 alan, kullanıcı seçimleri, `deploy.sh` **korundu**; deploy YOK, $0.00 |
 | 14 Ağu | **J-3 B-roll/cutaway çeşitliliği ölçüldü (kapı YOK)** | `e9034bb` | ✅ **push edildi**, ağsız tanısal: 7 bağımsız planda `kaynak_saglayici_dagilimi` (çekim **ve süre**), `benzersiz_varlik_orani`, `cekim_turu_dagilimi`, `tekrar_sure_orani`, provenance ve `gercek_video_*` ölçüldü; **taban**: benzersiz oran 6 planda 1.000 / `_smoke_editorv2` **0.750**, tekrar süresi 6 planda 0.000 / **0.126**, **çekim türü çeşidi 7/7 planda tam 3** (cutaway **dar**), tek sağlayıcı **süre** oranı 6 planda **1.000** / `_i20` **0.949**, **gerçek video 0.0** (açıkça 0 raporlanıyor, J-2a'dan okunuyor); ⚠ süre tabanlı ölçüm mevcut çekim tabanlı kapıdan **farklı bilgi** veriyor (`_i20` 0.80 → 0.949) → `SAGLAYICI-TEKEL` **çoğaltılmadı**; EMİN DEĞİLSEN ENGELLEME: kimlik yoksa oran **`None`** (1.0 değil), lisans boş/`unknown` ise provenance **ölçülemedi** + `uyari_adayi` (WARN **üretilmedi**, `durum`u değiştirirdi), J-2a yoksa video alanı **`None`**; `hedef: None`, `enforce: False`, **yeni fail kodu YOK**; red-first: doğal karşı-örnek `_smoke_editorv2` ayrışıyor + 5 sentetik müdahalenin **5'i** metriği tersine çeviriyor; **render değişmezliği kanıtlandı** (HEAD worktree, `render_plan`/`edit_manifest`/`props` SHA **birebir aynı**, QA WARN 0/3) → **pilot üretilmedi**; I-23/I-24/I-25/I-38, eşikler, lisans/provenance, 22 alan, kullanıcı seçimleri, `deploy.sh`, üretim seçim kodu **korundu**; deploy YOK, $0.00 |
 | 14 Ağu | **J-2a medya türü rapor sözleşmesi (kapı YOK)** | `09edd97` | ✅ **push edildi**, J-1 tabanı uygulamanın kendi raporuna bağlandı: `olcumler["medya_turu"]` → `video_sure_orani` + `donmus_kadraj_sure_orani` (+ statik/ölçülemedi oranları, kalemler); okuyucu deseni **mevcutla birebir** (`kare_okuyucu` dışarıdan, modül **dosya açmaz**), okuyucu yoksa oranlar **`None`** — 0.0 değil, çünkü 0.0 "video yok" **iddiasıdır**; ⚠ **seviye hatası ölçülüp ayrıştırıldı**: 0.155 **korpus agregası**, plan başına uygulanırsa **7 planın 4'ünde yanlış pozitif** → ayrı `DONMUS_KADRAJ_PLAN_REFERANSI = 0.334` (formül: `ceil(maks_gözlenen, 3)`), mevcut korpusta yanlış pozitif **0/7**; ikisi de **`enforce: False`**, hiçbir yerde uygulanmıyor; `VIDEO_SURE_ORANI_HEDEFI = None` — **uydurulmadı** (pozitif örnek yok); **yeni fail kodu YOK**, ölçüm modülü hüküm vermiyor; **render değişmezliği kanıtlandı** (HEAD worktree ile `render_plan`/`edit_manifest`/`props` SHA **birebir aynı**, QA WARN 0/3 aynı) → **pilot üretilmedi**; ⚠ yol boyunca gerçek kusur: `denetle()` imzasındaki bool `kalite_kapisi` parametresi modül adını **gölgeliyor** (→ `_KK` takma adı); I-23/I-24/I-25/I-38, eşikler, lisans/provenance, 22 alan, kullanıcı seçimleri, `deploy.sh` **korundu**; deploy YOK, $0.00 |
@@ -5675,6 +5676,129 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 81. FAZ J-5a — İLK GERÇEK VİDEO EDİNİMİ VE PİLOT (14 Ağu)
+
+> **Durum: J-4 kapısı edinim hattına **bağlandı** ve Wikimedia Commons'tan
+> **tam 1** gerçek video indirildi (1920×1080 VP9, 52.2 Mbps, 12.47 sn,
+> 81.4 MB, CC BY-SA, **$0.00**). 25.30 sn 1080p pilot üretildi:
+> **POST-QA PASS, kalite 100/100**, gerçek video oranı **%0.0 → %21.2**.
+> A–I yeşil (**3741**, 0 hata, 2 bilinen BLOKE).
+> ⚠ **KABUL EDİLMİŞ MP4 DEĞİL** — teknik PASS ama semantik değil (aşağıda).
+> Deploy YOK.**
+
+### İndirilen varlık ve J-4 kanıtları
+
+| Kanıt | Değer |
+|---|---|
+| Başlık | `Irrigation sprinkler 7 2017-06-25.webm` |
+| Sağlayıcı | wikimedia (anahtarsız) · **eser sahibi** F ASTILY |
+| Lisans | **cc-by-sa** · atıf zorunlu, künye ekranda çiziliyor |
+| Kaynak URL | `commons.wikimedia.org/wiki/File:Irrigation_sprinkler_7_2017-06-25.webm` |
+| Lisans **kaydı** | Commons API `imageinfo/extmetadata` (izleme sayfası **değil**) |
+| İndirme zamanı | `2026-08-14T08:57:23Z` |
+| codec / çözünürlük / bitrate | **vp9 / 1920×1080 / 52 242 783 bps** (ffprobe ile ölçüldü) |
+| Boyut | 81.4 MB (tavan 300 MB) · **1 dosya** (tavan 1) |
+| Maliyet | **$0.00** |
+
+Seçim kuralı kodda: tavan içindeki izinli özgünler arasından **en yüksek
+çözünürlük → en yüksek bitrate → en uzun süre**. Süresi yetersiz aday
+(`Irrigation sprinkler 9`, 7.6 sn < 8.0) elendi ve **raporlandı**.
+
+### Kapı iki kez koştu
+
+`video_provenance_karari()` indirmeden **önce** (aday kanıtları) ve
+indirmeden **sonra** (ffprobe ile ölçülen codec/çözünürlük/bitrate) çalıştı.
+Son kontrol reddetseydi **dosya silinecekti**. İndirme mevcut
+`guvenli_indir` üzerinden: SSRF + içerik türü + akış sırasında bayt tavanı +
+HTML izi + ffprobe decode. Redirect/HTML/bozuk medya/eksik lisans yolları
+red-first testlerle kanıtlandı.
+
+**NASA** devreye **girmedi** — sorgu uzay değil (`uzay_sorgusu_mu()` False).
+Konu dışı fallback **yok**. PEXELS/PIXABAY anahtarı **aranmadı** (modülde
+`os.environ`/`getenv` çağrısı yok, testle doğrulandı).
+
+### ⚠ Gerçek videonun ortaya çıkardığı İKİ yapısal kısıt
+
+Pilot ilk iki denemede **PRE-QA'da bloke oldu**. İkisi de gerçek bulgu:
+
+**1. 1080p kaynak + 1080p kare = sıfır punch payı.** `punch-1.6` kadraj
+ekranda **1.696×** büyütüyordu ve `KADRAJ_MERDIVENI`'nin **hiçbir basamağı**
+kurtarmıyordu (fotoğraflarda 3–5× pay vardı, videoda **yok**).
+→ **Düzeltme:** video kaynakta dijital zoom **uygulanmıyor**
+(`static`/`tam`, `VIDEO-KAMERA-NOTR` uyarısıyla). Kapı **gevşetilmedi** —
+gereksiz büyütmenin **kendisi** kaldırıldı; `KALITE-PUNCH-BUYUTME` duruyor.
+
+**2. `static` kamera süre kapısı hareketli kaynakta geçersiz.**
+`KALITE-OPTIK-DURGUN`, **durgun fotoğraf** üzerindeki statik kameradan optik
+durağanlık **tahmin eder**. Gerçek videoda o tahmin yanlıştır.
+→ **Düzeltme:** statik-sahne bacağı video kaynağı atlıyor — bu, **aynı
+fonksiyonda zaten var olan** enerji-bacağı muafiyetinin (`medya_turu ==
+"video" → continue`) birebir aynısı. Gerçek hüküm POST-QA'nın
+`optik_hareket_olcusu`'nda ve **aynen yürürlükte**.
+
+⚠ **Ampirik doğrulama:** b004 `static` kamerayla POST-QA'da optik **4.366**
+ölçtü (eşik 2.0) — hareket gerçekten görüntünün kendisinde. Muafiyet ölçümü
+**bypass etmiyor**.
+
+**3. Üçüncü kusur:** `girdi_kur()` medya türünü **sabit `"image"`** yazıyordu
+— J-1'de ölçülen %0'ın **mekanik nedeni buydu**. Artık varlığın kendi
+türünden okunuyor.
+
+### Pilot ölçümleri — önceki pilotla karşılaştırma
+
+| Ölçü | i56 (önceki) | **j5a** | Değişim |
+|---|---|---|---|
+| `video_sure_orani` | 0.0000 | **0.2123** | **+%21.2** |
+| `statik_sure_orani` | 1.0000 | **0.7877** | −%21.2 |
+| video çekim sayısı | 0 | **1** | +1 |
+| `donmus_kadraj_sure_orani` | 0.0 | 0.0 | = |
+| `benzersiz_varlik_orani` | 1.0 | 1.0 | = |
+| `tekrar_sure_orani` | 0.0 | 0.0 | = |
+| Süre / çözünürlük | 25.2 sn 1080p | **25.30 sn 1080p** | = |
+| POST-QA | PASS | **PASS** | = |
+| Kalite puanı | 100/100 | **100/100** | = |
+| Integrated loudness | −14.2 LUFS | **−14.2 LUFS** | = |
+| LRA | 2.5 LU | **2.5 LU** | = |
+| True peak | −3.1 dBFS | **−2.6 dBFS** | +0.5 dB |
+| Sessizlik (−50 dB, 0.3 sn) | — | **0 bölüt** | temiz |
+| Kare örneklemesi | 11 | **11** (6 beat) | = |
+| Kesme/geçiş algılaması | — | 20 | — |
+| Maliyet | $0.00 | **$0.00** | = |
+
+Görsel doğrulama: b004 penceresinden çıkarılan kare **gerçek yağmurlama
+görüntüsünü**, doğru altyazıyı ve sağ üstte `F ASTILY / CC-BY-SA` künyesini
+gösteriyor.
+
+### ⚠ KABUL EDİLMİŞ MP4 DEĞİL
+
+Teknik taraf **tam PASS**. Semantik taraf **değil**: PRE-QA hâlâ
+`KALITE-SEMANTIK-DONEM` WARN veriyor — **b001** açılış çekimi 1900 tarihli
+arşiv fotoğrafını (`Vegetable, grass and flower seeds, 1900`) güncel
+anlatımla eşleştiriyor. Bu I-47/I-57/I-58'den beri **açık olan** kusurdur ve
+J-5a'nın kapsamı **değildi**. Ayrıca `SAGLAYICI-TEKEL` %100 ve `PERDE-EKSIK`
+WARN'ları duruyor.
+
+### ⚠ Yol boyunca yapılan hata ve düzeltmesi
+
+İlk pilot koşumu, smoke modülünün **sabit kodlu** çıktı adlarını kullandığı
+için `outputs/sample/teknoloji_i20_rapor.json` ve `i20_kare_*.png`
+dosyalarının **üzerine yazdı** — I-23/I-25/I-27/I-33 kanıt artefaktları.
+Rapor JSON'u git'ten **geri yüklendi** (izleniyor); PNG kareler izlenmiyor
+(gitignore) ve **üzerine yazıldı**, i20 smoke'u yeniden koşularak
+üretilebilir. Tekrarı önlemek için smoke çıktı adları **parametrelendi**
+(`RAPOR_ADI` / `BLOKE_RAPOR_ADI` / `KARE_ONEKI`; varsayılanlar aynen eski) ve
+bu testle kilitlendi.
+
+### Testler
+
+§40m'de **34 red-first** birim/entegrasyon kontrolü **ağsız** koşuyor (sahte
+arayıcı): tavanlar, konu dışı fallback yokluğu, NASA koşulu, J-4 bağlantısı,
+HTML/bozuk medya reddi, dosya silme. Üstüne davranış kilidi ve pilot kanıtı.
+J-1/J-2a/J-3'ün **"video oranı sıfır"** taban iddiaları silinmedi,
+**tarihlendirildi**: J-5a planı dışındaki planlarda hâlâ sıfır.
 
 ---
 

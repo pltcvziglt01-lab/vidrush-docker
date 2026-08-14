@@ -43,6 +43,12 @@ sys.path.insert(0, KOK)
 os.environ.setdefault("VIDRUSH_KOK", os.path.join(DEPO, "cikti", "_i20_kok"))
 
 CIKTI_DIZIN = os.path.join(DEPO, "outputs", "sample")
+# ⚠ FAZ J-5a: rapor/kare adlari SABIT KODLU idi; farkli girdiyle kosan bir
+# surucu ONCEKI pilotun kanit artefaktlarinin UZERINE yaziyordu. Adlar artik
+# modul sabiti — varsayilanlar AYNEN eskisi, surucu gecersiz kilabilir.
+RAPOR_ADI = "teknoloji_i20_rapor.json"
+BLOKE_RAPOR_ADI = "teknoloji_i20_bloke_rapor.json"
+KARE_ONEKI = "i20_kare"
 VIDEO_ADI = "editorv2_teknoloji_i20.mp4"
 FIXTURE = os.path.join(DEPO, "app", "render-studio", "public", "editorv2",
                        "faz_e")
@@ -725,7 +731,11 @@ def girdi_kur(secilen, sinirlar, kesim_sn):
         adaylar.append({
             "asset_id": se["asset_id"], "scene_id": sid, "fact_id": fid,
             "saglayici": se["saglayici"], "lisans": se["lisans"],
-            "tur": "image", "medya_turu": "image",
+            # ⚠ FAZ J-5a: tur ARTIK VARLIGIN KENDISINDEN okunuyor. Onceden
+            # sabit "image" yaziliyordu; gercek video bir pilota bu yuzden
+            # HIC giremiyordu (J-1'de olculen %0'in mekanik nedeni buydu).
+            "tur": se.get("tur") or "image",
+            "medya_turu": se.get("medya_turu") or se.get("tur") or "image",
             "yerel_yol": se["yol"], "medya_yolu": se["yol"],
             "orijinal_url": se["orijinal_url"],
             "eser_sahibi": se["eser_sahibi"],
@@ -743,7 +753,9 @@ def girdi_kur(secilen, sinirlar, kesim_sn):
             adaylar.append({
                 "asset_id": _y["asset_id"], "scene_id": sid, "fact_id": fid,
                 "saglayici": _y.get("saglayici"), "lisans": _y.get("lisans"),
-                "tur": "image", "medya_turu": "image",
+                "tur": _y.get("tur") or "image",
+                "medya_turu": (_y.get("medya_turu") or _y.get("tur")
+                               or "image"),
                 "yerel_yol": _y["yol"], "medya_yolu": _y["yol"],
                 "orijinal_url": _y.get("orijinal_url"),
                 "eser_sahibi": _y.get("eser_sahibi"),
@@ -909,12 +921,12 @@ def main() -> int:
                     "kaynaklidir (cikis IP hiz siniri), lisans reddi DEGIL."),
         }
         os.makedirs(CIKTI_DIZIN, exist_ok=True)
-        with open(os.path.join(CIKTI_DIZIN, "teknoloji_i20_bloke_rapor.json"),
+        with open(os.path.join(CIKTI_DIZIN, BLOKE_RAPOR_ADI),
                   "w", encoding="utf-8") as f:
             json.dump(bloke, f, ensure_ascii=False, indent=2)
         print(f"\nBLOKE: {len(eksik)} sahne icin gorsel EDINILEMEDI "
               f"({sinif}). Sahte gorsel URETILMEDI.")
-        print("      rapor: outputs/sample/teknoloji_i20_bloke_rapor.json")
+        print(f"      rapor: outputs/sample/{BLOKE_RAPOR_ADI}")
         return 2
     gorsel_olcumleri = [{"asset_id": s["asset_id"], "detay_std": s["detay_std"]}
                         for s in secilen]
@@ -1194,7 +1206,7 @@ def main() -> int:
         print(f"      ⚠ YETERSIZ ORNEKLEME: {_ornek.get('sebep')}")
     kareler = []
     for t in kare_anlari:
-        ad = f"i20_kare_{str(t).replace('.', '_')}s.png"
+        ad = f"{KARE_ONEKI}_{str(t).replace('.', '_')}s.png"
         kare = os.path.join(CIKTI_DIZIN, ad)
         kos(["ffmpeg", "-nostdin", "-loglevel", "error", "-y", "-ss", str(t),
              "-i", video, "-frames:v", "1", kare], 60)
@@ -1373,10 +1385,10 @@ def main() -> int:
                 "altyazi ve kaynak kunyesi (sonraki atom)",
                                 "ucretli API (maliyet $0.00)"]},
     }
-    with open(os.path.join(CIKTI_DIZIN, "teknoloji_i20_rapor.json"), "w",
+    with open(os.path.join(CIKTI_DIZIN, RAPOR_ADI), "w",
               encoding="utf-8") as f:
         json.dump(rapor, f, ensure_ascii=False, indent=2)
-    print(f"\n      rapor : outputs/sample/teknoloji_i20_rapor.json")
+    print(f"\n      rapor : outputs/sample/{RAPOR_ADI}")
 
     pass_mi = (qa["durum"] != "FAIL" and pd["durum"] != "FAIL")
     print("\n" + "=" * 72)

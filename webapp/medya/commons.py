@@ -193,6 +193,133 @@ def ara(sorgu: str, *, adet: int = 6, en_az_genislik: int = 0,
     return sonuc
 
 
+# ═══════ VIDEO ARAMA (Faz J-5a) — GORSEL YOLU DEGISMEZ ════════════════
+# ⚠ `ara()` AYNEN duruyor (filetype:bitmap). Video AYRI bir fonksiyondur;
+# gorsel secimi/siralamasi bu atomda HIC degismedi.
+VIDEO_MIME_IZINLI = ("video/webm", "video/ogg", "video/mp4",
+                     "application/ogg")
+# Commons'ta yaygin ve ffmpeg'in sorunsuz cozdugu kodekler.
+VIDEO_KODEK_IZINLI = ("vp8", "vp9", "av1", "h264", "theora", "mpeg4")
+
+
+def video_ara(sorgu: str, *, adet: int = 8, en_az_genislik: int = 0,
+              en_az_sure_sn: float = 0.0, zaman_asimi: int = 30,
+              acan: Optional[Callable] = None) -> dict:
+    """Commons'ta VIDEO ara ve lisans duvarindan gecen adaylari don.
+
+    ⚠ Lisans karari yine `lisans.py`nin isidir; bu modul karar VERMEZ.
+    ⚠ Bitrate burada API'nin verdigi BOYUT/SURE'den TAHMIN edilir ve
+    `bitrate_tahmini` diye AYRI isimlendirilir — J-4'un istedigi KANIT
+    indirmeden sonra ffprobe ile OLCULUR, bu tahmin kanit DEGILDIR.
+    """
+    sonuc = {"ok": False, "sorgu": str(sorgu or ""), "denenen": 0,
+             "adaylar": [], "elenen": [], "hata": ""}
+    if not str(sorgu or "").strip():
+        sonuc["hata"] = "SORGU-BOS"
+        return sonuc
+    try:
+        ham = _api_cagir({
+            "generator": "search",
+            "gsrsearch": f"filetype:video {sorgu}",
+            "gsrnamespace": DOSYA_AD_ALANI,
+            "gsrlimit": max(1, int(adet) * 3),
+            "prop": "imageinfo",
+            "iiprop": "url|size|mime|extmetadata|mediatype",
+        }, zaman_asimi=zaman_asimi, acan=acan)
+    except Exception as e:                                        # noqa: BLE001
+        sonuc["hata"] = f"{type(e).__name__}: {str(e)[:140]}"
+        return sonuc
+
+    sayfalar = list(((ham.get("query") or {}).get("pages") or {}).values())
+    sonuc["denenen"] = len(sayfalar)
+    for sayfa in sayfalar:
+        bilgi = (sayfa.get("imageinfo") or [{}])[0]
+        em = bilgi.get("extmetadata") or {}
+
+        def al(alan):
+            return _metni_temizle((em.get(alan) or {}).get("value") or "")
+
+        baslik = _metni_temizle(sayfa.get("title") or "")
+        ad = baslik[5:] if baslik.lower().startswith("file:") else baslik
+        mime = str(bilgi.get("mime") or "").lower()
+        genislik = int(bilgi.get("width") or 0)
+        yukseklik = int(bilgi.get("height") or 0)
+        boyut = int(bilgi.get("size") or 0)
+        try:
+            sure = float(bilgi.get("duration") or 0.0)
+        except (TypeError, ValueError):
+            sure = 0.0
+        try:
+            alaka = int(sayfa.get("index"))
+        except (TypeError, ValueError):
+            alaka = 10 ** 6
+
+        kayit = {"LicenseShortName": al("LicenseShortName"),
+                 "license_url": al("LicenseUrl"),
+                 "Artist": al("Artist"), "Credit": al("Credit"),
+                 "UsageTerms": al("UsageTerms")}
+        karar = lisans.lisans_karari(kayit, "wikimedia")
+        aday = {
+            "asset_id": "", "baslik": ad, "saglayici": "wikimedia",
+            "tur": "video", "medya_turu": "video",
+            "alaka_sirasi": alaka,
+            "genislik": genislik, "yukseklik": yukseklik,
+            "sure_sn": sure, "boyut_bayt": boyut, "mime": mime,
+            "bitrate_tahmini": (int(boyut * 8 / sure) if sure > 0 else 0),
+            "indirme_url": str(bilgi.get("url") or ""),
+            "orijinal_url": str(bilgi.get("descriptionurl")
+                                or bilgi.get("url") or ""),
+            # ⚠ J-4'un istedigi BAGIMSIZ lisans kaydi: dosyanin API kaydi
+            # (izleme sayfasinin kendisi DEGIL).
+            "lisans_kaydi": (f"{API}?action=query&prop=imageinfo"
+                             f"&iiprop=extmetadata&titles="
+                             f"{baslik.replace(' ', '_')}"),
+            "lisans": karar.get("lisans", ""),
+            "lisans_url": karar.get("lisans_url", ""),
+            "eser_sahibi": karar.get("eser_sahibi", ""),
+            "atif_gerekli": bool(karar.get("atif_gerekli")),
+            "render_kullanilabilir": bool(karar.get("render_kullanilabilir")),
+            "red_nedeni": karar.get("red_nedeni", ""),
+        }
+        aday["atif_metni"] = lisans.atif_metni(
+            aday["lisans"], aday["eser_sahibi"], ad, aday["orijinal_url"])
+
+        def ele(neden):
+            sonuc["elenen"].append({"baslik": ad, "neden": neden})
+
+        if not aday["render_kullanilabilir"]:
+            ele(aday["red_nedeni"] or "LISANS")
+            continue
+        if not aday["eser_sahibi"]:
+            ele("ESER-SAHIBI-YOK")
+            continue
+        if not any(mime.startswith(m) for m in VIDEO_MIME_IZINLI):
+            ele(f"MIME-UYGUNSUZ ({mime or 'bos'})")
+            continue
+        if not aday["indirme_url"]:
+            ele("URL-YOK")
+            continue
+        if sure <= 0:
+            ele("SURE-OKUNAMADI")
+            continue
+        if en_az_sure_sn and sure < float(en_az_sure_sn):
+            ele(f"SURE-YETERSIZ ({sure:.1f} < {en_az_sure_sn})")
+            continue
+        if en_az_genislik and genislik < int(en_az_genislik):
+            ele(f"COZUNURLUK-YETERSIZ ({genislik} < {en_az_genislik})")
+            continue
+        sonuc["adaylar"].append(aday)
+
+    # ⚠ I-25 dersi: ALAKA BIRINCIL. Konu disi ama buyuk bir dosya basa
+    # gecmemeli. Esit alakada cozunurluk, sonra bitrate tahmini.
+    sonuc["adaylar"].sort(key=lambda a: (a["alaka_sirasi"],
+                                         -(a["genislik"] * a["yukseklik"]),
+                                         -a["bitrate_tahmini"]))
+    sonuc["adaylar"] = sonuc["adaylar"][:max(1, int(adet))]
+    sonuc["ok"] = bool(sonuc["adaylar"])
+    return sonuc
+
+
 def indir(aday: dict, hedef: str, *, istek: Optional[Callable] = None,
           maks_bayt: int = 40 * 1024 * 1024, zaman_asimi: int = 60,
           deneme: int = 3, bekleme_tavani: float = 20.0,

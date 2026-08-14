@@ -259,6 +259,20 @@ def _motion_kur(cekimler: list, beatler: list, p: EditProfili,
         _aday = (adaylar_index or {}).get(getattr(c, "asset_id", "")) or {}
         _g, _y = _aday.get("genislik"), _aday.get("yukseklik")
         _pb = {"olculdu": False, "neden": "OLCU-YOK", "buyutuyor": False}
+        # ⚠ FAZ J-5a — HAREKETLI KAYNAKTA DIJITAL ZOOM YOK.
+        # Gercek video zaten hareket TASIR; ustune Ken Burns koymak (a) gereksiz,
+        # (b) kaynak cozunurlugu kare olcusune ESITSE kacinilmaz UPSCALE demektir
+        # (olculdu: 1920x1080 kaynak + punch-1.6 -> ekranda 1.696x buyume ve
+        # KADRAJ_MERDIVENI'nin HICBIR basamagi kurtarmiyor). Kapi GEVSETILMIYOR;
+        # gereksiz buyutmenin KENDISI kaldiriliyor.
+        _tur_aday = str(_aday.get("medya_turu") or _aday.get("tur") or "")
+        if _tur_aday.lower() == "video":
+            if c.kadraj != "tam" or c.hareket != "static":
+                c.uyarilar.append(
+                    f"VIDEO-KAMERA-NOTR: kaynak zaten hareketli "
+                    f"({c.hareket}/{c.kadraj} -> static/tam); dijital zoom "
+                    f"UYGULANMADI")
+            c.hareket, c.kadraj = "static", "tam"
         if _g and _y and _kg and _ky and getattr(c, "kaynak_turu", "") == "medya":
             # Hareketin KENDI zoom ucu: kadraj carpani UYGULANMADAN.
             _taban = motion.kamera_spec(c.hareket, b.sure_sn, "tam", p=p)

@@ -6505,6 +6505,8 @@ else:
             (os.path.basename(os.path.dirname(_p1)), _sh1))
     _J1_TEMSIL = [sorted(v, key=lambda t: t[0])[0][1]
                   for v in _J1_IMZA.values()]
+    _J1_PLAN_ADI = [sorted(v, key=lambda t: t[0])[0][0]
+                    for v in _J1_IMZA.values()]
     _J1_CEKIM = [s for plan in _J1_TEMSIL for s in plan]
 
     kontrol("⭐ J-1: ayni planin yeniden renderlari BAGIMSIZ ORNEK "
@@ -6533,11 +6535,21 @@ else:
               f"({100 * _J1_S.get(_k1, 0.0) / _J1_TOP:5.1f}%)")
 
     # ── TABAN BULGUSU ──
-    kontrol("⭐ J-1 TABAN: GERCEK HAREKETLI VIDEO orani SIFIR — kayitli "
-            "hicbir planda video kaynagi kullanilmamis",
-            _J1_C.get("a_video", 0) == 0,
-            {k: _J1_C.get(k, 0) for k in
-             ("a_video", "b_kenburns", "b0_hareketsiz", "c_sentetik")})
+    # ⚠ J-5a'DA DEGISTI. J-1'in olctugu taban "video orani SIFIR"di ve o
+    # iddia J-5a'ya kadar DOGRUYDU. Artik korpusta GERCEK video var; iddia
+    # SILINMEDI, TARIHLENDIRILDI: J-5a plani DISINDA hala sifir.
+    _J1_VIDEOLU = [p_ for p_, pl in zip(_J1_PLAN_ADI, _J1_TEMSIL)
+                   if any(_j1_sinif(s_) == "a_video" for s_ in pl)]
+    kontrol("⭐ J-1 TABAN (J-5a ONCESI): video kaynagi kullanan plan "
+            "YALNIZCA J-5a pilotu — diger planlarin HEPSI hala SIFIR",
+            _J1_VIDEOLU == ["_j5a_calisma"],
+            {"videolu_plan": _J1_VIDEOLU,
+             "sinif": {k: _J1_C.get(k, 0) for k in
+                       ("a_video", "b_kenburns", "b0_hareketsiz",
+                        "c_sentetik")}})
+    kontrol("⭐ J-1: J-5a plani olcumu GERCEKTEN degistirdi — video "
+            "cekim sayisi artik SIFIRDAN BUYUK",
+            _J1_C.get("a_video", 0) >= 1, _J1_C.get("a_video", 0))
     kontrol("⭐ J-1 TABAN: SURE'nin %90'indan fazlasi STATIK FOTOGRAF "
             "(Ken Burns dahil)",
             _J1_STATIK_S / _J1_TOP > 0.90,
@@ -6572,10 +6584,15 @@ else:
     _J1_KAYNAK = sorted({str(s.get("medya_yolu") or "") for s in _J1_CEKIM
                          if str(s.get("kaynak_turu") or "") == "medya"})
     _J1_NEG = [(os.path.basename(y), _j1_kare(y)) for y in _J1_KAYNAK if y]
-    kontrol("⭐ J-1 KARSI-ORNEK: kaynak dosyalarin HEPSI ffprobe ile TEK "
-            "KARE (negatif sinifta YANLIS POZITIF yok)",
-            bool(_J1_NEG) and all(n == 1 for _, n in _J1_NEG),
-            [x for x in _J1_NEG if x[1] != 1])
+    # ⚠ J-5a SONRASI korpus ARTIK KARISIK: durgun fotograflar TEK KARE,
+    # gercek video COK KARE. Sinif AYNI korpusta ikisini AYIRT ETMELI.
+    _J1_TEK = [x for x in _J1_NEG if x[1] == 1]
+    _J1_COK = [x for x in _J1_NEG if x[1] and x[1] > 1]
+    kontrol("⭐ J-1 KARSI-ORNEK: AYNI korpusta durgun kaynaklar TEK KARE, "
+            "gercek video COK KARE — sinif ikisini AYIRIYOR",
+            len(_J1_TEK) >= 20 and len(_J1_COK) == 1
+            and all(n is not None for _, n in _J1_NEG),
+            {"tek_kare": len(_J1_TEK), "cok_kare": _J1_COK})
     kontrol("⭐ J-1: sinif karari `medya_turu` ALANINA DEGIL dosyanin "
             "KENDISINE dayaniyor; alan da bagimsiz olarak ayni sonucu veriyor",
             all(str(s.get("medya_turu") or "") == "image" for s in _J1_CEKIM
@@ -6650,10 +6667,17 @@ if _J1_FFPROBE and _J1_PLAN:
             all(o["olculdu"] is True for o in _J2_ORAN)
             and all(o["cekim"]["olculemedi"] == 0 for o in _J2_ORAN),
             [o["cekim"]["olculemedi"] for o in _J2_ORAN])
-    kontrol("⭐ J-2a TABAN: her planda `video_sure_orani` = 0.0 "
-            "(J-1 ile AYNI sonuc, bagimsiz kod yolundan)",
-            all(o["video_sure_orani"] == 0.0 for o in _J2_ORAN),
+    # ⚠ J-5a'DA DEGISTI: tam olarak BIR plan artik video tasiyor.
+    _J2_SIFIR = [o for o in _J2_ORAN if o["video_sure_orani"] == 0.0]
+    _J2_VIDEOLU = [o for o in _J2_ORAN if o["video_sure_orani"] > 0.0]
+    kontrol("⭐ J-2a TABAN: TAM OLARAK BIR plan video tasiyor (J-5a "
+            "pilotu); kalan planlar hala 0.0 — J-1 ile AYNI sonuc",
+            len(_J2_VIDEOLU) == 1 and len(_J2_SIFIR) == len(_J2_ORAN) - 1,
             [o["video_sure_orani"] for o in _J2_ORAN])
+    kontrol("⭐ J-2a: J-5a pilotunun video oraninin BUYUKLUGU de "
+            "raporlaniyor (sessiz bayrak degil, OLCU)",
+            0.15 < _J2_VIDEOLU[0]["video_sure_orani"] < 0.30,
+            _J2_VIDEOLU[0]["video_sure_orani"])
 
     # ── RED-FIRST (2): gercek video konunca oran ARTMALI ──
     _J2_MP4 = sorted(_g1.glob(os.path.join(os.path.dirname(KOK), "outputs",
@@ -6820,7 +6844,7 @@ if _J1_PLAN:
     _J3_TAM = [o for o in _J3 if o["benzersiz_varlik_orani"] == 1.0]
     kontrol("⭐ J-3 RED-FIRST: DOGAL karsi-ornek (`_smoke_editorv2`) "
             "metriklerle AYRISIYOR — benzersiz oran < 1.0 VE tekrar > 0",
-            len(_J3_TEK) == 1 and len(_J3_TAM) == 6
+            len(_J3_TEK) == 1 and len(_J3_TAM) == len(_J3) - 1
             and _J3_TEK[0]["tekrar_sure_orani"] > 0
             and all(o["tekrar_sure_orani"] == 0.0 for o in _J3_TAM),
             (_J3_TEK[0]["benzersiz_varlik_orani"],
@@ -7181,6 +7205,269 @@ kontrol("J-4: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
                                             "Video.tsx"))
 kontrol("J-4: deploy.sh DOKUNULMADI",
         "docker commit" in oku(os.path.dirname(KOK), "deploy.sh"))
+
+
+blok("§40m J-5a — GERCEK VIDEO EDINIMI (dar kapsam, tavanli, red-first)")
+
+# ⚠ BU BLOKTA AG KULLANILMAZ: arayici SAHTE cagrilabilirdir. Gercek indirme
+# ayri ve TEK seferlik yapildi; kaniti asagida §40n'de olculuyor.
+# Kapsam: J-4 kapisinin edinim hattina BAGLANDIGI dogrulanir, tavanlar ve
+# RED yollari red-first kanitlanir.
+
+_VE = __import__("medya.video_edinim", fromlist=["video_edinim"])
+
+
+def _j5_aday(**ek):
+    a = {"asset_id": "", "baslik": "Irrigation sprinkler", "saglayici": "wikimedia",
+         "tur": "video", "medya_turu": "video", "alaka_sirasi": 1,
+         "genislik": 1920, "yukseklik": 1080, "sure_sn": 16.5,
+         "boyut_bayt": 75_000_000, "mime": "video/webm",
+         "bitrate_tahmini": 36_000_000,
+         "indirme_url": "https://upload.wikimedia.org/x.webm",
+         "orijinal_url": "https://commons.wikimedia.org/wiki/File:x.webm",
+         "lisans_kaydi": "https://commons.wikimedia.org/w/api.php?titles=x",
+         "lisans": "cc-by-sa", "lisans_url": "https://cc.org/by-sa",
+         "eser_sahibi": "Jane", "atif_gerekli": True,
+         "render_kullanilabilir": True, "red_nedeni": "",
+         "atif_metni": "Jane / CC BY-SA", "license": "CC BY-SA 4.0",
+         "artist": "Jane"}
+    a.update(ek)
+    return a
+
+
+def _j5_arayici(adaylar, elenen=None, hata=""):
+    def _ara(sorgu, **kw):
+        return {"ok": bool(adaylar), "sorgu": sorgu, "denenen": len(adaylar),
+                "adaylar": list(adaylar), "elenen": list(elenen or []),
+                "hata": hata}
+    return _ara
+
+
+_J5_DIZIN = os.path.join(tempfile.mkdtemp(prefix="j5_"), "medya")
+os.makedirs(_J5_DIZIN, exist_ok=True)
+from medya import guvenlik as _j5guv                     # noqa: E402
+
+
+def _j5_bozuk_dosya():
+    """Medya OLMAYAN ama yeterince buyuk bir dosya — kapi reddetmeli."""
+    y = os.path.join(_J5_DIZIN, "bozuk.webm")
+    with open(y, "wb") as f:
+        f.write(b"\x00\x01bozuk-veri" * 2000)
+    return y
+
+# ── (1) TAVANLAR SERT ──
+kontrol("⭐ J-5a: indirme tavani DOSYA=1 ve BAYT=300MB olarak SABIT",
+        _VE.INDIRME_TAVANI_DOSYA == 1
+        and _VE.INDIRME_TAVANI_BAYT == 300 * 1024 * 1024,
+        (_VE.INDIRME_TAVANI_DOSYA, _VE.INDIRME_TAVANI_BAYT))
+kontrol("⭐ J-5a RED-FIRST: TAVANI ASAN aday secilmiyor ve neden "
+        "RAPORLANIYOR (301 MB reddedilir)",
+        _VE.aday_sec([_j5_aday(boyut_bayt=301 * 1024 * 1024)])[0] is None
+        and "TAVAN-ASIYOR" in _VE.aday_sec(
+            [_j5_aday(boyut_bayt=301 * 1024 * 1024)])[1][0]["neden"])
+kontrol("⭐ J-5a: tavan icindeki adaylar arasindan EN YUKSEK COZUNURLUK "
+        "seciliyor (720p yerine 1080p)",
+        _VE.aday_sec([_j5_aday(genislik=1280, yukseklik=720,
+                               baslik="720p"),
+                      _j5_aday(baslik="1080p")])[0]["baslik"] == "1080p")
+kontrol("⭐ J-5a: esit cozunurlukte EN YUKSEK BITRATE seciliyor",
+        _VE.aday_sec([_j5_aday(bitrate_tahmini=10_000_000, baslik="dusuk"),
+                      _j5_aday(bitrate_tahmini=40_000_000, baslik="yuksek")]
+                     )[0]["baslik"] == "yuksek")
+kontrol("⭐ J-5a: sure yetersizse aday ELENIYOR",
+        _VE.aday_sec([_j5_aday(sure_sn=2.0)], en_az_sure_sn=8.0)[0] is None)
+
+# ── (2) ANAHTARLI SAGLAYICI VE KONU DISI FALLBACK YOK ──
+kontrol("⭐ J-5a: anahtar gerektiren saglayicilar KULLANILMIYOR "
+        "(pexels/pixabay/freepik)",
+        set(("pexels", "pixabay", "freepik")) <= set(_VE.ANAHTARLI_SAGLAYICI)
+        and _VE.kapsam_ozeti()["anahtarli_saglayici_kullanilmaz"])
+_J5_VLS = oku(KOK, "medya", "video_edinim.py")
+kontrol("⭐ J-5a: modul PEXELS/PIXABAY anahtari ARAMIYOR (credential "
+        "okumasi YOK)",
+        not any(a in _J5_VLS for a in ("PEXELS_KEY", "PIXABAY_KEY",
+                                       "FREEPIK", "os.environ", "getenv")))
+_J5_BOS = _VE.video_edin("cim bicme", _J5_DIZIN,
+                         arayici=_j5_arayici([]))
+kontrol("⭐ J-5a BELIRLEYICI: aday YOKSA KONU DISI FALLBACK YAPILMIYOR — "
+        "bos donuyor (yanlis video ALINMIYOR)",
+        _J5_BOS["ok"] is False and _J5_BOS["indirilen"] == []
+        and _J5_BOS["hata"] in ("ADAY-YOK", ""), _J5_BOS["hata"])
+kontrol("⭐ J-5a: kapsam ozeti `konu_disi_fallback: False` diye YAZIYOR",
+        _VE.kapsam_ozeti()["konu_disi_fallback"] is False)
+
+# ── (3) NASA YALNIZ GERCEKTEN UZAY SORGUSUNDA ──
+for _s5 in ("nasa mars rover", "space station orbit", "uzay teleskobu",
+            "apollo 11 moon"):
+    kontrol(f"⭐ J-5a: uzay sorgusu TANINIYOR ({_s5})",
+            _VE.uzay_sorgusu_mu(_s5) is True)
+for _s5 in ("lawn grass mowing", "sprinkler irrigation lawn",
+            "grass seed sowing", "cim bicme makinesi"):
+    kontrol(f"⭐ J-5a BELIRLEYICI: konu disi sorguda NASA DEVREYE GIRMIYOR "
+            f"({_s5})",
+            _VE.uzay_sorgusu_mu(_s5) is False
+            and _VE.video_edin(_s5, _J5_DIZIN, arayici=_j5_arayici([]))
+            ["saglayici_sirasi"] == ["wikimedia"])
+kontrol("⭐ J-5a: uzay sorgusunda NASA IKINCI saglayici olarak EKLENIYOR",
+        _VE.video_edin("nasa mars rover", _J5_DIZIN,
+                       arayici=_j5_arayici([]))["saglayici_sirasi"]
+        == ["wikimedia", "nasa"])
+
+# ── (4) J-4 KAPISI GERCEKTEN BAGLI (ON-KONTROL REDDI) ──
+_J5_LISANSSIZ = _j5_aday(license="All Rights Reserved", artist="X",
+                         render_kullanilabilir=False,
+                         red_nedeni="lisans metni kisitli")
+_J5_R1 = _VE.video_edin("sprinkler", _J5_DIZIN,
+                        arayici=_j5_arayici([_J5_LISANSSIZ]))
+kontrol("⭐ J-5a BELIRLEYICI: J-4 kapisi edinim hattina BAGLI — lisansi "
+        "kirli aday INDIRILMEDEN reddediliyor",
+        _J5_R1["ok"] is False and _J5_R1["hata"] == "J4-ON-KONTROL-RED"
+        and _J5_R1["reddedilen"][0]["asama"] == "on-kontrol",
+        _J5_R1["reddedilen"])
+_J5_KAYITSIZ = _j5_aday(lisans_kaydi="", lisans_url="")
+_J5_R2 = _VE.video_edin("sprinkler", _J5_DIZIN,
+                        arayici=_j5_arayici([_J5_KAYITSIZ]))
+kontrol("⭐ J-5a RED-FIRST: LISANS KAYDI olmayan aday indirilmeden RED",
+        _J5_R2["ok"] is False and _J5_R2["hata"] == "J4-ON-KONTROL-RED")
+_J5_URLSUZ = _j5_aday(orijinal_url="")
+kontrol("⭐ J-5a RED-FIRST: KAYNAK URL'si olmayan aday indirilmeden RED",
+        _VE.video_edin("sprinkler", _J5_DIZIN,
+                       arayici=_j5_arayici([_J5_URLSUZ]))["hata"]
+        == "J4-ON-KONTROL-RED")
+kontrol("⭐ J-5a: edinim modulu J-4 kapisini GERCEKTEN import ediyor",
+        "video_lisans" in _J5_VLS
+        and "video_provenance_karari" in _J5_VLS
+        and _J5_VLS.count("video_provenance_karari(") >= 2)
+kontrol("⭐ J-5a: kapi IKI KEZ kosuyor (indirme ONCESI ve SONRASI)",
+        "on-kontrol" in _J5_VLS and "son-kontrol" in _J5_VLS)
+
+# ── (5) REDIRECT / HTML / BOZUK MEDYA REDDI (mevcut kapilar KULLANILIYOR) ──
+kontrol("⭐ J-5a: indirme GUVENLI indiriciden geciyor (SSRF + bayt + "
+        "HTML + ffprobe kapilari)",
+        "indirme.guvenli_indir" in _J5_VLS and 'beklenen="video"' in _J5_VLS)
+kontrol("⭐ J-5a: HTML/metin icerigi medya sayilmiyor (mevcut kapi)",
+        _mind.html_mi(b"<!doctype html><html>") is True
+        and _mind.html_mi(b"\x1aE\xdf\xa3") is False)
+kontrol("⭐ J-5a: bozuk/medya olmayan dosya ffprobe kapisinda REDDEDILIYOR",
+        _mind.dosya_dogrula(
+            _j5_bozuk_dosya(), beklenen="video")[0] is False)
+kontrol("⭐ J-5a: icerik turu video degilse RED (redirect HTML sayfasi)",
+        _j5guv.icerik_kapisi("text/html", 5000, "video")[0] is False)
+kontrol("⭐ J-5a: 300 MB ustu icerik uzunlugu RED",
+        _j5guv.icerik_kapisi("video/webm", 301 * 1024 * 1024, "video")[0]
+        is False)
+
+# ── (6) SON-KONTROL: OLCULEN TEKNIK KANIT EKSIKSE DOSYA SILINIR ──
+kontrol("⭐ J-5a: `teknik_olc` okunamayan dosyada BOS donuyor (varsayim yok)",
+        _VE.teknik_olc(os.path.join(_J5_DIZIN, "olmayan.webm")) == {})
+kontrol("⭐ J-5a: son-kontrol reddinde indirilen dosya SILINIYOR",
+        "os.remove(yol)" in _J5_VLS and "son-kontrol" in _J5_VLS)
+
+# ── (7) MALIYET VE GORSEL YOLU ──
+kontrol("⭐ J-5a: maliyet $0 olarak raporlaniyor (anahtarsiz kaynaklar)",
+        _VE.kapsam_ozeti()["maliyet_usd"] == 0.0
+        and _J5_BOS["maliyet_usd"] == 0.0)
+kontrol("⭐ J-5a: GORSEL arama yolu (`commons.ara`) DEGISMEDI — hala "
+        "filetype:bitmap",
+        'filetype:bitmap {sorgu}' in oku(KOK, "medya", "commons.py"))
+kontrol("⭐ J-5a: video arama AYRI fonksiyon (`video_ara`), gorsel "
+        "siralamasina DOKUNULMADI",
+        "def video_ara" in oku(KOK, "medya", "commons.py")
+        and 'filetype:video {sorgu}' in oku(KOK, "medya", "commons.py"))
+kontrol("J-5a: video_edinim.py derleniyor",
+        _derlenir(os.path.join(KOK, "medya", "video_edinim.py")))
+
+# ── (8) DEGISEN IKI URETIM DAVRANISI TESTLE KILITLENIYOR ──
+# ⚠ Ikisi de GERCEK VIDEO pilotunda OLCULEREK ortaya cikti; ikisi de kapi
+# GEVSETMESI DEGIL — birincisi gereksiz buyutmeyi kaldirir, ikincisi
+# GECERSIZ bir TAHMINI hareketli kaynaktan cikarir. Gercek hukum
+# POST-QA'nin `optik_hareket_olcusu` olcumundedir ve AYNEN durur.
+_J5_PLAN_KAYNAK = oku(KOK, "editor", "plan.py")
+kontrol("⭐ J-5a: VIDEO kaynakta dijital zoom UYGULANMIYOR "
+        "(static/tam) — 1080p kaynak 1080p kareye BUYUTULMEDEN giriyor",
+        "VIDEO-KAMERA-NOTR" in _J5_PLAN_KAYNAK
+        and 'c.hareket, c.kadraj = "static", "tam"' in _J5_PLAN_KAYNAK)
+kontrol("⭐ J-5a: bu degisiklik YALNIZ video icin — gorsel kaynakta "
+        "kadraj merdiveni AYNEN calisiyor",
+        "KADRAJ_MERDIVENI" in _J5_PLAN_KAYNAK
+        and "kadraj_buyutmeyen" in _J5_PLAN_KAYNAK)
+kontrol("⭐ J-5a: PUNCH-BUYUTME kapisi DURUYOR (kaldirilmadi)",
+        "KALITE-PUNCH-BUYUTME" in _qon.FAIL_KODLARI)
+
+# statik-kamera bacagi: FOTOGRAFTA olcer, VIDEODA olcmez
+_J5_ST = [{"beat_id": "b1", "hareket": "static", "islev": "hook",
+           "sure_sn": 9.0, "medya_turu": "image"}]
+_J5_SV = [{"beat_id": "b1", "hareket": "static", "islev": "hook",
+           "sure_sn": 9.0, "medya_turu": "video"}]
+kontrol("⭐ J-5a: uzun 'static' cekim FOTOGRAF kaynakta HALA yakalaniyor "
+        "(kapi gevsetilmedi)",
+        len(_kk.motion_grammar_olcusu(_J5_ST)["statik_sahneler"]) == 1)
+kontrol("⭐ J-5a: ayni cekim VIDEO kaynakta statik SAYILMIYOR — hareket "
+        "goruntunun kendisinde (enerji bacagindaki desenin AYNISI)",
+        _kk.motion_grammar_olcusu(_J5_SV)["statik_sahneler"] == [],
+        _kk.motion_grammar_olcusu(_J5_SV)["statik_sahneler"])
+kontrol("⭐ J-5a: KALITE-OPTIK-DURGUN kapisi DURUYOR (kod kaldirilmadi)",
+        "KALITE-OPTIK-DURGUN" in _qon.FAIL_KODLARI
+        and _kk.OPTIK_DURGUN_FAIL_SN == 3.0)
+kontrol("⭐ J-5a KANIT: gercek videonun POST-QA optik olcumu esigi "
+        "GECIYOR — muafiyet olcumu bypass ETMIYOR",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0)
+
+# ── (9) PILOT KANITI (uretilen MP4'un kendi kayitlarindan) ──
+_J5_RAPOR = os.path.join(os.path.dirname(KOK), "outputs", "sample",
+                         "lawn_j5a_rapor.json")
+if os.path.isfile(_J5_RAPOR):
+    _J5R = json.load(open(_J5_RAPOR, encoding="utf-8"))
+    kontrol("⭐ J-5a PILOT: kalite kapisi ACIK kosuldu (olcumler hukum "
+            "veriyor, yalniz rapor degil)",
+            "ACIK" in str(_J5R.get("kalite_kapisi") or ""),
+            _J5R.get("kalite_kapisi"))
+    kontrol("⭐ J-5a PILOT: optik duraganlik ihlali YOK",
+            int(((_J5R.get("optik_hareket") or {}).get("sonra") or {})
+                .get("duragan_ihlal", 0)) == 0
+            or ((_J5R.get("optik_hareket") or {}).get("sonra") or {})
+            .get("temiz") is True,
+            (_J5R.get("optik_hareket") or {}).get("sonra"))
+    kontrol("⭐ J-5a PILOT: izleyici kalite puani 100/100",
+            abs(float((_J5R.get("izleyici_kalite_puani") or {})
+                      .get("puan", 0)) - 100.0) < 1e-6,
+            (_J5R.get("izleyici_kalite_puani") or {}).get("puan"))
+    kontrol("⭐ J-5a PILOT: maliyet $0.00",
+            float(_J5R.get("maliyet_usd") or 0) == 0.0,
+            _J5R.get("maliyet_usd"))
+else:
+    bloke_yaz("J-5a pilot kaniti", "lawn_j5a_rapor.json yok")
+
+_J5_PLAN_J = os.path.join(os.path.dirname(KOK), "cikti", "_j5a_calisma",
+                          "render_plan.json")
+if os.path.isfile(_J5_PLAN_J) and _J1_FFPROBE:
+    _J5S = json.load(open(_J5_PLAN_J, encoding="utf-8"))["sahneler"]
+    _J5MT = _kk.medya_turu_ozeti(_J5S, kare_okuyucu=_j2_okuyucu)
+    _J5BR = _kk.broll_cesitliligi_ozeti(_J5S, medya_turu_ozeti_=_J5MT)
+    kontrol("⭐ J-5a PILOT OLCUMU: gercek video orani %0'dan YUKARI cikti "
+            "(J-1 tabani 0.0 -> pilot > 0.20)",
+            _J5MT["video_sure_orani"] > 0.20, _J5MT["video_sure_orani"])
+    kontrol("⭐ J-5a PILOT: statik fotograf orani DUSTU (1.0 -> < 0.80)",
+            _J5MT["statik_sure_orani"] < 0.80, _J5MT["statik_sure_orani"])
+    kontrol("⭐ J-5a PILOT: donmus kadraj YOK ve tekrar YOK "
+            "(gerileme olmadi)",
+            _J5MT["donmus_kadraj_sure_orani"] == 0.0
+            and _J5BR["tekrar_sure_orani"] == 0.0)
+    kontrol("⭐ J-5a PILOT: benzersiz varlik orani 1.0 (her beat AYRI "
+            "varlik) ve provenance TAM olculdu",
+            _J5BR["benzersiz_varlik_orani"] == 1.0
+            and _J5BR["provenance"]["olculdu"] is True)
+    kontrol("⭐ J-5a PILOT: video cekiminin lisansi ve kunyesi KAYITLI",
+            any(str(x.get("lisans") or "") and str(x.get("orijinal_url") or "")
+                for x in _J5S if str(x.get("medya_turu")) == "video"),
+            [(x.get("lisans"), x.get("orijinal_url", "")[:40])
+             for x in _J5S if str(x.get("medya_turu")) == "video"])
+
+# ── (10) CIKTI ADLARI ARTIK CAKISMIYOR ──
+kontrol("⭐ J-5a: smoke cikti adlari PARAMETRELENDI — farkli girdiyle kosan "
+        "surucu ONCEKI pilotun kanitini EZEMEZ",
+        all(k in oku(KOK, "testler", "smoke_konsept3_teknoloji_i20.py")
+            for k in ("RAPOR_ADI =", "BLOKE_RAPOR_ADI =", "KARE_ONEKI =")))
 
 
 blok("§40h I-58 — IKI ADAY DUZENI KARSI-OLGU OLARAK OLCULDU (yalniz tanisal)")

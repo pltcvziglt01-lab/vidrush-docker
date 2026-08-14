@@ -1907,8 +1907,15 @@ def motion_grammar_olcusu(sahneler, *, pencere: int = HAREKET_PENCERESI,
         if hareketler[i] and hareketler[i] in onceki:
             pencere_tekrar.append({"indeks": i, "hareket": hareketler[i],
                                    "pencere": pencere})
+    # ⚠ FAZ J-5a — VIDEO KAYNAK MUAFIYETI (enerji bacagindaki desenin AYNISI).
+    # Bu bacak, DURGUN FOTOGRAF uzerindeki 'static' kameradan optik duraganlik
+    # TAHMIN eder. Kaynak gercek VIDEO ise o tahmin GECERSIZDIR: hareket
+    # goruntunun kendisindedir. Kapi GEVSETILMIYOR — gercek hukum POST-QA'nin
+    # `optik_hareket_olcusu` olcumunde ve AYNEN yururlukte.
     statik = [{"indeks": i, "sure_sn": _sayi(liste[i].get("sure_sn"))}
-              for i, h in enumerate(hareketler) if h == "static"]
+              for i, h in enumerate(hareketler)
+              if h == "static"
+              and str(liste[i].get("medya_turu") or "image").lower() != "video"]
 
     # ── ISLEV TEKRARI (Faz I-24) ──
     # ⚠ `islev` bu olcume I-17'den beri GELIYORDU ama HIC KULLANILMIYORDU.
