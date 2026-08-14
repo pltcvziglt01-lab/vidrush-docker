@@ -14276,6 +14276,117 @@ kontrol("R-1d-g GERILEME YOK: gercek-timeline kapisi ve pix_fmt kapisi DURUYOR",
         "GERCEK-KAYNAK-TAVANI" in _GQ.FAIL_KODLARI
         and _HR.TESLIM_PIX_FMT == "yuv420p")
 
+blok("§40ab R-1d-h — SIYAH/DONMUS KARE: ILK BOZULAN KATMAN KANITI")
+
+# ⚠ MEDYASIZ: hicbir video/kare/QA artefakti URETILMEZ. Olcum `kosucu`
+# enjeksiyonuyla sahte ffmpeg stderr'i uzerinden kosar; GERCEK olcum
+# YALNIZCA uzak worker'da.
+#
+# ── OLCULEN KUSUR (R-1d-g pilotu, job_1786725532851) ──
+#   POST-SIYAH-KARE (fail): 28.458-28.667 · 30.917-31.417 ·
+#                           34.542-40.458 (5.92 sn)
+#   POST-DONMUS-KARE (warn): 34.542 (+5.83 sn)
+# POST-QA kusuru YAKALIYOR ama HANGI KATMANDA olustugunu SOYLEMIYORDU.
+
+_KO = __import__("katman_olcum")
+
+_SIYAH_ERR = ("[blackdetect @ 0x1] black_start:34.542 black_end:40.458 "
+              "black_duration:5.916\n")
+_DONMUS_ERR = "[freezedetect @ 0x1] lavfi.freezedetect.freeze_start: 34.542\n"
+
+
+def _kos(siyah="", donmus=""):
+    def _c(komut):
+        return siyah if "blackdetect" in " ".join(komut) else donmus
+    return _c
+
+
+kontrol("⭐ R-1d-h: esikler `qa_son` ile AYNI (yeniden tanimlanmadi)",
+        _KO.SIYAH_FILTRE in oku(KOK, "editor/qa_son.py")
+        and _KO.DONMUS_FILTRE in oku(KOK, "editor/qa_son.py")
+        and _KO.kapsam_ozeti()["esik_qa_son_ile_ayni"] is True)
+_O_TEMIZ = _KO.olc("/x.mp4", kosucu=_kos())
+_O_SIYAH = _KO.olc("/x.mp4", kosucu=_kos(siyah=_SIYAH_ERR))
+kontrol("⭐ R-1d-h: pilotun GERCEK araligi ayristiriliyor "
+        "(34.542-40.458, 5.916 sn)",
+        _O_SIYAH["siyah"] == [{"bas": 34.542, "bitis": 40.458,
+                               "sure": 5.916}], _O_SIYAH["siyah"])
+kontrol("⭐ R-1d-h: donmus baslangici da ayristiriliyor",
+        _KO.olc("/x.mp4", kosucu=_kos(donmus=_DONMUS_ERR))["donmus"]
+        == [{"bas": 34.542}])
+kontrol("⭐ R-1d-h RED-FIRST: OLCULEMEYEN dosya TEMIZ SAYILMIYOR",
+        _KO.temiz_mi({"olculdu": False}) is False
+        and _KO.temiz_mi(_O_TEMIZ) is True
+        and _KO.kapsam_ozeti()["olculmeyen_temiz_sayilir"] is False)
+kontrol("⭐ R-1d-h RED-FIRST: kosucu PATLARSA stabil kod",
+        _KO.olc("/x.mp4", kosucu=lambda k: (_ for _ in ()).throw(OSError())
+                )["kod"] == "KATMAN-OLCULEMEDI")
+
+# ── ILK BOZULAN KATMAN (uretim sirasi: kaynak -> segment -> birlesik -> final)
+kontrol("⭐ R-1d-h BELIRLEYICI: bozukluk KAYNAK klipte basliyorsa suc "
+        "`kaynak`a yazilir (xfade'e DEGIL)",
+        _KO.ilk_bozulan_katman({
+            "kaynak": [_O_TEMIZ, _O_SIYAH], "segment": [_O_SIYAH],
+            "birlesik": _O_SIYAH, "final": _O_SIYAH})["katman"] == "kaynak")
+kontrol("⭐ R-1d-h BELIRLEYICI: kaynak+segment TEMIZ, birlesik BOZUK ise "
+        "suc XFADE ZINCIRINE (`birlesik`) yazilir",
+        _KO.ilk_bozulan_katman({
+            "kaynak": [_O_TEMIZ], "segment": [_O_TEMIZ, _O_TEMIZ],
+            "birlesik": _O_SIYAH, "final": _O_SIYAH})["katman"] == "birlesik")
+kontrol("⭐ R-1d-h: kaynak TEMIZ ama SEGMENT bozuksa suc `segment`e yazilir",
+        _KO.ilk_bozulan_katman({
+            "kaynak": [_O_TEMIZ], "segment": [_O_TEMIZ, _O_SIYAH],
+            "final": _O_SIYAH})["katman"] == "segment")
+kontrol("⭐ R-1d-h: yalnizca FINAL bozuksa suc `final`e yazilir "
+        "(altyazi gomme adimi)",
+        _KO.ilk_bozulan_katman({
+            "kaynak": [_O_TEMIZ], "segment": [_O_TEMIZ],
+            "birlesik": _O_TEMIZ, "final": _O_SIYAH})["katman"] == "final")
+kontrol("⭐ R-1d-h: hicbir katman bozuk degilse `bozuk=False`",
+        _KO.ilk_bozulan_katman({"final": _O_TEMIZ})["bozuk"] is False)
+kontrol("⭐ R-1d-h: kod SIYAH/DONMUS ayrimi yapiyor",
+        _KO.ilk_bozulan_katman({"final": _O_SIYAH})["kod"]
+        == "KATMAN-SIYAH-KARE"
+        and _KO.ilk_bozulan_katman({"final": _KO.olc(
+            "/x.mp4", kosucu=_kos(donmus=_DONMUS_ERR))})["kod"]
+        == "KATMAN-DONMUS-KARE")
+
+# ── ATIF: "herhalde xfade'dir" DENMEZ ──
+kontrol("⭐ R-1d-h BELIRLEYICI RED-FIRST: FINAL bozuk ama ONCEKI katmanlar "
+        "HIC olculmediyse hukum `KATMAN-ATFEDILEMEDI` (tahmin YOK)",
+        _KO.atif({"final": _O_SIYAH})["kod"] == "KATMAN-ATFEDILEMEDI"
+        and _KO.atif({"final": _O_SIYAH})["atfedildi"] is False
+        and _KO.atif({"final": _O_SIYAH})["katman"] is None)
+kontrol("⭐ R-1d-h: onceki katman OLCULDUYSE atif YAPILIR",
+        _KO.atif({"segment": [_O_TEMIZ], "final": _O_SIYAH})["atfedildi"]
+        is True
+        and _KO.atif({"segment": [_O_TEMIZ],
+                      "final": _O_SIYAH})["katman"] == "final")
+kontrol("⭐ R-1d-h: modul TAHMIN ETMIYOR (kapsam ozeti beyan ediyor)",
+        _KO.kapsam_ozeti()["tahmin_eder"] is False
+        and _KO.kapsam_ozeti()["surec_acar"] is False)
+
+# ── URETIM ENTEGRASYONU (scratch DEGIL) ──
+_HR_H = oku(KOK, "hizli_render.py")
+kontrol("⭐ R-1d-h BELIRLEYICI: teslim kapisi siyah/donmus de OLCUYOR",
+        "_siyah_donmus_kapisi(yol)" in _HR_H
+        and "import katman_olcum" in _HR_H)
+kontrol("⭐ R-1d-h BELIRLEYICI: nihai dosyada siyah/donmus VARSA cikti "
+        "TESLIM EDILMIYOR (fail-closed)",
+        "return False" in _HR_H.split("def _siyah_donmus_kapisi")[1][:2200]
+        and "TESLIM EDILMEZ" in _HR_H.split(
+            "def _siyah_donmus_kapisi")[1][:2200])
+kontrol("⭐ R-1d-h: atif ARA DOSYALAR HALA DURURKEN yapiliyor "
+        "(segment + birlesik + kaynak olculuyor)",
+        all(x in _HR_H.split("def _siyah_donmus_kapisi")[1][:2200]
+            for x in ('"segment"', '"birlesik"', '"kaynak"')))
+kontrol("R-1d-h: katman_olcum.py derleniyor",
+        _derlenir(os.path.join(KOK, "katman_olcum.py")))
+kontrol("R-1d-h GERILEME YOK: pix_fmt kapisi + kaynak tavani + tenant imza",
+        _HR.TESLIM_PIX_FMT == "yuv420p"
+        and _KT2.KAYNAK_BASINA_TAVAN_SN == 8.0
+        and _IU.kapsam_ozeti()["tenant_baglanabilir"] is True)
+
 print(f"\n{'=' * 60}")
 print(f"GECEN: {gecen}   BASARISIZ: {len(basarisiz)}   BLOKE: {len(bloke)}")
 for b in basarisiz:

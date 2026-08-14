@@ -24,6 +24,8 @@ import math
 import shutil
 import subprocess
 import tempfile
+
+import katman_olcum   # Faz R-1d-h: siyah/donmus kare katman atfi
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 KOK_YOL = os.environ.get("VIDRUSH_KOK", "/opt/vidrush")
@@ -1003,11 +1005,58 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
             print("  hizli motor: xfade basarisiz -> Remotion", file=sys.stderr)
             return False
 
+        def _ffmpeg_stderr(komut):
+            r = subprocess.run(komut, capture_output=True, text=True,
+                               timeout=300)
+            return r.stderr or ""
+
+        def _siyah_donmus_kapisi(yol):
+            """FAZ R-1d-h — SIYAH/DONMUS KARE: ILK BOZULAN KATMANI KANITLA.
+
+            ⚠ OLCULEN KUSUR (R-1d-g pilotu): teslim edilen MP4'un ortasinda
+            ~5.9 sn SIYAH + DONMUS bolum vardi; POST-QA yakaliyordu ama
+            HANGI KATMANDA olustugunu soylemiyordu.
+            ⚠ Olcum TAM BURADA yapilir cunku ARA DOSYALAR (segmentler,
+            birlesik) HALA DURUYOR; is bitince silinirler ve atif imkansiz
+            hale gelir.
+            ⚠ FAIL-CLOSED: nihai dosyada siyah/donmus VARSA cikti TESLIM
+            EDILMEZ (Remotion'a duser) — izleyicinin gordugu bir kusurla
+            teslim yapilmaz.
+            """
+            fin = katman_olcum.olc(yol, kosucu=_ffmpeg_stderr)
+            if katman_olcum.temiz_mi(fin):
+                return True
+            # ⚠ Nihai bozuk -> SUCU DOGRU KATMANA yaz (tahmin YOK).
+            katmanlar = {"final": fin}
+            try:
+                katmanlar["segment"] = [
+                    katman_olcum.olc(y, kosucu=_ffmpeg_stderr)
+                    for y in list(seg_yollar.values())[:8] if y]
+                if os.path.exists(birlesik):
+                    katmanlar["birlesik"] = katman_olcum.olc(
+                        birlesik, kosucu=_ffmpeg_stderr)
+                katmanlar["kaynak"] = [
+                    katman_olcum.olc(os.path.join(PUBLIC, str(s0.get("medya"))),
+                                     kosucu=_ffmpeg_stderr)
+                    for s0 in sahneler[:8]
+                    if str(s0.get("medya") or "").endswith(".mp4")]
+            except Exception as e:                           # noqa: BLE001
+                print(f"  katman olcumu eksik: {type(e).__name__}",
+                      file=sys.stderr)
+            a = katman_olcum.atif(katmanlar)
+            print(f"  {a.get('kod') or katman_olcum.KOD_SIYAH}: ILK BOZULAN "
+                  f"KATMAN={a.get('katman')} atfedildi={a.get('atfedildi')} "
+                  f"| {({k: v['bozuk'] for k, v in (a.get('katmanlar') or {}).items()})}"
+                  f" -> hizli motor ciktisi TESLIM EDILMEZ", file=sys.stderr)
+            return False
+
         def _teslim_kapisi(yol):
             """TESLIM SINIRI: nihai dosya GERCEKTEN yuv420p mi? (ffprobe)
+            ve SIYAH/DONMUS kare tasiyor mu? (R-1d-h)
 
             ⚠ Filtreye GUVENILMEZ, dosya OLCULUR. Yanlissa `False` doner ve
-            hat Remotion'a duser — COZULEMEYEN bir MP4 TESLIM EDILMEZ.
+            hat Remotion'a duser — COZULEMEYEN ya da SIYAH BOLUMLU bir MP4
+            TESLIM EDILMEZ.
             """
             d = teslim_ciktisini_dogrula(yol)
             if not d["ok"]:
@@ -1016,7 +1065,7 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
                       f"-> hizli motor ciktisi TESLIM EDILMEZ",
                       file=sys.stderr)
                 return False
-            return True
+            return _siyah_donmus_kapisi(yol)
 
         # ── 3) Altyazi (varsa tek gecişte ASS ile gomulur) ──
         stil = str(props.get("altyaziStil", "orta"))

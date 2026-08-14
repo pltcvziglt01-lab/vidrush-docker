@@ -9794,3 +9794,51 @@ ikisi de **0**'dı. Bu turda değişen tek render-ilgili şey **ses dilimleme
 yolu düzeltmesi** (bölme tetiklenmedi), dolayısıyla **nedensellik
 kanıtlanmadı**; bir sonraki atom önce **kaynağı ölçmeli** (segment üretimi
 mi, xfade zinciri mi, medya klibinin kendisi mi).
+
+---
+
+## 71. FAZ R-1d-h — SİYAH/DONMUŞ KARE: İLK BOZULAN KATMAN KANITI (14 Ağu)
+
+> **Durum: ölçüm + fail-closed kapı üretim hattında. A–I yeşil.
+> Mac'te medya/kare/QA artefaktı ÜRETİLMEDİ. $0.00.**
+> Değişen: yeni `webapp/katman_olcum.py`, `webapp/hizli_render.py`,
+> `webapp/testler/test_faz_i.py`.
+
+### ⛔ Ölçülen kusur
+
+R-1d-g pilotu (`job_1786725532851`):
+`POST-SIYAH-KARE` **fail** — 28.458–28.667 · 30.917–31.417 ·
+**34.542–40.458 (5.92 sn)**; `POST-DONMUS-KARE` **warn** — 34.542 (+5.83 sn).
+POST-QA kusuru **yakalıyor** ama **hangi katmanda** oluştuğunu
+**söylemiyordu**: kaynak klip mi, segment üretimi mi, xfade zinciri mi?
+
+### Yapılan
+
+**`webapp/katman_olcum.py`** — aynı ölçüm (`blackdetect` / `freezedetect`,
+eşikler **`qa_son` ile aynı**, yeniden tanımlanmadı) **her katmana ayrı**
+uygulanır ve **üretim sırasında ilk bozulan** katman raporlanır:
+`kaynak → segment → birlesik → final`.
+
+⚠ **Tahmin yok:** `final` bozuk ama önceki katmanların **hiçbiri
+ölçülemediyse** hüküm **`KATMAN-ATFEDILEMEDI`** — "herhalde xfade'dir"
+**denmez**. Ölçülemeyen dosya **temiz sayılmaz**. Koşucu patlarsa
+**`KATMAN-OLCULEMEDI`**. Kodlar: `KATMAN-SIYAH-KARE`, `KATMAN-DONMUS-KARE`.
+
+**`hizli_render`** — teslim kapısı artık `pix_fmt`'e **ek olarak**
+siyah/donmuş de ölçüyor. ⚠ Ölçüm **tam burada** yapılır çünkü **ara
+dosyalar (segmentler, `birlesik`) hâlâ duruyor**; iş bitince silinirler ve
+atıf **imkânsız** hale gelir. ⚠ **FAIL-CLOSED**: nihai dosyada siyah/donmuş
+varsa çıktı **teslim edilmez** (Remotion'a düşer) — izleyicinin gördüğü bir
+kusurla teslim yapılmaz.
+
+### Red-first — MEDYASIZ davranış testleri
+
+Sahte ffmpeg stderr enjekte edilerek **gerçek fonksiyonlar** çağrılıyor:
+* pilotun **gerçek** aralığı ayrıştırılıyor (`34.542–40.458`, 5.916 sn);
+* **kaynak** bozuksa suç `kaynak`a — **xfade'e değil**;
+* kaynak+segment temiz, `birlesik` bozuksa suç **xfade zincirine**;
+* yalnız `final` bozuksa suç **altyazı gömme adımına**;
+* önceki katman ölçülmediyse **`KATMAN-ATFEDILEMEDI`**, `katman=None`;
+* ölçülemeyen **temiz sayılmıyor**.
+
+Modül kaldırılınca: **`ModuleNotFoundError: No module named 'katman_olcum'`**.
