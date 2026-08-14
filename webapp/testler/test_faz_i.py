@@ -8237,6 +8237,170 @@ kontrol("R-1b GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
                            oku(KOK, "static/js/api.js")))) == 22)
 
 
+blok("§40s R-1c-a — ZORUNLU OTURUM + TENANT IZOLASYONU (guvenlik)")
+
+# ⚠ MEDYASIZ + AGSIZ. Gercek hesap OLUSTURULMAZ, parola KODA/COMMIT'E
+# YAZILMAZ; provisioning yalniz env/stdin'den okunur. $0.00.
+
+_KM = __import__("kimlik")
+import time as _kmtime                                    # noqa: E402
+_KM_A = _KM.secrets.token_bytes(32)
+
+# ── (1) PAROLA: TESLIM SOZLESMESI = ARGON2ID / BCRYPT, FAIL-CLOSED ──
+kontrol("⭐ R-1c-a BELIRLEYICI: uretim algoritmasi ARGON2ID ya da BCRYPT "
+        "(zayif fallback YOK)",
+        _KM.kdf_adi() in ("argon2id", "bcrypt")
+        and _KM.kapsam_ozeti()["zayif_fallback"] is False
+        and _KM.kapsam_ozeti()["fail_closed"] is True, _KM.kdf_adi())
+kontrol("⭐ R-1c-a: bagimlilik repo yonetiminde SABIT (Dockerfile)",
+        "argon2-cffi==" in oku(os.path.dirname(KOK), "Dockerfile")
+        and "argon2-cffi==" in oku(os.path.dirname(KOK), "Dockerfile.sunucu"))
+_KM_H = _KM.parola_hashle("Ornek-Test-Parola-9!")
+kontrol("⭐ R-1c-a: uretilen hash ARGON2ID/BCRYPT bicimi",
+        _KM_H.split("$")[0] in ("argon2id", "bcrypt"), _KM_H.split("$")[0])
+kontrol("⭐ R-1c-a: parola DUZ METIN saklanmiyor",
+        "Ornek-Test-Parola-9!" not in _KM_H)
+kontrol("⭐ R-1c-a: dogru parola GECIYOR, yanlis parola GECMIYOR",
+        _KM.parola_dogrula("Ornek-Test-Parola-9!", _KM_H) is True
+        and _KM.parola_dogrula("yanlis", _KM_H) is False)
+kontrol("⭐ R-1c-a: her hash FARKLI (tuz) — rainbow tablo yok",
+        _KM.parola_hashle("ayni") != _KM.parola_hashle("ayni"))
+kontrol("⭐ R-1c-a RED-FIRST: ZAYIF eski bicim (pbkdf2/scrypt) normal "
+        "dogrulamadan GECMIYOR",
+        _KM.parola_dogrula("x", "pbkdf2$600000$0$0$aaaa$bbbb") is False
+        and _KM.parola_dogrula("x", "scrypt$32768$8$1$aaaa$bbbb") is False)
+_KM_TUZ = _KM.secrets.token_bytes(16)
+_KM_OZ = _KM.hashlib.pbkdf2_hmac("sha256", b"eski-parola", _KM_TUZ, 1000,
+                                 dklen=32)
+_KM_ESKI = ("pbkdf2$1000$0$0$" + _KM._b64(_KM_TUZ) + "$"
+            + _KM._b64(_KM_OZ))
+_KM_G = _KM.eski_hash_dogrula("eski-parola", _KM_ESKI)
+kontrol("⭐ R-1c-a: GECIS yolu AYRI ve ACIK — eski kayit yalniz "
+        "`eski_hash_dogrula()` ile dogrulanir",
+        _KM_G["gecerli"] is True and _KM_G["yeniden_hashle"] is True,
+        _KM_G["neden"])
+kontrol("⭐ R-1c-a: gecis dogrulamasi YANLIS parolayi GECIRMIYOR",
+        _KM.eski_hash_dogrula("yanlis", _KM_ESKI)["gecerli"] is False)
+kontrol("⭐ R-1c-a: guclu bicim gecis yoluna DUSMUYOR",
+        _KM.eski_hash_dogrula("x", _KM_H)["neden"] == "ESKI-BICIM-DEGIL")
+kontrol("⭐ R-1c-a: bozuk/bos kayit istisna SIZDIRMADAN False",
+        _KM.parola_dogrula("x", "") is False
+        and _KM.parola_dogrula("x", "bozuk") is False
+        and _KM.parola_dogrula("", _KM_H) is False)
+kontrol("⭐ R-1c-a: zayif parola REDDEDILIYOR",
+        _KM.parola_gucu("kisa")["gecerli"] is False
+        and _KM.parola_gucu("Ornek-Test-Parola-9!")["gecerli"] is True)
+kontrol("⭐ R-1c-a FAIL-CLOSED: KDF yoksa stabil hata kodu (`KIMLIK-KDF-YOK`)",
+        _KM.KDF_HATA_KODU == "KIMLIK-KDF-YOK"
+        and _KM.kapsam_ozeti()["kdf_hata_kodu"] == "KIMLIK-KDF-YOK")
+
+# ── (2) OTURUM ──
+_KM_J = _KM.oturum_uret("t1", anahtar=_KM_A)
+kontrol("⭐ R-1c-a: gecerli oturum tenant kimligini VERIYOR",
+        _KM.oturum_coz(_KM_J, anahtar=_KM_A)["tenant_id"] == "t1")
+kontrol("⭐ R-1c-a RED-FIRST: IMZASI BOZUK oturum REDDEDILIYOR",
+        _KM.oturum_coz(_KM_J[:-2] + "xx", anahtar=_KM_A)["neden"]
+        == "IMZA-GECERSIZ")
+kontrol("⭐ R-1c-a RED-FIRST: BASKA anahtarla uretilmis oturum GECMIYOR "
+        "(jeton uydurulamaz)",
+        _KM.oturum_coz(_KM.oturum_uret("t9",
+                                       anahtar=_KM.secrets.token_bytes(32)),
+                       anahtar=_KM_A)["neden"] == "IMZA-GECERSIZ")
+kontrol("⭐ R-1c-a: SURESI DOLMUS oturum REDDEDILIYOR",
+        _KM.oturum_coz(_KM.oturum_uret("t1", anahtar=_KM_A, omur_sn=1),
+                       anahtar=_KM_A,
+                       simdi=int(_kmtime.time()) + 10)["neden"]
+        == "SURESI-DOLMUS")
+kontrol("⭐ R-1c-a: bicimi bozuk jeton COZULMEYE CALISILMIYOR",
+        _KM.oturum_coz("abc", anahtar=_KM_A)["neden"] == "BICIM-BOZUK")
+
+# ── (3) COOKIE / CSRF ──
+kontrol("⭐ R-1c-a: cerez HttpOnly + SameSite + Secure",
+        _KM.COOKIE_BAYRAKLARI["httponly"] is True
+        and _KM.COOKIE_BAYRAKLARI["samesite"] == "lax"
+        and _KM.COOKIE_BAYRAKLARI["secure"] is True)
+kontrol("⭐ R-1c-a: CSRF double-submit — esit degerler GECER",
+        _KM.csrf_dogrula("abc123", "abc123") is True)
+kontrol("⭐ R-1c-a RED-FIRST: CSRF uyusmazligi ve BOS deger REDDEDILIYOR",
+        _KM.csrf_dogrula("abc123", "abc124") is False
+        and _KM.csrf_dogrula("", "") is False
+        and _KM.csrf_dogrula("abc", "") is False)
+
+# ── (4) GIRIS HIZ SINIRI ──
+_KM_RL = {}
+_KM_IZIN = []
+for _i in range(_KM.GIRIS_TAVAN + 2):
+    _r = _KM.hiz_siniri(_KM_RL, "ip1")
+    _KM_IZIN.append(_r["izin"])
+    if _r["izin"]:
+        _KM.hiz_siniri_isle(_KM_RL, "ip1")
+kontrol("⭐ R-1c-a RED-FIRST: art arda basarisiz giris HIZ SINIRINA takiliyor",
+        _KM_IZIN[:_KM.GIRIS_TAVAN] == [True] * _KM.GIRIS_TAVAN
+        and _KM_IZIN[_KM.GIRIS_TAVAN] is False, _KM_IZIN)
+kontrol("⭐ R-1c-a: pencere gecince yeniden izin veriliyor (kalici kilit yok)",
+        _KM.hiz_siniri(dict(_KM_RL), "ip1",
+                       simdi=_kmtime.time() + _KM.GIRIS_PENCERE_SN + 1)["izin"]
+        is True)
+kontrol("⭐ R-1c-a: hiz siniri IP BASINA ayri (bir kullanici digerini "
+        "kilitleyemez)",
+        _KM.hiz_siniri(_KM_RL, "ip2")["izin"] is True)
+
+# ── (5) TENANT IZOLASYONU ──
+kontrol("⭐ R-1c-a BELIRLEYICI: KIMLIK YOKSA ERISIM YOK",
+        _KM.tenant_coz("", anahtar=_KM_A)["yetkili"] is False
+        and _KM.kapsam_ozeti()["kimliksiz_erisim"] is False)
+kontrol("⭐ R-1c-a BELIRLEYICI: BASKA tenant'in kaynagina erisim REDDEDILIYOR",
+        _KM.sahiplik_dogrula({"tenant_id": "t2"}, "t1")["neden"]
+        == "BASKA-TENANT")
+kontrol("⭐ R-1c-a: SAHIPSIZ (eski) kayit 'herkese acik' SAYILMIYOR",
+        _KM.sahiplik_dogrula({}, "t1")["neden"] == "KAYNAK-SAHIPSIZ"
+        and _KM.kapsam_ozeti()["sahipsiz_kaynak_erisilir"] is False)
+kontrol("⭐ R-1c-a: tenant kimligi BOSSA erisim yok",
+        _KM.sahiplik_dogrula({"tenant_id": "t1"}, "")["neden"] == "TENANT-YOK")
+kontrol("⭐ R-1c-a: kendi kaynagina erisim GECERLI",
+        _KM.sahiplik_dogrula({"tenant_id": "t1"}, "t1")["izin"] is True)
+
+# ── (6) GUVENLI PROVISIONING ──
+_KM_P = _KM.provisioning_girdisi(
+    env={"VIDRUSH_ADMIN_KULLANICI": "ornek",
+         "VIDRUSH_ADMIN_PAROLA": "Ornek-Test-Parola-9!"})
+kontrol("⭐ R-1c-a: provisioning env'den okunuyor ve PAROLA HASH'LENIYOR",
+        _KM_P["hazir"] is True
+        and sorted(_KM_P["kayit"]) == ["kullanici", "parola_hash",
+                                       "tenant_id"])
+kontrol("⭐ R-1c-a BELIRLEYICI: donen kayitta DUZ METIN PAROLA YOK",
+        "Ornek-Test-Parola-9!" not in repr(_KM_P["kayit"]))
+kontrol("⭐ R-1c-a: her hesaba AYRI tenant_id uretiliyor",
+        _KM.provisioning_girdisi(
+            env={"VIDRUSH_ADMIN_KULLANICI": "a",
+                 "VIDRUSH_ADMIN_PAROLA": "Ornek-Test-Parola-9!"}
+        )["kayit"]["tenant_id"] != _KM_P["kayit"]["tenant_id"])
+kontrol("⭐ R-1c-a: girdi eksikse hesap ACILMIYOR (ipucu veriliyor)",
+        _KM.provisioning_girdisi(env={})["neden"] == "GIRDI-EKSIK")
+kontrol("⭐ R-1c-a: zayif parolayla hesap ACILMIYOR",
+        _KM.provisioning_girdisi(
+            env={"VIDRUSH_ADMIN_KULLANICI": "a",
+                 "VIDRUSH_ADMIN_PAROLA": "kisa"})["neden"] == "PAROLA-ZAYIF")
+kontrol("⭐ R-1c-a: parola stdin'den de okunabiliyor (argumanda GECMEZ)",
+        _KM.provisioning_girdisi(
+            env={"VIDRUSH_ADMIN_KULLANICI": "a"},
+            stdin_okuyucu=lambda: "Ornek-Test-Parola-9!")["hazir"] is True)
+
+# ── (7) SINIRLAR ──
+kontrol("⭐ R-1c-a: modul AGA CIKMIYOR / MEDYA ACMIYOR",
+        not any(a in _kod_yalniz(oku(KOK, "kimlik.py"))
+                for a in ("requests", "urlopen", "ffmpeg", "subprocess")))
+kontrol("⭐ R-1c-a: repoda DUZ METIN parola YOK",
+        "VIDRUSH_ADMIN_PAROLA=" not in oku(KOK, "kimlik.py"))
+kontrol("R-1c-a: kimlik.py derleniyor",
+        _derlenir(os.path.join(KOK, "kimlik.py")))
+kontrol("R-1c-a GERILEME YOK: 22 alan + K/R kapilari DURUYOR",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22
+        and "KALITE-BROLL-CESITLILIK" in _qon.FAIL_KODLARI
+        and "KALITE-BASLIK-SURESI" in _qon.FAIL_KODLARI)
+
+
 blok("§40h I-58 — IKI ADAY DUZENI KARSI-OLGU OLARAK OLCULDU (yalniz tanisal)")
 
 # ⚠ YALNIZ TANISAL. Uretim davranisi DEGISMEDI, kapi/esik eklenmedi.

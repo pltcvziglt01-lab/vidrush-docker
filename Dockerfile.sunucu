@@ -14,7 +14,7 @@ COPY app/render-studio/package.json app/render-studio/package-lock.json ./render
 RUN cd render-studio && npm install --no-audit --no-fund && npm cache clean --force
 COPY app/render-studio/ ./render-studio/
 COPY app/uret.py ./
-RUN /opt/venv/bin/pip install --no-cache-dir fastapi==0.115.6 "uvicorn[standard]==0.34.0" python-multipart==0.0.20 requests==2.32.3 Pillow==11.1.0 yt-dlp==2025.6.9
+RUN /opt/venv/bin/pip install --no-cache-dir fastapi==0.115.6 "uvicorn[standard]==0.34.0" python-multipart==0.0.20 requests==2.32.3 Pillow==11.1.0 yt-dlp==2025.6.9 argon2-cffi==23.1.0
 COPY webapp ./webapp
 RUN mkdir -p render-studio/public/isler render-studio/out webapp/veri/gecici webapp/ciktilar
 ENV REMOTION_BROWSER_EXECUTABLE=/usr/bin/chromium

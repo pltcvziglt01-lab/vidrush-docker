@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 14 Ağu | **R-1c-a zorunlu oturum + tenant izolasyonu temeli** | `PENDING` | ✅ **push edildi**, yeni `webapp/kimlik.py`; ⚠ **parola sözleşmesi FAIL-CLOSED**: yalnız **Argon2id/bcrypt**, güçlü algoritma yoksa hesap açma/giriş **başlamaz** → stabil kod **`KIMLIK-KDF-YOK`**, **zayıf fallback YOK** (ilk taslaktaki scrypt→PBKDF2 zinciri kullanıcı kararıyla **geri alındı**); bağımlılık repo yönetiminde **sabit** (`argon2-cffi==23.1.0`, her iki Dockerfile), Argon2id 64 MiB/3 tur/4 paralellik; ⚠ **geçiş ayrı ve açık yol** — eski `scrypt`/`pbkdf2` yalnız `eski_hash_dogrula()` ile doğrulanır ve `yeniden_hashle` ister, normal doğrulama bu biçimleri **geçirmez**; oturum **HMAC** mühürlü (**önce imza, sonra süre** — bilgi sızmaz), çerez **HttpOnly+SameSite+Secure**, **CSRF double-submit** sabit zamanlı, giriş **5/300sn IP başına** kayan pencere (kalıcı kilit yok); tenant izolasyonu: **kimlik yoksa erişim yok**, başka tenant → `BASKA-TENANT`, ⚠ **sahipsiz kayıt "herkese açık" sayılmıyor** → `KAYNAK-SAHIPSIZ`; provisioning **yalnız env/stdin**, parola **koda/commit'e/argümana yazılmadı**, dönen kayıtta düz metin **yok**, her hesaba ayrı `tenant_id`; ⚠ **gerçek hesap OLUŞTURULMADI**; 33 red-first güvenlik/sızıntı kontrolü; uçların oturuma bağlanması ve son-3-video yaşam döngüsü **R-1c-b**; deploy YOK, $0.00 |
 | 14 Ağu | **R-1b tenant provider zinciri (adapter→motor→timeline)** | `4fb1d3a` | ✅ **push edildi**, **gerçek OAuth YOK / kredi TÜKETİLMEDİ** — test-double + ücretsiz stok fallback; yeni `medya/saglayici_motoru.py`: planlayıcı(`shot_istegi`: semantik sorgu+negatifler+oran+süre+kalite hedefi) → **provider registry** (tenant izolasyonlu) → **job-scope token** → **MCP capability discovery** → edinim → ölçüm → **provenance** → **timeline**; dış dünyanın tamamı **enjekte** (modül ağa çıkmaz/medya açmaz, testli); ⚠ **uydurma yok**: stok arama yoksa üretim, o da yoksa dönüşüm, hiçbiri yoksa **ücretsiz stok**, her durumda **`provider_used`+`fallback_reason`** görünür; ⚠ **şifreleme uydurulmadı** — `cryptography` sunucuda **yok**, gerçek çözücü verilmezse token **kullanılmaz** ve **düz metin token kabul edilmez** (R-1c ön koşulu); **tenant tokeni istemciye çıkmıyor** (`baglanti_ozeti` token vermez); başka tenant bağlantısı **asla** seçilmiyor; kullanıcı açıkça Magnific dediyse **sessiz geçiş yok**; provenance auto modda **`model_unknown/auto`** yazıyor; timeline **semantik→gerçek video→piksel→bitrate** ile sıralıyor, **negatif ihlali eleniyor**, **aynı kaynak ≤8 sn**, **kaynak sesi sıfır**; 26 red-first entegrasyon kontrolü; Mac'te medya **üretilmedi**; deploy YOK, $0.00 |
 | 14 Ağu | **R-1a sunucu kapasite ölçümü + imzalı çıktı URL** | `4846264` | ✅ **push edildi**, teslim odağı: sunucu **salt-okunur** denetlendi — ⚠ canlı IP CLAUDE.md'deki değil **185.23.17.240**; konteynerde **bellek/CPU limiti YOK**, `RENDER_MOTOR=ffmpeg`, `EDITOR_V2` **kapalı**, `PEXELS_KEY` boş; **kapasite ölçüldü: 60 sn 1080p30 CRF18 render = 18 sn, tepe RSS 968 MB** → 55–65 sn 1080p **blokaj değil** (önceki bellek endişem yanlıştı); yeni `webapp/imzali_url.py`: `/ciktilar/` ucu **imzasızdı** (dosya adını bilen herkes indirebiliyordu) → **HMAC-SHA256 + sabit zamanlı karşılaştırma + zorunlu TTL**, anahtar env→`veri/.imza_anahtari` (**0600**)→üretilir, **repoda değil/loglanmıyor**, kurulamazsa uç **503** (sessizce korumasız çalışmaz), path traversal kesildi; iş sözleşmesi imzalı `video_url`+`manifest_url` üretiyor, **imzalayıcı yoksa eski davranış korunuyor**; ⚠ imzasız istek artık **403** (404 değil — varlık sızdırılmaz), `test_faz_h` bu gerekçeyle güncellendi; 16 red-first kontrol; Mac'te medya **üretilmedi**; deploy YOK, $0.00 |
 | 14 Ağu | **K-3 açılış başlık/şerit süresi** | `7d58a4e` | ✅ **push edildi**, **MEDYASIZ atom**: açılış başlığı `min(5.5, beat+1.5)` ile kuruluyordu — **metne hiç bakmıyordu** (iki kelimelik başlık da 5.5 sn) ve `+1.5` ile **intro beat'i aşıyordu** (anlatıcı cümlesi bitince yazı **asılı** kalıyordu); artık süre **metinden** türüyor: `max(karakter/CPS, kelime/KPS) × katsayi`, `min_gorunme_sn` alt sınırı ve **üç sert üst sınır** (mutlak tavan · **intro beat sonu** · asılı kalma **0**); gerçek pilot başlığı **5.325 → 1.714 sn**, asılı kalma **1.700 → 0.000 sn**; CPS eşiği **TÜRETİLMİŞ** (`ALTYAZI_MAKS_CPS` ile aynı okuma hızı), diğerleri **beyan edilmiş**; stabil kod **`KALITE-BASLIK-SURESI`**; kısaltma sessiz değil (`kisaltildi` bayrağı); **K-4 kancası gevşek ve geriye uyumlu** — `katsayi` varsayılanı 1.0, üst sınırları **delemez**, `edit_seviyesi` çalışan koda ve 22 alan sözleşmesine **girmedi**; 25 red-first saf timeline kontrolü; ⚠ I-9 tuzağına ikinci kez düşüldü (yorum taraması) ve `olcum` sözlüğü erken kullanıldı — ikisi de düzeltildi; 22 alan, kullanıcı seçimleri, `deploy.sh`, I-38 ve K-1/K-2 kapıları **korundu**; deploy YOK, $0.00 |
@@ -5681,6 +5682,68 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 87. FAZ R-1c-a — ZORUNLU OTURUM + TENANT İZOLASYONU TEMELİ (14 Ağu)
+
+> **Durum: kimlik/oturum temeli kuruldu. Parola sözleşmesi **Argon2id**
+> (fail-closed). **Gerçek hesap oluşturulmadı, parola hiçbir yere
+> yazılmadı.** A–I yeşil (**3912**, 0 hata, 2 bilinen BLOKE). Mac'te medya
+> üretilmedi. Deploy YOK. $0.00.**
+> Değişen: **yeni** `webapp/kimlik.py`, `Dockerfile`, `Dockerfile.sunucu`,
+> `webapp/testler/test_faz_i.py` (§40s, 33 kontrol).
+
+### ⚠ Parola sözleşmesi — FAIL-CLOSED
+
+Ölçüldü: `argon2-cffi`, `bcrypt`, `passlib` **ne yerelde ne sunucuda**
+kuruluydu. İlk taslakta `scrypt → PBKDF2` zinciri kurmuştum; **kullanıcı
+kararıyla bu reddedildi ve geri alındı.**
+
+Şimdi: **yalnızca Argon2id ya da bcrypt.** Güçlü algoritma yoksa hesap
+açma/giriş **başlamaz** → stabil kod **`KIMLIK-KDF-YOK`**. Zayıf geri düşüş
+**yok** (`zayif_fallback: False`). Bağımlılık repo yönetiminde **sabit**:
+`argon2-cffi==23.1.0` (her iki Dockerfile).
+
+Argon2id parametreleri OWASP 2024 civarı: **64 MiB bellek, 3 tur, 4
+paralellik**.
+
+⚠ **Geçiş ayrı ve açık yol**: eski `scrypt`/`pbkdf2` kayıtları **yalnızca**
+`eski_hash_dogrula()` ile doğrulanır ve `yeniden_hashle: True` döner — normal
+`parola_dogrula()` bu biçimleri **geçirmez**.
+
+### Oturum / CSRF / hız sınırı
+
+- Oturum jetonu **HMAC-SHA256** mühürlü (`tenant.exp.imza`); **önce imza,
+  sonra süre** doğrulanır (bilgi sızmasın)
+- Çerez: **HttpOnly + SameSite=Lax + Secure**
+- CSRF: **double-submit** (çerez + başlık), sabit zamanlı karşılaştırma
+- Giriş: **5 deneme / 300 sn** kayan pencere, **IP başına ayrı** (bir
+  kullanıcı diğerini kilitleyemez), pencere geçince açılır (kalıcı kilit yok)
+
+### Tenant izolasyonu
+
+- **Kimlik yoksa erişim yok** (`kimliksiz_erisim: False`)
+- Başka tenant'ın kaynağı → **`BASKA-TENANT`**
+- ⚠ **Sahipsiz (eski) kayıt "herkese açık" sayılmıyor** →
+  **`KAYNAK-SAHIPSIZ`**; sessiz sızıntı yerine açık red
+
+### Güvenli provisioning
+
+Hesap girdisi **yalnız** `VIDRUSH_ADMIN_KULLANICI` + `VIDRUSH_ADMIN_PAROLA`
+env'inden **ya da stdin**'den okunur. ⚠ Parola **koda/commit'e/argümana
+yazılmaz**, dönen kayıtta **düz metin yok** (yalnız `parola_hash`), her
+hesaba **ayrı `tenant_id`**. Zayıf parola ya da eksik girdi → hesap
+**açılmaz**.
+
+⚠ **Gerçek hesap OLUŞTURULMADI.** Credential girişi son adımda kullanıcı
+tarafından yapılacak.
+
+### Kalan (R-1c-b)
+
+Kullanıcı başına **son 3 başarılı video** yaşam döngüsü + dashboard
+kütüphanesi; uçların (`/api/generate`, `/api/job`, `/ciktilar`) oturum
+zorunluluğuna **bağlanması** — bu atomda **yalnız temel** kuruldu.
 
 ---
 
