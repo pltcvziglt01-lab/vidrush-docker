@@ -9418,3 +9418,56 @@ TESLIM ...: RED — ZINCIR-EKSIK:pre_qa
 ulaşmıyor → zincir `pre_qa` halkasını kanıtsız görüp **her** videoyu
 reddediyordu. (Daha önce avcı özetinde yaşanan kusurun **aynı sınıfı**.)
 Düzeltildi; red-first testle kilitlendi.
+
+### R-1d-e PİLOT 2 — zincir İLK KEZ KABUL etti, ama TAM PASS DEĞİL
+
+`job_1786720519626_r1dasm_def821` · 8 sahne · **57.05 sn**.
+
+```
+RENDER-QA (gercek timeline): WARN  fail=0 warn=5  sahne=8
+TESLIM ...: KABUL          teslim=true, kutuphane 2 kayit
+```
+
+**Atomun ALTI kapısı da gerçek ölçümle korundu:**
+
+| kapı | gerçek timeline ölçümü |
+|---|---|
+| `kapsam_orani` | **0.875** (7 medya / 1 fallback) ✅ |
+| **gerçek video oranı** | **0.4899** (`video:4, donmus:3, sentetik:1`) ✅ |
+| **`kaynak_ses = sifir`** | `olculdu: true`, **ihlal `[]`** ✅ |
+| **aynı kaynak ≤ 8.0 sn** | **7 varlık**, en uzun **7.572 sn**, `asan: []` ✅ |
+| `SAGLAYICI-TEKEL` | **warn %56** (tavan %40) — gizlenmiyor ✅ |
+| `SUREKLILIK-AYNI-CEKIM` | ihlal **yok** ✅ |
+| `FACT-BAGLANTI-YOK` | **4 warn** — ölçülüyor ✅ |
+
+**Teknik PASS:** 1920×1080 · h264 · **57.05 sn** · aac 48 kHz ·
+**LUFS −14.0** · **TP −1.4 dBTP** · **LRA 3.9** · sessiz oran **%0.0** ·
+ölü final 0.0 sn · hiss 21.0 dB altta · 5 kesme · siyah 0 · donmuş 0 ·
+12 kare · POST-QA WARN (FAIL yok).
+**Signed URL:** kendi oturumu **200** · oturumsuz **401** · **başka tenant 403**.
+
+⛔ **TAM PASS DEĞİL — kabul edilmiş video DENMEZ.** Kalan 5 FAIL + 1 ölçülemedi.
+
+### ⛔ SONRAKİ TEK GERÇEK BLOKAJ — teslim edilen MP4 `yuv444p`
+
+```
+ffprobe: 1920x1080 h264  pix_fmt = yuv444p     (yuv420p DEĞİL)
+hizli_render.py:695  ... + ",format=yuv420p"
+hizli_render.py:753  vf += ",format=yuv420p"
+```
+
+`hizli_render` **segment** filtre zincirlerinde `format=yuv420p` **var**, ama
+**nihai çıktı `yuv444p`** — yani son birleştirme/encode adımı piksel
+formatını **korumuyor**. Sonuç: teslim edilen MP4 birçok oynatıcı/tarayıcıda
+**çözülemez** (H.264 High 4:4:4 profili yaygın desteklenmez). Bu, teslim
+edilen artefaktta **ölçülen, kullanıcıya dokunan** tek gerçek blokaj.
+
+**Diğer kalanlar (blokaj değil, kayıt için):** rumble marjı 17.7 dB
+(⚠ 20 dB eşiği **benim**, projede kalibre **değil** — hüküm zayıf) ·
+olgu bağı 4/8 · `geçiş hard_cut_orani` ve `J/L-cut ducking` **gerçek zaman
+çizgisinde ölçülmüyor** (R-1d-e'nin ölçüm kapsamı dışında kaldı) ·
+`B-roll` **`GERCEK-TIMELINE-CEKIM-TURU-YOK`** (gerçek hat çekim türü
+atamıyor — uydurulmadı).
+
+⚠ Kütüphanede artık **2 kayıt** var: bu kabul + **R-1d-b'deki hatalı kabul**
+(`job_1786712620354`). Eski kayda **dokunulmadı** (talimat).
