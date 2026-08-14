@@ -131,6 +131,64 @@ def erisim_kapisi(kaynak: dict, tenant_id: str) -> dict:
     return kimlik.sahiplik_dogrula(kaynak, tenant_id)
 
 
+# ═══════════════ 1b) ANONIM KAPSAM (R-1e) ══════════════════════════════
+#
+# ⚠ NEDEN VAR: `ZORUNLU_OTURUM=0` (uyeliksiz mod) acikken `server._tenant()`
+# BOS STRING donuyordu. Bos tenant butun sahiplik/imza kapilarini ATLATIYORDU:
+#   · `_erisim_dogrula`  -> `if not tenant_id: return` (kontrol tumden atlanir)
+#   · `_imzalayici`      -> tenant'siz legacy imzalayiciya duser
+#   · `is_listesi`       -> `if tenant_id and ...` (filtre komple atlanir)
+# Sonuc olculdu: anonim istek MEVCUT kullanicinin videosu icin GECERLI imzali
+# URL aliyordu.
+#
+# ⚠ COZUM: oturumsuz modda anonim ziyaretciye BOS STRING degil GERCEK bir
+# kapsam kimligi verilir. Boylece mevcut izolasyon makinesi (sahiplik_dogrula
+# / erisim_kapisi / imzalayici_kur / kutuphane.listele) HICBIR KAPI
+# ATLANMADAN oldugu gibi calisir — yeni bir paralel yetki yolu ACILMAZ.
+ANON_TENANT = "anon:oturumsuz"
+
+# ⚠ Kapsamsiz (tenant'siz) istegin stabil red kodu.
+ANON_RED_KODU = "R1E-KAPSAM-YOK"
+
+
+def kapsam_kapisi(kaynak: dict, tenant_id: str) -> dict:
+    """TEK kapi: kaynak bu istegin KAPSAMINDA mi?
+
+    ⚠ `tenant_id` BOS diye kontrol ATLANMAZ — bos string hicbir kapsam
+    DEGILDIR ve hicbir kayda erisim vermez (R-1e kusuru buydu).
+    ⚠ Anonim kapsam (`ANON_TENANT`) normal bir tenant gibi dogrulanir:
+    kendi anonim isini gorur, MEVCUT tenant'larin damgali islerini ve
+    DAMGASIZ eski kayitlari GORMEZ. Oturumsuz moda gecmek gecmisteki
+    sahipsiz isleri ACMAZ.
+    """
+    if not _s(tenant_id):
+        return {"izin": False, "neden": ANON_RED_KODU}
+    return erisim_kapisi(kaynak, tenant_id)
+
+
+def imzalayici_sec(tenant_id: str, kaynak: Optional[dict] = None, *,
+                   oturumsuz_izin: bool = False,
+                   ttl_sn: Optional[int] = None) -> Optional[Callable]:
+    """Bu istek BU KAYIT icin imzali URL uretebilir mi, hangi imzalayiciyla?
+
+    ⚠ TENANT'SIZ (legacy) IMZALAYICI HIC URETILMEZ. Eski `server._imzalayici`
+    oturumsuz modda `imzali_url.imzala`ya dusuyordu; `tenant=""` ile uretilen
+    imza `tenant=""` ile DOGRULANIYORDU, yani anonim istek yabanci bir video
+    dosyasi icin gecerli link aliyordu (olculdu).
+    ⚠ Kayit verildiyse once KAPSAM kapisi gecilir: kapsam disindaki kayda
+    imzalayici URETILMEZ (ikinci savunma hatti — uc zaten 404 vermeli).
+    """
+    t = _s(tenant_id)
+    if not t:
+        return None
+    if kaynak is not None and not kapsam_kapisi(kaynak, t)["izin"]:
+        return None
+    # ⚠ Anonim kapsam YALNIZCA oturumsuz mod ACIKCA acikken is gorur.
+    if t == ANON_TENANT and not oturumsuz_izin:
+        return None
+    return imzalayici_kur(t, ttl_sn=ttl_sn)
+
+
 # ═══════════════ 2) SAGLAYICI KARARI (R-1b halkasi) ═════════════════════
 
 def saglayici_karari(baglanti_kayit: dict, tenant_id: str, *,

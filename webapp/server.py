@@ -13,7 +13,7 @@ import shutil
 import asyncio
 import threading
 import traceback
-from typing import List
+from typing import List, Optional
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
@@ -264,16 +264,25 @@ def _oturum_jetonu(istek: Request) -> str:
 
 
 def _tenant(istek: Request) -> str:
-    """Istegin tenant kimligi. ⚠ ZORUNLU OTURUM acikken kimliksiz = 401.
+    """Istegin KAPSAM kimligi. ⚠ ZORUNLU OTURUM acikken kimliksiz = 401.
 
-    Kapaliyken (`ZORUNLU_OTURUM=0`) bos string doner ve cagiran taraf eski
-    davranisi surdurur — bu ACIK bir karardir, sessiz bir bosluk degil.
+    ⚠ FAZ R-1e: oturumsuz modda (`ZORUNLU_OTURUM=0`) artik BOS STRING
+    DONMEZ — anonim ziyaretciye GERCEK bir kapsam kimligi
+    (`teslim.ANON_TENANT`) verilir.
+
+    OLCULEN KUSUR: bos string donmek butun sahiplik/imza kapilarini
+    ATLATIYORDU (`_erisim_dogrula` erken return, `_imzalayici` legacy
+    fallback, `is_listesi` filtre atlamasi). Anonim istek MEVCUT
+    kullanicinin videosu icin GECERLI imzali URL alabiliyordu. Gercek bir
+    kapsam kimligi verince mevcut izolasyon makinesi HICBIR KAPI
+    ATLANMADAN calisir; damgali isler de damgasiz ESKI kayitlar da anonime
+    KAPALI kalir.
     """
     d = teslim.oturum_kapisi(_oturum_jetonu(istek))
     if d["izin"]:
         return d["tenant_id"]
     if not ZORUNLU_OTURUM:
-        return ""
+        return teslim.ANON_TENANT
     # ⚠ Sunucu tarafi eksikligi (anahtar/KDF) ile kullanici tarafi eksikligi
     # (jeton yok/bozuk) AYIRT EDILIR: ilki 503, ikincisi 401.
     if d["neden"] in ("OTURUM-ANAHTARI-YOK", kimlik.KDF_HATA_KODU):
@@ -281,10 +290,18 @@ def _tenant(istek: Request) -> str:
     raise HTTPException(401, f"giris gerekli: {d['neden'] or 'OTURUM-YOK'}")
 
 
-def _imzalayici(tenant_id: str):
-    """Tenant'a BAGLI imzalayici; tenant yoksa eski (tenant'siz) imzalayici."""
-    im = teslim.imzalayici_kur(tenant_id, ttl_sn=IMZA_TTL_SN)
-    return im or (imzali_url.imzala if not ZORUNLU_OTURUM else None)
+def _imzalayici(tenant_id: str, kayit: Optional[dict] = None):
+    """Bu istek BU KAYIT icin imzali URL uretebilir mi, hangi imzalayiciyla?
+
+    ⚠ FAZ R-1e: tenant'siz (legacy) imzalayici fallback'i KALDIRILDI.
+    Eskiden oturumsuz modda `imzali_url.imzala` donuyordu; `tenant=""` ile
+    uretilen imza `tenant=""` ile DOGRULANIYORDU, yani anonim istek yabanci
+    bir video dosyasi icin gecerli link aliyordu (olculdu).
+    ⚠ Kayit verilirse kapsam disindaki kayda imzalayici URETILMEZ.
+    """
+    return teslim.imzalayici_sec(tenant_id, kayit,
+                                 oturumsuz_izin=not ZORUNLU_OTURUM,
+                                 ttl_sn=IMZA_TTL_SN)
 
 
 @app.post("/api/giris")
@@ -1224,9 +1241,14 @@ async def uret_baslat(istek: Request,
     _sag = teslim.saglayici_karari(_kayitlar, tenant_id, tercih=_tercih)
     _dmg = teslim.is_damgala(isler[is_id], tenant_id=tenant_id,
                              metin=story, saglayici=_sag)
-    if not _dmg["ok"] and ZORUNLU_OTURUM:
+    if not _dmg["ok"]:
         # ⚠ Damgalanamayan is KUYRUGA GIRMEZ: sahipsiz is kimseye teslim
         # edilemez, uretmek bosa kredi olurdu.
+        # ⚠ FAZ R-1e: kapi ARTIK OTURUMSUZ MODDA DA CALISIR. Anonim istegin
+        # de gercek bir kapsami (`ANON_TENANT`) oldugu icin damgalama her
+        # iki modda BASARILI olur; damgalanamayan is ise ANONIM MODDA DA
+        # sahipsiz kalirdi ve `kapsam_kapisi` onu SAHIBINE BILE
+        # gostermezdi — yani sessizce kayip is uretirdi.
         shutil.rmtree(idir, ignore_errors=True)
         del isler[is_id]
         raise HTTPException(401, f"is tenant'a baglanamadi: {_dmg['neden']}")
@@ -1262,7 +1284,8 @@ async def uret_baslat(istek: Request,
     cevap = is_sozlesme.normalize(is_id, isler[is_id],
                                   kuyruk_sira=_kuyruk_sirasi(is_id),
                                   kuyruk_toplam=is_kuyrugu.qsize(),
-                                  imzalayici=_imzalayici(tenant_id))
+                                  imzalayici=_imzalayici(tenant_id,
+                                                         isler[is_id]))
     cevap.update({"kuyruk": is_kuyrugu.qsize(), "tur": mod, "edit": edit_id,
                   "profil": profil.strip(),
                   # ⚠ Saglayici karari BASTAN GORUNUR: kullanici videonun
@@ -1285,7 +1308,6 @@ def is_listesi(istek: Request, session: str):
     tenant_id = _tenant(istek)
     session = gecerli_session(session)
     on6 = session[:6]
-    imz = _imzalayici(tenant_id)
     cikti = []
     try:
         for ad in os.listdir(IS_DURUM_DIR):
@@ -1298,16 +1320,21 @@ def is_listesi(istek: Request, session: str):
                     with open(yol, encoding="utf-8") as f:
                         d = json.load(f)
                 # ⚠ FAZ R-1d-a: `session` on eki TAHMIN EDILEBILIR bir
-                # etikettir, yetki degildir. Zorunlu oturumda liste TENANT
-                # SAHIPLIGINE gore suzulur; sahipsiz eski kayitlar GORUNMEZ.
-                if tenant_id and not teslim.erisim_kapisi(d, tenant_id)["izin"]:
+                # etikettir, YETKI DEGILDIR. Liste TENANT SAHIPLIGINE gore
+                # suzulur; sahipsiz eski kayitlar GORUNMEZ.
+                # ⚠ FAZ R-1e: suzgec ARTIK KOSULSUZ. Eski hal
+                # (`if tenant_id and ...`) oturumsuz modda tenant bos oldugu
+                # icin filtreyi KOMPLE atliyordu ve tahmin edilebilir session
+                # oneki o oneki tasiyan TUM isleri imzali URL'lerle
+                # listeliyordu.
+                if not teslim.kapsam_kapisi(d, tenant_id)["izin"]:
                     continue
                 # ⚠ FAZ H: liste de TEK TIP sozlesmeden geciyor. Eskiden
                 # `ilerleme` donuyordu ama arayuz `yuzde` okuyordu -> ilerleme
                 # cubugu her zaman %0 gorunuyordu. normalize() ikisini de verir.
                 cikti.append(is_sozlesme.normalize(
                     ad[:-5], d, zaman=os.path.getmtime(yol),
-                    imzalayici=imz))
+                    imzalayici=_imzalayici(tenant_id, d)))
             except Exception:
                 continue
     except Exception:
@@ -1323,7 +1350,6 @@ def is_durum(istek: Request, is_id: str):
     progress/stage/video_url/qa/attribution/fallbacks) ve eski (durum/ilerleme/
     mesaj/video) adlar BIRLIKTE donuyor."""
     tenant_id = _tenant(istek)
-    imz = _imzalayici(tenant_id)
     d = isler.get(is_id)
     if not d:
         # bellekte yoksa (restart olmus olabilir) diskten dene
@@ -1333,8 +1359,11 @@ def is_durum(istek: Request, is_id: str):
             if os.path.exists(yol):
                 with open(yol, encoding="utf-8") as f:
                     d = json.load(f)
+                # ⚠ FAZ R-1e: imzalayici KAYDA gore secilir ve kapi ONCE
+                # calisir — kapsam disindaki kayit icin link URETILMEZ.
                 _erisim_dogrula(d, tenant_id)
-                return is_sozlesme.normalize(is_id, d, imzalayici=imz)
+                return is_sozlesme.normalize(
+                    is_id, d, imzalayici=_imzalayici(tenant_id, d))
         except HTTPException:
             raise
         except Exception:
@@ -1345,7 +1374,7 @@ def is_durum(istek: Request, is_id: str):
     return is_sozlesme.normalize(
         is_id, d, kuyruk_sira=sira,
         kuyruk_toplam=is_kuyrugu.qsize() if sira is not None else None,
-        imzalayici=imz)
+        imzalayici=_imzalayici(tenant_id, d))
 
 
 def _erisim_dogrula(kayit: dict, tenant_id: str) -> None:
@@ -1353,10 +1382,13 @@ def _erisim_dogrula(kayit: dict, tenant_id: str) -> None:
 
     403 "bu is var ama senin degil" bilgisini sizdirirdi; is kimlikleri
     tahmin edilebilir zaman damgasi tasidigi icin bu bir sayim yoluydu.
+
+    ⚠ FAZ R-1e: kapi tenant BOS olsa da CALISIR. Eski hal
+    (`if not tenant_id: return`) oturumsuz modda sahiplik kontrolunu TUMDEN
+    atliyordu — `kimlik.sahiplik_dogrula()` dogru karari veriyordu ama HIC
+    CAGRILMIYORDU. Artik tek kapi: `teslim.kapsam_kapisi`.
     """
-    if not tenant_id:
-        return
-    if not teslim.erisim_kapisi(kayit, tenant_id)["izin"]:
+    if not teslim.kapsam_kapisi(kayit, tenant_id)["izin"]:
         raise HTTPException(404, "is yok")
 
 
