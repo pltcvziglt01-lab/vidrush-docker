@@ -8598,9 +8598,18 @@ kontrol("⭐ R-1d-a BELIRLEYICI: SIZAN baglanti BASKA TENANT'in oturumunda "
 kontrol("⭐ R-1d-a RED-FIRST: tenant'a bagli baglanti OTURUMSUZ da GECERSIZ",
         _IU.dogrula("j.mp4", _T1_Q["exp"], _T1_Q["sig"], simdi=1000,
                     tenant="")["neden"] == "IMZA-GECERSIZ")
+# ⚠ Iddia "imzanin BAYTLARINDA t1 gecmiyor" DEGIL (base64 rastgele; ilk
+# yazimda tam bu yuzden ara ara kirmizi yandi). Iddia: URL tenant'i AYRI BIR
+# ALAN olarak TASIMIYOR — parametreler yalniz exp+sig, yol ayni, iki farkli
+# tenant icin YALNIZCA imza degisiyor.
+_T2_URL = _IU.imzala("j.mp4", simdi=1000, tenant="t2")
 kontrol("⭐ R-1d-a: TENANT KIMLIGI URL'e YAZILMIYOR (link kimin oldugunu "
         "sizdirmiyor)",
-        "t1" not in _T1_URL and set(_T1_Q) == {"exp", "sig"}, _T1_URL)
+        set(_T1_Q) == {"exp", "sig"}
+        and _T1_URL.split("?")[0] == _T2_URL.split("?")[0] == "ciktilar/j.mp4"
+        and _T1_Q["exp"] == dict(x.split("=") for x in
+                                 _T2_URL.split("?")[1].split("&"))["exp"]
+        and _T1_URL != _T2_URL, f"{_T1_URL} | {_T2_URL}")
 kontrol("⭐ R-1d-a: tenant YOKSA imzalayici URETILMIYOR (imzasiz link YOK)",
         _TS.imzalayici_kur("") is None)
 

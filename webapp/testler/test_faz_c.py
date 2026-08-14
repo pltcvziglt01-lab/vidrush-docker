@@ -390,6 +390,50 @@ kontrol("atif eksikligi FAIL uretir",
             for s in q_atif.sorunlar),
         str([s.kod for s in q_atif.sorunlar if s.seviye == "fail"]))
 
+# ── HATA DUZELTMESI (R-1d-a deploy'unda yakalandi): `_ekle` TANIMSIZDI ──
+# ⚠ OLCULEN KUSUR: K-1/K-2/K-3 kapilari bulgularini `_ekle(...)` ile
+# yaziyordu ama o yardimci YALNIZCA `_kalite_denetle()` icinde tanimliydi.
+# `denetle()` icinden cagrilinca `NameError` firliyordu — yani kapi bir
+# ihlal bulunca RAPOR ETMEK yerine PRE-QA'yi COKERTIYORDU. Ihlalsiz planda
+# kod yolu hic calismadigi icin bugune kadar HICBIR test yakalamadi.
+# Bu kontrol tam O YOLU kosturuyor: kaynak videonun kendi sesi mikse
+# sizarken kapi ACIK.
+# ⚠ Sozlesme yalnizca VIDEO cekimler icin hukum verir; fixture'daki
+# adaylar gorsel oldugu icin medya_turu de video'ya cekiliyor.
+_ses_sizan = {k: dict(v, medya_turu="video", ses_kanali="orijinal")
+              for k, v in index.items()}
+try:
+    q_ses = qa_on.denetle(beat_plani=bplan, cekimler=cekimler,
+                          yazi_katmanlari=katmanlar, motion_specler=specler,
+                          ses_plani=splan, adaylar_index=_ses_sizan, profil_=P,
+                          kalite_kapisi=True)
+    _ses_hata = ""
+except Exception as _e:                                          # noqa: BLE001
+    q_ses, _ses_hata = None, f"{type(_e).__name__}: {_e}"
+kontrol("⭐ R-1d-a RED-FIRST: kalite kapisi ihlal bulunca COKMUYOR "
+        "(`_ekle` tanimsizdi -> NameError)",
+        _ses_hata == "", _ses_hata)
+kontrol("⭐ R-1d-a: kaynak sesi sizintisi RAPOR EDILIYOR (sessizce "
+        "yutulmuyor)",
+        q_ses is not None
+        and any(s.kod == "KALITE-KAYNAK-SES-SIZINTI" and s.seviye == "fail"
+                for s in q_ses.sorunlar),
+        str([s.kod for s in (q_ses.sorunlar if q_ses else [])]))
+kontrol("⭐ R-1d-a: kapi KAPALIYKEN ayni plan KALITE-* kodu URETMIYOR "
+        "(yalniz olcum)",
+        not [s for s in qa_on.denetle(
+            beat_plani=bplan, cekimler=cekimler, yazi_katmanlari=katmanlar,
+            motion_specler=specler, ses_plani=splan,
+            adaylar_index=_ses_sizan, profil_=P).sorunlar
+            if s.kod.startswith("KALITE-")])
+import subprocess as _sp  # noqa: E402
+_pf = _sp.run([sys.executable, "-m", "pyflakes",
+               os.path.join(KOK, "editor", "qa_on.py")],
+              capture_output=True, text=True)
+kontrol("⭐ R-1d-a: qa_on.py'de TANIMSIZ ISIM YOK (deploy.sh tam bunu "
+        "yakalayip deploy'u DURDURMUSTU)",
+        "undefined name" not in (_pf.stdout + _pf.stderr), _pf.stdout[:200])
+
 kotu_spec = [{"ad": "x", "renderer": "remotion", "beat_id": "b001",
               "parametre": {}, "remotion_zorunlu": False, "fallback": None}]
 q_efekt = qa_on.denetle(beat_plani=bplan, cekimler=cekimler,

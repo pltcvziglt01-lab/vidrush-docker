@@ -8735,3 +8735,53 @@ koşuldu →
    devam eder.
 3. **`saglayicilar.json` yazan bir uç yok**: provider registry okunuyor ama
    tenant bağlantısını **kuran** akış (gerçek OAuth) hâlâ yok — bu bilinçli.
+
+---
+
+## 63. HATA DÜZELTMESİ — `qa_on._ekle` TANIMSIZDI (R-1d-a deploy'unda yakalandı, 14 Ağu)
+
+> **Durum: ölçülen kusur ÇÖZÜLDÜ. A–I yeşil. Mac'te medya ÜRETİLMEDİ. $0.00.**
+> Değişen: `webapp/editor/qa_on.py` (**tek yardımcı fonksiyon eklendi**,
+> çağrı yerleri DEĞİŞMEDİ), `webapp/testler/test_faz_c.py`.
+
+### ⛔ Ölçülen kusur
+
+`deploy.sh`in **pyflakes taraması deploy'u DURDURDU** (koruma çalıştı):
+
+```
+webapp/editor/qa_on.py:366,374,402,421,437: undefined name '_ekle'
+```
+
+K-1/K-2/K-3 atomları bulgularını `_ekle(...)` ile yazıyordu; ama o yardımcı
+**yalnızca `_kalite_denetle()` içinde** (satır 574) tanımlıydı. Çağrılar ise
+**`denetle()`** içindeydi (163–556). Yani şu dört kapı **bir ihlal bulunca
+raporlamak yerine PRE-QA'yı çökertiyordu**:
+
+`KALITE-BROLL-CESITLILIK` · `KALITE-BASLIK-SURESI` ·
+`KALITE-KAYNAK-SES-SIZINTI` · `KALITE-SES-GURULTU`
+
+⚠ **Neden hiçbir test yakalamadı**: kod yolu `if kalite_kapisi:` + **ihlal
+listesi boş değil** koşuluna bağlı. Mevcut testler ya kapıyı kapalı
+koşuyordu ya da temiz plan veriyordu → satırlar **hiç çalışmadı**. K-1/K-2/K-3
+testleri yalnızca kodun `FAIL_KODLARI`'na kayıtlı olduğunu doğruluyordu.
+
+### Düzeltme (en küçük)
+
+`denetle()` içine `_kalite_denetle` ile **aynı imzada** yerel bir yardımcı:
+
+```python
+def _ekle(kod, seviye, detay, oneri, scene_id="", beat_id=""):
+    q.ekle(Sorun(kod, seviye, scene_id, beat_id, detay, oneri))
+```
+
+**Beş çağrı yerinin hiçbiri değişmedi.** Eşik/kod/seviye **gevşetilmedi**.
+
+### Red-first — ölçüldü
+
+Düzeltme geri alınıp aynı testler koşuldu → **3 kontrol kırmızı**:
+`NameError: name '_ekle' is not defined`, sızıntı raporu `[]` (boş),
+pyflakes `undefined name '_ekle'`.
+
+⚠ **Bu, R-1d-a teslim zinciri için de blokajdı**: `pre_qa` halkası kanıtını
+`edit_plani.qa`'dan okuyor; PRE-QA çökerse halka **hiç kanıt üretmiyor** ve
+hiçbir video teslim edilemiyordu.

@@ -206,6 +206,22 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
     """
     p = profil_ or VARSAYILAN
     q = QaSonucu()
+
+    # ⚠ HATA DUZELTMESI (R-1d-a deploy'unda yakalandi): K-1/K-2/K-3
+    # atomlari bulgularini `_ekle(...)` ile yaziyordu, ama o yardimci
+    # YALNIZCA `_kalite_denetle()` icinde tanimliydi. `denetle()` icinden
+    # cagrilinca `NameError: name '_ekle' is not defined` firlatiyordu —
+    # yani KALITE-BROLL-CESITLILIK / KALITE-BASLIK-SURESI /
+    # KALITE-KAYNAK-SES-SIZINTI / KALITE-SES-GURULTU kapilari bir ihlal
+    # bulunca RAPOR ETMEK yerine PRE-QA'yi COKERTIYORDU. Ihlal yokken kod
+    # yolu hic calismadigi icin testlerden gecmisti.
+    # `deploy.sh`in pyflakes taramasi bunu "undefined name" olarak yakaladi
+    # ve deploy'u DURDURDU (koruma calisti).
+    # ⚠ EN KUCUK DUZELTME: cagri yerleri DEGISTIRILMEDI; `_kalite_denetle`
+    # ile AYNI imzada yerel bir yardimci tanimlaniyor.
+    def _ekle(kod, seviye, detay, oneri, scene_id="", beat_id=""):
+        q.ekle(Sorun(kod, seviye, scene_id, beat_id, detay, oneri))
+
     beatler = beat_plani.beatler
     toplam = beat_plani.toplam_sn or sum(b.sure_sn for b in beatler)
 
