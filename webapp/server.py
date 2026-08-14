@@ -1234,6 +1234,15 @@ def _bir_is(is_id, story, kar, stil_yol, mod, edit_id, sure_dk, gecis_acik, zoom
                   "arastirma": sonuc.get("arastirma") or {},
                   "kaynaklar": sonuc.get("kaynaklar") or [],
                   "qa": sonuc.get("qa") or {},
+                  # ⚠ FAZ R-1d-e: PRE-QA kaniti (RENDER EDILEN zaman
+                  # cizgisi). Bu satir YOKKEN olcum uretiliyor ama is
+                  # kaydina HIC ULASMIYORDU -> zincir `pre_qa` halkasini
+                  # kanitsiz gorup HER videoyu reddediyordu (olculdu:
+                  # log "RENDER-QA ... FAIL sahne=8 kapsam=1.0" diyor,
+                  # kayitta `render_qa` bos). Ayni kusur sinifi daha once
+                  # avci ozetinde de yasandi: `d.update` anahtarlari ACIKCA
+                  # listelidir, listeye girmeyen alan sessizce DUSER.
+                  "render_qa": sonuc.get("render_qa") or {},
                   "edit_plani": sonuc.get("edit_plani") or {},
                   "dususler": sonuc.get("dususler") or []})
         # ── FAZ R-1d-a: ZINCIRIN SON HALKASI — TESLIM ──

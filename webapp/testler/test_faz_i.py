@@ -9505,6 +9505,12 @@ kontrol("⭐ R-1d-e: modul AG/MEDYA ACMIYOR, DOSYA YAZMIYOR, RENDER ETMIYOR",
 kontrol("⭐ R-1d-e: olcum patlarsa 'PASS' DENMIYOR (OLCULEMEDI)",
         'OLCULEMEDI' in oku(KOK, "pipeline.py").split(
             "RENDER-QA olculemedi")[0][-900:])
+kontrol("⭐ R-1d-e BELIRLEYICI: `render_qa` IS KAYDINA YAZILIYOR "
+        "(pipeline olcuyordu ama server kaydetmiyordu -> zincir HER videoyu "
+        "kanitsiz sayip reddediyordu)",
+        '"render_qa": sonuc.get("render_qa")' in oku(KOK, "server.py"))
+kontrol("⭐ R-1d-e: pipeline `render_qa`yi sonuc sozlugune yaziyor",
+        '"render_qa": _render_qa' in oku(KOK, "pipeline.py"))
 kontrol("R-1d-e: gercek_qa.py derleniyor",
         _derlenir(os.path.join(KOK, "gercek_qa.py")))
 kontrol("R-1d-e GERILEME YOK: 22 alan + K kapilari + render motoru DURUYOR",

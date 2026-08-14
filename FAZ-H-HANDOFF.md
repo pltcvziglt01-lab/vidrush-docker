@@ -9393,3 +9393,28 @@ render-QA'nın onu kullanabilmesi için **render öncesine** alındı.
 | `gercek_qa.py` | `ModuleNotFoundError: No module named 'gercek_qa'` |
 | `teslim.py` | **4+ kırmızı** (zincir hâlâ `edit_plani` arıyor) |
 | `pipeline.py` | **1 kırmızı** (ölçüm render öncesinde koşmuyor) |
+
+### R-1d-e PİLOTU — gerçek timeline ölçüldü + PERSİSTANS KUSURU bulundu
+
+`job_1786719801861_r1dasm_32d4e2` logu:
+
+```
+RENDER-QA (gercek timeline): FAIL sahne=8 kapsam=1.0 gercek_video=0.5135
+TESLIM ...: RED — ZINCIR-EKSIK:pre_qa
+```
+
+**Atomun iddiası doğrulandı** — gerçek zaman çizgisinde plandaki iki semptom
+**yok**:
+
+| ölçüm | editorv2 planı | **gerçek timeline** |
+|---|---|---|
+| çekim | 16 | **8** |
+| `kapsam_orani` | 0.5 | **1.0** ✅ |
+| gerçek video oranı | 0.259 | **0.5135** ✅ |
+
+⚠ **Ama iş kaydında `render_qa` BOŞ çıktı.** Kök neden: `server.py`
+`_bir_is` içindeki `d.update({...})` anahtarları **açıkça listelidir** ve
+`render_qa` listeye **girmemişti** → ölçüm üretiliyor ama kayda hiç
+ulaşmıyor → zincir `pre_qa` halkasını kanıtsız görüp **her** videoyu
+reddediyordu. (Daha önce avcı özetinde yaşanan kusurun **aynı sınıfı**.)
+Düzeltildi; red-first testle kilitlendi.
