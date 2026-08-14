@@ -8951,3 +8951,41 @@ klip_gecmisi_sifirla`'dan sonraki **sabit 600 karakteri** tarıyordu; tek satır
 eklenince `kare_butce_kur()` **605.** karaktere kaydı ve kod DOĞRUYKEN test
 kırmızı yandı. İddia "ilk 600 karakterde" değil "**bu fonksiyonun
 gövdesinde**" — kapsam bir sonraki üst düzey `def`e kadar genişletildi.
+
+### ⚠ R-1d-b PİLOTU — köprü çalıştı ama İKİ KUSUR DAHA ÖLÇÜLDÜ
+
+İlk köprü pilotunda (`job_1786712620354_r1dasm_45f951`) log şunu dedi:
+
+```
+sahne 2/4/6/8: KOPRU -> butceye secim yazildi (pexels/pexels-license)
+EDIT PLANI: QA=WARN render_edilebilir=True sahne=0
+TESLIM ...: KABUL
+```
+
+Yani köprü **çalıştı** (manifest doldu, `plan_kur` denendi) ve teslim
+zinciri **KABUL** verdi. Ama QA ölçümü bakınca:
+
+**Kusur 1 — plan SIFIR çekim üretti (`sahne=0`).** Bütün PRE-QA ölçüm
+sözlükleri **BOŞ** (`kapsam:{}`, `tipografi:{}`, `medya_turu:{}`,
+`broll:{}`, `islev:{}`, `gecis:{}`, `ses:{}`, `kaynak_ses:{}`).
+Kök neden ölçüldü: **sahneler `scene_id` TAŞIMIYORDU.**
+`edit_kopru.plan_kur(cumleler=...)` her cümleye `scene_id: ""` veriyor,
+medya manifesti ise `s001/s002...` taşıyor → `editor.plan` beat ile adayı
+**eşleştiremiyor** → plan sıfır çekimle dönüyor.
+**Düzeltme:** `props_sahneler`'e tek anahtar — `scene_id`, `_sahne_medya(n, s)`
+ile **aynı `n`**den türer. Video.tsx bu alanı okumaz; 22 alan sözleşmesi
+değişmedi.
+
+**Kusur 2 — zincir İÇİ BOŞ bir PRE-QA hükmünü KANIT saydı.** `pre_qa`
+halkası yalnızca `edit_plani.qa.durum in (PASS, WARN)` bakıyordu. Sıfır
+çekim üzerinde üretilen "WARN" **vakumda** oluşmuştu ve zincir onu kanıt
+sayıp videoyu **KABUL etti**. Bu, atomun kendi "kanıtsız halka geçmez"
+sözleşmesinin **ihlaliydi**.
+**Düzeltme (SIKILAŞTIRMA):** hüküm artık **yetmez** — plan en az **1 çekim**
+kapsamalı **VE** PRE-QA gerçekten ölçüm yazmış olmalı. Aksi halde
+`PRE-QA-BOS:sahne=..,olcum=..` ile **reddedilir**.
+
+⚠ Bu bir eşik **gevşetmesi değil**, tam tersi: R-1d-a'nın kabul ettiği bir
+durum artık **reddediliyor**. Red-first ölçüldü: `teslim.py` sıkılaştırması
+geri alınınca 3 kontrol kırmızı; `pipeline.py` `scene_id` geri alınınca 1
+kontrol kırmızı.

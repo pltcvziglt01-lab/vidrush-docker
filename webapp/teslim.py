@@ -217,9 +217,28 @@ def zincir_raporu(kayit: dict, *, tenant_id: str = "",
     k = kayit if isinstance(kayit, dict) else {}
     t = _s(tenant_id) or _s(k.get("tenant_id"))
     sag = k.get("saglayici") if isinstance(k.get("saglayici"), dict) else {}
-    plan_qa = ((k.get("edit_plani") or {}).get("qa")
-               if isinstance(k.get("edit_plani"), dict) else None)
+    plan = k.get("edit_plani") if isinstance(k.get("edit_plani"), dict) else {}
+    plan_qa = plan.get("qa")
     on_durum = _qa_durum(plan_qa)
+    # ⚠ FAZ R-1d-b — ICI BOS PRE-QA HUKMU KABUL EDILMEZ.
+    # OLCULEN KUSUR (staging, 14 Agu): kopru manifesti doldurdu, `plan_kur`
+    # calisti ve `QA=WARN` dondu — ama plan SIFIR cekim uretmisti
+    # (`sahne=0`) ve butun olcum sozlukleri BOSTU. "WARN" hukmu sifir sahne
+    # uzerinde VAKUMDA olusmustu; zincir bunu KANIT sayip videoyu KABUL etti.
+    # Bu, "kanitsiz halka gecmez" sozlesmesinin ihlaliydi.
+    # ⚠ Artik hukum YETMEZ, OLCULMUS OLMAK da sart: plan en az 1 cekim
+    # kapsamali VE PRE-QA gercekten olcum yazmis olmali.
+    try:
+        on_sahne = int(plan.get("sahne") or 0)
+    except (TypeError, ValueError):
+        on_sahne = 0
+    on_olcum = (plan_qa.get("olcumler") if isinstance(plan_qa, dict) else None)
+    on_olculdu = bool(on_sahne >= 1 and isinstance(on_olcum, dict) and on_olcum)
+    on_neden = ""
+    if on_durum not in QA_KABUL:
+        on_neden = f"PRE-QA:{on_durum or 'olculmedi'}"
+    elif not on_olculdu:
+        on_neden = f"PRE-QA-BOS:sahne={on_sahne},olcum={len(on_olcum or {})}"
     son_durum = _qa_durum(k.get("qa"))
     sahne = k.get("sahne_sayisi")
     try:
@@ -248,9 +267,10 @@ def zincir_raporu(kayit: dict, *, tenant_id: str = "",
          "tamam": bool(_s(k.get("video"))) and sure > 0,
          "kanit": {"video": _s(k.get("video")), "sure_sn": sure},
          "neden": "" if (_s(k.get("video")) and sure > 0) else "RENDER-KANITI-YOK"},
-        {"asama": "pre_qa", "tamam": on_durum in QA_KABUL,
-         "kanit": {"durum": on_durum or None},
-         "neden": "" if on_durum in QA_KABUL else f"PRE-QA:{on_durum or 'olculmedi'}"},
+        {"asama": "pre_qa", "tamam": not on_neden,
+         "kanit": {"durum": on_durum or None, "sahne": on_sahne,
+                   "olcum_sayisi": len(on_olcum or {})},
+         "neden": on_neden},
         {"asama": "post_qa", "tamam": son_durum in QA_KABUL,
          "kanit": {"durum": son_durum or None},
          "neden": "" if son_durum in QA_KABUL else f"POST-QA:{son_durum or 'olculmedi'}"},

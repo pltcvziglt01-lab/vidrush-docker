@@ -4507,6 +4507,16 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         tur, medya = sonuc_medya[n]
         syol, kelimeler, sure = tts_sonuc[n]
         props_sahneler.append({
+            # ⚠ FAZ R-1d-b: SAHNE KIMLIGI. Sahneler bugune kadar `scene_id`
+            # TASIMIYORDU: `edit_kopru.plan_kur(cumleler=...)` her cumleye
+            # `scene_id: ""` veriyor, medya manifesti ise `s001/s002...`
+            # tasiyordu -> `editor.plan` beat ile adayi ESLESTIREMIYOR ve
+            # plan SIFIR cekimle donuyordu (olculdu: `sahne=0`, butun PRE-QA
+            # olcum sozlukleri BOS). Kimlik `_sahne_medya(n, s)` ile AYNI
+            # `n`den turer, boylece iki taraf BIT-BIT ayni kimligi kullanir.
+            # ⚠ Video.tsx bu alani OKUMAZ; bilinmeyen props anahtari cizimi
+            # etkilemez (22 alan sozlesmesi de DEGISMEDI).
+            "scene_id": str(s.get("scene_id") or f"s{n:03d}"),
             "tur": tur, "medya": medya, "ses": syol, "sure": round(sure, 3),
             **({"zoom": "yok", "pan": "yok"} if not zoom_acik else
                (lambda k: (_son_kurgu.update(k), {"zoom": k["zoom"], "pan": k["pan"]})[1])(

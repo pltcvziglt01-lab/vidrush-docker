@@ -8654,7 +8654,11 @@ def _ts_tam(**ek):
          "saglayici": {"provider_used": "wikimedia",
                        "fallback_reason": "BAGLANTI-YOK:BAGLANTI-YOK"},
          "video": "ciktilar/j1.mp4", "sure": 60.0, "durum": "bitti",
-         "edit_plani": {"qa": {"durum": "PASS"}},
+         # ⚠ R-1d-b: PRE-QA kaniti artik HUKUM + GERCEK OLCUM ister
+         # (sifir cekimli plan uzerindeki hukum KANIT SAYILMAZ).
+         "edit_plani": {"ok": True, "sahne": 8,
+                        "qa": {"durum": "PASS",
+                               "olcumler": {"kapsam": {"cekim": 8}}}},
          "qa": {"durum": "PASS", "fail": 0, "warn": 0}}
     k.update(ek)
     return k
@@ -8680,11 +8684,48 @@ kontrol("⭐ R-1d-a BELIRLEYICI: depolama OLCULMEDIYSE 'vardir' SAYILMIYOR "
         and [h for h in _TS.zincir_raporu(_ts_tam())["halkalar"]
              if h["asama"] == "depolama"][0]["neden"] == "DEPOLAMA-OLCULMEDI")
 kontrol("⭐ R-1d-a: PRE-QA WARN teslimi ENGELLEMIYOR, FAIL ENGELLIYOR",
-        _TS.zincir_raporu(_ts_tam(edit_plani={"qa": {"durum": "WARN"}}),
-                          dosya_var=True)["tam"] is True
+        _TS.zincir_raporu(_ts_tam(edit_plani={
+            "sahne": 8, "qa": {"durum": "WARN", "olcumler": {"kapsam": {}}}}),
+            dosya_var=True)["tam"] is True
         and "pre_qa" in _TS.zincir_raporu(
-            _ts_tam(edit_plani={"qa": {"durum": "FAIL"}}),
+            _ts_tam(edit_plani={"sahne": 8,
+                                "qa": {"durum": "FAIL",
+                                       "olcumler": {"kapsam": {}}}}),
             dosya_var=True)["eksik"])
+
+# ⚠ FAZ R-1d-b — ICI BOS PRE-QA HUKMU (staging'de OLCULEN kusur).
+# Kopru manifesti doldurdu, `plan_kur` calisti ve QA=WARN dondu; ama plan
+# SIFIR cekim uretmisti ve TUM olcum sozlukleri BOSTU. Zincir bu "WARN"i
+# kanit sayip videoyu KABUL ETMISTI — "kanitsiz halka gecmez" ihlali.
+kontrol("⭐ R-1d-b RED-FIRST: SIFIR CEKIMLI plan uzerindeki PRE-QA hukmu "
+        "KANIT SAYILMIYOR (vakumda WARN kabul edilmez)",
+        "pre_qa" in _TS.zincir_raporu(
+            _ts_tam(edit_plani={"ok": True, "sahne": 0,
+                                "qa": {"durum": "WARN", "olcumler": {}}}),
+            dosya_var=True)["eksik"])
+kontrol("⭐ R-1d-b: reddin NEDENI 'PRE-QA-BOS' olarak ACIKCA yaziliyor "
+        "(sadece 'eksik' demiyor)",
+        [h["neden"] for h in _TS.zincir_raporu(
+            _ts_tam(edit_plani={"ok": True, "sahne": 0,
+                                "qa": {"durum": "WARN", "olcumler": {}}}),
+            dosya_var=True)["halkalar"]
+         if h["asama"] == "pre_qa"][0].startswith("PRE-QA-BOS:"))
+kontrol("⭐ R-1d-b RED-FIRST: sahne VAR ama OLCUM BOS ise de gecmiyor",
+        "pre_qa" in _TS.zincir_raporu(
+            _ts_tam(edit_plani={"sahne": 8,
+                                "qa": {"durum": "PASS", "olcumler": {}}}),
+            dosya_var=True)["eksik"])
+kontrol("⭐ R-1d-b: sahne VAR ve OLCUM VAR ise halka GECIYOR "
+        "(kapi asiri sikilastirilmadi)",
+        _TS.zincir_raporu(
+            _ts_tam(edit_plani={"sahne": 8,
+                                "qa": {"durum": "PASS",
+                                       "olcumler": {"kapsam": {"cekim": 8}}}}),
+            dosya_var=True)["tam"] is True)
+kontrol("⭐ R-1d-b: sahne kimligi props sinirinda TASINIYOR "
+        "(cumle <-> manifest bagi kopmasin)",
+        '"scene_id": str(s.get("scene_id") or f"s{n:03d}")'
+        in oku(KOK, "pipeline.py"))
 
 # ── (5) TESLIM: UC KAPI DA GECILMEDEN KUTUPHANEYE GIRILMEZ ──
 _TSD: dict = {}
