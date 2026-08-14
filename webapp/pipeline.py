@@ -4560,7 +4560,11 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             r = subprocess.run(
                 ["ffmpeg", "-y", "-loglevel", "error", "-ss", f"{bas_sn:.3f}",
                  "-t", f"{uzunluk_sn:.3f}", "-i", kaynak_ses,
-                 "-c:a", "libmp3lame", "-q:a", "2", hedef],
+                 # ⚠ Kodek UZANTIDAN turer; sabit `libmp3lame`
+                 # bazi ffmpeg derlemelerinde YOK ve dilimleme sessizce
+                 # basarisiz oluyordu (pilotta olculdu:
+                 # "3 parca atanamadi -> KAYNAK-TAVANI-SURE-BOZUK").
+                 "-q:a", "2", hedef],
                 capture_output=True, text=True, timeout=180)
             return r.returncode == 0 and os.path.exists(hedef)
         except Exception:                                    # noqa: BLE001
@@ -4594,33 +4598,48 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             if n_parca <= 1 or not h:
                 yeni_liste.append(sh)
                 continue
-            # ── Ek varliklar: her ek parca icin FARKLI ucretsiz stok klip ──
-            ek_yollar = []
+            # ── Ek varliklar: FARKLI KAYNAKLI ucretsiz stok klipler ──
+            # ⚠ Kabul karari `kaynak_tavani.ek_varlik_edin`e aittir: kimlik
+            # (saglayici|asset_id) MEVCUT parcadan ve birbirinden FARKLI
+            # olmali, lisans/saglayici/asset_id DOLU olmali ve KOPRU KAYDI
+            # BASARILI olmali. Aksi halde aday REDDEDILIR, sirdaki denenir.
             _s = h.get("s") or {}
             _sorgu = str(_s.get("footage_sorgu") or "").strip()
-            for j in range(1, n_parca):
+            _sorgular = ([_sorgu] +
+                         list(kaynak.genel_yedek_sorgular(_sorgu))[:4]
+                         if _sorgu else [])
+            _mevcut_kimlik = kaynak_tavani.kimlik_normalize(
+                kaynak.stok_provenans_al(
+                    os.path.join(PUBLIC, str(sh.get("medya") or ""))))
+
+            def _aday(sira, _n=h["n"], _sorg=_sorgular):
+                if sira >= len(_sorg):
+                    return None
                 hedef = os.path.join(PUBLIC, "isler", is_adi,
-                                     f"sahne_{h['n']}_p{j}.mp4")
-                alindi = False
-                if _sorgu:
-                    for _q in ([_sorgu] +
-                               list(kaynak.genel_yedek_sorgular(_sorgu))[:2]):
-                        if kaynak.footage_getir(_q, hedef, yt_once=False):
-                            alindi = True
-                            break
-                if alindi:
-                    _kopru_kaydet(hedef, _s, h["n"])
-                    ek_yollar.append(f"isler/{is_adi}/sahne_{h['n']}_p{j}.mp4")
-                else:
-                    ek_yollar.append(None)
-            if any(y is None for y in ek_yollar):
+                                     f"sahne_{_n}_p{sira + 1}.mp4")
+                if kaynak.footage_getir(_sorg[sira], hedef, yt_once=False):
+                    return hedef
+                return None
+
+            _ed = kaynak_tavani.ek_varlik_edin(
+                adet=n_parca - 1,
+                mevcut_kimlikler=[_mevcut_kimlik] if _mevcut_kimlik else [],
+                aday_uretici=_aday,
+                provenans_okuyucu=kaynak.stok_provenans_al,
+                kopru_yazici=lambda y: _kopru_kaydet(y, _s, h["n"]),
+                maks_deneme=len(_sorgular))
+            if not _ed["ok"]:
                 # ⚠ FAIL-CLOSED: bolme YAPILMAZ; kapi ihlali GORUNUR kalir.
-                sorunlar.append({"kod": kaynak_tavani.KOD_VARLIK_YOK,
+                sorunlar.append({"kod": _ed["kod"],
                                  "scene_id": sh.get("scene_id"),
-                                 "detay": f"{n_parca - 1} ek varlik gerekti, "
-                                          f"edinilemedi"})
+                                 "detay": (f"{_ed['istenen']} ek FARKLI "
+                                           f"kaynak gerekti, {_ed['bulunan']} "
+                                           f"bulundu; red: "
+                                           f"{[r.get('neden') for r in _ed['red']][:4]}")})
                 yeni_liste.append(sh)
                 continue
+            ek_yollar = [os.path.relpath(k["yol"], PUBLIC)
+                         for k in _ed["kabul"]]
             # ── Ses + altyazi SENKRON bolunur ──
             p_sure = round(sure / n_parca, 3)
             parcalar, kesim_ok = [], True

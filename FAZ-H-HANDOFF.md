@@ -9665,3 +9665,47 @@ bağlandı (yeni atom sayılmadı).
   (`GERCEK-KAYNAK-TAVANI` yok).
 * **Aynı** varlık iki parçada kullanılırsa kapı **yine ihlal** veriyor —
   tekrar-kaynak kaçamağı **kapalı**.
+
+### R-1d-g (devam 2) — BAĞIMSIZ DENETİMİN BULDUĞU İKİ DELİK + PİLOT KUSURU
+
+⚠ Denetim (`cd3a5b5`) haklıydı; pilot üçüncü bir kusuru gösterdi.
+
+| # | kusur | kanıt |
+|---|---|---|
+| 1 | ek `footage_getir` **aynı `asset_id`** dönebilir; kimlik **hiç karşılaştırılmıyordu** | kod incelemesi |
+| 2 | `_kopru_kaydet` **False** dönse bile klip `ek_yollar`a eklenip **timeline'a giriyordu** | kod incelemesi |
+| 3 | ses dilimleme **başarısız** → bölme iptal | pilot logu: `KAYNAK TAVANI: 3 parca atanamadi -> KAYNAK-TAVANI-SURE-BOZUK` |
+
+### Düzeltme — `kaynak_tavani.ek_varlik_edin()` (kabul kararı TEK yerde)
+
+`kimlik_normalize(provenans)` → **`saglayici|asset_id`**; lisans/sağlayıcı/
+asset_id'den **biri bile eksikse kimlik ÜRETİLMEZ**.
+
+Bir aday ancak **üçü birden** sağlanınca kabul edilir:
+* normalize kimlik **üretilebiliyor**,
+* kimlik **mevcut parçadan ve kabul edilen tüm parçalardan FARKLI**,
+* **köprü kaydı BAŞARILI**.
+
+Aksi halde aday **reddedilir** (`AYNI-KAYNAK` / `PROVENANS-EKSIK` /
+`KOPRU-RED` / `ADAY-YOK`) ve **sıradaki ücretsiz aday** denenir. Seçenek
+tükenirse **`KAYNAK-TAVANI-VARLIK-YOK`** → bölme **yapılmaz**, timeline
+kabulü **fail-closed**. Aday üretici patlarsa çökmez, sıradakine geçer.
+
+**Ses dilimleme:** sabit `libmp3lame` kaldırıldı — kodek **uzantıdan türer**
+(bazı ffmpeg derlemelerinde o kodek yok ve dilimleme **sessizce**
+başarısızdı; pilotta ölçüldü).
+
+### Red-first — DAVRANIŞ testi (string kontrol DEĞİL)
+
+Gerçek `ek_varlik_edin` **test-double**'larla çağrılıyor:
+* aynı `asset_id` dönen aday → **`AYNI-KAYNAK`**, sıradaki kabul edilir;
+* tek aday ve o da aynı kaynak → **`KAYNAK-TAVANI-VARLIK-YOK`**, `kabul: []`;
+* **köprü False** → **`KOPRU-RED`**, aday timeline'a **girmez**;
+* köprü ilk adayda False, ikincide True → **ikincisi** kabul;
+* lisanssız aday → **`PROVENANS-EKSIK`**;
+* iki ek parça → **birbirinden farklı** iki kaynak.
+
+Modül geri alınınca: **`AttributeError: ... has no attribute 'ek_varlik_edin'`**.
+
+⚠ ffmpeg dilimleme yolu **yalnızca uzak worker'da** koşar; Mac'te medya/QA
+artefaktı **üretilmedi**.

@@ -152,6 +152,91 @@ def dogrula(kullanim: dict, *,
             "kod": "" if not asan else KOD_VARLIK_YOK}
 
 
+def kimlik_normalize(provenans) -> str:
+    """Provenanstan NORMALIZE kaynak kimligi. ⚠ Eksikse BOS doner.
+
+    Kimlik `saglayici|asset_id`dir. Lisans/saglayici/asset_id'den BIRI bile
+    eksikse kimlik URETILMEZ — "herhalde farklidir" DENMEZ.
+    """
+    p = provenans if isinstance(provenans, dict) else {}
+    sag = str(p.get("saglayici") or "").strip()
+    aid = str(p.get("asset_id") or "").strip()
+    lis = str(p.get("lisans") or "").strip()
+    if not (sag and aid and lis):
+        return ""
+    return f"{sag}|{aid}"
+
+
+def ek_varlik_edin(*, adet: int, mevcut_kimlikler,
+                   aday_uretici, provenans_okuyucu, kopru_yazici,
+                   maks_deneme: int = 6) -> dict:
+    """Bolme icin `adet` tane FARKLI kaynakli varlik edin. FAIL-CLOSED.
+
+    ⚠ OLCULEN KUSUR (bagimsiz denetim, cd3a5b5): ek klip edinimi
+    `footage_getir` TRUE dondu diye kabul ediliyordu. Iki delik vardi:
+      (1) Saglayici AYNI `asset_id`i tekrar dondurebilir; kimlik HIC
+          karsilastirilmiyordu -> ayni kaynak iki parcada kullanilip toplam
+          tavani ASABILIYORDU.
+      (2) `kopru_yazici` False donse (lisans/kare dogrulamasi GECMEDI) bile
+          klip listeye ekleniyor ve TIMELINE'A GIRIYORDU.
+
+    Sozlesme (hepsi enjekte edilir; bu modul AG/MEDYA/DOSYA'ya DOKUNMAZ):
+      `aday_uretici(sira) -> yol | None`   : sirayla UCRETSIZ aday uretir
+      `provenans_okuyucu(yol) -> dict`     : o yolun provenansi
+      `kopru_yazici(yol) -> bool`          : lisans+kare kaydi BASARILI mi
+
+    Kabul kosullari (HEPSI):
+      · normalize kimlik URETILEBILIYOR (lisans + saglayici + asset_id dolu)
+      · kimlik MEVCUT ve daha once KABUL EDILEN kimliklerden FARKLI
+      · kopru kaydi BASARILI
+    Aksi halde aday REDDEDILIR ve SIRADAKI denenir; secenek tukenirse
+    `ok=False` + `KAYNAK-TAVANI-VARLIK-YOK`.
+    """
+    gorulen = {str(k) for k in (mevcut_kimlikler or []) if str(k or "")}
+    kabul, red = [], []
+    sira = 0
+    while len(kabul) < int(adet) and sira < int(maks_deneme):
+        try:
+            yol = aday_uretici(sira)
+        except Exception as e:                               # noqa: BLE001
+            red.append({"sira": sira, "neden": f"URETICI-HATA:{type(e).__name__}"})
+            sira += 1
+            continue
+        sira += 1
+        if not yol:
+            red.append({"sira": sira - 1, "neden": "ADAY-YOK"})
+            continue
+        try:
+            pv = provenans_okuyucu(yol) or {}
+        except Exception:                                    # noqa: BLE001
+            pv = {}
+        kimlik = kimlik_normalize(pv)
+        if not kimlik:
+            red.append({"yol": yol, "neden": "PROVENANS-EKSIK"})
+            continue
+        if kimlik in gorulen:
+            # ⚠ Ayni kaynak: tavan bu yolla ASILAMAZ.
+            red.append({"yol": yol, "kimlik": kimlik, "neden": "AYNI-KAYNAK"})
+            continue
+        try:
+            yazildi = bool(kopru_yazici(yol))
+        except Exception:                                    # noqa: BLE001
+            yazildi = False
+        if not yazildi:
+            # ⚠ Kopru kaydi YOKSA timeline'a GIRMEZ.
+            red.append({"yol": yol, "kimlik": kimlik, "neden": "KOPRU-RED"})
+            continue
+        gorulen.add(kimlik)
+        kabul.append({"yol": yol, "kimlik": kimlik,
+                      "saglayici": pv.get("saglayici"),
+                      "asset_id": pv.get("asset_id"),
+                      "lisans": pv.get("lisans")})
+    ok = len(kabul) >= int(adet)
+    return {"ok": ok, "kabul": kabul, "red": red,
+            "kod": "" if ok else KOD_VARLIK_YOK,
+            "istenen": int(adet), "bulunan": len(kabul)}
+
+
 def kapsam_ozeti() -> dict:
     return {
         "sema_surum": SEMA_SURUM,

@@ -14073,10 +14073,10 @@ kontrol("⭐ R-1d-g BELIRLEYICI: pipeline bolme planini GERCEK HATTA "
         and "import kaynak_tavani" in _PL_G)
 kontrol("⭐ R-1d-g: tavani asan sahne icin IKINCI ucretsiz stok klip "
         "ediniliyor (footage_getir)",
-        "kaynak.footage_getir(_q, hedef, yt_once=False)" in _PL_G
+        "kaynak.footage_getir(_sorg[sira], hedef, yt_once=False)" in _PL_G
         and "genel_yedek_sorgular" in _PL_G)
 kontrol("⭐ R-1d-g: ek klip de KOPRUDEN geciyor (lisans/provenans kaydi)",
-        "_kopru_kaydet(hedef, _s, h[\"n\"])" in _PL_G)
+        'kopru_yazici=lambda y: _kopru_kaydet(y, _s, h["n"])' in _PL_G)
 kontrol("⭐ R-1d-g BELIRLEYICI: SES sunucuda ffmpeg ile SENKRON kesiliyor",
         "def _ses_dilimle(" in _PL_G and '"-ss", f"{bas_sn:.3f}"' in _PL_G
         and '"-t", f"{uzunluk_sn:.3f}"' in _PL_G)
@@ -14088,8 +14088,8 @@ kontrol("⭐ R-1d-g BELIRLEYICI: ALTYAZI zaman dilimleri de bolunuyor ve "
         in _PL_G)
 kontrol("⭐ R-1d-g BELIRLEYICI: ek varlik EDINILEMEZSE sahne BOLUNMUYOR ve "
         "KAYNAK-TAVANI-VARLIK-YOK raporlaniyor (fail-closed)",
-        '"kod": kaynak_tavani.KOD_VARLIK_YOK' in _PL_G
-        and "ek varlik gerekti" in _PL_G
+        '"kod": _ed["kod"]' in _PL_G
+        and "ek FARKLI" in _PL_G
         and "tekrar kullanilip tavan ASILMAZ" in _PL_G)
 kontrol("⭐ R-1d-g: her parca AYRI scene_id aliyor (olcum ayirt edebilsin)",
         'yeni["scene_id"] = f"{sh.get(\'scene_id\')}p{j + 1}"' in _PL_G)
@@ -14123,6 +14123,82 @@ kontrol("⭐ R-1d-g RED-FIRST: AYNI varlik iki parcada kullanilirsa kapi "
                 "saglayici": "pexels", "lisans": "pexels-license",
                 "asset_id": "a1", "medya_turu": "video"}))["sorunlar"]
          ].count("GERCEK-KAYNAK-TAVANI") == 1)
+# ── (7) EK VARLIK EDINIMI — GERCEK FONKSIYON + TEST-DOUBLE (string DEGIL) ──
+# ⚠ BAGIMSIZ DENETIM (cd3a5b5) IKI DELIK buldu:
+#   (1) `footage_getir` AYNI asset_id'i dondurebilir; kimlik HIC
+#       karsilastirilmiyordu -> ayni kaynak iki parcada kullanilip toplam
+#       tavani ASABILIYORDU.
+#   (2) `_kopru_kaydet` False donse (lisans/kare dogrulamasi GECMEDI) bile
+#       klip listeye eklenip TIMELINE'A GIRIYORDU.
+# Asagidaki kontroller GERCEK `ek_varlik_edin`i test-double'larla cagirir.
+
+_EV_PV = {
+    "/a.mp4": {"saglayici": "pexels", "asset_id": "A1",
+               "lisans": "pexels-license"},
+    "/ayni.mp4": {"saglayici": "pexels", "asset_id": "MEV",
+                  "lisans": "pexels-license"},
+    "/b.mp4": {"saglayici": "pixabay", "asset_id": "B1",
+               "lisans": "pixabay-content-license"},
+    "/lisanssiz.mp4": {"saglayici": "pexels", "asset_id": "C1"},
+}
+
+
+def _ev(yollar, *, adet=1, mevcut=("pexels|MEV",), kopru=True):
+    return _KT2.ek_varlik_edin(
+        adet=adet, mevcut_kimlikler=list(mevcut),
+        aday_uretici=lambda i: yollar[i] if i < len(yollar) else None,
+        provenans_okuyucu=lambda y: _EV_PV.get(y, {}),
+        kopru_yazici=(kopru if callable(kopru) else (lambda y: bool(kopru))),
+        maks_deneme=len(yollar) + 1)
+
+
+kontrol("⭐ R-1d-g BELIRLEYICI: AYNI asset_id donen aday REDDEDILIYOR ve "
+        "SIRADAKI deneniyor (kimlik GERCEKTEN karsilastiriliyor)",
+        _ev(["/ayni.mp4", "/a.mp4"])["ok"] is True
+        and _ev(["/ayni.mp4", "/a.mp4"])["kabul"][0]["kimlik"] == "pexels|A1"
+        and any(r.get("neden") == "AYNI-KAYNAK"
+                for r in _ev(["/ayni.mp4", "/a.mp4"])["red"]),
+        _ev(["/ayni.mp4", "/a.mp4"])["red"])
+kontrol("⭐ R-1d-g RED-FIRST: TEK aday ve o da AYNI kaynak ise FAIL-CLOSED "
+        "(KAYNAK-TAVANI-VARLIK-YOK)",
+        _ev(["/ayni.mp4"])["ok"] is False
+        and _ev(["/ayni.mp4"])["kod"] == "KAYNAK-TAVANI-VARLIK-YOK"
+        and _ev(["/ayni.mp4"])["kabul"] == [])
+kontrol("⭐ R-1d-g BELIRLEYICI: KOPRU FALSE donerse aday KABUL EDILMIYOR "
+        "(timeline'a GIRMEZ)",
+        _ev(["/a.mp4"], kopru=False)["ok"] is False
+        and any(r.get("neden") == "KOPRU-RED"
+                for r in _ev(["/a.mp4"], kopru=False)["red"]))
+kontrol("⭐ R-1d-g: kopru ILK adayda False, IKINCIDE True ise IKINCISI "
+        "kabul ediliyor (sirdaki denenir)",
+        _ev(["/a.mp4", "/b.mp4"],
+            kopru=lambda y: y == "/b.mp4")["kabul"][0]["kimlik"]
+        == "pixabay|B1")
+kontrol("⭐ R-1d-g RED-FIRST: LISANSI eksik aday REDDEDILIYOR "
+        "(provenans EKSIK -> kimlik uretilmez)",
+        _KT2.kimlik_normalize(_EV_PV["/lisanssiz.mp4"]) == ""
+        and any(r.get("neden") == "PROVENANS-EKSIK"
+                for r in _ev(["/lisanssiz.mp4"])["red"]))
+kontrol("⭐ R-1d-g: IKI ek parca istenince IKISI de BIRBIRINDEN farkli "
+        "kaynak aliyor",
+        [k["kimlik"] for k in _ev(["/a.mp4", "/b.mp4"], adet=2)["kabul"]]
+        == ["pexels|A1", "pixabay|B1"])
+kontrol("⭐ R-1d-g: aday URETICI patlarsa cokmez, siradakine gecer",
+        _KT2.ek_varlik_edin(
+            adet=1, mevcut_kimlikler=[],
+            aday_uretici=lambda i: (_ for _ in ()).throw(OSError())
+            if i == 0 else "/a.mp4",
+            provenans_okuyucu=lambda y: _EV_PV.get(y, {}),
+            kopru_yazici=lambda y: True, maks_deneme=3)["ok"] is True)
+kontrol("⭐ R-1d-g: pipeline ARTIK bu yardimciyi kullaniyor "
+        "(kabul karari orada)",
+        "kaynak_tavani.ek_varlik_edin(" in oku(KOK, "pipeline.py")
+        and "kopru_yazici=lambda y: _kopru_kaydet(" in oku(KOK, "pipeline.py"))
+kontrol("⭐ R-1d-g: ses dilimleme kodeki UZANTIDAN tureyor (pilotta sabit "
+        "libmp3lame ile 3 parca atanamamisti)",
+        '"-c:a", "libmp3lame"' not in oku(KOK, "pipeline.py")
+        and '"-q:a", "2", hedef]' in oku(KOK, "pipeline.py"))
+
 kontrol("R-1d-g GERILEME YOK: kaynak_ses / yuv420p / tenant imza kapilari "
         "DURUYOR",
         "GERCEK-KAYNAK-SES-SIZINTI" in _GQ.FAIL_KODLARI
