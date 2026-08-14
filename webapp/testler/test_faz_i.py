@@ -6412,6 +6412,188 @@ kontrol("I-38: KaynakEtiketi spec.bas_sn'i SAHNE-YEREL kare ile okuyor",
         "KaynakEtiketi" in _GRAFIK_TSX
         and "sayi(spec.bas_sn" in _sikistir(_GRAFIK_TSX).replace(" ", ""))
 
+blok("§40i J-1 — STATIK FOTOGRAF / GERCEK VIDEO ORANI OLCULDU (yalniz tanisal)")
+
+# ⚠ YALNIZ TANISAL. Uretim davranisi DEGISMEDI, kapi/esik EKLENMEDI.
+# Ag YOK, ucretli API YOK, rerender/deploy YOK, $0.00.
+#
+# ⚠ I-58 DERSI UYGULANDI: bu blokta SABIT OLCUM SOZLUGU YOKTUR. Butun
+# oranlar `cikti/*/render_plan.json` kayitlarindan ve dosyalarin KENDISINDEN
+# (ffprobe) HER KOSUMDA YENIDEN hesaplanir; sayilar teste "yazilmaz".
+#
+# ── SINIFLANDIRICI (ag gerektirmez) ──
+#   (c) sentetik/diger    : kaynak_turu != "medya" (fallback/motion-graphic)
+#   olculemedi            : medya_yolu bos / dosya diskte yok / ffprobe okumadi
+#   (a) gercek hareketli  : ffprobe ile kare sayisi > 1
+#   (b) statik + KenBurns : kare == 1 VE motion'da zoom/pan DEGISIYOR
+#   (b0) statik hareketsiz: kare == 1 VE zoom/pan SABIT (donmus kadraj)
+# ⚠ "Belirsizse statik say" YAPILMAZ — belirsiz olan `olculemedi` yazilir.
+#
+# ── AYNI PLANIN YENIDEN RENDERI BAGIMSIZ ORNEK SAYILMAZ ──
+# Plan imzasi = (fact_id, asset_id, yuvarlanmis sure) uclulerinin dizisi;
+# ayni imzali kosumlardan TEK temsilci alinir (I-34/I-58 dersi).
+
+import glob as _g1                                       # noqa: E402
+import subprocess as _sp1                                # noqa: E402
+
+_J1_PLAN = sorted(_g1.glob(os.path.join(os.path.dirname(KOK), "cikti", "*",
+                                        "render_plan.json")))
+_J1_FFPROBE = _sh.which("ffprobe")
+
+
+def _j1_kare(yol, _onbellek={}):
+    """Dosyanin GERCEK kare sayisi (ffprobe). Okunamazsa None = OLCULEMEDI."""
+    if yol in _onbellek:
+        return _onbellek[yol]
+    sonuc = None
+    if _J1_FFPROBE and os.path.isfile(yol):
+        try:
+            r = _sp1.run([_J1_FFPROBE, "-v", "error", "-select_streams", "v:0",
+                          "-count_frames", "-show_entries",
+                          "stream=nb_read_frames", "-of", "json", yol],
+                         capture_output=True, text=True, timeout=120)
+            n = json.loads(r.stdout)["streams"][0].get("nb_read_frames")
+            sonuc = int(n) if str(n).isdigit() else None
+        except Exception:
+            sonuc = None
+    _onbellek[yol] = sonuc
+    return sonuc
+
+
+def _j1_kamera_hareketi(sahne) -> bool:
+    """motion listesinde zoom ya da pan GERCEKTEN degisiyor mu?"""
+    for m in sahne.get("motion") or []:
+        p = m.get("parametre") or {}
+        for anahtar in ("zoom", "pan_x", "pan_y"):
+            v = p.get(anahtar)
+            if isinstance(v, list) and len(v) == 2:
+                try:
+                    if abs(float(v[0]) - float(v[1])) > 1e-6:
+                        return True
+                except (TypeError, ValueError):
+                    continue
+    return False
+
+
+def _j1_sinif(sahne):
+    if str(sahne.get("kaynak_turu") or "") != "medya":
+        return "c_sentetik"
+    yol = str(sahne.get("medya_yolu") or "")
+    if not yol or not os.path.isfile(yol):
+        return "olculemedi"
+    n = _j1_kare(yol)
+    if n is None:
+        return "olculemedi"
+    if n > 1:
+        return "a_video"
+    return "b_kenburns" if _j1_kamera_hareketi(sahne) else "b0_hareketsiz"
+
+
+if not _J1_FFPROBE:
+    bloke_yaz("J-1 medya turu olcumu", "ffprobe yok (yerel arac)")
+elif not _J1_PLAN:
+    bloke_yaz("J-1 medya turu olcumu", "cikti/*/render_plan.json yok")
+else:
+    _J1_IMZA: dict = {}
+    for _p1 in _J1_PLAN:
+        _d1 = json.load(open(_p1, encoding="utf-8"))
+        _sh1 = _d1.get("sahneler") or []
+        _im1 = repr([(s.get("fact_id"), s.get("asset_id"),
+                      round(float(s.get("sure_sn") or 0), 2)) for s in _sh1])
+        _J1_IMZA.setdefault(_im1, []).append(
+            (os.path.basename(os.path.dirname(_p1)), _sh1))
+    _J1_TEMSIL = [sorted(v, key=lambda t: t[0])[0][1]
+                  for v in _J1_IMZA.values()]
+    _J1_CEKIM = [s for plan in _J1_TEMSIL for s in plan]
+
+    kontrol("⭐ J-1: ayni planin yeniden renderlari BAGIMSIZ ORNEK "
+            "SAYILMIYOR (kosum sayisi > benzersiz plan sayisi)",
+            len(_J1_PLAN) > len(_J1_IMZA) >= 5,
+            f"{len(_J1_PLAN)} kosum -> {len(_J1_IMZA)} benzersiz plan")
+
+    _J1_C: dict = {}
+    _J1_S: dict = {}
+    for _s1 in _J1_CEKIM:
+        _k1 = _j1_sinif(_s1)
+        _J1_C[_k1] = _J1_C.get(_k1, 0) + 1
+        _J1_S[_k1] = _J1_S.get(_k1, 0.0) + float(_s1.get("sure_sn") or 0)
+    _J1_N = len(_J1_CEKIM)
+    _J1_TOP = sum(_J1_S.values()) or 1.0
+    _J1_STATIK_C = _J1_C.get("b_kenburns", 0) + _J1_C.get("b0_hareketsiz", 0)
+    _J1_STATIK_S = _J1_S.get("b_kenburns", 0.0) + _J1_S.get("b0_hareketsiz", 0.0)
+
+    print(f"     [J-1 TABAN] {len(_J1_IMZA)} benzersiz plan · {_J1_N} cekim · "
+          f"{_J1_TOP:.1f} sn")
+    for _k1 in ("a_video", "b_kenburns", "b0_hareketsiz", "c_sentetik",
+                "olculemedi"):
+        print(f"     [J-1] {_k1:15} cekim {_J1_C.get(_k1, 0):2}/{_J1_N} "
+              f"({100 * _J1_C.get(_k1, 0) / _J1_N:5.1f}%)  "
+              f"sure {_J1_S.get(_k1, 0.0):6.1f} sn "
+              f"({100 * _J1_S.get(_k1, 0.0) / _J1_TOP:5.1f}%)")
+
+    # ── TABAN BULGUSU ──
+    kontrol("⭐ J-1 TABAN: GERCEK HAREKETLI VIDEO orani SIFIR — kayitli "
+            "hicbir planda video kaynagi kullanilmamis",
+            _J1_C.get("a_video", 0) == 0,
+            {k: _J1_C.get(k, 0) for k in
+             ("a_video", "b_kenburns", "b0_hareketsiz", "c_sentetik")})
+    kontrol("⭐ J-1 TABAN: SURE'nin %90'indan fazlasi STATIK FOTOGRAF "
+            "(Ken Burns dahil)",
+            _J1_STATIK_S / _J1_TOP > 0.90,
+            f"{_J1_STATIK_S:.1f}/{_J1_TOP:.1f} sn")
+    kontrol("⭐ J-1: CEKIM'lerin de %90'indan fazlasi statik fotograf",
+            _J1_STATIK_C / _J1_N > 0.90, f"{_J1_STATIK_C}/{_J1_N}")
+    kontrol("⭐ J-1: statik fotograflarin bir kismi HIC kamera hareketi "
+            "almiyor (donmus kadraj); `hareket` alani da bunu soyluyor",
+            _J1_C.get("b0_hareketsiz", 0) > 0
+            and all(str(s.get("hareket") or "") in ("static", "data-reveal")
+                    for s in _J1_CEKIM if _j1_sinif(s) == "b0_hareketsiz"),
+            _J1_S.get("b0_hareketsiz", 0.0))
+    kontrol("⭐ J-1 DURUSTLUK: hicbir cekim 'belirsiz oldugu icin statik' "
+            "sayilmadi — olculemeyen ayri KALEM olarak raporlanir",
+            _J1_C.get("olculemedi", 0) == 0, _J1_C.get("olculemedi", 0))
+
+    # ── YANLIS SINIFLAMA PAYI: GERCEK TEMIZ KARSI-ORNEKLER ──
+    # ⚠ Pozitif sinif (gercek hareketli video) korpusun KENDISINDE YOK; bu
+    # yuzden sinif, YEREL ve GERCEK mp4 ciktilari uzerinde olculur.
+    _J1_MP4 = sorted(_g1.glob(os.path.join(os.path.dirname(KOK), "outputs",
+                                           "sample", "*.mp4")))[:4]
+    if _J1_MP4:
+        _J1_POZ = [(os.path.basename(y), _j1_sinif(
+            {"kaynak_turu": "medya", "medya_yolu": y})) for y in _J1_MP4]
+        kontrol("⭐ J-1 KARSI-ORNEK: GERCEK hareketli video dosyalarinin "
+                "HEPSI `a_video` siniflaniyor (pozitif sinif KACIRILMIYOR)",
+                bool(_J1_POZ) and all(s == "a_video" for _, s in _J1_POZ),
+                _J1_POZ)
+    else:
+        bloke_yaz("J-1 pozitif karsi-ornek", "outputs/sample/*.mp4 yok")
+
+    _J1_KAYNAK = sorted({str(s.get("medya_yolu") or "") for s in _J1_CEKIM
+                         if str(s.get("kaynak_turu") or "") == "medya"})
+    _J1_NEG = [(os.path.basename(y), _j1_kare(y)) for y in _J1_KAYNAK if y]
+    kontrol("⭐ J-1 KARSI-ORNEK: kaynak dosyalarin HEPSI ffprobe ile TEK "
+            "KARE (negatif sinifta YANLIS POZITIF yok)",
+            bool(_J1_NEG) and all(n == 1 for _, n in _J1_NEG),
+            [x for x in _J1_NEG if x[1] != 1])
+    kontrol("⭐ J-1: sinif karari `medya_turu` ALANINA DEGIL dosyanin "
+            "KENDISINE dayaniyor; alan da bagimsiz olarak ayni sonucu veriyor",
+            all(str(s.get("medya_turu") or "") == "image" for s in _J1_CEKIM
+                if _j1_sinif(s) in ("b_kenburns", "b0_hareketsiz")))
+
+    # ── URETIM DEGISMEDI ──
+    kontrol("⭐ J-1: uretim video turunu ZATEN destekliyor — kisit KOD DEGIL "
+            "(avci ve medya_kopru varsayilani zaten 'video')",
+            'medya_turu: str = "video"' in oku(KOK, "medya", "avci.py")
+            and 'medya_turu: str = "video"' in oku(KOK, "medya_kopru.py"))
+    kontrol("⭐ J-1: HICBIR esik/kapi eklenmedi ya da gevsetilmedi",
+            _kk.OPTIK_DURGUN_ESIGI == 2.0
+            and abs(_kk.BENZERLIK_ESIGI - 0.86) < 1e-9
+            and abs(_kk.KENAR_DIS_ESIGI - 6.234) < 1e-9)
+    kontrol("J-1 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+            len(set(re.findall(r"\{ad: '(\w+)'",
+                               oku(KOK, "static/js/api.js")))) == 22)
+
+
 blok("§40h I-58 — IKI ADAY DUZENI KARSI-OLGU OLARAK OLCULDU (yalniz tanisal)")
 
 # ⚠ YALNIZ TANISAL. Uretim davranisi DEGISMEDI, kapi/esik eklenmedi.

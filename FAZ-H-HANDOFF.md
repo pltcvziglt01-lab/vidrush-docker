@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 14 Ağu | **J-1 statik fotoğraf / gerçek video oranı ölçüldü (tanısal)** | `PENDING` | ⚠ **push edildi**, kullanıcı önceliğinin 1. atomu, ağsız: 17 koşum → **7 benzersiz plan** (lawn'ın 10 render'ı **tek** örnek), 32 çekim / 118.5 sn; **gerçek hareketli video %0.0**, statik fotoğraf **süre %94.7** (Ken Burns %79.2 + **donmuş kadraj %15.5**), sentetik %5.3, **ölçülemedi %0**; sınıf kararı `medya_turu` alanına DEĞİL `ffprobe -count_frames` ile **dosyanın kendisine** dayanıyor, belirsiz olan varsayılmıyor; yanlış sınıflama payı **24/24 doğru** (4 gerçek MP4 → 4/4 `a_video`, 20 kaynak → 20/20 tek kare) ⚠ ama pozitif örnekler **render çıktısı**, korpusa hiç video kaynağı girmemiş; red-first: sahte korpusa video enjekte edilince iddia **KIRMIZI** yanıyor (totolojik değil); ⚠ kısıt **kod değil** — `avci`/`medya_kopru` varsayılanı zaten `"video"`; J-2 eşiği **önerildi ama ÜRETİME ALINMADI** (pozitif örnek yok, E türetilemez); üretim kodu/eşik değişmedi, rerender/deploy YOK, $0.00 |
 | 14 Ağu | **I-58 iki aday düzeni karşı-olgu olarak ölçüldü (tanısal)** | `855a60c` | ⚠ **push edildi**, ağsız/ücretsiz karşı-olgu: **A** (farklı 2. aday) tekrar kapısından temiz, **B** (aynı adayın farklı kadrajı) **mevcut I-22 kapısını ihlal ediyor** (bitişik aynı varlık → `KALITE-MEDYA-TEKRAR` fail, üretimin kendi manifestinden canlı hesaplandı); B'yi bloke eden şeyin benzerlik **değil** yalnız `asset_id` olduğu **kaynak koddan** gösterildi (`medya_tekrari` aynı-kimlik çiftinde benzerlik bacağını `continue` ile atlıyor; üretimde `benzerlik_okuyucu=None`); ⚠ **belirleyici**: B **semantik kusuru gidermiyor** — b002 1900 arşiv fotoğrafını alıyor, I-47 uyarısı onun için de yanıyor (canlı çağrı); ⚠ çok-beatli sahne 17 koşumun 12'sinde var ama 10'u aynı planın yeniden render'ı → lawn ailesi dışında yalnız **iki** bağımsız iş (`_i20`, `_smoke_editorv2`) → yanlış pozitif payı güvenilir ölçülemez (I-34 dersi); ⚠ **kapanış denetiminde ÜÇ iddia ELENDİ ve silindi** — kadraj varyantı dHash'leri (0.59–0.77), beş varyantın beklenen optiği (2.83–3.48) ve lisans/provenance iddiası: üçü de sabit sözlükten okunup eşikle karşılaştırılıyordu, **yeniden türetilmiyordu** ve dayanağı (dHash uygulaması / E,d girdileri / ilgili kontrol) repoda **yok**; **üretime alınmadı**, üretim kodu değişmedi, rerender/deploy YOK, $0.00 |
 | 14 Ağu | **I-57 b001/b002 seçim zinciri geriye izlendi (tanısal)** | `ab9b09e` | ✅ **push edildi**, üretimin kendi kayıtlarından: s001 cümlesi **ikiye kesilmiş**, b002 sahnenin **2. adayı** (puan 90→80) ve **kendi beat metniyle hiç aranmamış**; ⚠ ölçüldü ki `semantik_puan` varlık çıkmayınca **altı adayda da tam 50.0** (sıfır bilgi) ve `alaka_kapisi` bu korpusta **ters** çalışıyor — **3 yanlış adayın 3'ünü geçiriyor, 3 doğrudan 2'sini reddediyor**; b002'yi ayıran tek sinyal **yapısal** (aynı sahnenin rank≥2 adayı) ama **yanlış pozitif payı ölçülemez** (örnek büyüklüğü 1) → **üretime konmadı**; ⚠ b002 varlığı **yağmurlama değil** (Kanapou-Kahoolawe erozyon sahası; yağmurlama b004 ve **doğru**); üretim/render değişmedi, deploy YOK |
 | 14 Ağu | **I-56 bağımsız kenar ölçüm hattı üretime alındı** | `ae438bd` | ✅ **push edildi**, I-54 yapılandırması + I-55 eşiği **uygulandı**: `kenar_ornek_komutu` (384×216 @ **8 fps**, optik 64×36@4fps sözleşmesinden **bağımsız**) + `kenar_dis_olcusu` (**dört yön**, en dış sütun/satır, eşik **6.234**); POST-QA'ya **geriye uyumlu** bağlandı (`kenar_dis` alanı + `POST-KENAR-DIS` fail kodu; eski `kenar`/`POST-KENAR-SIYAH` **aynen** duruyor); kabul ölçütü sağlandı: I-52 karşı-örneği **FAIL**, **17 temiz videonun 17'si PASS** → **kaçırma 0, yanlış pozitif 0**; 25.2 sn 1080p pilot **POST-QA PASS**, 11/11 kare SHA-256 aynı, **kabul edilmiş MP4 DEĞİL** (b001/b002 semantik), deploy YOK |
@@ -5671,6 +5672,87 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 77. FAZ J-1 — STATİK FOTOĞRAF / GERÇEK VİDEO ORANI ÖLÇÜLDÜ (yalnız tanısal, 14 Ağu)
+
+> **Durum: kullanıcı önceliğinin 1. atomu. "Slayt gösterisi hissi" artık bir
+> izlenim değil, **ölçülmüş taban**: kayıtlı 7 benzersiz planın **hiçbirinde**
+> gerçek hareketli video yok (**%0.0**), sürenin **%94.7'si statik fotoğraf**.
+> Üretim davranışı **DEĞİŞMEDİ**, kapı/eşik **EKLENMEDİ**. A–I yeşil
+> (**3593**, 0 hata, 2 bilinen BLOKE). Ağ YOK, ücretli API YOK, rerender/
+> deploy YOK, $0.00.**
+> Değişen: **yalnızca** `webapp/testler/test_faz_i.py` (§40i, 12 kontrol) ve
+> bu handoff.
+
+### Ölçülen taban — 7 benzersiz plan · 32 çekim · 118.5 sn
+
+| Sınıf | Çekim | % | Süre | % |
+|---|---|---|---|---|
+| **(a) gerçek hareketli video** | **0/32** | **0.0** | **0.0 sn** | **0.0** |
+| (b) statik foto + Ken Burns/zoom/pan | 26/32 | 81.2 | 93.9 sn | 79.2 |
+| (b0) statik foto, **hiç hareket yok** (donmuş kadraj) | 4/32 | 12.5 | 18.4 sn | **15.5** |
+| (c) sentetik / motion-graphic (fallback) | 2/32 | 6.2 | 6.3 sn | 5.3 |
+| **ölçülemedi** | 0/32 | 0.0 | 0.0 sn | 0.0 |
+| **STATİK FOTOĞRAF TOPLAMI (b+b0)** | **30/32** | **93.8** | **112.3 sn** | **94.7** |
+
+### Yöntem — ağsız, alan bilgisine güvenmeyen
+
+17 kayıtlı koşum plan imzasıyla (`fact_id, asset_id, süre` üçlüleri)
+gruplandı → **7 benzersiz plan**; lawn planının **10 yeniden render'ı tek
+örnek** sayıldı (I-34/I-58 dersi). Sınıf kararı `medya_turu` **alanına
+değil**, dosyanın **kendisine** dayanıyor: her kaynak `ffprobe -count_frames`
+ile okundu. Kaynak türü belirsizse (`medya_yolu` boş / dosya yok / ffprobe
+okumadı) **varsayılmadı**, ayrı `ölçülemedi` kalemi yazıldı — bu korpusta 0.
+
+⚠ **I-58 dersi uygulandı**: bu blokta **sabit ölçüm sözlüğü yoktur**. Bütün
+oranlar her koşumda kayıtlardan **yeniden hesaplanır**; sayı teste yazılmaz.
+
+### Yanlış sınıflama payı (gerçek temiz karşı-örnekler)
+
+| Sınıf | Örnek | Sonuç |
+|---|---|---|
+| Pozitif (gerçek hareketli video) | 4 gerçek MP4 (`outputs/sample/`, 288–756 kare) | **4/4 `a_video`** — kaçırma 0 |
+| Negatif (statik kaynak) | 20 benzersiz kaynak dosyası | **20/20 tek kare** — yanlış pozitif 0 |
+
+**Toplam 24/24 doğru.** ⚠ **Dürüst sınır**: pozitif örnekler korpusun kendi
+kaynakları değil, **render çıktılarıdır** — korpusa hiç video kaynağı
+girmediği için, indirilmiş bir stok video üzerinde uçtan uca davranış
+**ölçülmemiştir**.
+
+**Red-first doğrulaması**: sahte bir korpusa tek gerçek MP4 enjekte edilince
+`a_video == 0` iddiası **KIRMIZI** yanıyor; kayıp dosya `ölçülemedi`,
+fallback `c_sentetik` veriyor → test **totolojik değil**.
+
+### Kök neden: kısıt kod değil
+
+`medya/avci.py` ve `medya_kopru.py` varsayılanı **zaten `"video"`**; üretim
+video türünü destekliyor. Yani %0 sonucu bir **kod kısıtı değil**, arama/arz
+ve seçim zincirinin sonucu. Ayrıca `editor/plan.py:462` aday yokken türü
+**sessizce `"image"`** yazıyor — ayrı ve dar bir atom adayı.
+
+### J-2 için eşik türetme önerisi (⚠ ÜRETİME ALINMADI)
+
+⚠ Bugün "video oranı ≥ E" kapısı **veriden türetilemez**: korpusta **tek bir
+pozitif örnek yok**. E'yi şimdi yazmak I-34/I-58'de elenen hatanın aynısı
+olur. Bu yüzden iki aşama önerilir:
+
+**J-2a — regresyon kilidi (bugün türetilebilir).** Ölçülen tabandan, açık
+formülle, gevşetmeden:
+
+```
+donmus_kadraj_sure_orani  ≤  ölçülen_taban  =  18.4 / 118.5  =  0.155
+```
+
+Yeni hedef koymaz, yalnız **kötüleşmeyi** yakalar; yanlış pozitif payı bugün
+ölçülebilir (7 planın 7'si geçer). Önce yalnız **rapor alanı** olarak
+(`video_sure_orani`, `donmus_kadraj_sure_orani`) eklenir, kapı sonra.
+
+**J-2b — hedef kapı (veri gelince).** `video_sure_orani ≥ E`, ancak **en az
+K=5 bağımsız planda** gerçek video kaynağı alındıktan sonra ve I-55 kalıbıyla
+(yalnız TRAIN'den açık formül, held-out'a tek bakış). **K < 5 iken eşik
+KONULMAZ**, yalnız WARN raporlanır — `EMİN DEĞİLSEN ENGELLEME`.
 
 ---
 
