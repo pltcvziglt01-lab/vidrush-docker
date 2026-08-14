@@ -9751,3 +9751,46 @@ mutlak yolla siliyor.
 ⚠ Bu, "uzantı varsayımıyla PASS deme" uyarısının haklılığını da gösterdi:
 kodek değişimi tek başına yetmezdi — asıl kusur yoldu ve **stderr
 raporlaması** olmasa yine görünmezdi.
+
+### R-1d-g PİLOTU (son) — HEDEF ÖLÇÜLDÜ, örnek KABUL EDİLMEDİ
+
+`job_1786725532851_r1dasm_189422` · 8 sahne · 56.3 sn.
+
+```
+RENDER-QA (gercek timeline): WARN  fail=0 warn=5  sahne=8  kapsam=0.875
+kaynak_kullanimi: 7 varlik · en uzun 7.956 sn · asan: []  · temiz: true
+TESLIM: RED — ZINCIR-EKSIK:post_qa + KABUL-YOK:QA:FAIL
+```
+
+**Atomun hedefi ölçüldü:** `GERCEK-KAYNAK-TAVANI` **kayboldu**
+(`asan: []`, `temiz: true`); `KAYNAK TAVANI: … atanamadi` log satırı da
+**yok** — yani `KAYNAK-TAVANI-SURE-BOZUK` kusuru **kapandı**.
+Kalan uyarılar yalnız `SAGLAYICI-TEKEL` + `FACT-BAGLANTI-YOK` (warn).
+
+⚠ **Bölme yolu bu koşuda ÜRETİMDE TETİKLENMEDİ**: bu işte hiçbir sahne
+8.0 sn'yi aşmadı (`en uzun 7.956`), dolayısıyla `n_parca > 1` dalı
+çalışmadı. Bölme+ek-varlık zinciri **medyasız davranış testleriyle**
+kilitli ama **canlı bir bölme** henüz gözlenmedi.
+
+⛔ **TAM PASS DEĞİL — kabul edilmiş video DENMEZ.**
+
+### ⛔ SONRAKİ TEK GERÇEK BLOKAJ — POST-QA `POST-SIYAH-KARE`
+
+```
+POST-QA: FAIL
+  [fail] POST-SIYAH-KARE : 3 siyah aralik —
+         28.458-28.667 (0.21 sn) · 30.917-31.417 (0.50 sn) ·
+         34.542-40.458 (5.92 sn)
+  [warn] POST-DONMUS-KARE: 1 donmus aralik — 34.542 (+5.83 sn)
+  [warn] POST-FPS        : 24.0 fps, beklenen 30.0
+```
+
+Teslim edilen MP4'ün ortasında **~5.9 sn siyah + donmuş** bir bölüm var
+(aynı zaman damgası). Bu, izleyicinin **doğrudan gördüğü** bir kusur ve
+teknik kapı da onu **fail** ile yakalıyor.
+
+Not: aynı işte `siyah_aralik: 3`, `donmus_aralik: 2` — R-1d-f pilotunda
+ikisi de **0**'dı. Bu turda değişen tek render-ilgili şey **ses dilimleme
+yolu düzeltmesi** (bölme tetiklenmedi), dolayısıyla **nedensellik
+kanıtlanmadı**; bir sonraki atom önce **kaynağı ölçmeli** (segment üretimi
+mi, xfade zinciri mi, medya klibinin kendisi mi).
