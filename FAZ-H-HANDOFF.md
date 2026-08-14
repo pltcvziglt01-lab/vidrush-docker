@@ -9952,3 +9952,61 @@ Modül fonksiyonu geri alınınca:
 3'e çıktığı için sabit `== 2` sayacı kod **doğruyken** kırmızı yanıyordu;
 iddia "**her** başarısız yolda temizlik var" olarak (sayaç eşitliği)
 kilitlendi.
+
+### R-1d-i PİLOTU — CANLI BÖLME İLK KEZ GERÇEKLEŞTİ
+
+`job_1786728166599_r1dasm_17f43c` · **56.30 sn** · **9 sahne** (8 değil).
+
+```
+sahne 2: KOPRU -> butceye secim yazildi (pexels/pexels-license)   <- asil
+sahne 2: KOPRU -> butceye secim yazildi (pexels/pexels-license)   <- EK VARLIK
+RENDER-QA (gercek timeline): WARN  fail=0  sahne=9  kapsam=1.0
+TESLIM: KABUL   (teslim=true, kutuphane 3 kayit)
+```
+
+⚠ **Bölme yolu üretimde İLK KEZ çalıştı** ve doğrulandı: sahne 2 iki parçaya
+bölündü, ikinci parça **farklı `asset_id`** ile ücretsiz stoktan alındı —
+`7033925` ve `8327175` **tam 4.038'er sn** (aynı sahnenin iki yarısı).
+Sahne sayısı 8 → **9**.
+
+| ölçüm | değer |
+|---|---|
+| **aynı kaynak ≤ 8.0 sn** | **9 varlık**, en uzun **7.596 sn**, `asan: []`, **temiz** ✅ |
+| `kapsam_orani` | **1.0** (9 medya / 0 fallback) ✅ |
+| **gerçek video oranı** | **0.6543** (`video:6, donmus:3, sentetik:0`) ✅ |
+| **`kaynak_ses`** | `politika: sifir`, **ihlal `[]`**, temiz ✅ |
+| sağlayıcı | `pexels` 6 çekim + `openai` 3 çekim ✅ |
+| RENDER-QA | **WARN, fail=0** (yalnız `SAGLAYICI-TEKEL` + `FACT-BAGLANTI-YOK`) |
+
+**POST-QA: WARN, FAIL yok** — **siyah 0 · donmuş 0** · 13 kesme ·
+LUFS **−14.04** · TP **−1.46 dBTP** · LRA **3.8**.
+**Bağımsız ffprobe:** `h264, 1920x1080, yuv420p, 24/1, 56.299 sn` ✅
+**Signed URL:** kendi oturumu **200** · oturumsuz **401** ·
+**başka tenant 403** · kütüphane **3 kayıt**.
+**Maliyet:** araştırma **$0.000**, avcı bütçesi **$0.00** (ücretsiz stok +
+zaten üretilmiş görseller; yeni ücretli görsel üretilmedi).
+
+### ⛔ TAM PASS DEĞİL — kabul edilmiş video DENMEZ
+
+`PASS 37 · FAIL 3 · ÖLÇÜLEMEDİ 1`. ⚠ **Üçü de ÜRÜN kusuru değil, ÖLÇÜM
+eksiği:**
+
+| kalan | niteliği |
+|---|---|
+| `geçiş hard_cut_orani` = **None** | gerçek zaman çizgisinde **ölçülmüyor** |
+| `J/L-cut ducking_araligi` = **None** | gerçek zaman çizgisinde **ölçülmüyor** |
+| B-roll | **`GERCEK-TIMELINE-CEKIM-TURU-YOK`** (uydurulmadı) |
+| rumble 17.8 dB | ⚠ 20 dB eşiği **BENİM**, projede **kalibre değil** |
+
+Projenin **kendi** kapılarının ölçtüğü hiçbir şey bu örnekte fail vermiyor.
+
+### ⛔ SONRAKİ TEK GERÇEK BLOKAJ
+
+**`gercek_qa` geçiş/ses-kurgu ölçümlerini üretmiyor.** R-1d-e'de PRE-QA
+kanıtı gerçek zaman çizgisine taşınırken `gecis` (hard-cut oranı) ve `ses`
+(J/L-cut ducking) **taşınmadı**; `props_sahneler` bu kararları `zoom`/`pan`/
+`islev` olarak taşıyor ama `gercek_qa` bunlardan **metrik türetmiyor**.
+Bu üç ölçüm kapanmadan **savunulabilir bir TAM PASS** verilemez.
+
+⚠ Rumble eşiği ayrıca **kalibre edilmeli** (şu an bana ait, projeye ait
+değil) — ya ölçülerek türetilmeli ya da rapordan **çıkarılmalı**.
