@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 14 Ağu | **K-3 açılış başlık/şerit süresi** | `PENDING` | ✅ **push edildi**, **MEDYASIZ atom**: açılış başlığı `min(5.5, beat+1.5)` ile kuruluyordu — **metne hiç bakmıyordu** (iki kelimelik başlık da 5.5 sn) ve `+1.5` ile **intro beat'i aşıyordu** (anlatıcı cümlesi bitince yazı **asılı** kalıyordu); artık süre **metinden** türüyor: `max(karakter/CPS, kelime/KPS) × katsayi`, `min_gorunme_sn` alt sınırı ve **üç sert üst sınır** (mutlak tavan · **intro beat sonu** · asılı kalma **0**); gerçek pilot başlığı **5.325 → 1.714 sn**, asılı kalma **1.700 → 0.000 sn**; CPS eşiği **TÜRETİLMİŞ** (`ALTYAZI_MAKS_CPS` ile aynı okuma hızı), diğerleri **beyan edilmiş**; stabil kod **`KALITE-BASLIK-SURESI`**; kısaltma sessiz değil (`kisaltildi` bayrağı); **K-4 kancası gevşek ve geriye uyumlu** — `katsayi` varsayılanı 1.0, üst sınırları **delemez**, `edit_seviyesi` çalışan koda ve 22 alan sözleşmesine **girmedi**; 25 red-first saf timeline kontrolü; ⚠ I-9 tuzağına ikinci kez düşüldü (yorum taraması) ve `olcum` sözlüğü erken kullanıldı — ikisi de düzeltildi; 22 alan, kullanıcı seçimleri, `deploy.sh`, I-38 ve K-1/K-2 kapıları **korundu**; deploy YOK, $0.00 |
 | 14 Ağu | **K-2 arka plan uğultu kapısı + kaynak sesi sıfır** | `200828a` | ✅ **push edildi**, **MEDYASIZ atom** (Mac'te medya/ses/kare/render/QA artefaktı yok, `ffmpeg` çalıştırılmadı): kaynak video sesi **mutlak sıfır** olarak üç katmanda kilitlendi — renderer zaten `muted`, `render_plan` artık **makine okunur** `ses_kanali: "sifir"` yazıyor, `kaynak_ses_sozlesmesi()` denetliyor → ihlal **`KALITE-KAYNAK-SES-SIZINTI`**; TTS dışı sürekli hiss/rumble/wind için yeni `editor/ses_gurultu.py`: öznitelikler (`konusma_disi_lufs`, `sureklilik_orani`, `spektral_duzluk`, `dusuk/yuksek_frekans_orani`, `belirsizlik_db`) **sayı olarak dışarıdan** enjekte edilir (mevcut okuyucu deseni), modül **medya açmaz/ffmpeg çalıştırmaz**; karar **üç koşul birlikte** (duyulabilir + sürekli + spektral iz) — tek başına düşük SNR müzik yatağında da olur; ⚠ SNR eşiği **TÜRETİLMİŞ** (`DUYULABILIR_FARK_DB`=30 dB ters yönde okundu), diğerleri `DUYULABILIR_FARK_DB` ile **aynı dürüstlük etiketiyle** "beyan edilmiş tasarım eşiği" ve `esik_kaynagi` alanında **raporlanıyor**; **güven aralığı**: SNR±belirsizlik eşiği kesiyorsa `supheli` → **WARN, FAIL değil** (emin değilsen temiz içeriği FAIL etme), ölçüm eksikse **hüküm yok**; deterministik akış ölç→**güvenli** filtre öner (rumble `highpass f=80` — konuşma temel frekansının altında; genişbant bastırma **≤6 dB tavanlı**; **konuşma bandı 300–3400 Hz'e dokunulmaz**)→temizlemeyi doğrula (konuşma bandı >1.0 dB geriler **ya da** ASR güveni >0.02 düşerse **filtre reddedilir**, netliği bozan denoise **uygulanmaz**)→temizlenemiyorsa **`KALITE-SES-GURULTU`** FAIL; 38 red-first kontrol; ⚠ testte I-9 tuzağı (ham dize modülün kendi docstring'ini yakaladı) `_kod_yalniz` ile düzeltildi; I-23/I-24/I-25/I-38, eşikler, 22 alan, kullanıcı seçimleri, `deploy.sh`, K-1 B-roll kapısı **korundu**; deploy YOK, $0.00 |
 | 14 Ağu | **K-1 video kamera muafiyeti + B-roll çeşitlilik kapısı** | `759fe9b` | ✅ **push edildi**, **MEDYASIZ atom** (Mac'te medya/ses/kare/render cache/QA artefaktı/MP4 **üretilmedi**): video ağırlıklı kurguyu **yapısal olarak imkânsız** kılan etiket artefaktı düzeltildi — J-5a'dan beri gerçek video `static` diye etiketleniyordu ve I-24'ün "aynı işlevde aynı kamera hareketi" kuralı bunu gerçek kamera kararı sanıp **4+ video sahnesinde kaçınılmaz FAIL** üretiyordu; `islev_tekrari` + `pencere_tekrari` bacakları artık video çekimlerde **muaf** (enerji I-44 ve statik-süre J-5a bacaklarındaki **mevcut** desenin aynısı), muaf çekimler `kamera_kapisi_muaf_video`da **sayılabilir**; ⚠ boşluk **boş bırakılmadı**: yerini `broll_cesitliligi_ozeti`nin **B-roll görsel dili** bacağı aldı — I-24 işlev kuralının **birebir** karşılığı (`hareket` yerine `cekim_turu`), stabil kod **`KALITE-BROLL-CESITLILIK`** (işlev tekrarı → FAIL, pencere tekrarı → WARN); **sayısal eşik UYDURULMADI** — J-3 oranları hâlâ yalnız rapor (`hedef: None`, `enforce: False`), kapıya bağlı alanlar `kapiya_bagli`da sayılı; red-first: fotoğraf yolu **bit-bit aynı** (I-24 korundu), video yokken davranış **değişmez**, farklı çekim türünde **yanlış pozitif yok**, kod `KALITE_KODLARI`'nda olduğu için kalite kapısı kapalıyken **üretilmez**; ⚠ `ardisik_tekrar` **bilerek kapsam dışı** → iki video hâlâ yan yana gelemez (K-1b); I-23/I-24/I-25/I-38, eşikler, lisans/provenance, 22 alan, kullanıcı seçimleri, `deploy.sh` **korundu**; deploy YOK, $0.00 |
 | 14 Ağu | **J-5a ilk gerçek video edinimi + pilot** | `ee81265` | ⚠ **push edildi**, J-4 kapısı edinim hattına **bağlandı**; Wikimedia Commons'tan **tam 1** gerçek video indi (`Irrigation sprinkler 7`, **1920×1080 vp9 52.2 Mbps** 12.47 sn 81.4 MB, **cc-by-sa**, F ASTILY, lisans **kaydı** API'den — izleme sayfası değil, indirme zamanı kayıtlı, **$0.00**); tavanlar **1 dosya / 300 MB**, NASA **devreye girmedi** (sorgu uzay değil), konu dışı fallback **yok**, PEXELS/PIXABAY anahtarı **aranmadı**; kapı **iki kez** koştu (indirme öncesi + ffprobe ölçümüyle sonrası, red → dosya silinir); **25.30 sn 1080p pilot**: POST-QA **PASS**, kalite **100/100**, `video_sure_orani` **0.0 → 0.2123**, statik **1.0 → 0.7877**, LUFS −14.2 (aynı), LRA 2.5 (aynı), TP −2.6 dBFS, **0** sessizlik bölütü, **11 kare**, benzersiz varlık 1.0 / tekrar 0.0 (gerileme yok); ⚠ gerçek video **iki yapısal kısıt** ortaya çıkardı ve düzeltildi: (1) 1080p kaynak 1080p karede **sıfır punch payı** → video kaynakta dijital zoom **yok** (`VIDEO-KAMERA-NOTR`), (2) `static` süre kapısı hareketli kaynakta **geçersiz tahmin** → statik bacağı video atlıyor (enerji bacağındaki **mevcut** desenin aynısı); ⚠ **kapılar gevşetilmedi**, `KALITE-PUNCH-BUYUTME` ve `KALITE-OPTIK-DURGUN` duruyor, POST-QA optiği b004'te **4.366** ölçtü (eşik 2.0) → muafiyet bypass **değil**; (3) `girdi_kur` medya türünü sabit `"image"` yazıyordu — J-1'deki %0'ın **mekanik nedeni**, düzeltildi; ⚠ **KABUL EDİLMİŞ MP4 DEĞİL** — teknik tam PASS ama **semantik değil** (b001 hâlâ 1900 arşiv fotoğrafı, `KALITE-SEMANTIK-DONEM`); ⚠ ilk koşum `teknoloji_i20_rapor.json` + `i20_kare_*.png` üzerine yazdı, rapor git'ten **geri yüklendi**, smoke çıktı adları **parametrelendi**; 34 red-first **ağsız** test; deploy YOK |
@@ -5678,6 +5679,67 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 84. FAZ K-3 — AÇILIŞ BAŞLIK/ŞERİT SÜRESİ (14 Ağu)
+
+> **Durum: açılış başlığı artık **metinden** hesaplanıyor ve intro beat'i
+> **asla** aşmıyor. Gerçek pilot başlığı **5.325 sn → 1.714 sn**.
+> **MEDYASIZ ATOM**: Mac'te medya/ses/kare/render/QA artefaktı üretilmedi.
+> A–I yeşil (**3828**, 0 hata, 2 bilinen BLOKE). Deploy YOK. $0.00.**
+> Değişen: `webapp/editor/tipografi.py`, `webapp/editor/plan.py`,
+> `webapp/editor/qa_on.py`, `webapp/testler/test_faz_i.py` (§40p, 25 kontrol).
+
+### Ölçülen kusur
+
+Açılış başlığı `min(5.5, b.sure_sn + 1.5)` ile kuruluyordu:
+
+- **Metne hiç bakmıyordu** — iki kelimelik başlık da 5.5 sn duruyordu.
+- **`+1.5` ile intro beat'i aşıyordu** → anlatıcı cümlesi bittikten sonra
+  yazı ekranda **asılı** kalıyordu.
+
+Gerçek pilot: `"THERE IS A BAG OF GRASS"`, beat 3.825 sn →
+eski **5.325 sn** (1.700 sn asılı) · K-3 **1.714 sn** (0.000 sn asılı).
+
+### Politika
+
+```
+sure = max(karakter/CPS, kelime/KPS) × katsayi
+       ↑ min_gorunme_sn alt sınırı
+       ↓ ÜÇ SERT ÜST SINIR: mutlak tavan · intro beat sonu · asılı kalma 0
+```
+
+| Sabit | Değer | Kaynak |
+|---|---|---|
+| `BASLIK_MAKS_CPS` | 20.0 | **TÜRETİLMİŞ** — `ALTYAZI_MAKS_CPS` ile aynı okuma hızı |
+| `BASLIK_KELIME_KPS` | 3.5 | beyan edilmiş (~210 kelime/dk) |
+| `BASLIK_MAKS_SN` | 5.5 | beyan edilmiş mutlak tavan |
+
+Stabil kod: **`KALITE-BASLIK-SURESI`** (fail). Kısaltma sessiz değil —
+`kisaltildi` bayrağı raporlanıyor.
+
+### K-4 kancası (gevşek, geriye uyumlu)
+
+`katsayi` varsayılanı **1.0** → mevcut davranışı yalnızca **güvenli
+kısaltır**. `edit_seviyesi` geldiğinde az/orta/yüksek katsayıları **aynı
+fonksiyona** bağlanacak. ⚠ Katsayı **üst sınırları delemez** (beat hâlâ
+tavan). K-4 bu atomda **uygulanmadı** — çalışan kodda `edit_seviyesi` yok
+ve 22 alan sözleşmesine girmedi.
+
+### Red-first (25/25)
+
+Eski formülün ürettiği başlık kapıda **FAIL** (1.7 sn asılı), yeni hesabınki
+**temiz** (0.0). Kısa/orta/uzun başlıklar **farklı** süre alıyor; çok kısa
+beat'te süre beat'e kırpılıyor; mutlak tavan korunuyor; bozuk girdi hüküm
+vermiyor.
+
+⚠ Test yazarken **I-9 tuzağına ikinci kez** düşüldü: ham dize taraması
+K-4 kancasını anlatan **yorumu** yakaladı. `_kod_yalniz` ile düzeltildi.
+
+⚠ Uygulama sırasında `olcum` sözlüğü henüz kurulmadan kullanıldı ve uçtan
+uca fixture kırıldı; ölçüm K-1/K-2 ile aynı desende doğrudan `q.olcumler`e
+yazılarak düzeltildi.
 
 ---
 

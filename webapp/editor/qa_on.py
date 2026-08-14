@@ -71,6 +71,8 @@ FAIL_KODLARI = {
     # ── Faz K-2: arka plan ugultu/rumble/wind + kaynak ses sizintisi ──
     # ⚠ Olcum remote worker'dan SAYI olarak gelir; verilmezse HUKUM YOK.
     "KALITE-SES-GURULTU", "KALITE-KAYNAK-SES-SIZINTI",
+    # ── Faz K-3: acilis basligi/seridi ekranda ASILI kalamaz ──
+    "KALITE-BASLIK-SURESI",
 }
 
 # I-14 kapisinin urettigi kodlar. Kapi KAPALIYKEN bunlarin HICBIRI uretilmez;
@@ -78,6 +80,7 @@ FAIL_KODLARI = {
 # verilmiyor). Boylece varsayilan yolun PASS/WARN/FAIL karari BIT-BIT ayni kalir.
 KALITE_KODLARI = ("KALITE-BROLL-CESITLILIK",
                   "KALITE-SES-GURULTU", "KALITE-KAYNAK-SES-SIZINTI",
+                  "KALITE-BASLIK-SURESI",
                   "KALITE-BASLIK-KIRPIK", "KALITE-BASLIK-TASMA",
                   "KALITE-MEDYA-TEKRAR", "KALITE-RITIM-SABIT",
                   "KALITE-OLU-FINAL", "KALITE-MEDYA-BENZER-OLCULEMEDI",
@@ -373,6 +376,40 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
                   f"tekrar etti: {_bt['cekim_turu']} (sahne {_bt['indeks']})",
                   "B-roll cekim turunu cesitlendir",
                   beat_id=_bt.get("beat_id", ""))
+
+    # ═══ 4c2) ACILIS BASLIK/SERIT SURESI (Faz K-3) ═══
+    # ⚠ Acilis basligi anlatici cumlesi bittikten sonra ekranda ASILI
+    # kalamaz ve INTRO BEAT'i asamaz. Olcum PLANDAN turer (medya YOK).
+    _bas_kayit = []
+    _beat_ind = {getattr(b3, "beat_id", ""): b3 for b3 in (beatler or [])}
+    for _k3 in (yazi_katmanlari or []):
+        if getattr(_k3, "ad", "") != "chapter-title":
+            continue
+        _b3 = _beat_ind.get(getattr(_k3, "fact_id", ""))
+        if _b3 is None:
+            _b3 = (beatler or [None])[0]
+        if _b3 is None:
+            continue
+        _d3 = tipografi.baslik_suresi_denetle(
+            bas_sn=getattr(_k3, "bas_sn", 0.0),
+            sure_sn=getattr(_k3, "sure_sn", 0.0),
+            beat_bas_sn=getattr(_b3, "bas_sn", 0.0),
+            beat_sure_sn=getattr(_b3, "sure_sn", 0.0))
+        if not _d3.get("olculdu"):
+            continue
+        _bas_kayit.append(dict(_d3, metin=str(getattr(_k3, "metin", ""))[:40]))
+        if kalite_kapisi and not _d3["temiz"]:
+            _ekle("KALITE-BASLIK-SURESI", "fail",
+                  f"acilis basligi anlatim bittikten sonra "
+                  f"{_d3['asili_kalma_sn']} sn ASILI kaliyor "
+                  f"(tolerans {_d3['asili_tolerans_sn']} sn, "
+                  f"tavan {_d3['maks_sn']} sn)",
+                  "sureyi metnin okuma ihtiyacindan turet; intro beat'i asma")
+    # ⚠ `olcum` sozlugu bu noktada HENUZ YOK (kalite bolumunde kuruluyor);
+    # olcum dogrudan `q.olcumler`e yazilir — K-1/K-2 ile ayni desen.
+    q.olcumler["baslik_suresi"] = {
+        "olculen": len(_bas_kayit), "kayitlar": _bas_kayit,
+        "temiz": all(k["temiz"] for k in _bas_kayit)}
 
     # ═══ 4d) SES: KAYNAK SESI SIFIR + ARKA PLAN UGULTU (Faz K-2) ═══
     # ⚠ Bu modul SES ACMAZ. Kaynak-ses sozlesmesi PLANDAN, gurultu karari

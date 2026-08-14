@@ -76,7 +76,16 @@ def _yazi_katmanlari_kur(cekimler: list, beatler: list, adaylar_index: dict,
                 "chapter-title",
                 _kart_basligi(b.metin, baslik_siniri).upper(),
                 b.bas_sn + 0.2,
-                min(5.5, b.sure_sn + 1.5), fact_id=b.fact_id, p=p))
+                # ⚠ FAZ K-3: eski formul `min(5.5, b.sure_sn + 1.5)` idi —
+                # METNE bakmiyordu ve `+1.5` ile INTRO BEAT'i ASIYORDU
+                # (yazi anlatici cumlesi bittikten sonra ASILI kaliyordu).
+                # Artik sure METINDEN turer ve beat'i ASLA asmaz.
+                tipografi.acilis_baslik_suresi(
+                    _kart_basligi(b.metin, baslik_siniri).upper(),
+                    beat_sure_sn=b.sure_sn, gecikme_sn=0.2,
+                    min_gorunme_sn=p.tipografi.min_gorunme_sn,
+                )["sure_sn"],
+                fact_id=b.fact_id, p=p))
         # Kanit beat'lerinde alt band (yer/kurum)
         if b.islev == "kanit" and c.ulke:
             katmanlar.append(tipografi.katman_kur(

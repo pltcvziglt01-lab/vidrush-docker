@@ -239,6 +239,124 @@ def cakisma_coz(katmanlar: list, *, p: Optional[EditProfili] = None,
     return sorted(yerlesmis, key=lambda k: k.bas_sn), rapor
 
 
+# ═══════ ACILIS BASLIK/SERIT SURESI (Faz K-3) — SAF HESAP ══════════════
+#
+# ⚠ OLCULEN KUSUR: acilis basligi `min(5.5, beat.sure_sn + 1.5)` ile
+# kuruluyordu. Bu formul (a) METNE HIC BAKMIYOR — iki kelimelik baslik da
+# 5.5 sn duruyordu, (b) `+1.5` ile INTRO BEAT'i ASABILIYORDU, yani anlatici
+# cumlesi bittikten sonra yazi ekranda ASILI kaliyordu.
+#
+# K-3 politikasi: sure METINDEN turer, okunabilir bir ALT sinirin altina
+# inmez, ust sinirlari ASLA asmaz.
+#
+# ── ESIK KAYNAKLARI (durustce etiketli) ──
+# `BASLIK_MAKS_CPS`  : TURETILMIS — `kalite_kapisi.ALTYAZI_MAKS_CPS` (20.0)
+#                      ayni izleyicinin ayni okuma hizidir; yeni sayi
+#                      uydurulmadi.
+# `BASLIK_KELIME_KPS`: BEYAN EDILMIS tasarim esigi (~210 kelime/dk = 3.5
+#                      kelime/sn yayin pratigi). Dinleme/okuma testi DEGIL;
+#                      parametre olarak disari acildi.
+# `BASLIK_ASILI_TAVANI_SN` / `BASLIK_MAKS_SN`: BEYAN EDILMIS ust sinirlar.
+BASLIK_MAKS_CPS = 20.0
+BASLIK_KELIME_KPS = 3.5
+BASLIK_ASILI_TAVANI_SN = 0.8
+BASLIK_MAKS_SN = 5.5
+
+# ⚠ K-4 KANCASI (simdi UYGULANMIYOR). `edit_seviyesi` geldiginde bu sozluk
+# az|orta|yuksek katsayilarina baglanacak. Varsayilan 1.0 -> GERIYE UYUMLU;
+# K-3 tek basina yalnizca GUVENLI KISALTMA yapar.
+BASLIK_PROFIL_KATSAYISI = {"varsayilan": 1.0}
+
+
+def acilis_baslik_suresi(metin: str, *, beat_sure_sn: float,
+                         gecikme_sn: float = 0.0,
+                         min_gorunme_sn: float = 1.2,
+                         katsayi: float = 1.0,
+                         maks_cps: float = BASLIK_MAKS_CPS,
+                         kelime_kps: float = BASLIK_KELIME_KPS,
+                         maks_sn: float = BASLIK_MAKS_SN) -> dict:
+    """Acilis basligi/seridi ekranda NE KADAR kalmali? (saf hesap)
+
+    `gecikme_sn`: baslik beat basindan ne kadar SONRA giriyor (plan 0.2 sn).
+    ⚠ Uc SERT ust sinir birlikte uygulanir:
+      1. `maks_sn` mutlak tavan,
+      2. INTRO BEAT'in sonu — baslik beat'i ASLA asamaz,
+      3. anlatici cumlesi bittikten sonra en fazla `asili_tavani_sn`.
+    ⚠ ALT sinir `min_gorunme_sn`: okunamayacak kadar kisa da olamaz.
+    """
+    m = str(metin or "")
+    kar = len(m.strip())
+    kelime = len([w for w in m.split() if w])
+    try:
+        beat = float(beat_sure_sn)
+    except (TypeError, ValueError):
+        beat = 0.0
+    try:
+        gec = max(0.0, float(gecikme_sn))
+    except (TypeError, ValueError):
+        gec = 0.0
+    kat = float(katsayi) if katsayi and float(katsayi) > 0 else 1.0
+
+    # ── OKUMA IHTIYACI: karakter ve kelime bacaklarinin BUYUGU ──
+    kar_sn = kar / float(maks_cps) if maks_cps > 0 else 0.0
+    kel_sn = kelime / float(kelime_kps) if kelime_kps > 0 else 0.0
+    okuma_sn = max(kar_sn, kel_sn) * kat
+    istenen = max(float(min_gorunme_sn), okuma_sn)
+
+    # ── UST SINIRLAR ──
+    # ⚠ Anlatici cumlesi INTRO BEAT boyunca surer; dolayisiyla "cumle
+    # bittikten sonra asili kalma" ile "beat'i asma" AYNI buyukluktur ve
+    # tavani SIFIRDIR. `asili_tavani_sn` bu yuzden HESAPTA KULLANILMAZ —
+    # yalnizca ESKI/dis kaynakli katmanlari denetleyen kapinin TOLERANSIDIR
+    # (`baslik_suresi_denetle`). Olu ayar birakilmadi.
+    beat_kalan = max(0.0, beat - gec)            # baslik girisinden beat sonuna
+    sinirlar = {"maks_sn": float(maks_sn),
+                "intro_beat_kalan": round(beat_kalan, 3),
+                "asili_kalma_tavani_sn": 0.0}
+    sure = min(istenen, float(maks_sn), beat_kalan)
+    sure = max(0.0, round(sure, 3))
+    return {
+        "sure_sn": sure,
+        "karakter": kar, "kelime": kelime,
+        "karakter_bacagi_sn": round(kar_sn, 3),
+        "kelime_bacagi_sn": round(kel_sn, 3),
+        "okuma_ihtiyaci_sn": round(okuma_sn, 3),
+        "istenen_sn": round(istenen, 3),
+        "katsayi": kat,
+        "sinirlar": sinirlar,
+        "beat_asiyor": False,                    # tanim geregi: min() ile kesildi
+        "kisaltildi": bool(sure + 1e-6 < istenen),
+        "min_gorunme_sn": float(min_gorunme_sn),
+    }
+
+
+def baslik_suresi_denetle(*, bas_sn: float, sure_sn: float,
+                          beat_bas_sn: float, beat_sure_sn: float,
+                          asili_tavani_sn: float = BASLIK_ASILI_TAVANI_SN,
+                          maks_sn: float = BASLIK_MAKS_SN) -> dict:
+    """Kurulmus bir acilis basligi sinirlari ASIYOR mu? (kapi girdisi)"""
+    try:
+        b, sr = float(bas_sn), float(sure_sn)
+        bb, bs = float(beat_bas_sn), float(beat_sure_sn)
+    except (TypeError, ValueError):
+        return {"olculdu": False, "neden": "GIRDI-BOZUK"}
+    bitis = b + sr
+    beat_bitis = bb + bs
+    # ⚠ TEK BUYUKLUK: anlatici cumlesi beat boyunca surdugu icin "cumleden
+    # sonra asili kalma" = "intro beat'i asma". Iki ad altinda AYNI sayiyi
+    # raporlamak yaniltici olurdu; tek ad kullaniliyor.
+    asili = round(max(0.0, bitis - beat_bitis), 3)
+    tol = float(asili_tavani_sn)
+    return {"olculdu": True, "bitis_sn": round(bitis, 3),
+            "beat_bitis_sn": round(beat_bitis, 3),
+            "asili_kalma_sn": asili,
+            "asili_tolerans_sn": tol,
+            "maks_sn": float(maks_sn),
+            "maks_asimi_sn": round(max(0.0, sr - float(maks_sn)), 3),
+            "temiz": (asili <= tol + 1e-6
+                      and sr <= float(maks_sn) + 1e-6)}
+
+
 def katman_kur(spec_adi: str, metin: str, bas_sn: float, sure_sn: float, *,
                fact_id: str = "", p: Optional[EditProfili] = None,
                x: Optional[int] = None,

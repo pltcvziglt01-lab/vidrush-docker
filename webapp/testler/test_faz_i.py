@@ -7844,6 +7844,155 @@ kontrol("K-2: B-ROLL kapisi (K-1) DURUYOR",
         "KALITE-BROLL-CESITLILIK" in _qon.FAIL_KODLARI)
 
 
+blok("§40p K-3 — ACILIS BASLIK/SERIT SURESI (saf timeline, medyasiz)")
+
+# ⚠ MEDYASIZ ATOM: dosya/medya/ffmpeg YOK, artefakt URETILMEZ. $0.00.
+#
+# ── OLCULEN KUSUR ──
+# Acilis basligi `min(5.5, beat.sure_sn + 1.5)` ile kuruluyordu:
+#   (a) METNE HIC BAKMIYORDU — iki kelimelik baslik da 5.5 sn duruyordu,
+#   (b) `+1.5` ile INTRO BEAT'i ASIYORDU, yani anlatici cumlesi bittikten
+#       sonra yazi ekranda ASILI kaliyordu.
+# Gercek pilot ornegi: "THERE IS A BAG OF GRASS", beat 3.825 sn
+#   ESKI: 5.325 sn  ->  1.700 sn ASILI (kapi FAIL verir)
+#   K-3 : 1.714 sn  ->  0.000 sn asili (TEMIZ)
+#
+# ── POLITIKA ──
+#  · sure = max(karakter/CPS, kelime/KPS) x katsayi, `min_gorunme_sn` alt
+#    sinirina saygi duyar
+#  · UC SERT UST SINIR: mutlak tavan, INTRO BEAT sonu, asili kalma 0
+#  · K-4 KANCASI: `katsayi` varsayilan 1.0 -> GERIYE UYUMLU; az/orta/yuksek
+#    baglaninca ayni fonksiyon kullanilir. K-4 BU ATOMDA UYGULANMADI.
+
+_T3 = _etipo
+
+
+def _k3(metin, beat, **ek):
+    return _T3.acilis_baslik_suresi(metin, beat_sure_sn=beat,
+                                    gecikme_sn=0.2, **ek)
+
+
+# ── (1) SURE METINDEN TURUYOR ──
+_K3_KISA = _k3("GO", 3.825)
+_K3_ORTA = _k3("THERE IS A BAG OF GRASS", 3.825)
+_K3_UZUN = _k3("A VERY LONG OPENING TITLE THAT NEEDS MORE READING TIME", 6.0)
+kontrol("⭐ K-3 BELIRLEYICI: sure artik METNE BAGLI — kisa baslik uzun "
+        "baslikla AYNI sureyi ALMIYOR",
+        _K3_KISA["sure_sn"] < _K3_ORTA["sure_sn"] < _K3_UZUN["sure_sn"],
+        [_K3_KISA["sure_sn"], _K3_ORTA["sure_sn"], _K3_UZUN["sure_sn"]])
+kontrol("⭐ K-3: hem KARAKTER hem KELIME bacagi hesaplaniyor, BUYUGU "
+        "aliniyor",
+        _K3_ORTA["okuma_ihtiyaci_sn"]
+        == max(_K3_ORTA["karakter_bacagi_sn"], _K3_ORTA["kelime_bacagi_sn"]),
+        (_K3_ORTA["karakter_bacagi_sn"], _K3_ORTA["kelime_bacagi_sn"]))
+kontrol("⭐ K-3: okunamayacak kadar KISA olamaz (`min_gorunme_sn` alt siniri)",
+        _K3_KISA["sure_sn"] >= _K3_KISA["min_gorunme_sn"],
+        (_K3_KISA["sure_sn"], _K3_KISA["min_gorunme_sn"]))
+
+# ── (2) UST SINIRLAR: INTRO BEAT ASILMIYOR ──
+kontrol("⭐ K-3 BELIRLEYICI: baslik INTRO BEAT'i ASLA asmiyor "
+        "(gecikme dahil bitis <= beat sonu)",
+        all(_k3(m, b)["sure_sn"] + 0.2 <= b + 1e-6
+            for m, b in (("GO", 3.825),
+                         ("THERE IS A BAG OF GRASS", 3.825),
+                         ("A VERY LONG OPENING TITLE THAT NEEDS TIME", 2.0),
+                         ("KISA", 1.0))))
+kontrol("⭐ K-3: cok KISA beat'te bile tasma YOK (sure beat'e kirpilir)",
+        _k3("THERE IS A BAG OF GRASS", 1.0)["sure_sn"] <= 0.8 + 1e-6,
+        _k3("THERE IS A BAG OF GRASS", 1.0)["sure_sn"])
+kontrol("⭐ K-3: mutlak tavan (5.5 sn) korunuyor — cok uzun metin + cok "
+        "uzun beat'te bile asilmiyor",
+        _k3("X" * 400, 60.0)["sure_sn"] <= _T3.BASLIK_MAKS_SN + 1e-6,
+        _k3("X" * 400, 60.0)["sure_sn"])
+kontrol("⭐ K-3: kisaltma SESSIZ degil — `kisaltildi` bayragi RAPORLANIYOR",
+        _k3("THERE IS A BAG OF GRASS", 1.0)["kisaltildi"] is True
+        and _K3_KISA["kisaltildi"] is False)
+
+# ── (3) RED-FIRST: ESKI DAVRANIS KAPIDAN GECMIYOR ──
+_K3_ESKI = _T3.baslik_suresi_denetle(
+    bas_sn=0.2, sure_sn=min(5.5, 3.825 + 1.5),      # ESKI formul
+    beat_bas_sn=0.0, beat_sure_sn=3.825)
+kontrol("⭐ K-3 RED-FIRST: ESKI formulun urettigi baslik kapida FAIL "
+        "(1.7 sn ASILI kaliyordu)",
+        _K3_ESKI["temiz"] is False
+        and abs(_K3_ESKI["asili_kalma_sn"] - 1.7) < 1e-3,
+        _K3_ESKI["asili_kalma_sn"])
+_K3_YENI = _T3.baslik_suresi_denetle(
+    bas_sn=0.2, sure_sn=_K3_ORTA["sure_sn"],
+    beat_bas_sn=0.0, beat_sure_sn=3.825)
+kontrol("⭐ K-3: YENI hesabin urettigi baslik kapidan TEMIZ geciyor "
+        "(asili kalma 0.0)",
+        _K3_YENI["temiz"] is True and _K3_YENI["asili_kalma_sn"] == 0.0)
+kontrol("⭐ K-3: gercek pilot basligi OLCULEBILIR sekilde KISALDI "
+        "(5.325 -> ~1.7 sn)",
+        _K3_ORTA["sure_sn"] < min(5.5, 3.825 + 1.5) - 3.0,
+        (min(5.5, 3.825 + 1.5), _K3_ORTA["sure_sn"]))
+kontrol("⭐ K-3: mutlak tavani asan katman da FAIL veriyor",
+        _T3.baslik_suresi_denetle(bas_sn=0.0, sure_sn=9.0, beat_bas_sn=0.0,
+                                  beat_sure_sn=30.0)["temiz"] is False)
+kontrol("⭐ K-3: bozuk girdi hukum VERMIYOR (`olculdu=False`)",
+        _T3.baslik_suresi_denetle(bas_sn="x", sure_sn=1.0, beat_bas_sn=0.0,
+                                  beat_sure_sn=3.0)["olculdu"] is False)
+
+# ── (4) K-4 KANCASI: GEVSEK VE GERIYE UYUMLU ──
+kontrol("⭐ K-3: varsayilan katsayi 1.0 — mevcut davranis GUVENLI KISALTMA",
+        _T3.BASLIK_PROFIL_KATSAYISI["varsayilan"] == 1.0
+        and _K3_ORTA["katsayi"] == 1.0)
+kontrol("⭐ K-3: katsayi ILERIDE baglanabilir — buyuk katsayi sureyi "
+        "UZATIR, kucuk katsayi KISALTIR (K-4 hazir)",
+        _k3("THERE IS A BAG OF GRASS", 6.0, katsayi=1.6)["sure_sn"]
+        > _k3("THERE IS A BAG OF GRASS", 6.0)["sure_sn"]
+        > _k3("THERE IS A BAG OF GRASS", 6.0, katsayi=0.6)["sure_sn"])
+kontrol("⭐ K-3: katsayi UST SINIRLARI DELEMEZ (beat hala tavan)",
+        _k3("THERE IS A BAG OF GRASS", 2.0, katsayi=9.0)["sure_sn"]
+        + 0.2 <= 2.0 + 1e-6)
+# ⚠ I-9 tuzagi (K-2'de de yasandi): ham dize taramasi K-4 KANCASINI
+# ANLATAN YORUMU yakaliyor. Yalniz CALISAN kod taranir.
+kontrol("⭐ K-3: K-4 BU ATOMDA UYGULANMADI — calisan kodda `edit_seviyesi` "
+        "YOK, 22 alan sozlesmesine de girmedi",
+        "edit_seviyesi" not in _kod_yalniz(oku(KOK, "editor",
+                                               "tipografi.py"))
+        and "edit_seviyesi" not in oku(KOK, "static/js/api.js"))
+
+# ── (5) SOZLESME VE KOD ──
+kontrol("⭐ K-3: `KALITE-BASLIK-SURESI` FAIL kodu KILITLENDI",
+        "KALITE-BASLIK-SURESI" in _qon.FAIL_KODLARI
+        and "KALITE-BASLIK-SURESI" in _qon.KALITE_KODLARI)
+kontrol("⭐ K-3: plan.py ESKI formulu ARTIK KULLANMIYOR",
+        "min(5.5, b.sure_sn + 1.5)" not in _sikistir(
+            oku(KOK, "editor", "plan.py")).replace(" ", "")
+        and "acilis_baslik_suresi" in oku(KOK, "editor", "plan.py"))
+kontrol("⭐ K-3 DURUSTLUK: esik kaynaklari etiketli — CPS TURETILMIS "
+        "(ALTYAZI_MAKS_CPS ile ayni), digerleri BEYAN EDILMIS",
+        abs(_T3.BASLIK_MAKS_CPS - _kk.ALTYAZI_MAKS_CPS) < 1e-9
+        and "TURETILMIS" in oku(KOK, "editor", "tipografi.py")
+        and "BEYAN EDILMIS" in oku(KOK, "editor", "tipografi.py"))
+kontrol("⭐ K-3: olu ayar birakilmadi — asili tavani HESAPTA degil yalniz "
+        "KAPI TOLERANSINDA kullaniliyor",
+        "asili_tavani_sn" not in _sikistir(
+            oku(KOK, "editor", "tipografi.py")
+        ).split("defacilis_baslik_suresi")[1].split("defbaslik_suresi")[0])
+
+# ── KORUNANLAR ──
+kontrol("K-3 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("K-3 GERILEME YOK: I-38 yazi kapisi ve tipografi kapilari DURUYOR",
+        "KALITE-YAZI-SAHNE-DISI" in _qon.FAIL_KODLARI
+        and "KALITE-YAZI-NEFES-YOK" in _qon.FAIL_KODLARI
+        and "KALITE-BASLIK-KIRPIK" in _qon.FAIL_KODLARI)
+kontrol("K-3 GERILEME YOK: K-1/K-2 kapilari DURUYOR",
+        "KALITE-BROLL-CESITLILIK" in _qon.FAIL_KODLARI
+        and "KALITE-SES-GURULTU" in _qon.FAIL_KODLARI
+        and "KALITE-KAYNAK-SES-SIZINTI" in _qon.FAIL_KODLARI)
+kontrol("K-3: kullanici secimleri DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in oku(os.path.dirname(KOK), "app",
+                                            "render-studio", "src",
+                                            "Video.tsx"))
+kontrol("K-3: deploy.sh DOKUNULMADI",
+        "docker commit" in oku(os.path.dirname(KOK), "deploy.sh"))
+
+
 blok("§40h I-58 — IKI ADAY DUZENI KARSI-OLGU OLARAK OLCULDU (yalniz tanisal)")
 
 # ⚠ YALNIZ TANISAL. Uretim davranisi DEGISMEDI, kapi/esik eklenmedi.
