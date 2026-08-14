@@ -10067,3 +10067,55 @@ yok** · J/L-cut = 0 **gerekçeli** · ducking **stabil kodla fail-closed** ve
 ⚠ Bir mevcut test **düzeltildi, gevşetilmedi**: stabil kod listesi
 `== {3 kod}` yerine **alt küme** olarak kilitlendi (iddia "bu üçü beyan
 ediliyor"du, "tam olarak üç tane" değil).
+
+### R-1d-j PİLOTU — **FAIL: 0** (ilk kez), ama TAM PASS DEĞİL
+
+`job_1786729772370_r1dasm_2d4c01` · **59.18 sn** · **10 sahne**.
+
+**Yeni ölçümler artık gerçek değer üretiyor:**
+```
+GECIS: gecis=9  hard_cut=6  efektli=3  hard_cut_orani=0.667
+       imza_dagilimi={"karartma": 3}
+SES  : ses_gecis=9  j_l_cut=0
+       gerekce: acrossfade=d=g ile xfade=duration=g AYNI g/offset
+                -> ses/video siniri AYRISMAZ
+       ducking: olculdu=false  GERCEK-TIMELINE-DUCKING-VERISI-YOK
+```
+
+| ölçüm | değer |
+|---|---|
+| ffprobe | `h264, 1920×1080, **yuv420p**, 24 fps, **59.18 sn**` ✅ |
+| `kapsam_orani` | **1.0** (10 medya / 0 fallback) ✅ |
+| gerçek video oranı | **0.6454** ✅ |
+| aynı kaynak ≤ 8.0 sn | **10 varlık**, en uzun **7.716**, `asan: []` ✅ |
+| `kaynak_ses` | `sifir`, **ihlal `[]`** ✅ |
+| **hard-cut oranı** | **0.667** (≥ 0.55) ✅ |
+| POST-QA | **WARN, FAIL yok** · siyah 0 · donmuş 0 |
+| RENDER-QA | **WARN, fail=0** |
+| signed URL | **200 / 401 / 403** ✅ |
+| teslim | **KABUL** · kütüphane 3 kayıt |
+
+⚠ **Yaşam döngüsü çalıştı:** `silme_kuyrugu` artık R-1d-b'deki **hatalı
+kabul kaydını** (`job_1786712620354`) `TAVAN-ASILDI` ile içeriyor — son-3
+dışına düştü. **Silinmedi** (talimat); gerçek silme remote lifecycle işinin
+işi ve o iş **hâlâ yok**.
+
+### ⛔ TAM PASS DEĞİL — kabul edilmiş video DENMEZ
+
+`PASS 38 · **FAIL 0** · ÖLÇÜLEMEDİ 4`. Dördü de **yapısal olarak
+ölçülemez**, ürün kusuru değil:
+
+| ölçülemedi | neden |
+|---|---|
+| rumble · hiss | **projede kalibre edilmiş eşik YOK** (uydurulmadı) |
+| B-roll / cutaway | `GERCEK-TIMELINE-CEKIM-TURU-YOK` — gerçek hat çekim türü atamıyor |
+| ducking zarfı | `GERCEK-TIMELINE-DUCKING-VERISI-YOK` — gerçek zaman çizgisi taşımıyor |
+
+### ⛔ SONRAKİ TEK GERÇEK BLOKAJ
+
+**Dört ölçüm mimari olarak türetilemiyor.** Tam PASS için ikisinden biri
+gerekir: (a) gerçek hat bu verileri **üretsin** (çekim türü ataması,
+ducking zarfı) ve rumble/hiss eşiği **ölçülerek kalibre edilsin**; ya da
+(b) teslim sözleşmesi bu dördünü **kapsam dışı** ilan etsin — ama bu, o
+kriterlerden **vazgeçmek** demektir ve **kullanıcı kararıdır**.
+⚠ Eşik uydurmak ya da "ölçülemedi"yi PASS saymak **yanlış** olur.
