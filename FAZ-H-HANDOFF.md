@@ -9522,3 +9522,47 @@ Gerçek `ffprobe` doğrulaması **yalnızca remote worker pilotunda** koşar.
 
 Red-first ölçüldü: düzeltme geri alınınca
 **`AttributeError: module 'hizli_render' has no attribute 'TESLIM_PIX_FMT'`**.
+
+### R-1d-f PİLOTU — `yuv420p` DOĞRULANDI, örnek yine KABUL EDİLMEDİ
+
+`job_1786721869701_r1dasm_843bd1` · 8 sahne · **61.63 sn**.
+
+| ölçüm | R-1d-e pilotu | **R-1d-f pilotu** |
+|---|---|---|
+| **`pix_fmt`** | ⛔ **`yuv444p`** | ✅ **`yuv420p`** |
+
+**Teknik PASS:** 1920×1080 · h264 · **`yuv420p`** · **61.63 sn** · aac 48 kHz ·
+12 kare · siyah 0 · donmuş 0 · POST-QA **WARN** (FAIL yok).
+**Gerçek-timeline PASS:** `kapsam_orani` **1.0** (8 medya / 0 fallback) ·
+gerçek video oranı **0.4979** · `kaynak_ses` ihlal **[]** ·
+tipografi/künye/motion/semantik FAIL yok.
+**Signed URL:** kendi oturumu **200** · oturumsuz **401** · **başka tenant 403**.
+
+⛔ **TAM PASS DEĞİL — kabul edilmiş video DENMEZ.** RENDER-QA **FAIL** (4 fail).
+
+### ⛔ SONRAKİ TEK GERÇEK BLOKAJ — sahne süresi kaynak tavanını aşıyor
+
+```
+GERCEK-KAYNAK-TAVANI: 36560908  8.508 sn   (tavan 8.0)
+GERCEK-KAYNAK-TAVANI: ..._s001  8.124 sn
+GERCEK-KAYNAK-TAVANI: 38614588  8.052 sn
+GERCEK-KAYNAK-TAVANI: 15924008  8.028 sn
+```
+
+Gerçek hatta **1 sahne = 1 varlık**. Bir sahne **8.0 sn'yi aşarsa** o varlık
+**tek başına** kaynak tavanını aşar; başka çare yoktur. Bu iş: 61.63 sn / 8
+sahne ≈ **7.7 sn ortalama**, ama 4 sahne 8.0'ın üstünde.
+
+⚠ **Kabul bu yüzden SÜREYE BAĞLI ve KARARSIZ**: R-1d-e pilotunda sahneler
+7.1–7.6 sn olduğu için **kabul edilmişti**; bu işte 8.0'ı aşınca reddedildi.
+Aynı ürün, aynı kapı, farklı sonuç — **plan sahne süresini tavana göre
+sınırlamıyor**.
+
+**Doğru atom (R-1d-g):** sahne/beat süresi üretilirken `KAYNAK_BASINA_TAVAN_SN`
+(8.0) **üst sınır olarak uygulansın** (aşan sahne bölünsün), ya da bir sahne
+**≥2 varlıkla** kaplansın. ⚠ Tavanı yükseltmek **YANLIŞ** olur: J-5b
+kullanıcı şartı ve `saglayici_motoru` ile aynı tek sabit.
+
+**Diğer kalanlar (blokaj değil):** rumble 18.1 dB (⚠ eşik **benim**, kalibre
+değil) · olgu bağı 4/8 · `geçiş hard_cut` ve `J/L-cut ducking` gerçek zaman
+çizgisinde **ölçülmüyor** · B-roll `GERCEK-TIMELINE-CEKIM-TURU-YOK`.
