@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 14 Ağu | **K-1 video kamera muafiyeti + B-roll çeşitlilik kapısı** | `PENDING` | ✅ **push edildi**, **MEDYASIZ atom** (Mac'te medya/ses/kare/render cache/QA artefaktı/MP4 **üretilmedi**): video ağırlıklı kurguyu **yapısal olarak imkânsız** kılan etiket artefaktı düzeltildi — J-5a'dan beri gerçek video `static` diye etiketleniyordu ve I-24'ün "aynı işlevde aynı kamera hareketi" kuralı bunu gerçek kamera kararı sanıp **4+ video sahnesinde kaçınılmaz FAIL** üretiyordu; `islev_tekrari` + `pencere_tekrari` bacakları artık video çekimlerde **muaf** (enerji I-44 ve statik-süre J-5a bacaklarındaki **mevcut** desenin aynısı), muaf çekimler `kamera_kapisi_muaf_video`da **sayılabilir**; ⚠ boşluk **boş bırakılmadı**: yerini `broll_cesitliligi_ozeti`nin **B-roll görsel dili** bacağı aldı — I-24 işlev kuralının **birebir** karşılığı (`hareket` yerine `cekim_turu`), stabil kod **`KALITE-BROLL-CESITLILIK`** (işlev tekrarı → FAIL, pencere tekrarı → WARN); **sayısal eşik UYDURULMADI** — J-3 oranları hâlâ yalnız rapor (`hedef: None`, `enforce: False`), kapıya bağlı alanlar `kapiya_bagli`da sayılı; red-first: fotoğraf yolu **bit-bit aynı** (I-24 korundu), video yokken davranış **değişmez**, farklı çekim türünde **yanlış pozitif yok**, kod `KALITE_KODLARI`'nda olduğu için kalite kapısı kapalıyken **üretilmez**; ⚠ `ardisik_tekrar` **bilerek kapsam dışı** → iki video hâlâ yan yana gelemez (K-1b); I-23/I-24/I-25/I-38, eşikler, lisans/provenance, 22 alan, kullanıcı seçimleri, `deploy.sh` **korundu**; deploy YOK, $0.00 |
 | 14 Ağu | **J-5a ilk gerçek video edinimi + pilot** | `ee81265` | ⚠ **push edildi**, J-4 kapısı edinim hattına **bağlandı**; Wikimedia Commons'tan **tam 1** gerçek video indi (`Irrigation sprinkler 7`, **1920×1080 vp9 52.2 Mbps** 12.47 sn 81.4 MB, **cc-by-sa**, F ASTILY, lisans **kaydı** API'den — izleme sayfası değil, indirme zamanı kayıtlı, **$0.00**); tavanlar **1 dosya / 300 MB**, NASA **devreye girmedi** (sorgu uzay değil), konu dışı fallback **yok**, PEXELS/PIXABAY anahtarı **aranmadı**; kapı **iki kez** koştu (indirme öncesi + ffprobe ölçümüyle sonrası, red → dosya silinir); **25.30 sn 1080p pilot**: POST-QA **PASS**, kalite **100/100**, `video_sure_orani` **0.0 → 0.2123**, statik **1.0 → 0.7877**, LUFS −14.2 (aynı), LRA 2.5 (aynı), TP −2.6 dBFS, **0** sessizlik bölütü, **11 kare**, benzersiz varlık 1.0 / tekrar 0.0 (gerileme yok); ⚠ gerçek video **iki yapısal kısıt** ortaya çıkardı ve düzeltildi: (1) 1080p kaynak 1080p karede **sıfır punch payı** → video kaynakta dijital zoom **yok** (`VIDEO-KAMERA-NOTR`), (2) `static` süre kapısı hareketli kaynakta **geçersiz tahmin** → statik bacağı video atlıyor (enerji bacağındaki **mevcut** desenin aynısı); ⚠ **kapılar gevşetilmedi**, `KALITE-PUNCH-BUYUTME` ve `KALITE-OPTIK-DURGUN` duruyor, POST-QA optiği b004'te **4.366** ölçtü (eşik 2.0) → muafiyet bypass **değil**; (3) `girdi_kur` medya türünü sabit `"image"` yazıyordu — J-1'deki %0'ın **mekanik nedeni**, düzeltildi; ⚠ **KABUL EDİLMİŞ MP4 DEĞİL** — teknik tam PASS ama **semantik değil** (b001 hâlâ 1900 arşiv fotoğrafı, `KALITE-SEMANTIK-DONEM`); ⚠ ilk koşum `teknoloji_i20_rapor.json` + `i20_kare_*.png` üzerine yazdı, rapor git'ten **geri yüklendi**, smoke çıktı adları **parametrelendi**; 34 red-first **ağsız** test; deploy YOK |
 | 14 Ağu | **J-4 video provenance/lisans sözleşmesi (YALNIZ ENGELLER)** | `4440a81` | ✅ **push edildi**, ağsız/indirmesiz koruyucu sözleşme: yeni `medya/video_lisans.py`, video kabulü için **8 zorunlu kanıt** (`kaynak_url`, `saglayici`, `lisans_turu`, **`lisans_kaydi`** — beyan değil, `indirme_zamani`, ffprobe ile ölçülen `codec`/`cozunurluk`/`bitrate`); biri eksikse **RED** ve eksik alan **adıyla** raporlanıyor; ⚠ **YouTube/Vimeo/TikTok/X vb.**: video **açıklamasındaki lisans beyanı TEK BAŞINA YETMİYOR** (`beyan_tek_basina_yeterli: False`), ayrıca `indirme_izni`+`tos_uyumu`+`hak_sahibi_dogrulandi` **üçü birden** şart, eksikse `PLATFORM-IZIN-KANITI-YOK` → RED; izinler açık olsa **bile** lisans kaydı videonun kendi sayfasıysa **beyan sayılıp** RED → ToS/telif ihlali yolu kapalı; **mevcut kapılar gevşetilmedi**: `lisans_karari()` **sarmalanıyor**, ARR/NC/ND/Getty reddi **asla çevrilmiyor**, görsel yolu **hiç değişmedi** (PD beyanı hâlâ geçiyor); red-first **kabul tabanıyla** kuruldu (temiz Commons videosu KABUL) ki kapı totolojik olmasın; ⚠ **bilerek edinim hattına bağlanmadı** ve **ağa çıkmıyor** → seçim/render davranışı değişmedi (HEAD worktree ile `render_plan`/`edit_manifest`/`props` SHA **birebir aynı**), **pilot üretilmedi**; I-23/I-24/I-25/I-38, eşikler, 22 alan, kullanıcı seçimleri, `deploy.sh` **korundu**; deploy YOK, $0.00 |
 | 14 Ağu | **J-3 B-roll/cutaway çeşitliliği ölçüldü (kapı YOK)** | `e9034bb` | ✅ **push edildi**, ağsız tanısal: 7 bağımsız planda `kaynak_saglayici_dagilimi` (çekim **ve süre**), `benzersiz_varlik_orani`, `cekim_turu_dagilimi`, `tekrar_sure_orani`, provenance ve `gercek_video_*` ölçüldü; **taban**: benzersiz oran 6 planda 1.000 / `_smoke_editorv2` **0.750**, tekrar süresi 6 planda 0.000 / **0.126**, **çekim türü çeşidi 7/7 planda tam 3** (cutaway **dar**), tek sağlayıcı **süre** oranı 6 planda **1.000** / `_i20` **0.949**, **gerçek video 0.0** (açıkça 0 raporlanıyor, J-2a'dan okunuyor); ⚠ süre tabanlı ölçüm mevcut çekim tabanlı kapıdan **farklı bilgi** veriyor (`_i20` 0.80 → 0.949) → `SAGLAYICI-TEKEL` **çoğaltılmadı**; EMİN DEĞİLSEN ENGELLEME: kimlik yoksa oran **`None`** (1.0 değil), lisans boş/`unknown` ise provenance **ölçülemedi** + `uyari_adayi` (WARN **üretilmedi**, `durum`u değiştirirdi), J-2a yoksa video alanı **`None`**; `hedef: None`, `enforce: False`, **yeni fail kodu YOK**; red-first: doğal karşı-örnek `_smoke_editorv2` ayrışıyor + 5 sentetik müdahalenin **5'i** metriği tersine çeviriyor; **render değişmezliği kanıtlandı** (HEAD worktree, `render_plan`/`edit_manifest`/`props` SHA **birebir aynı**, QA WARN 0/3) → **pilot üretilmedi**; I-23/I-24/I-25/I-38, eşikler, lisans/provenance, 22 alan, kullanıcı seçimleri, `deploy.sh`, üretim seçim kodu **korundu**; deploy YOK, $0.00 |
@@ -5676,6 +5677,89 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 82. FAZ K-1 — VİDEO KAMERA MUAFİYETİ + B-ROLL ÇEŞİTLİLİK KAPISI (14 Ağu)
+
+> **Durum: video ağırlıklı kurguyu **yapısal olarak imkânsız** kılan kapı
+> düzeltildi. Kamera-hareketi bacakları (`islev_tekrari`, `pencere_tekrari`)
+> gerçek video çekimlerde **muaf**; boşluk boş bırakılmadı, yerini
+> `KALITE-BROLL-CESITLILIK` aldı. **MEDYASIZ ATOM**: Mac'te medya, ses, kare,
+> render cache, QA artefaktı veya MP4 **üretilmedi**. A–I yeşil (**3765**,
+> 0 hata, 2 bilinen BLOKE). Deploy YOK. $0.00.**
+> Değişen: `webapp/editor/kalite_kapisi.py`, `webapp/editor/qa_on.py`,
+> `webapp/testler/test_faz_i.py` (§40n, 24 kontrol).
+
+### Ölçülen sorun (J-5b denemesinde)
+
+1 dakikalık video ağırlıklı örnek **iki kez PRE-QA'da bloke oldu**. Kök neden:
+J-5a'dan beri gerçek video çekimleri plan tarafında **`static` diye
+etiketleniyor** (hareket görüntünün kendisinde; dijital zoom uygulanmıyor).
+I-24'ün *"aynı işlevde aynı kamera hareketi olamaz"* kuralı bu **etiketi**
+gerçek bir kamera kararı sanıyor ve **4+ video sahnesinde işlev çakışması
+kaçınılmaz** oluyordu → `KALITE-MOTION-ISLEV-TEKRAR` FAIL.
+
+⚠ Bu bir **etiket artefaktıydı**, ölçülen bir kusur değil.
+
+### K-1 politikası (deterministik, eşik uydurulmadı)
+
+1. **Muafiyet:** `islev_tekrari` ve `pencere_tekrari` bacakları
+   `medya_turu == "video"` çekimleri **atlar** — enerji (I-44) ve statik-süre
+   (J-5a) bacaklarındaki desenin **aynısı**. Muaf çekimler
+   `kamera_kapisi_muaf_video` alanında **sayılabilir** (sessiz değil).
+2. **Yerine geçen kapı:** `broll_cesitliligi_ozeti` içinde **B-roll görsel
+   dili** bacağı — I-24'ün işlev kuralının **birebir** karşılığı, `hareket`
+   yerine **`cekim_turu`**. Aynı anlatı işlevindeki iki video çekim aynı
+   çekim türünü alırsa izleyici aynı görsel cümleyi iki kez görür.
+   - `video_islev_tur_tekrari` → **FAIL** `KALITE-BROLL-CESITLILIK`
+   - `video_pencere_tur_tekrari` → **WARN** (aynı kod)
+3. **Sayısal eşik YOK.** J-3'ün oranları (`video_sure_orani`,
+   `benzersiz_varlik_orani`, …) **hâlâ yalnız rapor**: `hedef: None`,
+   `enforce: False`. Kapıya bağlı alanlar sözleşmede sayılı
+   (`kapiya_bagli`).
+
+### Red-first
+
+| İddia | Kanıt |
+|---|---|
+| Aynı işlevde iki **video** → artık `islev_tekrari` **yok** | ✅ |
+| Aynı işlevde iki **fotoğraf** aynı hareket → **hâlâ FAIL** (I-24 korundu) | ✅ |
+| Hiç video yokken ölçüm **eski davranışla aynı** | ✅ |
+| Aynı işlevde iki video **aynı çekim türü** → B-roll kapısı **ateşler** | ✅ |
+| Çekim türü **farklıysa** → **ateşlemez** (yanlış pozitif yok) | ✅ |
+| Fotoğraf çekimleri B-roll kapısını **tetiklemez** | ✅ |
+| Kod `KALITE_KODLARI`'nda → kalite kapısı kapalıyken **üretilmez** | ✅ |
+
+### ⚠ Bilerek kapsam dışı
+
+`ardisik_tekrar` (bitişik aynı hareket) **dokunulmadı** — K-1 kapsamında
+değildi. Sonuç: **iki video sahnesi hâlâ yan yana gelemez**, yani video
+oranı sahne sayısının ~%50'siyle sınırlı. Sıradaki atom adayı (K-1b).
+
+### Medyasız atom kanıtı
+
+Bu atomda dosya okunmadı/indirilmedi; `cikti/` ve `outputs/` altında **tek
+bir yeni dosya oluşmadı**. Değişen üç dosya da kaynak koddur.
+
+---
+
+## ⏭ SIRADAKİ ATOM SIRASI (kullanıcı tarafından belirlendi)
+
+⚠ Hepsinde: **Mac'te medya artefaktı üretilmez**, tüm medya QA/render
+**yalnız sunucuda**. Scratch çözüm atomu **kapatmaz** — aynı davranış
+server/pipeline üzerinden **otomatik** çalışmalı. Deploy yalnız ilgili tam
+regresyon yeşil + repo temiz + origin güncel + rollback hazırsa.
+
+| # | Atom | Özet |
+|---|---|---|
+| **K-2** | **Arka plan uğultu/rüzgâr kapısı** | TTS dışı sürekli hava/hiss/rumble tespiti → deterministik temizleme ya da FAIL. Kaynak video sesi **daima sıfır**. Konuşma netliğini bozan denoise **uygulanmaz**. Ayrı stabil hata kodu + red-first test. |
+| **K-3** | **Açılış yazı şeridi süresi** | İlk başlık/şerit metni ekranda asılı kalmasın. Süre **kelime/karakter sayısından** okunabilir min+max ile deterministik; anlatıcı cümlesi bittikten sonraki asılı kalma sınırlı; **intro beat süresini aşamaz**; profile göre farklı ama her profilde **üst sınır**. Stabil kod + red-first görsel-zaman çizelgesi testleri. |
+| **K-4** | **`edit_seviyesi` = az \| orta \| yuksek** | ChatGPT düşünme modu benzeri **tek üç-konumlu** çubuk/radio-segment. **22 alan sözleşmesini bozmadan** bağlanır. Seviyeler etiket değil **ölçülebilir profil**: min gerçek-video oranı, ort. plan süresi, cutaway yoğunluğu, geçiş çeşitliliği, J/L-cut sayısı, SFX yoğunluğu, kapanış gücü eşikleri **farklı**; aynı girdiyle çıktılar testte **bariz ayrışmalı**. |
+| **K-5** | **Belgesel anlatı kapısı** | hook→bağlam→kanıt/karşıtlık→sonuç→kapanış yapısı + anlatıcı/B-roll **semantik eşleşmesi**. |
+| **K-1b** | **Bitişik video kısıtı** | `ardisik_tekrar`ın video çekimlerdeki karşılığı; video oranı tavanını açar. |
+| **M-1** | **Magnific MCP sağlayıcı adaptörü** | Resmi uç: `https://mcp.magnific.com`. Sunucu **provider adapter** + kullanıcıya özel **Connect Magnific OAuth/MCP** + **şifreli token** + **tenant izolasyonu** + balance check + varlık arama/edinim + **açık kredi/model onayı** + idempotency/retry/timeout + provenance/license metadata + **object storage ingest** + ffprobe kalite seçimi. Parola/API key **alınmaz**. Auto mode kullanılırsa provenance'a `model_unknown/auto` yazılır; kalite için **açık model seçimi** tercih edilir. Magnific yok/erişilemezse **ücretsiz stok sağlayıcı fallback**. ⚠ MCP yalnız ajan istemcisi olduğundan **resmî çok-kullanıcılı OAuth yetkisi kanıtlanmadan hesap bağlama/deploy YOK**: adaptör **test-double** ile kurulur, gerçek OAuth adımı **güvenli blokaj** olarak raporlanır. Kaynak sesi **daima sıfır**, kaynak başına toplam **≤8 sn** kapıları korunur. |
+| **R-1** | **Remote-only iş mimarisi** | web isteği→server job→queue→ephemeral worker→sağlayıcı→object storage→remote TTS/render/PRE-QA/POST-QA→**signed download URL**. Mac yalnız kaynak kodu geliştirme + salt-okunur denetim. Kullanıcı izolasyonu, şifreli OAuth token, kredi onayı, retry/failover/idempotency, lifecycle TTL/cleanup, job status sözleşmesi **zorunlu**. |
 
 ---
 

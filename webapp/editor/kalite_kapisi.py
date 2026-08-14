@@ -1901,9 +1901,22 @@ def motion_grammar_olcusu(sahneler, *, pencere: int = HAREKET_PENCERESI,
     ardisik_tekrar = [{"indeks": i, "hareket": hareketler[i]}
                       for i in range(1, len(hareketler))
                       if hareketler[i] and hareketler[i] == hareketler[i - 1]]
+    # ⚠ FAZ K-1 — KAMERA HAREKETI KAPILARI YALNIZ DURGUN FOTOGRAFA UYGULANIR.
+    # Gercek videoda kamera hareketi PLANA ait DEGILDIR: goruntunun kendisinde
+    # tasinir ve plan onu `static` diye etiketler (J-5a). Bu etiketten
+    # "gorsel dil tekrar etti" sonucunu cikarmak OLCULEN bir sey degil,
+    # ETIKET ARTEFAKTIDIR. Muafiyet, enerji (I-44) ve statik-sure (J-5a)
+    # bacaklarindaki desenin AYNISIDIR. ⚠ Bosluk BOS BIRAKILMIYOR: yerini
+    # `broll_cesitliligi_ozeti`nin B-ROLL GORSEL DILI bacagi alir
+    # (`KALITE-BROLL-CESITLILIK`).
+    _video = [str(s.get("medya_turu") or "image").lower() == "video"
+              for s in liste]
     pencere_tekrar = []
     for i in range(len(hareketler)):
-        onceki = hareketler[max(0, i - pencere):i]
+        if _video[i]:
+            continue
+        onceki = [hareketler[j] for j in range(max(0, i - pencere), i)
+                  if not _video[j]]
         if hareketler[i] and hareketler[i] in onceki:
             pencere_tekrar.append({"indeks": i, "hareket": hareketler[i],
                                    "pencere": pencere})
@@ -1927,7 +1940,7 @@ def motion_grammar_olcusu(sahneler, *, pencere: int = HAREKET_PENCERESI,
     _islev_gorulen: dict = {}
     islev_tekrari = []
     for i, (isl, h) in enumerate(zip(islevler, hareketler)):
-        if not isl or not h:
+        if not isl or not h or _video[i]:      # ⚠ K-1: video MUAF (yukari bak)
             continue
         onceki = _islev_gorulen.setdefault(isl, {})
         if h in onceki:
@@ -1999,6 +2012,9 @@ def motion_grammar_olcusu(sahneler, *, pencere: int = HAREKET_PENCERESI,
         # ⚠ I-46: risk OPTIK BIRIMDE (enerji x yer degistirme).
         "optik_riski": optik_riski,
         "model_k": MODEL_K, "model_en_kotu_hata": MODEL_EN_KOTU_HATA,
+        # ⚠ K-1: kamera-hareketi bacaklarindan MUAF tutulan cekimler
+        # SESSIZ degil, SAYILABILIR.
+        "kamera_kapisi_muaf_video": [i for i, v in enumerate(_video) if v],
         "benzersiz_hareket": len({h for h in hareketler if h}),
         "ardisik_tekrar": ardisik_tekrar,
         "pencere_tekrari": pencere_tekrar,
@@ -2434,7 +2450,8 @@ BELIRSIZ_LISANS = ("", "unknown", "bilinmiyor", "belirsiz", "?")
 
 
 def broll_cesitliligi_ozeti(sahneler, *,
-                            medya_turu_ozeti_: Optional[dict] = None) -> dict:
+                            medya_turu_ozeti_: Optional[dict] = None,
+                            pencere: int = HAREKET_PENCERESI) -> dict:
     """B-roll / cutaway CESITLILIGI — saglayici, varlik, cekim turu, tekrar.
 
     ⚠ HUKUM VERMEZ: donen sozlukte fail/warn/seviye YOKTUR; esik yoktur.
@@ -2528,9 +2545,53 @@ def broll_cesitliligi_ozeti(sahneler, *,
         "kod_adayi": "BROLL-PROVENANCE-BELIRSIZ",
     }
 
+    # ── (6) B-ROLL GORSEL DILI TEKRARI (Faz K-1) ──
+    # ⚠ I-24'un ISLEV kuralinin BIREBIR karsiligi: orada `hareket`, burada
+    # `cekim_turu`. Gerekce: gercek videoda kamera hareketi PLANA ait degil,
+    # goruntunun kendisinde; plan onu `static` diye etiketler. O etiketten
+    # cesitlilik hukmu cikarmak olcum degil ARTEFAKT olur (K-1'de muaf
+    # tutuldu). Yerini BU bacak alir: ayni anlati islevindeki iki VIDEO
+    # cekim ayni cekim turunu alirsa izleyici ayni gorsel cumleyi iki kez
+    # goruyor demektir.
+    # ⚠ ESIK UYDURULMADI: sayisal hedef/oran YOK; yalnizca "ayni islevde
+    # ayni cekim turu IKINCI KEZ" yapisal kosulu — I-24 ile ayni bicim.
+    _vid = [s for s in liste
+            if str(s.get("medya_turu") or "").lower() == "video"]
+    _vid_idx = [i for i, s in enumerate(liste)
+                if str(s.get("medya_turu") or "").lower() == "video"]
+    _gorulen: dict = {}
+    islev_tur_tekrari = []
+    for _sira, (i, s) in enumerate(zip(_vid_idx, _vid)):
+        isl = str(s.get("islev") or "")
+        tur = str(s.get("cekim_turu") or "")
+        if not isl or not tur:
+            continue
+        onceki = _gorulen.setdefault(isl, {})
+        if tur in onceki:
+            islev_tur_tekrari.append({
+                "indeks": i, "beat_id": str(s.get("beat_id") or ""),
+                "islev": isl, "cekim_turu": tur,
+                "ilk_indeks": onceki[tur]})
+        else:
+            onceki[tur] = i
+    pencere_tur_tekrari = []
+    _turler = [str(s.get("cekim_turu") or "") for s in _vid]
+    for _sira in range(len(_turler)):
+        _onc = _turler[max(0, _sira - int(pencere)):_sira]
+        if _turler[_sira] and _turler[_sira] in _onc:
+            pencere_tur_tekrari.append({
+                "indeks": _vid_idx[_sira],
+                "beat_id": str(_vid[_sira].get("beat_id") or ""),
+                "cekim_turu": _turler[_sira], "pencere": int(pencere)})
+
     ozet = {
         "olculdu": bool(medya) and varlik_olculdu and prov_olculdu
         and tur_belirsiz == 0,
+        # ── K-1: B-ROLL GORSEL DILI (kamera bacaginin yerini alan kapi) ──
+        "video_cekim_sayisi": len(_vid),
+        "video_islev_tur_tekrari": islev_tur_tekrari,
+        "video_pencere_tur_tekrari": pencere_tur_tekrari,
+        "video_cekim_turu_cesidi": len({t for t in _turler if t}),
         "medya_cekim_sayisi": len(medya),
         "toplam_sn": round(toplam, 3),
         "kaynak_saglayici_dagilimi": sag,
@@ -2552,8 +2613,13 @@ def broll_cesitliligi_ozeti(sahneler, *,
             (medya_turu_ozeti_ or {}).get("video_sure_orani")
             if isinstance(medya_turu_ozeti_, dict) else None),
         # ── HEDEF YOK ──
+        # ⚠ J-3 alanlari (oranlar) HALA yalniz RAPOR: hedef yok, enforce yok.
+        # K-1'de kapiya baglanan TEK sey `video_islev_tur_tekrari` /
+        # `video_pencere_tur_tekrari` YAPISAL kosuludur — sayisal esik DEGIL.
         "hedef": None,
         "enforce": False,
+        "kapiya_bagli": ["video_islev_tur_tekrari",
+                         "video_pencere_tur_tekrari"],
         "not": ("cesitlilik OLCUMU; hedef/esik UYDURULMADI. Saglayici "
                 "tekeli icin kapi ZATEN var (SAGLAYICI-TEKEL, cekim "
                 "tabanli); buradaki oran SURE tabanlidir."),

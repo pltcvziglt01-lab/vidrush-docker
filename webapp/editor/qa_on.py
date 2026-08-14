@@ -63,12 +63,17 @@ FAIL_KODLARI = {
     # (12 kontrollu + 6 tutulan noktada YANLIS FAIL yok). Belirsiz bant
     # `warn` seviyesinde kalir -> EMIN DEGILSEN ENGELLEME korunur.
     "KALITE-OPTIK-DURGUN-BEKLENEN",
+    # ── Faz K-1: B-ROLL GORSEL DILI ──
+    # ⚠ Kamera-hareketi bacagi (I-24) gercek VIDEO cekimlerde MUAF; bosluk
+    # bos birakilmadi, yerini bu kod aldi. Yapisal kosul, sayisal esik YOK.
+    "KALITE-BROLL-CESITLILIK",
 }
 
 # I-14 kapisinin urettigi kodlar. Kapi KAPALIYKEN bunlarin HICBIRI uretilmez;
 # olcumler yine de `olcumler["kalite"]`e yazilir (gizlenmiyor, yalniz hukum
 # verilmiyor). Boylece varsayilan yolun PASS/WARN/FAIL karari BIT-BIT ayni kalir.
-KALITE_KODLARI = ("KALITE-BASLIK-KIRPIK", "KALITE-BASLIK-TASMA",
+KALITE_KODLARI = ("KALITE-BROLL-CESITLILIK",
+                  "KALITE-BASLIK-KIRPIK", "KALITE-BASLIK-TASMA",
                   "KALITE-MEDYA-TEKRAR", "KALITE-RITIM-SABIT",
                   "KALITE-OLU-FINAL", "KALITE-MEDYA-BENZER-OLCULEMEDI",
                   "KALITE-YAZI-CAKISMA", "KALITE-GUVENLI-ALAN",
@@ -315,6 +320,10 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
          "asset_id": getattr(c_, "asset_id", ""),
          "saglayici": getattr(c_, "saglayici", ""),
          "cekim_turu": getattr(c_, "cekim_turu", ""),
+         # ⚠ K-1: B-ROLL GORSEL DILI bacagi icin gerekli iki alan.
+         "islev": getattr(b_, "islev", ""),
+         "medya_turu": str((adaylar_index.get(getattr(c_, "asset_id", ""))
+                            or {}).get("medya_turu") or "image"),
          "lisans": ((adaylar_index.get(getattr(c_, "asset_id", "")) or {})
                     .get("lisans") or ""),
          "medya_yolu": ((adaylar_index.get(getattr(c_, "asset_id", "")) or {})
@@ -328,8 +337,27 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
     # ═══ 4c) B-ROLL / CUTAWAY CESITLILIGI (Faz J-3 — YALNIZ RAPOR) ═══
     # ⚠ HUKUM YOK: Sorun URETILMEZ, esik ENFORCE EDILMEZ, SECIM DEGISMEZ.
     # Gercek video orani J-2a olcumunden OKUNUR; yeniden hesaplanmaz.
-    q.olcumler["broll_cesitliligi"] = _KK.broll_cesitliligi_ozeti(
+    _broll = _KK.broll_cesitliligi_ozeti(
         _j2_sahneler, medya_turu_ozeti_=q.olcumler["medya_turu"])
+    q.olcumler["broll_cesitliligi"] = _broll
+    # ⚠ K-1 KAPISI. I-24'un ISLEV kuralinin video karsiligi; kamera bacagi
+    # video cekimlerde MUAF tutuldugu icin bosluk BURADA kapaniyor.
+    # Kapi yalnizca `kalite_kapisi` ACIKKEN hukum verir (KALITE_KODLARI).
+    if kalite_kapisi:
+        for _bt in (_broll.get("video_islev_tur_tekrari") or []):
+            _ekle("KALITE-BROLL-CESITLILIK", "fail",
+                  f"'{_bt['islev']}' islevindeki iki VIDEO cekim ayni cekim "
+                  f"turunu aliyor: {_bt['cekim_turu']} "
+                  f"(sahne {_bt['ilk_indeks']} ve {_bt['indeks']})",
+                  "ayni islevdeki B-roll cekimlerine FARKLI cekim turu ata "
+                  "(genis/yakin/detay) ya da farkli bir kaynak sec",
+                  beat_id=_bt.get("beat_id", ""))
+        for _bt in (_broll.get("video_pencere_tur_tekrari") or []):
+            _ekle("KALITE-BROLL-CESITLILIK", "warn",
+                  f"son {_bt['pencere']} VIDEO cekimde ayni cekim turu "
+                  f"tekrar etti: {_bt['cekim_turu']} (sahne {_bt['indeks']})",
+                  "B-roll cekim turunu cesitlendir",
+                  beat_id=_bt.get("beat_id", ""))
 
     # ═══ 5) EFEKT YOGUNLUGU / RENDERABILITY ═══
     beat_efekt: dict = {}

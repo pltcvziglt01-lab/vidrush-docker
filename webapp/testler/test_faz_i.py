@@ -6942,9 +6942,17 @@ kontrol("⭐ J-3: J-2a olcumu VERILMEZSE video alani 0 DEGIL None "
 kontrol("⭐ J-3: hedef UYDURULMADI (`hedef` None, `enforce` False)",
         _J3_KK.broll_cesitliligi_ozeti([])["hedef"] is None
         and _J3_KK.broll_cesitliligi_ozeti([])["enforce"] is False)
-kontrol("⭐ J-3: cesitlilik icin YENI FAIL KODU EKLENMEDI",
-        not any("BROLL" in k or "CESIT" in k for k in _qon.FAIL_KODLARI),
-        _qon.FAIL_KODLARI)
+# ⚠ K-1'DE DEGISTI. J-3 aninda cesitlilik alanlarinin HICBIRI kapiya bagli
+# DEGILDI ve bu dogruydu. K-1 kamera-hareketi bacagini video cekimlerde muaf
+# tutunca bosluk kapanmali oldu ve `KALITE-BROLL-CESITLILIK` BILEREK eklendi.
+# Iddia SILINMEDI, TARIHLENDIRILDI: ORANLAR hala kapiya bagli degil.
+kontrol("⭐ J-3 (K-1 sonrasi): cesitlilik ORANLARI hala kapiya BAGLI DEGIL "
+        "— hedef None, enforce False, sayisal esik YOK",
+        _J3_KK.broll_cesitliligi_ozeti([])["hedef"] is None
+        and _J3_KK.broll_cesitliligi_ozeti([])["enforce"] is False
+        and set(_J3_KK.broll_cesitliligi_ozeti([])["kapiya_bagli"])
+        == {"video_islev_tur_tekrari", "video_pencere_tur_tekrari"},
+        _J3_KK.broll_cesitliligi_ozeti([])["kapiya_bagli"])
 kontrol("⭐ J-3: olcum modulu hukum VERMIYOR — donen sozlukte "
         "fail/warn/seviye/ihlal ANAHTARI YOK",
         not ({"fail", "warn", "seviye", "ihlal"}
@@ -7468,6 +7476,161 @@ kontrol("⭐ J-5a: smoke cikti adlari PARAMETRELENDI — farkli girdiyle kosan "
         "surucu ONCEKI pilotun kanitini EZEMEZ",
         all(k in oku(KOK, "testler", "smoke_konsept3_teknoloji_i20.py")
             for k in ("RAPOR_ADI =", "BLOKE_RAPOR_ADI =", "KARE_ONEKI =")))
+
+
+blok("§40n K-1 — VIDEO KAMERA MUAFIYETI + B-ROLL CESITLILIK KAPISI")
+
+# ⚠ MEDYASIZ ATOM: bu blokta dosya OKUNMAZ, indirilmez, render/QA artefakti
+# URETILMEZ. Yalniz URETIM KARAR MANTIGI test edilir. $0.00.
+#
+# ── SORUN (J-5b'de OLCULDU) ──
+# Gercek video cekimleri plan tarafinda `static` diye ETIKETLENIYOR (J-5a:
+# hareket goruntunun kendisinde, dijital zoom uygulanmiyor). I-24'un
+# "ayni islevde ayni kamera hareketi olamaz" kurali bu etiketi GERCEK bir
+# kamera karari saniyor ve DORT video sahnesinde islev cakismasi KACINILMAZ
+# oluyordu -> `KALITE-MOTION-ISLEV-TEKRAR` FAIL -> video agirlikli kurgu
+# YAPISAL OLARAK IMKANSIZ.
+#
+# ── K-1 POLITIKASI (deterministik, esik UYDURULMADI) ──
+#  1. Kamera-hareketi bacaklari (`islev_tekrari`, `pencere_tekrari`) VIDEO
+#     cekimlerde ATLANIR — enerji (I-44) ve statik-sure (J-5a) bacaklarindaki
+#     desenin AYNISI. Muaf cekimler `kamera_kapisi_muaf_video`de SAYILABILIR.
+#  2. Bosluk BOS BIRAKILMAZ: yerini `broll_cesitliligi_ozeti`nin B-ROLL
+#     GORSEL DILI bacagi alir — I-24'un ISLEV kuralinin BIREBIR karsiligi,
+#     `hareket` yerine `cekim_turu`. Stabil kod: `KALITE-BROLL-CESITLILIK`.
+#  3. Cesitlilik ORANLARI (J-3) kapiya BAGLANMADI: hedef None, enforce False.
+
+_K1 = _kk
+
+
+def _k1_sahne(i, *, tur="image", islev="kanit", hareket="static",
+              cekim="wide", sure=4.0):
+    return {"beat_id": f"b{i:03d}", "medya_turu": tur, "islev": islev,
+            "hareket": hareket, "cekim_turu": cekim, "sure_sn": sure,
+            "kaynak_turu": "medya", "asset_id": f"a{i}", "saglayici": "w",
+            "lisans": "cc-by"}
+
+
+# ── (1) MUAFIYET: VIDEO artik kamera bacaklarini TETIKLEMIYOR ──
+_K1_VV = [_k1_sahne(1, tur="video", islev="kanit"),
+          _k1_sahne(2, tur="image", islev="aciklama", hareket="push-in"),
+          _k1_sahne(3, tur="video", islev="kanit")]
+_K1_MV = _K1.motion_grammar_olcusu(_K1_VV)
+kontrol("⭐ K-1 BELIRLEYICI: ayni islevdeki IKI VIDEO cekim artik "
+        "`islev_tekrari` URETMIYOR (etiket artefakti hukum vermiyor)",
+        _K1_MV["islev_tekrari"] == [], _K1_MV["islev_tekrari"])
+kontrol("⭐ K-1: video cekimler `pencere_tekrari` de URETMIYOR",
+        _K1_MV["pencere_tekrari"] == [], _K1_MV["pencere_tekrari"])
+kontrol("⭐ K-1: muaf tutulan cekimler SESSIZ degil, SAYILABILIR",
+        _K1_MV["kamera_kapisi_muaf_video"] == [0, 2],
+        _K1_MV["kamera_kapisi_muaf_video"])
+
+# ── (2) RED-FIRST: FOTOGRAF yolu BIT-BIT AYNI (kapi GEVSETILMEDI) ──
+_K1_FF = [_k1_sahne(1, tur="image", islev="kanit", hareket="push-in"),
+          _k1_sahne(2, tur="image", islev="aciklama", hareket="pan-left"),
+          _k1_sahne(3, tur="image", islev="kanit", hareket="push-in")]
+_K1_MF = _K1.motion_grammar_olcusu(_K1_FF)
+kontrol("⭐ K-1 RED-FIRST: ayni islevdeki iki FOTOGRAF ayni hareketi alirsa "
+        "kapi HALA ateslenıyor (I-24 KORUNDU)",
+        len(_K1_MF["islev_tekrari"]) == 1
+        and _K1_MF["islev_tekrari"][0]["hareket"] == "push-in",
+        _K1_MF["islev_tekrari"])
+kontrol("⭐ K-1: FOTOGRAF pencere tekrari da KORUNDU",
+        len(_K1_MF["pencere_tekrari"]) == 1, _K1_MF["pencere_tekrari"])
+kontrol("⭐ K-1: hicbir video YOKKEN olcum eski davranisla AYNI "
+        "(muaf listesi bos, kapilar aynen calisiyor)",
+        _K1_MF["kamera_kapisi_muaf_video"] == []
+        and "KALITE-MOTION-ISLEV-TEKRAR" in _qon.FAIL_KODLARI)
+kontrol("⭐ K-1: ARDISIK ayni hareket kapisi DEGISMEDI (K-1 kapsaminda "
+        "DEGILDI — bilerek dokunulmadi)",
+        len(_K1.motion_grammar_olcusu(
+            [_k1_sahne(1, tur="video"), _k1_sahne(2, tur="video")]
+        )["ardisik_tekrar"]) == 1)
+
+# ── (3) YERINE GECEN KAPI: B-ROLL GORSEL DILI ──
+_K1_B1 = _K1.broll_cesitliligi_ozeti(
+    [_k1_sahne(1, tur="video", islev="kanit", cekim="wide"),
+     _k1_sahne(2, tur="image", islev="aciklama", cekim="medium"),
+     _k1_sahne(3, tur="video", islev="kanit", cekim="wide")])
+kontrol("⭐ K-1 BELIRLEYICI: ayni islevdeki iki VIDEO cekim AYNI cekim "
+        "turunu alirsa B-ROLL kapisi ATESLENIYOR",
+        len(_K1_B1["video_islev_tur_tekrari"]) == 1
+        and _K1_B1["video_islev_tur_tekrari"][0]["cekim_turu"] == "wide",
+        _K1_B1["video_islev_tur_tekrari"])
+_K1_B2 = _K1.broll_cesitliligi_ozeti(
+    [_k1_sahne(1, tur="video", islev="kanit", cekim="wide"),
+     _k1_sahne(2, tur="image", islev="aciklama", cekim="medium"),
+     _k1_sahne(3, tur="video", islev="kanit", cekim="close-detail")])
+kontrol("⭐ K-1 RED-FIRST: cekim turu FARKLIYSA kapi ATESLENMIYOR "
+        "(yanlis pozitif yok)",
+        _K1_B2["video_islev_tur_tekrari"] == [],
+        _K1_B2["video_islev_tur_tekrari"])
+kontrol("⭐ K-1: FOTOGRAF cekimleri B-ROLL kapisini TETIKLEMIYOR "
+        "(kapi yalniz VIDEO icin)",
+        _K1.broll_cesitliligi_ozeti(
+            [_k1_sahne(1, tur="image", islev="kanit", cekim="wide"),
+             _k1_sahne(2, tur="image", islev="kanit", cekim="wide")]
+        )["video_islev_tur_tekrari"] == [])
+kontrol("⭐ K-1: video cekim sayisi ve tur cesidi RAPORLANIYOR",
+        _K1_B2["video_cekim_sayisi"] == 2
+        and _K1_B2["video_cekim_turu_cesidi"] == 2,
+        (_K1_B2["video_cekim_sayisi"], _K1_B2["video_cekim_turu_cesidi"]))
+kontrol("⭐ K-1: pencere icinde ayni VIDEO cekim turu tekrari da "
+        "OLCULUYOR (warn adayi)",
+        len(_K1.broll_cesitliligi_ozeti(
+            [_k1_sahne(1, tur="video", islev="a", cekim="wide"),
+             _k1_sahne(2, tur="video", islev="b", cekim="wide")]
+        )["video_pencere_tur_tekrari"]) == 1)
+
+# ── (4) KOD STABIL VE KAPIYA BAGLI ──
+kontrol("⭐ K-1: `KALITE-BROLL-CESITLILIK` FAIL kodu olarak KILITLENDI",
+        "KALITE-BROLL-CESITLILIK" in _qon.FAIL_KODLARI)
+kontrol("⭐ K-1: kod KALITE_KODLARI'nda — kalite kapisi KAPALIYKEN "
+        "URETILMEZ (varsayilan yolun karari DEGISMEZ)",
+        "KALITE-BROLL-CESITLILIK" in _qon.KALITE_KODLARI)
+kontrol("⭐ K-1: kapi `kalite_kapisi` bayragina BAGLI (kosulsuz degil)",
+        "if kalite_kapisi:" in oku(KOK, "editor", "qa_on.py")
+        and "KALITE-BROLL-CESITLILIK" in oku(KOK, "editor", "qa_on.py"))
+kontrol("⭐ K-1: kapiya bagli alanlar SOZLESMEDE sayili (oranlar DEGIL)",
+        set(_K1.broll_cesitliligi_ozeti([])["kapiya_bagli"])
+        == {"video_islev_tur_tekrari", "video_pencere_tur_tekrari"})
+kontrol("⭐ K-1: SAYISAL ESIK UYDURULMADI — hedef None, enforce False",
+        _K1.broll_cesitliligi_ozeti([])["hedef"] is None
+        and _K1.broll_cesitliligi_ozeti([])["enforce"] is False)
+
+# ── (5) MEDYASIZ ATOM KANITI ──
+kontrol("⭐ K-1: olcum modulu DOSYA ACMIYOR (okuyucu enjeksiyonu deseni "
+        "korundu)",
+        "def broll_cesitliligi_ozeti" in oku(KOK, "editor",
+                                             "kalite_kapisi.py")
+        and "open(" not in oku(KOK, "editor", "kalite_kapisi.py")
+        .split("def broll_cesitliligi_ozeti")[1].split("def ")[0])
+
+# ── KORUNANLAR ──
+kontrol("K-1 GERILEME YOK: I-23/I-24/I-25/I-38 kapilari DURUYOR",
+        "KALITE-MOTION-ACILIS-KAPANIS" in _qon.FAIL_KODLARI
+        and "KALITE-MOTION-ISLEV-TEKRAR" in _qon.FAIL_KODLARI
+        and "KALITE-YAZI-SAHNE-DISI" in _qon.FAIL_KODLARI
+        and "ORAN-UYUMSUZ" in oku(KOK, "medya/edinim.py")
+        and "class DevreKesici" in oku(KOK, "medya/edinim.py"))
+kontrol("K-1 GERILEME YOK: ESIKLER GEVSETILMEDI",
+        _kk.OPTIK_DURGUN_ESIGI == 2.0
+        and abs(_kk.BENZERLIK_ESIGI - 0.86) < 1e-9
+        and abs(_kk.UZAMSAL_ENERJI_ESIGI - 11.589) < 1e-9
+        and abs(_kk.KENAR_DIS_ESIGI - 6.234) < 1e-9
+        and abs(_kk.MODEL_K - 0.935) < 1e-6)
+kontrol("K-1 GERILEME YOK: lisans/provenance kapilari DURUYOR",
+        "KALITE-KUNYE-EKSIK" in _qon.FAIL_KODLARI
+        and "def lisans_suz" in oku(KOK, "edit_kopru.py"))
+kontrol("K-1 GERILEME YOK: 22 alanlik generate sozlesmesi DEGISMEDI",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22)
+kontrol("K-1: kullanici secimleri (zoom/pan alanlari) DOKUNULMADI",
+        "zoom: 'in' | 'out' | 'yok'" in oku(os.path.dirname(KOK), "app",
+                                            "render-studio", "src",
+                                            "Video.tsx"))
+kontrol("K-1: deploy.sh DOKUNULMADI",
+        "docker commit" in oku(os.path.dirname(KOK), "deploy.sh"))
 
 
 blok("§40h I-58 — IKI ADAY DUZENI KARSI-OLGU OLARAK OLCULDU (yalniz tanisal)")
