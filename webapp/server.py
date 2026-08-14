@@ -396,8 +396,12 @@ label{display:block;margin:10px 0 4px;font-size:14px}
 textarea,select{width:100%;box-sizing:border-box;padding:10px;
 border-radius:8px;border:1px solid #2c313c;background:#0f1115;color:#e8eaed}
 textarea{min-height:110px}
+/* ⚠ FAZ UI-2: `min-height` 44 px SOZLESMEDIR (dokunma hedefi). Uzak
+   tarayici hatti bunu masaustu VE mobilde OLCER; 37 px oldugu icin
+   kirmiziydi. Padding degistirilirse bu satir KALIR. */
 button{margin-top:12px;padding:11px 16px;border:0;border-radius:8px;
-background:#3b82f6;color:#fff;font-weight:600;cursor:pointer;width:100%}
+background:#3b82f6;color:#fff;font-weight:600;cursor:pointer;width:100%;
+min-height:44px}
 #akis-ilerleme{height:10px;border-radius:999px;background:#2c313c;
 overflow:hidden;margin:8px 0}
 #akis-ilerleme::after{content:"";display:block;height:100%;
