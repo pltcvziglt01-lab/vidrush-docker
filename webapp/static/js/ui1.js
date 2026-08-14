@@ -53,6 +53,31 @@ async function oturumKontrol() {
   return d;
 }
 
+/* ── KURGU YOGUNLUGU -> GECERLI STIL KIMLIGI ──
+ * ⚠ OLCULEN KUSUR `UI4-EDIT-SEVIYESI-GECERSIZ`: bu akis `edit` alanina
+ * `az|orta|yuksek` gonderiyordu, ama documentary `EDIT_STILLERI` bu
+ * kimlikleri TANIMIYOR — sunucu degeri SESSIZCE `sinematik-belgesel`e
+ * dusuruyordu. Gercek staging kaniti: `edit=yuksek` -> cevap
+ * `EDIT=sinematik-belgesel`. Yani kurgu secimi UYGULANMIYORDU.
+ * ⚠ 22 alanlik sozlesme BUYUMEZ: `edit` zaten o 22'nin icinde; degisen
+ * yalnizca GONDERILEN DEGERIN gecerli olmasidir.
+ * ⚠ Uc konum ve etiketler (Az / Orta / Yuksek) AYNEN kalir.
+ * Olculebilir yogunluk (`sahne_sn`, sahne basina saniye):
+ *   az    -> sinematik-belgesel  7.0 sn/sahne  (en seyrek kesme)
+ *   orta  -> anlati-video-essay  4.0 sn/sahne
+ *   yuksek-> hizli-explainer     2.4 sn/sahne  (en yogun kesme)      */
+const EDIT_HARITASI = {
+  az: "sinematik-belgesel",
+  orta: "anlati-video-essay",
+  yuksek: "hizli-explainer",
+};
+const VARSAYILAN_EDIT_KIMLIGI = "sinematik-belgesel";
+
+function editKimligi() {
+  // ⚠ Bilinmeyen segment GECERSIZ deger URETMEZ; gecerli varsayilana duser.
+  return EDIT_HARITASI[$("#akis-edit")?.value] || VARSAYILAN_EDIT_KIMLIGI;
+}
+
 /* ── KREDI ONAYI GORUNURLUGU ──
  * ⚠ Kullanici KREDI HARCANACAGINI once bilmelidir. Sunucu saglayici
  * kararini `/api/generate` cevabinda doner; secim aninda ise politikayi
@@ -138,7 +163,7 @@ async function uretimBaslat(ev) {
   fd.append("session", oturumEtiketi());
   fd.append("story", metin);
   fd.append("tur", "documentary");
-  fd.append("edit", $("#akis-edit")?.value || "orta");
+  fd.append("edit", editKimligi());
   fd.append("sure_dk", "1");
   fd.append("altyazi", "1");
   // ⚠ FAZ UI-3: kaynak secimi BU ISTEGE EKLENMEZ — 22 alanlik sozlesme

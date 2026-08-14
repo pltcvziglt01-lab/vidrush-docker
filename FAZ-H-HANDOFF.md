@@ -10519,3 +10519,83 @@ yani ürün doğru davrandı, ölçüm yanlıştı. Desen artık **yalnız fail-
 adımında** açılıp hemen geri alınıyor. ⚠ Bu, yerel testlerin (yapısal) tek
 başına yetmediğinin ve gerçek tarayıcı koşusunun neden şart olduğunun
 somut kanıtıdır.
+
+---
+
+## 78. FAZ UI-4 — KURGU YOĞUNLUĞU GEÇERLİ STİL KİMLİĞİNE BAĞLANDI (14 Ağu)
+
+> **Durum: `UI4-EDIT-SEVIYESI-GECERSIZ` kapandı. `/api/generate` üst-seviye
+> alan sayısı **TAM 22** kaldı. A–I 4282/4282 + UI-2 74 + UI-3 51 + UI-4 22
+> = **4429, 0 hata**. Medya/render YOK, ücretli API YOK, $0.00.**
+> Değişen üretim kodu: **yalnız** `webapp/static/js/ui1.js` (istemci).
+> Yeni: `webapp/testler/test_faz_ui4.py`.
+
+### Kusur nasıl bulundu
+
+Gerçek staging pilotu başlatılırken **ölçüldü**: istek `edit=yuksek`
+gönderdi, cevap `EDIT=sinematik-belgesel` döndü. Documentary
+`EDIT_STILLERI` = `sinematik-belgesel · anlati-video-essay ·
+seyahat-belgeseli · veri-anlatisi · hizli-explainer`; `az|orta|yuksek`
+**bu sözlükte yok**, sunucu geçersiz değeri **sessizce** varsayılana
+düşürüyordu. Yani "Kurgu yoğunluğu" seçimi **hiç uygulanmıyordu** —
+kapatılan `UI2-KAYNAK-TERCIHI-SUNUCUYA-GITMIYOR` ile **aynı sınıf** kusur.
+
+⚠ Bu kusur, ürünü **gerçekten çalıştırmadan** görünmüyordu: UI-1'in kaynak
+dizesi testi de, UI-2'nin gerçek tarayıcı hattı da `edit` **değerinin**
+sunucuda tanınıp tanınmadığını sormuyordu.
+
+### Çözüm (en küçük)
+
+Üç konum ve etiketler (**Az / Orta / Yüksek**), `label[for]` bağı,
+`value="az|orta|yuksek"` **aynen** kaldı. Değişen tek şey: istemci `edit`
+alanına artık **deterministik ve geçerli** bir stil kimliği gönderiyor.
+
+```
+az     -> sinematik-belgesel   7.0 sn/sahne   (en seyrek kesme)
+orta   -> anlati-video-essay   4.0 sn/sahne
+yuksek -> hizli-explainer      2.4 sn/sahne   (en yoğun kesme)
+```
+
+⚠ **22 alan büyümedi**: `edit` zaten o 22'nin içinde; değişen yalnızca
+gönderilen **değerin geçerli** olması. Generate gövdesi hâlâ **7 alan**.
+
+### Ölçülebilir sahne yoğunluğu (red-first testin çekirdeği)
+
+`sahne_sn` gerçek `EDIT_STILLERI` sözlüğünden okunuyor (iddia değil):
+
+```
+sahne_sn   az 7.0  >  orta 4.0  >  yuksek 2.4      ✅ kesin azalan
+60 sn'lik aynı girdi -> sahne  az 9 · orta 15 · yuksek 25   ✅ üç farklı
+yuksek >= 2 x az                                    ✅ seçim HİSSEDİLİR
+```
+
+Bu, durdurulan pilotlardaki **gerçek** gözlemle uyuşuyor:
+`sinematik-belgesel` **8 sahne**, `hizli-explainer` **25 sahne** planladı.
+
+### Korunanlar
+
+* Sunucunun geçersiz değer politikası (sessiz düşüş) **korundu** — eski
+  istemcileri kırmamak için orada. Değişen şey, **ana akışın artık
+  geçersiz değer üretmemesi**. İstemci de fail-safe: bilinmeyen segment
+  `VARSAYILAN_EDIT_KIMLIGI`ne düşer, **asla** geçersiz değer göndermez.
+* Test, `az|orta|yuksek`in `EDIT_STILLERI`de **olmadığını** da kilitliyor —
+  biri ileride bunları sözlüğe eklerse test **fark eder**.
+* UI-2/UI-3 kazanımları test edildi: kaynak tercihi ayrı uçtan, CSRF
+  başlığı, fail-closed kapısı, oturum çerezi okunmuyor (çerez erişimi tek),
+  generate gövdesi 7 alan, `api.js` 22 alan.
+
+### ⛔ AÇIK KALAN
+
+* **`UI3-CSRF-KAPSAMI-EKSIK`** — `/api/generate`, `/api/profil`,
+  `/api/cikis` hâlâ CSRF doğrulamıyor (ayrı atom).
+* **PİLOT BLOCKED** — 14 Ağu 22:47'de iki gerçek pilot başlatıldı
+  (`sinematik-belgesel` 8 sahne, `hizli-explainer` 25 sahne), ücretsiz stok
+  yolu **gerçekten çalıştı** (11 `sahne_*.mp4` stok video). ⚠ Sistemde
+  **görsel/planner maliyet muhasebesi YOK** (`arastirma_usd=None`), 15
+  `gpt-image-2` görseli üretilmişti ve toplamın **kesin** `<$1` kaldığı
+  **garanti edilemedi** → 22:48:59'da konteyner restart ile **ikisi de
+  durduruldu** (`durum=hata`, %79 ve %38). **Kabul edilmiş MP4 YOK.**
+* R-1d-j'nin **4 yapısal ölçüm boşluğu** hâlâ açık.
+
+⚠ **Kabul edilmiş video hâlâ YOK.** UI-4 arayüz kablosunu düzeltti,
+video kabulünü değiştirmedi.
