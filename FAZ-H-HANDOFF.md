@@ -9727,3 +9727,27 @@ artefaktı **üretilmedi**.
 
 Sıra ve temizlik kontrolleri kod üzerinden; geri alınınca
 **`ValueError: substring not found`** (blok yok).
+
+### R-1d-g (devam 4) — PİLOT KÖK NEDENİ KANITLANDI: göreli ses yolu
+
+Pilot `job_1786724831925` yine `KAYNAK TAVANI: 3 parca atanamadi ->
+KAYNAK-TAVANI-SURE-BOZUK` dedi. Kök neden **sunucuda ölçülerek** kanıtlandı
+(Mac'te değil, hiçbir kalıcı medya üretmeden):
+
+```
+# sunucuda, konteyner içinde
+ffmpeg ... -c:a pcm_s16le -ar 44100 /tmp/dilim_t.wav   ->  rc=0, dosya 132378 B
+```
+
+Yani **ffmpeg ve PCM WAV encoder sorunsuz**. Sorun **yol**du:
+`syol = f"isler/{is_adi}/ses_{n}.mp3"` — **göreli**. Doğrudan ffmpeg'e
+verilince sürecin cwd'sine (`/opt/vidrush/webapp`) göre çözülüyor ve dosya
+**bulunamıyordu**.
+
+**Düzeltme:** kaynak ve hedef ffmpeg için **`PUBLIC` ile mutlak**;
+props `ses` alanı **göreli** kalıyor (renderer sözleşmesi). Temizlik de
+mutlak yolla siliyor.
+
+⚠ Bu, "uzantı varsayımıyla PASS deme" uyarısının haklılığını da gösterdi:
+kodek değişimi tek başına yetmezdi — asıl kusur yoldu ve **stderr
+raporlaması** olmasa yine görünmezdi.

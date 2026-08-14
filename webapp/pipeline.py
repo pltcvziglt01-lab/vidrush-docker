@@ -4625,24 +4625,30 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             # ── (B) SES DILIMLERI ONCE (transactional sira) ──
             # ⚠ Kesim basarisizsa HICBIR ek varlik EDINILMEZ ve kopruye
             # HICBIR SEY yazilmaz; butce/provenans olcumu KIRLENMEZ.
+            # ⚠ OLCULEN KUSUR (pilot job_1786724831925): `syol` GORELIDIR
+            # (`isler/<is>/ses_N.mp3`) ve dogrudan ffmpeg'e verilince surecin
+            # cwd'sine gore cozuluyor, dosya BULUNAMIYORDU. Sunucuda
+            # kanitlandi: ayni ffmpeg komutu MUTLAK yolla rc=0 veriyor.
+            # Kaynak/hedef ffmpeg icin MUTLAK; props `ses` alani GORELI kalir
+            # (renderer goreli bekliyor).
             _ses_yollari, _kesim_hata = [], ""
+            _kaynak_ses_abs = os.path.join(PUBLIC, str(h["syol"]))
             for j in range(n_parca):
                 _bas = round(j * p_sure, 3)
-                _hedef = os.path.join(
-                    os.path.dirname(h["syol"]),
-                    f"{os.path.basename(h['syol']).rsplit('.', 1)[0]}_p{j}.wav")
-                _ok, _err = _ses_dilimle(h["syol"], _bas, p_sure, _hedef)
+                _goreli = (f"{str(h['syol']).rsplit('.', 1)[0]}_p{j}.wav")
+                _hedef = os.path.join(PUBLIC, _goreli)
+                _ok, _err = _ses_dilimle(_kaynak_ses_abs, _bas, p_sure, _hedef)
                 if not _ok:
                     _kesim_hata = _err or "bilinmeyen"
                     break
-                _ses_yollari.append(_hedef)
+                _ses_yollari.append(_goreli)      # props GORELI yol tutar
             if _kesim_hata:
                 sorunlar.append({"kod": kaynak_tavani.KOD_SURE_BOZUK,
                                  "scene_id": sh.get("scene_id"),
                                  "detay": f"ses dilimlenemedi: {_kesim_hata}"})
                 for _y in _ses_yollari:            # yarim kalan dilimleri sil
                     try:
-                        os.remove(_y)
+                        os.remove(os.path.join(PUBLIC, _y))
                     except OSError:
                         pass
                 yeni_liste.append(sh)
@@ -4683,7 +4689,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                                            f"{[r.get('neden') for r in _ed['red']][:4]}")})
                 for _y in _ses_yollari:
                     try:
-                        os.remove(_y)
+                        os.remove(os.path.join(PUBLIC, _y))
                     except OSError:
                         pass
                 yeni_liste.append(sh)

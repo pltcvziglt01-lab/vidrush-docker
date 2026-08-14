@@ -14254,7 +14254,17 @@ kontrol("⭐ R-1d-g BELIRLEYICI (denetim-2/3): SES KESIMI ONCE, EDINIM SONRA "
 kontrol("⭐ R-1d-g (denetim-2/3): basarisiz yolda YARIM ses dilimleri "
         "TEMIZLENIYOR (artik birakilmiyor)",
         _PL_H.count("for _y in _ses_yollari:") == 2
-        and _PL_H.count("os.remove(_y)") == 2)
+        and _PL_H.count("os.remove(os.path.join(PUBLIC, _y))") == 2)
+
+kontrol("⭐ R-1d-g BELIRLEYICI (pilot kok nedeni): ses kaynagi ffmpeg'e "
+        "MUTLAK yolla veriliyor (`syol` GORELI; pilotta dosya bulunamiyordu)",
+        '_kaynak_ses_abs = os.path.join(PUBLIC, str(h["syol"]))' in _PL_H
+        and "_ses_dilimle(_kaynak_ses_abs," in _PL_H)
+kontrol("⭐ R-1d-g: props `ses` alani GORELI kaliyor (renderer sozlesmesi)",
+        "_ses_yollari.append(_goreli)" in _PL_H
+        and 'yeni["ses"] = _ses_yollari[j]' in _PL_H)
+kontrol("⭐ R-1d-g: temizlik de MUTLAK yolla siliyor",
+        _PL_H.count("os.remove(os.path.join(PUBLIC, _y))") == 2)
 
 kontrol("R-1d-g GERILEME YOK: kaynak_ses / yuv420p / tenant imza kapilari "
         "DURUYOR",
