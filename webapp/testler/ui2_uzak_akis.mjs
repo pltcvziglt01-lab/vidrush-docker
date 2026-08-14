@@ -255,8 +255,7 @@ async function pastaKos(tarayici, pasta, olcu) {
 
   /* ── 4) UCRETLI SINIR: /api/generate YAKALANIR, gecirilmez ── */
   await s.g("Fetch.enable", {
-    patterns: [{urlPattern: "*/api/generate*", requestStage: "Request"},
-               {urlPattern: "*/api/kaynak-tercihi*", requestStage: "Request"}],
+    patterns: [{urlPattern: "*/api/generate*", requestStage: "Request"}],
   });
   let yakalandi = null;
   let generateSayaci = 0;
@@ -516,6 +515,13 @@ async function pastaKos(tarayici, pasta, olcu) {
    * ⚠ Tercih yazimi basarisizken uretime DEVAM ETMEK, isi ESKI tercihle
    * baslatir ve kullanicinin secimini SESSIZCE ihlal eder. Bu adim
    * uretimin GERCEKTEN durdugunu tarayicida kanitlar.                   */
+  // ⚠ Desen YALNIZ bu adimda genisletilir. Surekli acik birakilirsa
+  // normal akistaki tercih yazimi duraklatilip HIC surdurulmez ve fetch
+  // asili kalir (ilk kosumda tam bunu olctuk: zincir koptu).
+  await s.g("Fetch.enable", {
+    patterns: [{urlPattern: "*/api/generate*", requestStage: "Request"},
+               {urlPattern: "*/api/kaynak-tercihi*", requestStage: "Request"}],
+  });
   tercihYazimiBozuk = true;
   const genOnce = generateSayaci;
   await s.deger(`(() => {
@@ -539,6 +545,9 @@ async function pastaKos(tarayici, pasta, olcu) {
      "UI2-TERCIH-YAZILAMADI-FAIL-OPEN", durdu.slice(0, 80));
   await s.kanit(pasta, "06", "fail-closed");
   tercihYazimiBozuk = false;
+  await s.g("Fetch.enable", {
+    patterns: [{urlPattern: "*/api/generate*", requestStage: "Request"}],
+  });
   return konsolHatalari;
 }
 

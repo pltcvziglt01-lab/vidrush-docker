@@ -10482,3 +10482,40 @@ sayılmadı** ve kapsam dışına **çıkarılmadı**.
 3. Object storage hâlâ yok; kanıt staging host diskinde.
 
 ⚠ **Kabul edilmiş video hâlâ YOK.**
+
+### UI-3 STAGING DOĞRULAMASI (uzak, Mac'e artefakt YOK)
+
+Deploy: `HEAD=origin=c2d5b6f`, repo temiz, aktif render 0, rollback
+`bedosaho:pre-ui3-20260814`. Deploy → **8 uç 200, smoke PASS**, imaja basıldı.
+
+Uzak koşu `ui2-20260814-223802` (kimlikler MASKELİ: tenant `8328ffcc`,
+iş `ef0291b3`), masaüstü 1280x800 + mobil 390x844:
+
+```
+kimliksiz /akis -> giriş formu · geçersiz giriş -> STABIL 401     ✅
+6 adım · 3 alan = 3 label[for] · progressbar 1 · taşma 0 px       ✅
+dokunma hedefi 44 px · HttpOnly çerez JS'ten OKUNAMIYOR           ✅
+generate gövdesi 22 alanın ALT KÜMESİ                             ✅
+⭐ generate gövdesine YENİ ALAN EKLENMEDİ (kaynak_tercihi YOK)     ✅
+⭐ kaynak seçimi GERÇEK sunucuya AYRI uçtan ULAŞTI
+   (/api/kaynak-tercihi · tercih=ucretsiz · kredi_tuketilir=false) ✅
+⭐ kredi metni SUNUCUNUN kararı (istemci tahmini DEĞİL)            ✅
+/api/generate YAKALANDI, sunucuya GİTMEDİ · iş 57 → 57 ($0.00)    ✅
+gerçek iş izlendi · QA teslim_ok · imzalı URL 200/401-403/403     ✅
+son-3 gerçek kütüphaneden · her satırda kredi durumu              ✅
+⭐ tercih yazılamayınca /api/generate HİÇ GİTMEDİ (fail-open YOK)  ✅
+⭐ duruş STABİL KODLA görünür (UI3-KAYNAK-TERCIHI-YAZILAMADI)      ✅
+akış uygulamasında konsol hatası 0                                ✅
+
+GEÇEN 58 · FAIL 0 · ÖLÇÜLEMEDİ 0
+KANIT 12 png + sonuc.json (1.8 MB) -> /root/ui2_kanit/ui2-20260814-223802
+```
+
+⚠ **İlk staging koşusu FAIL verdi (10 kırmızı) ve sebep ÜRÜNDE DEĞİL
+HATTAYDI:** `/api/kaynak-tercihi` deseni `Fetch`'e **sürekli** kayıtlıydı;
+normal akışta duraklatılan istek hiç sürdürülmediği için `fetch` **asılı
+kaldı**, `kaynakTercihiYaz()` null döndü ve **fail-closed zinciri kesti** —
+yani ürün doğru davrandı, ölçüm yanlıştı. Desen artık **yalnız fail-open
+adımında** açılıp hemen geri alınıyor. ⚠ Bu, yerel testlerin (yapısal) tek
+başına yetmediğinin ve gerçek tarayıcı koşusunun neden şart olduğunun
+somut kanıtıdır.
