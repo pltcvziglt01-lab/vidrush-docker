@@ -160,6 +160,13 @@ def normalize(is_id: str, ham: dict, *, kuyruk_sira=None, kuyruk_toplam=None,
         # PASS/WARN/FAIL/OLCULEMEDI/OLCULMEDI/KAPALI
         "kalite": kalite,
         "kalite_ok": kalite_ok,
+        # ⚠ FAZ R-1d-a: TESLIM KARARI GORUNUR OLMALI. `kalite` videonun
+        # olcumunu soyler; `teslim` ise KABUL EDILMIS FINAL olup olmadigini.
+        # Ikisi ayni sey DEGIL: QA PASS olsa bile zincirin bir halkasinin
+        # kaniti yoksa is teslim EDILMEZ. Olculmemisse "teslim edildi"
+        # DENMEZ — `teslim_ok` False ve `teslim.neden` bos kalir.
+        "teslim": ham.get("teslim") or {},
+        "teslim_ok": bool((ham.get("teslim") or {}).get("teslim")),
         "attribution": ham.get("atiflar") or ham.get("attribution") or [],
         "sources": ham.get("kaynaklar") or [],
         # ⚠ FAZ R-1a: arastirma manifesti de IMZALI baglanti ile verilir;

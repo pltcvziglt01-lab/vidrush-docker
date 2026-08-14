@@ -8718,6 +8718,21 @@ kontrol("⭐ R-1d-a: teslim edilmeyen isin NEDENI acikca yaziliyor "
         "(sessiz basarisizlik YOK)",
         bool(_TS_FAIL["neden"]) and _TS_FAIL["video_url"] is None)
 
+# ── (5b) TESLIM KARARI API SOZLESMESINDE GORUNUR ──
+# ⚠ `kalite` videonun OLCUMUNU soyler; `teslim` KABUL EDILMIS FINAL olup
+# olmadigini. Ikisi ayni sey degil: QA PASS olsa bile zincirin bir halkasi
+# kanitsizsa is teslim EDILMEZ. Arayuz ikisini KARISTIRMAMALI.
+_TS_N1 = _isz.normalize("j1", dict(_ts_tam(),
+                                   teslim={"teslim": True, "neden": "",
+                                           "eksik": []}))
+_TS_N2 = _isz.normalize("j2", _ts_tam())
+kontrol("⭐ R-1d-a: is sozlesmesi TESLIM kararini donduruyor",
+        _TS_N1["teslim_ok"] is True and _TS_N1["teslim"]["teslim"] is True)
+kontrol("⭐ R-1d-a RED-FIRST: teslim OLCULMEMISSE 'teslim edildi' DENMIYOR "
+        "(QA PASS olsa bile)",
+        _TS_N2["kalite"] == "PASS" and _TS_N2["teslim_ok"] is False
+        and _TS_N2["teslim"] == {}, _TS_N2["teslim"])
+
 # ── (6) SON-3 YASAM DONGUSU GERCEK TESLIM UZERINDEN ──
 for _i in range(2, 5):
     _TS.teslim_et(is_id=f"j{_i}", tenant_id="t1", kayit=_ts_tam(),

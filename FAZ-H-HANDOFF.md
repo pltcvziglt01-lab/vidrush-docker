@@ -8785,3 +8785,101 @@ pyflakes `undefined name '_ekle'`.
 ⚠ **Bu, R-1d-a teslim zinciri için de blokajdı**: `pre_qa` halkası kanıtını
 `edit_plani.qa`'dan okuyor; PRE-QA çökerse halka **hiç kanıt üretmiyor** ve
 hiçbir video teslim edilemiyordu.
+
+---
+
+## 64. R-1d-a — STAGING DEPLOY + SMOKE + 1080p ÖRNEK (14 Ağu)
+
+> **Durum: deploy TAMAM, smoke TAM PASS. ⛔ Üretilen 1080p örnek
+> KABUL EDİLMİŞ VİDEO DEĞİLDİR — teslim zinciri onu REDDETTİ
+> (`ZINCIR-EKSIK:pre_qa`). Bu, atomun DOĞRU çalışmasıdır.**
+
+### Hedef sunucu — ⚠ CLAUDE.md YANLIŞ
+
+| şey | değer |
+|---|---|
+| canlı/staging | **`185.23.17.240`** (RX-4, 10 vCPU, 9.9 GB RAM, 107 GB boş) |
+| CLAUDE.md'deki IP | `204.168.136.159` — **eski**, `deploy.sh` 1 Ağu'da taşımış |
+| rollback etiketi | `bedosaho:rollback-20260814` **VAR** (13 gün, 2.08 GB) |
+| ⚠ ek güvenlik etiketi | `bedosaho:pre-r1da-20260814` (deploy öncesi **9.52 GB** hâli) |
+| ⚠ ek geri dönüş | `bedosaho_pre_r1da` konteyneri **duruyor** (durdurulmuş) |
+
+⚠ `rollback-20260814` **2.08 GB**, çalışan imaj **9.52 GB** — o etikete
+dönmek `node_modules`/Remotion'ı kaybettirebilir. **Gerçek geri dönüş
+noktası `bedosaho:pre-r1da-20260814`**.
+
+### Deploy sırasında çıkan İKİ ön koşul (kod dışı)
+
+1. **`argon2-cffi` konteynerde YOKTU.** R-1c-a `Dockerfile`'a eklemişti ama
+   `deploy.sh` yalnızca `.py` kopyalar, `pip install` yapmaz. Kurulmadan
+   `kdf_hazir:false` → **hiç giriş yapılamaz** (fail-closed doğru çalıştı ve
+   `/api/saglik`ta görünür oldu). Kuruldu + imaja basıldı.
+2. **`EDITOR_V2=1` env, konteyner yeniden kurulmadan eklenemiyor.**
+   Konteyner `--env-file /root/bedosaho.env` (0600) ile YENİDEN KURULDU;
+   mevcut env AYNEN korundu, `EDITOR_V2=1` + `MEDYA_AVCISI=1` eklendi.
+   Portlar/bind-mount'lar/restart politikası birebir aynı.
+
+### ⚠ `COOKIE_SECURE` — ölçülen kurulum tavizi
+
+Kurulum **düz HTTP** (IP, HTTPS yok). Ölçüldü: uzak adresten `/api/giris`
+**200** dönüyor ama tarayıcı/istemci `Secure` çerezi **saklamıyor**, sonraki
+`/api/kutuphane` **401** alıyor → zorunlu oturum açıkken uygulama
+**kullanılamıyor**. `COOKIE_SECURE` env eklendi: **varsayılan AÇIK**,
+staging'de `0`. Sessiz değil — `/api/saglik` `cookie_secure:false` diyor ve
+başlangıçta uyarı basılıyor. **Kalıcı çözüm HTTPS'tir.**
+
+### Smoke — **TAM PASS** (uzak adresten, 16/16)
+
+kimliksiz `/api/isler` `/api/kutuphane` `/ciktilar/*` `/api/generate` → **401** ·
+`/api/saglik` → 200 · anasayfa **giriş formu** · yanlış parola / olmayan
+kullanıcı → **401** · doğru parola → **200** + tenant ·
+çerezle korumalı uçlar → **200** · **başka tenant'a imzalanmış link → 403** ·
+imza bozuk → 403 · kendi linki **oturumsuz → 401** · çıkış sonrası → **401**.
+
+### 1080p örnek — ölçüldü
+
+`job_1786710555280_r1dasm_82a7d8` · 8 sahne · üretim ~7 dk · `wikimedia`
+sağlayıcı kararı (`BAGLANTI-YOK` — **gerçek OAuth/kredi yok**; Magnific
+`Error consuming credits` verdi ve iş boyunca devre dışı kaldı).
+
+**PASS (20):** 1920×1080 · h264 · **63.23 sn** (55–65 ✅) · aac 48 kHz ·
+**LUFS −14.0** · **TP −1.5 dBTP** · **LRA 3.3** · sessiz oran **%0.0**
+(projenin kendi tavanı %15) · ölü final **0.0 sn** · hiss (>9 kHz) ham
+sinyalden **20.6 dB** düşük · **7 kesme** · siyah **0** · donmuş **0** ·
+**12 kare** çıkarıldı, hiçbiri boş değil · POST-QA **WARN**, FAIL yok.
+
+**FAIL (5):**
+
+| bulgu | ölçüm |
+|---|---|
+| `pix_fmt` **yuv444p** | yuv420p değil — birçok oynatıcı/tarayıcı çözemez |
+| rumble (<80 Hz) marjı | ham sinyalden **19.3 dB** düşük ⚠ eşik 20 dB **BENİM** koyduğum, projede kalibre EDİLMEMİŞ — sayı raporlanır, hüküm zayıf |
+| olgu bağı | **4/8 sahne** doğrulanmış iddiaya bağlanamadı (eşik altı örtüşme) |
+| **teslim** | `ZINCIR-EKSIK:pre_qa` → **teslim EDİLMEDİ** |
+| kütüphane | 0 kayıt (teslim edilmeyen iş **girmez**) |
+
+**ÖLÇÜLEMEDİ (9):** semantik uyum · tekrar/benzerlik · tipografi · ekran
+künyesi · motion çeşitliliği · **gerçek video oranı** · **B-roll/cutaway** ·
+**hook/J-L-cut/kapanış** · **aynı kaynak ≤ 8 sn**.
+
+### ⛔ TEK SOMUT BLOKAJ — PRE-QA hiç koşmuyor
+
+`EDITOR_V2=1` **ve** `MEDYA_AVCISI=1` açık, avcı bütçesi kuruldu
+(`butce=$0.00 / 60 istek / 240 sn / 40 kare`) — ama `edit_plani.neden =
+**MEDYA-YOK**`. Kök neden ölçüldü: **gerçek medya `kaynak.py` → Pexels
+yolundan geliyor ve avcı bütçesini BESLEMİYOR**; `medya_kopru.manifest_kur()`
+`butce.secimler()`den okuduğu için **sıfır aday** görüyor → PRE-QA denenmiyor
+→ `pre_qa` halkasının **kanıtı yok** → zincir teslimi **reddediyor**.
+
+Bu, handoff **§1'deki "iki paralel dünya"** kusurunun teslim sınırındaki
+somut ölçümüdür. ⚠ **Eşik gevşetilmedi**: `pre_qa` halkasını zincirden
+çıkarmak ya da POST-QA'ya indirgemek bu kusuru GİZLERDİ.
+
+### SONRAKİ ATOM (R-1d-b) — yalnız ölçülen kusurdan
+
+1. **`kaynak.py` seçimlerini avcı bütçesine yazmak** (ya da `manifest_kur`u
+   gerçek seçim kaydından beslemek) → PRE-QA gerçekten koşar, 9 ölçüm
+   ölçülebilir hale gelir, zincir tamamlanabilir.
+2. **`pix_fmt` yuv420p**: render/mux çıktısı yuv444p veriyor.
+3. **HTTPS**: `COOKIE_SECURE=1`e dönebilmek için.
+4. **Silme kuyruğu işlenmiyor** (R-1c-b'den devrediyor).
