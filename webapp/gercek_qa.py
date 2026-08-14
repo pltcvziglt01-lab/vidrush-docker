@@ -1,0 +1,251 @@
+#!/usr/bin/env python3
+"""FAZ R-1d-e — PRE-QA KANITI **RENDER EDILEN** ZAMAN CIZGISINDEN URETILIR.
+
+⚠ OLCULEN KUSUR (R-1d-d pilotu, job_1786717796777):
+`uret()` icinde sira soyleydi —
+    4655  hizli_render.ffmpeg_render(is_adi, props, ...)   <- VIDEO BURADA RENDER EDILIR
+    4822  editorv2 plan blogu                              <- PRE-QA BURADA KOSAR
+Yani PRE-QA, video ZATEN render edildikten SONRA, **hicbir zaman render
+EDILMEYEN** alternatif bir plani olcuyordu (kodun kendi yorumu: "Bu blok
+RENDER ETMEZ"). Iki artefakt olcumle ayrisiyordu:
+
+    teslim edilen MP4 : 8 sahne · POST-QA 8 kesme · 64.8 sn
+    PRE-QA'nin plani  : 16 cekim · kapsam {medya:8, fallback:8, oran:0.5}
+
+Sonuc: teslim zincirinin `pre_qa` halkasi, TESLIM EDILEN videoya ait
+OLMAYAN bir kanit tasiyordu. O plandaki `kapsam_orani`'ni yukseltmek MP4'u
+iyilestirmez; halkayi PASS'a dondurmek ise YANLIS BIR KABUL SINYALI uretir.
+
+Bu modul o bosluktur: **render EDILEN sahne listesinden** (`props_sahneler`)
+olcum uretir ve render **ONCESINDE** kosar.
+
+⚠ OLCUM MODULLERI DEGISMEDI. `editor.kalite_kapisi` ve `editor.ses_gurultu`
+AYNEN kullanilir; degisen tek sey GIRDI: hayali plan yerine gercek zaman
+cizgisi.
+
+⚠ UYDURMA YOK — TURETILEMEYEN OLCUM URETILMEZ. Gercek hat sahnelere
+`cekim_turu` (establishing/medium/close-detail...) ATAMAZ; onun yerine
+`zoom`/`pan` kararlari vardir. Bu yuzden CEKIM TURU tabanli B-roll gorsel
+dili olcumu bu zaman cizgisinde UYGULANAMAZ ve stabil kodla bildirilir:
+`GERCEK-TIMELINE-CEKIM-TURU-YOK`. Sahte bir cekim turu URETILMEZ.
+
+⚠ Bu modul AG ACMAZ, MEDYA ACMAZ, DOSYA YAZMAZ, RENDER ETMEZ. Kare sayaci
+ve provenans okuyucusu DISARIDAN enjekte edilir.
+"""
+from __future__ import annotations
+
+import os
+from typing import Callable, Optional
+
+from editor import kalite_kapisi as _kk
+from editor import ses_gurultu as _sg
+
+SEMA_SURUM = "1.0.0"
+
+# ── STABIL HATA/DURUM KODLARI (deterministik politika) ──
+KOD_CEKIM_TURU_YOK = "GERCEK-TIMELINE-CEKIM-TURU-YOK"
+KOD_PROVENANS_YOK = "GERCEK-TIMELINE-PROVENANS-YOK"
+KOD_SAHNE_YOK = "GERCEK-TIMELINE-SAHNE-YOK"
+
+# Kapilar. ⚠ Esikler MEVCUT kaynaklardan OKUNUR, burada YENIDEN TANIMLANMAZ.
+KAYNAK_TAVANI_SN = _kk.KAYNAK_BASINA_TAVAN_SN_PLAN
+TEK_SAGLAYICI_TAVANI = 0.40          # `SAGLAYICI-TEKEL` ile AYNI esik
+
+FAIL_KODLARI = (
+    "GERCEK-KAYNAK-SES-SIZINTI",
+    "GERCEK-KAYNAK-TAVANI",
+    "GERCEK-KAPSAM-YOK",
+)
+
+
+def _s(v) -> str:
+    return str(v or "").strip()
+
+
+def _f(v, d=0.0) -> float:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return d
+
+
+def sahneleri_cevir(props_sahneler: list, *, kok_dizin: str = "",
+                    provenans_okuyucu: Optional[Callable] = None,
+                    olgu_raporu: Optional[dict] = None) -> list:
+    """RENDER EDILEN sahneleri olcum sozlesmesine cevir.
+
+    ⚠ `provenans_okuyucu(mutlak_yol) -> dict` DISARIDAN verilir; bu modul
+    dosya ACMAZ. Provenans yoksa sahne `fallback` sayilir — "herhalde
+    lisanslidir" DENMEZ.
+    """
+    bosluk_sahneler = {str(b.get("sahne")) for b in
+                       ((olgu_raporu or {}).get("bosluklar") or [])}
+    cikti = []
+    for i, s in enumerate(props_sahneler or []):
+        if not isinstance(s, dict):
+            continue
+        medya = _s(s.get("medya"))
+        yol = os.path.join(kok_dizin, medya) if (kok_dizin and medya) else medya
+        pv = {}
+        if callable(provenans_okuyucu) and yol:
+            try:
+                pv = provenans_okuyucu(yol) or {}
+            except Exception:                                # noqa: BLE001
+                pv = {}
+        var = bool(pv.get("saglayici")) and bool(pv.get("lisans"))
+        sid = _s(s.get("scene_id")) or f"s{i + 1:03d}"
+        cikti.append({
+            "beat_id": sid, "scene_id": sid,
+            # ⚠ Provenans YOKSA `medya` DENMEZ.
+            "kaynak_turu": "medya" if var else "fallback",
+            "asset_id": _s(pv.get("asset_id")),
+            "saglayici": _s(pv.get("saglayici")),
+            "lisans": _s(pv.get("lisans")),
+            # ⚠ Gercek hattin kendi tur bilgisi: props `tur` alani.
+            "medya_turu": _s(pv.get("medya_turu")) or _s(s.get("tur")) or "image",
+            "medya_yolu": yol,
+            # ⚠ K-2: kaynak sesi politikasi. Gercek hat harici klibi
+            # `OffthreadVideo ... muted` ile ciziyor; sozlesme MAKINE OKUNUR
+            # yazilir ki kapi denetleyebilsin.
+            "ses_kanali": _s(pv.get("ses_kanali")) or _sg.KAYNAK_SES_POLITIKASI,
+            "islev": _s(s.get("islev")) or "aciklama",
+            "sure_sn": _f(s.get("sure")),
+            # ⚠ CEKIM TURU URETILMEZ (gercek hat atamiyor) — bos birakilir.
+            "cekim_turu": "",
+            "olgu_boslugu": str(i + 1) in bosluk_sahneler,
+        })
+    return cikti
+
+
+def olc(sahneler: list, *, kare_okuyucu: Optional[Callable] = None) -> dict:
+    """Gercek zaman cizgisinin PRE-QA olcumu + hukmu.
+
+    ⚠ Olcum fonksiyonlari DEGISMEDI; yalnizca girdi gercek zaman cizgisi.
+    ⚠ Turetilemeyen olcum `olculdu: False` + STABIL KOD ile bildirilir.
+    """
+    liste = [s for s in (sahneler or []) if isinstance(s, dict)]
+    if not liste:
+        return {"durum": "OLCULEMEDI", "neden": KOD_SAHNE_YOK,
+                "fail": 0, "warn": 0, "sorunlar": [], "olcumler": {}}
+
+    sorunlar = []
+
+    def _ekle(kod, seviye, detay, scene_id=""):
+        sorunlar.append({"kod": kod, "seviye": seviye, "detay": str(detay)[:160],
+                         "beat_id": _s(scene_id), "scene_id": _s(scene_id)})
+
+    # ── 1) KAPSAM (medya vs fallback) ──
+    medya = [s for s in liste if s.get("kaynak_turu") == "medya"]
+    kapsam = {"cekim": len(liste), "medya": len(medya),
+              "fallback": len(liste) - len(medya),
+              "kapsam_orani": round(len(medya) / max(1, len(liste)), 3)}
+    if not medya:
+        _ekle("GERCEK-KAPSAM-YOK", "fail",
+              "hicbir sahnede lisans/provenans kayitli medya yok")
+
+    # ── 2) MEDYA TURU / GERCEK VIDEO ORANI (mevcut olcum modulu) ──
+    medya_turu = _kk.medya_turu_ozeti(liste, kare_okuyucu=kare_okuyucu)
+
+    # ── 3) KAYNAK SESI SIFIR (K-2 sozlesmesi, mevcut modul) ──
+    kaynak_ses = _sg.kaynak_ses_sozlesmesi(liste)
+    for ih in (kaynak_ses.get("ihlal") or []):
+        _ekle("GERCEK-KAYNAK-SES-SIZINTI", "fail",
+              f"kaynak video sesi SIFIR degil: {ih.get('ses_kanali')!r}",
+              ih.get("beat_id"))
+
+    # ── 4) AYNI KAYNAK <= TAVAN ──
+    kullanim: dict = {}
+    for s in medya:
+        aid = _s(s.get("asset_id"))
+        if aid:
+            kullanim[aid] = kullanim.get(aid, 0.0) + _f(s.get("sure_sn"))
+    asan = [{"asset_id": a, "sure_sn": round(v, 3)}
+            for a, v in sorted(kullanim.items()) if v > KAYNAK_TAVANI_SN + 1e-9]
+    for a in asan:
+        _ekle("GERCEK-KAYNAK-TAVANI", "fail",
+              f"{a['asset_id']} toplam {a['sure_sn']} sn "
+              f"(tavan {KAYNAK_TAVANI_SN} sn)")
+    kaynak_kullanimi = {
+        "olculdu": True, "tavan_sn": KAYNAK_TAVANI_SN,
+        "varlik_sayisi": len(kullanim),
+        "kullanim": {a: round(v, 3) for a, v in sorted(kullanim.items())},
+        "en_uzun_sn": round(max(kullanim.values()), 3) if kullanim else 0.0,
+        "asan": asan, "temiz": not asan}
+
+    # ── 5) SAGLAYICI DAGILIMI (SAGLAYICI-TEKEL ile AYNI esik) ──
+    sag: dict = {}
+    toplam_medya_sn = sum(_f(s.get("sure_sn")) for s in medya)
+    for s in medya:
+        k = _s(s.get("saglayici")) or "?"
+        h = sag.setdefault(k, {"cekim": 0, "sure_sn": 0.0})
+        h["cekim"] += 1
+        h["sure_sn"] = round(h["sure_sn"] + _f(s.get("sure_sn")), 3)
+    tek_oran = (round(max((v["sure_sn"] for v in sag.values()), default=0.0)
+                      / toplam_medya_sn, 4) if toplam_medya_sn > 0 else None)
+    if tek_oran is not None and tek_oran > TEK_SAGLAYICI_TAVANI:
+        _ekle("SAGLAYICI-TEKEL", "warn",
+              f"tek saglayici %{tek_oran * 100:.0f} "
+              f"(tavan %{TEK_SAGLAYICI_TAVANI * 100:.0f})")
+
+    # ── 6) SUREKLILIK: ARDIL AYNI VARLIK ──
+    for i in range(1, len(liste)):
+        a, b = liste[i - 1], liste[i]
+        if (a.get("kaynak_turu") == "medya" and b.get("kaynak_turu") == "medya"
+                and _s(a.get("asset_id"))
+                and _s(a.get("asset_id")) == _s(b.get("asset_id"))):
+            _ekle("SUREKLILIK-AYNI-CEKIM", "warn",
+                  f"ardil ayni varlik ({_s(b.get('asset_id'))})",
+                  b.get("scene_id"))
+
+    # ── 7) OLGU BAGI ──
+    kopuk = [s for s in liste if s.get("olgu_boslugu")]
+    for s in kopuk:
+        _ekle("FACT-BAGLANTI-YOK", "warn",
+              "sahne dogrulanmis bir iddiaya baglanamadi", s.get("scene_id"))
+
+    # ── 8) UYGULANAMAYAN OLCUM — STABIL KODLA BILDIRILIR ──
+    # ⚠ Gercek hat sahneye `cekim_turu` ATAMAZ (zoom/pan kararlari var).
+    # Sahte tur URETMEK yerine olcum ACIKCA yapilamadi denir.
+    broll = {"olculdu": False, "neden": KOD_CEKIM_TURU_YOK,
+             "video_cekim_sayisi": sum(1 for s in medya
+                                       if _s(s.get("medya_turu")) == "video"),
+             "kaynak_saglayici_dagilimi": sag,
+             "tek_saglayici_sure_orani": tek_oran}
+
+    fail = sum(1 for s in sorunlar if s["seviye"] == "fail")
+    warn = sum(1 for s in sorunlar if s["seviye"] == "warn")
+    durum = "FAIL" if fail else ("WARN" if warn else "PASS")
+    return {
+        "durum": durum, "fail": fail, "warn": warn,
+        "sorun_sayisi": len(sorunlar), "sorunlar": sorunlar[:40],
+        "kaynak": "render-edilen-timeline",
+        "sahne": len(liste),
+        "kapsam": kapsam,
+        "medya_turu": medya_turu,
+        "gercek_video_orani": (medya_turu or {}).get("video_sure_orani"),
+        "kaynak_ses": kaynak_ses,
+        "kaynak_kullanimi": kaynak_kullanimi,
+        "saglayici": sag,
+        "broll_cesitliligi": broll,
+        "olcumler": {"kapsam": kapsam, "medya_turu": medya_turu,
+                     "kaynak_ses": kaynak_ses,
+                     "kaynak_kullanimi": kaynak_kullanimi,
+                     "saglayici": sag, "broll_cesitliligi": broll},
+    }
+
+
+def kapsam_ozeti() -> dict:
+    return {
+        "sema_surum": SEMA_SURUM,
+        "kaynak": "render-edilen-timeline",
+        "render_oncesi_kosar": True,
+        "olcum_modulleri_degismedi": True,
+        "uydurma_cekim_turu": False,
+        "stabil_kodlar": [KOD_CEKIM_TURU_YOK, KOD_PROVENANS_YOK,
+                          KOD_SAHNE_YOK],
+        "fail_kodlari": list(FAIL_KODLARI),
+        "kaynak_tavani_sn": KAYNAK_TAVANI_SN,
+        "tek_saglayici_tavani": TEK_SAGLAYICI_TAVANI,
+        "aga_cikar": False, "medya_acar": False, "dosya_yazar": False,
+        "render_eder": False,
+    }

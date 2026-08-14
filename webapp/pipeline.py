@@ -4635,6 +4635,54 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     with open(props_yolu, "w") as f:
         json.dump(props, f, ensure_ascii=False)
 
+    def _kare_sayisi_oku(yol):
+        """ffprobe ile kare sayisi. ⚠ UCRETSIZ + YEREL; ag/kredi YOK.
+
+        ⚠ Okunamazsa None doner — "statiktir" DENMEZ; olcum tarafi
+        `olculemedi` yazar (uydurma sinif ATANMAZ).
+        ⚠ FAZ R-1d-e: tanim RENDER ONCESINE alindi; render-QA da bunu
+        kullaniyor (once yalnizca editorv2 blogunda tanimliydi).
+        """
+        try:
+            if not yol or not os.path.exists(yol):
+                return None
+            r = subprocess.run(
+                ["ffprobe", "-v", "error", "-select_streams", "v:0",
+                 "-count_packets", "-show_entries", "stream=nb_read_packets",
+                 "-of", "csv=p=0", yol],
+                capture_output=True, text=True, timeout=25)
+            ham = (r.stdout or "").strip().rstrip(",")
+            return int(ham) if ham.isdigit() else None
+        except Exception:                                    # noqa: BLE001
+            return None
+
+    # ── FAZ R-1d-e: PRE-QA **RENDER EDILEN** ZAMAN CIZGISINDEN, RENDER ONCESI ──
+    # ⚠ OLCULEN KUSUR (R-1d-d pilotu): PRE-QA, video ZATEN render edildikten
+    # SONRA calisan ve HICBIR ZAMAN RENDER EDILMEYEN editorv2 planini
+    # olcuyordu. Iki artefakt olcumle ayrisiyordu (MP4: 8 sahne / 8 kesme;
+    # plan: 16 cekim, kapsam 0.5). Yani teslim zincirinin `pre_qa` halkasi
+    # TESLIM EDILEN videoya ait OLMAYAN bir kanit tasiyordu.
+    # ⚠ Olcum modulleri DEGISMEDI; degisen tek sey GIRDI ve ZAMANLAMA.
+    _render_qa = {}
+    try:
+        import gercek_qa
+        _render_qa = gercek_qa.olc(
+            gercek_qa.sahneleri_cevir(
+                props_sahneler, kok_dizin=PUBLIC,
+                provenans_okuyucu=kaynak.stok_provenans_al,
+                olgu_raporu=_fact_rapor),
+            kare_okuyucu=_kare_sayisi_oku)
+        print(f"  RENDER-QA (gercek timeline): {_render_qa.get('durum')} "
+              f"sahne={_render_qa.get('sahne')} "
+              f"kapsam={(_render_qa.get('kapsam') or {}).get('kapsam_orani')} "
+              f"gercek_video={_render_qa.get('gercek_video_orani')}",
+              file=sys.stderr)
+    except Exception as e:                                   # noqa: BLE001
+        # ⚠ Olcum patlarsa "PASS" DENMEZ; durum ACIKCA OLCULEMEDI olur.
+        _render_qa = {"durum": "OLCULEMEDI",
+                      "neden": f"{type(e).__name__}: {str(e)[:120]}"}
+        print(f"  RENDER-QA olculemedi: {_render_qa['neden']}", file=sys.stderr)
+
     ham = os.path.join(STUDYO, "out", f"{is_adi}.mp4")
     os.makedirs(os.path.join(STUDYO, "out"), exist_ok=True)
 
@@ -4800,7 +4848,11 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
              "kaynaklar": arastirma_kopru.atif_satirlari(
                  CIKTI_DIR, arastirma_sonuc.manifest_dosya),
              # Gorunur dusus kayitlari: hangi asamada neden geri duselduği.
-             "dususler": list(arastirma_sonuc.dususler)}
+             "dususler": list(arastirma_sonuc.dususler),
+             # ⚠ FAZ R-1d-e: RENDER EDILEN zaman cizgisinin PRE-QA'si.
+             # Teslim zinciri `pre_qa` kanitini BURADAN okur; `edit_plani`
+             # (render EDILMEYEN alternatif plan) kanit SAYILMAZ.
+             "render_qa": _render_qa}
     # ── FAZ I-8: OLGU BAGI OZETI (yalnizca bag KURULDUYSA yazilir) ──
     # ⚠ Arastirma kapaliysa anahtar HIC eklenmez -> eski islerde `sonuc`
     # bit-bit ayni. Kapsam bosluklari GORUNUR: "her sahne kaynakli" gibi
@@ -4824,25 +4876,6 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # gercek render MEVCUT `VidrushVideo` yoluyla zaten yapildi.
     # ⚠ Manifest YALNIZCA avci GERCEKTEN lisansli + kare-dogrulanmis aday
     # verdiyse kurulur; aksi halde plan denenmez (uydurma manifest yok).
-    def _kare_sayisi_oku(yol):
-        """ffprobe ile kare sayisi. ⚠ UCRETSIZ + YEREL; ag/kredi YOK.
-
-        ⚠ Okunamazsa None doner — "statiktir" DENMEZ; olcum tarafi
-        `olculemedi` yazar (uydurma sinif ATANMAZ).
-        """
-        try:
-            if not yol or not os.path.exists(yol):
-                return None
-            r = subprocess.run(
-                ["ffprobe", "-v", "error", "-select_streams", "v:0",
-                 "-count_packets", "-show_entries", "stream=nb_read_packets",
-                 "-of", "csv=p=0", yol],
-                capture_output=True, text=True, timeout=25)
-            ham = (r.stdout or "").strip().rstrip(",")
-            return int(ham) if ham.isdigit() else None
-        except Exception:                                    # noqa: BLE001
-            return None
-
     _ed_acik, _ed_gerekce = edit_kopru.acik_mi(_is_ayar)
     if _ed_acik:
         try:

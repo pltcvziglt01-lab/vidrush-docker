@@ -8654,14 +8654,15 @@ def _ts_tam(**ek):
          "saglayici": {"provider_used": "wikimedia",
                        "fallback_reason": "BAGLANTI-YOK:BAGLANTI-YOK"},
          "video": "ciktilar/j1.mp4", "sure": 60.0, "durum": "bitti",
-         # ⚠ R-1d-b: PRE-QA kaniti artik HUKUM + GERCEK OLCUM ister
-         # (sifir cekimli plan uzerindeki hukum KANIT SAYILMAZ).
-         # ⚠ R-1d-b: sema GERCEK `edit_kopru.plan_kur` ozetidir — `olcumler`
-         # anahtari YOKTUR, olcumler UST SEVIYEDE durur.
-         "edit_plani": {"ok": True, "sahne": 8,
-                        "qa": {"durum": "PASS", "fail": 0, "warn": 1,
-                               "medya_turu": {"olculdu": True},
-                               "broll_cesitliligi": {"olculdu": True}}},
+         # ⚠ R-1d-e: PRE-QA kaniti artik RENDER EDILEN zaman cizgisinden
+         # gelir (`render_qa`). `edit_plani` HICBIR ZAMAN RENDER EDILMEYEN
+         # alternatif plandir ve KANIT SAYILMAZ.
+         # ⚠ R-1d-b: hukum YETMEZ — sahne >= 1 VE gercek olcum sart.
+         "render_qa": {"durum": "PASS", "sahne": 8, "fail": 0, "warn": 1,
+                       "kapsam": {"kapsam_orani": 1.0},
+                       "medya_turu": {"olculdu": True},
+                       "kaynak_ses": {"olculdu": True, "temiz": True},
+                       "kaynak_kullanimi": {"olculdu": True, "temiz": True}},
          "qa": {"durum": "PASS", "fail": 0, "warn": 0}}
     k.update(ek)
     return k
@@ -8674,7 +8675,7 @@ for _alan, _bek in (({"sahne_sayisi": 0}, "plan"),
                     ({"metin_uzunlugu": 0}, "metin"),
                     ({"saglayici": {}}, "saglayici"),
                     ({"sure": 0}, "uzak_tts_render"),
-                    ({"edit_plani": {}}, "pre_qa"),
+                    ({"render_qa": {}}, "pre_qa"),
                     ({"qa": {}}, "post_qa")):
     kontrol(f"⭐ R-1d-a RED-FIRST: '{_bek}' halkasinin KANITI yoksa zincir "
             f"TAM DEGIL",
@@ -8687,14 +8688,12 @@ kontrol("⭐ R-1d-a BELIRLEYICI: depolama OLCULMEDIYSE 'vardir' SAYILMIYOR "
         and [h for h in _TS.zincir_raporu(_ts_tam())["halkalar"]
              if h["asama"] == "depolama"][0]["neden"] == "DEPOLAMA-OLCULMEDI")
 kontrol("⭐ R-1d-a: PRE-QA WARN teslimi ENGELLEMIYOR, FAIL ENGELLIYOR",
-        _TS.zincir_raporu(_ts_tam(edit_plani={
-            "sahne": 8, "qa": {"durum": "WARN",
-                               "medya_turu": {"olculdu": True}}}),
-            dosya_var=True)["tam"] is True
+        _TS.zincir_raporu(_ts_tam(render_qa={
+            "durum": "WARN", "sahne": 8,
+            "medya_turu": {"olculdu": True}}), dosya_var=True)["tam"] is True
         and "pre_qa" in _TS.zincir_raporu(
-            _ts_tam(edit_plani={"sahne": 8,
-                                "qa": {"durum": "FAIL",
-                                       "medya_turu": {"olculdu": True}}}),
+            _ts_tam(render_qa={"durum": "FAIL", "sahne": 8,
+                               "medya_turu": {"olculdu": True}}),
             dosya_var=True)["eksik"])
 
 # ⚠ FAZ R-1d-b — ICI BOS PRE-QA HUKMU (staging'de OLCULEN kusur).
@@ -8704,33 +8703,29 @@ kontrol("⭐ R-1d-a: PRE-QA WARN teslimi ENGELLEMIYOR, FAIL ENGELLIYOR",
 kontrol("⭐ R-1d-b RED-FIRST: SIFIR CEKIMLI plan uzerindeki PRE-QA hukmu "
         "KANIT SAYILMIYOR (vakumda WARN kabul edilmez)",
         "pre_qa" in _TS.zincir_raporu(
-            _ts_tam(edit_plani={"ok": True, "sahne": 0,
-                                "qa": {"durum": "WARN", "olcumler": {}}}),
+            _ts_tam(render_qa={"durum": "WARN", "sahne": 0}),
             dosya_var=True)["eksik"])
 kontrol("⭐ R-1d-b: reddin NEDENI 'PRE-QA-BOS' olarak ACIKCA yaziliyor "
         "(sadece 'eksik' demiyor)",
         [h["neden"] for h in _TS.zincir_raporu(
-            _ts_tam(edit_plani={"ok": True, "sahne": 0,
-                                "qa": {"durum": "WARN", "olcumler": {}}}),
+            _ts_tam(render_qa={"durum": "WARN", "sahne": 0}),
             dosya_var=True)["halkalar"]
          if h["asama"] == "pre_qa"][0].startswith("PRE-QA-BOS:"))
 kontrol("⭐ R-1d-b RED-FIRST: sahne VAR ama OLCUM YOKSA da gecmiyor",
         "pre_qa" in _TS.zincir_raporu(
-            _ts_tam(edit_plani={"sahne": 8, "qa": {"durum": "PASS"}}),
+            _ts_tam(render_qa={"durum": "PASS", "sahne": 8}),
             dosya_var=True)["eksik"])
 kontrol("⭐ R-1d-b BELIRLEYICI: olcum GERCEK sema ile (`olcumler` DEGIL, "
         "ust seviye `medya_turu`) taninıyor — dolu PRE-QA 'bos' sayilmiyor",
         _TS.zincir_raporu(
-            _ts_tam(edit_plani={"sahne": 10,
-                                "qa": {"durum": "PASS", "fail": 0, "warn": 1,
-                                       "medya_turu": {"olculdu": True},
-                                       "broll_cesitliligi": {"olculdu": True}}}),
+            _ts_tam(render_qa={"durum": "PASS", "sahne": 10, "fail": 0,
+                               "medya_turu": {"olculdu": True},
+                               "kapsam": {"kapsam_orani": 1.0}}),
             dosya_var=True)["tam"] is True)
 kontrol("⭐ R-1d-b: dogrudan `qa_on` ciktisi (`olcumler` dolu) da KABUL",
         _TS.zincir_raporu(
-            _ts_tam(edit_plani={"sahne": 8,
-                                "qa": {"durum": "PASS",
-                                       "olcumler": {"kapsam": {"cekim": 8}}}}),
+            _ts_tam(render_qa={"durum": "PASS", "sahne": 8,
+                               "olcumler": {"kapsam": {"cekim": 8}}}),
             dosya_var=True)["tam"] is True)
 kontrol("⭐ R-1d-b: anlatim metni props sinirinda TASINIYOR "
         "(bos metin -> beat plani kurulamiyor -> sifir cekim)",
@@ -9347,6 +9342,176 @@ kontrol("R-1d-d GERILEME YOK: kaynak_ses / FACT / SUREKLILIK kapilari DURUYOR",
         "KALITE-KAYNAK-SES-SIZINTI" in _qon.FAIL_KODLARI
         and "FACT-BAGLANTI-YOK" in _qon.FAIL_KODLARI
         and "SUREKLILIK-AYNI-CEKIM" in oku(KOK, "editor/gramer.py"))
+
+
+blok("§40y R-1d-e — PRE-QA KANITI RENDER EDILEN ZAMAN CIZGISINDEN")
+
+# ⚠ MEDYASIZ + AGSIZ + PARASIZ.
+#
+# ── OLCULEN KUSUR (R-1d-d pilotu, job_1786717796777) ──
+# `uret()` icindeki SIRA olculdu:
+#     4655  hizli_render.ffmpeg_render(...)  <- VIDEO BURADA RENDER EDILIR
+#     4822  editorv2 plan blogu              <- PRE-QA BURADA KOSAR
+# Yani PRE-QA, video ZATEN render edildikten SONRA, HICBIR ZAMAN RENDER
+# EDILMEYEN alternatif bir plani olcuyordu (kodun kendi yorumu: "Bu blok
+# RENDER ETMEZ"). Iki artefakt OLCUMLE ayrismisti:
+#     teslim edilen MP4 : 8 sahne · POST-QA 8 kesme · 64.8 sn
+#     PRE-QA'nin plani  : 16 cekim · kapsam {medya:8, fallback:8, oran:0.5}
+# Sonuc: `pre_qa` halkasi TESLIM EDILEN videoya ait OLMAYAN kanit tasiyordu.
+
+_GQ = __import__("gercek_qa")
+
+
+def _re_sahne(sid, tur="video", sure=7.0, islev="aciklama", medya=None):
+    return {"scene_id": sid, "tur": tur, "medya": medya or f"{sid}.mp4",
+            "sure": sure, "islev": islev}
+
+
+_RE_PV = {
+    "s001.mp4": {"saglayici": "pexels", "lisans": "pexels-license",
+                 "asset_id": "a1", "medya_turu": "video"},
+    "s002.mp4": {"saglayici": "openai", "lisans": "uretilmis-eser",
+                 "asset_id": "a2", "medya_turu": "image"},
+}
+
+
+def _re_cevir(sahneler, pv=None, olgu=None):
+    return _GQ.sahneleri_cevir(
+        sahneler, provenans_okuyucu=lambda y: (pv if pv is not None
+                                               else _RE_PV).get(y, {}),
+        olgu_raporu=olgu)
+
+
+# ── (1) KANIT ARTIK GERCEK ZAMAN CIZGISINDEN ──
+kontrol("⭐ R-1d-e BELIRLEYICI: teslim zinciri `pre_qa` kanitini `render_qa`"
+        "'dan okuyor (editorv2 plani KANIT SAYILMIYOR)",
+        'k.get("render_qa")' in oku(KOK, "teslim.py")
+        and "KANIT SAYILMAZ" in oku(KOK, "teslim.py")
+        and "RENDER EDILEN" in oku(KOK, "teslim.py"))
+kontrol("⭐ R-1d-e BELIRLEYICI: olcum RENDER ONCESINDE kosuyor",
+        oku(KOK, "pipeline.py").index("gercek_qa.olc(")
+        < oku(KOK, "pipeline.py").index("hizli_render.ffmpeg_render("))
+kontrol("⭐ R-1d-e: kanit kaynagi ACIKCA isaretli",
+        _GQ.olc(_re_cevir([_re_sahne("s001")]))["kaynak"]
+        == "render-edilen-timeline"
+        and _GQ.kapsam_ozeti()["render_oncesi_kosar"] is True)
+kontrol("⭐ R-1d-e: olcum modulleri DEGISMEDI (ayni kalite_kapisi/ses_gurultu)",
+        _GQ.KAYNAK_TAVANI_SN == _kk.KAYNAK_BASINA_TAVAN_SN_PLAN
+        and _GQ.kapsam_ozeti()["olcum_modulleri_degismedi"] is True)
+
+# ── (2) GERCEK TIMELINE'DA KAPSAM 1.0 (16 beat / 8 aday sorunu YOK) ──
+_RE_8 = [_re_sahne(f"s{i:03d}", medya=f"s{i:03d}.mp4") for i in (1, 2)]
+_RE_R = _GQ.olc(_re_cevir(_RE_8))
+kontrol("⭐ R-1d-e BELIRLEYICI: provenansi olan HER sahne `medya` sayiliyor "
+        "-> kapsam 1.0 (planda 0.5 idi)",
+        _RE_R["kapsam"] == {"cekim": 2, "medya": 2, "fallback": 0,
+                            "kapsam_orani": 1.0}, _RE_R["kapsam"])
+kontrol("⭐ R-1d-e RED-FIRST: PROVENANSI OLMAYAN sahne `medya` SAYILMIYOR "
+        "('herhalde lisanslidir' DENMEZ)",
+        _GQ.olc(_re_cevir(_RE_8, pv={}))["kapsam"]["kapsam_orani"] == 0.0)
+kontrol("⭐ R-1d-e RED-FIRST: hicbir sahnede medya yoksa FAIL",
+        _GQ.olc(_re_cevir(_RE_8, pv={}))["durum"] == "FAIL"
+        and any(s["kod"] == "GERCEK-KAPSAM-YOK"
+                for s in _GQ.olc(_re_cevir(_RE_8, pv={}))["sorunlar"]))
+kontrol("⭐ R-1d-e RED-FIRST: sahne YOKSA 'PASS' DENMIYOR (stabil kod)",
+        _GQ.olc([])["durum"] == "OLCULEMEDI"
+        and _GQ.olc([])["neden"] == _GQ.KOD_SAHNE_YOK)
+
+# ── (3) KAPILAR GERCEK OLCUMLE KORUNUYOR ──
+kontrol("⭐ R-1d-e: KAYNAK SESI SIFIR olculuyor ve TEMIZ",
+        _RE_R["kaynak_ses"]["olculdu"] is True
+        and _RE_R["kaynak_ses"]["temiz"] is True)
+_RE_SIZ = _re_cevir(_RE_8)
+_RE_SIZ[0]["ses_kanali"] = "orijinal"
+kontrol("⭐ R-1d-e RED-FIRST: kaynak sesi SIFIR DEGILSE FAIL",
+        _GQ.olc(_RE_SIZ)["durum"] == "FAIL"
+        and any(s["kod"] == "GERCEK-KAYNAK-SES-SIZINTI"
+                for s in _GQ.olc(_RE_SIZ)["sorunlar"]))
+kontrol("⭐ R-1d-e: AYNI KAYNAK <= 8.0 sn olculuyor",
+        _RE_R["kaynak_kullanimi"]["temiz"] is True
+        and _RE_R["kaynak_kullanimi"]["tavan_sn"] == 8.0)
+_RE_ASAN = [_re_sahne("s001", sure=5.0, medya="s001.mp4"),
+            _re_sahne("s002", sure=5.0, medya="s001.mp4")]
+kontrol("⭐ R-1d-e RED-FIRST: ayni kaynak 10 sn > 8 sn ise FAIL",
+        _GQ.olc(_re_cevir(_RE_ASAN))["durum"] == "FAIL"
+        and _GQ.olc(_re_cevir(_RE_ASAN))["kaynak_kullanimi"]["asan"]
+        == [{"asset_id": "a1", "sure_sn": 10.0}])
+kontrol("⭐ R-1d-e: SAGLAYICI-TEKEL AYNI %40 esigiyle olculuyor",
+        _GQ.TEK_SAGLAYICI_TAVANI == 0.40
+        and any(s["kod"] == "SAGLAYICI-TEKEL"
+                for s in _GQ.olc(_re_cevir(
+                    [_re_sahne("s001", medya="s001.mp4")]))["sorunlar"]))
+kontrol("⭐ R-1d-e: SUREKLILIK-AYNI-CEKIM (ardil ayni varlik) olculuyor",
+        any(s["kod"] == "SUREKLILIK-AYNI-CEKIM"
+            for s in _GQ.olc(_re_cevir(_RE_ASAN))["sorunlar"]))
+kontrol("⭐ R-1d-e: FACT-BAGLANTI-YOK gercek olgu raporundan olculuyor",
+        any(s["kod"] == "FACT-BAGLANTI-YOK"
+            for s in _GQ.olc(_re_cevir(
+                _RE_8, olgu={"bosluklar": [{"sahne": 1}]}))["sorunlar"]))
+kontrol("⭐ R-1d-e: GERCEK VIDEO ORANI alani uretiliyor",
+        "gercek_video_orani" in _RE_R)
+
+# ── (4) UYDURMA YOK: TURETILEMEYEN OLCUM STABIL KODLA BILDIRILIR ──
+kontrol("⭐ R-1d-e BELIRLEYICI: gercek hat `cekim_turu` ATAMADIGI icin "
+        "B-roll gorsel dili olcumu UYDURULMUYOR — stabil kod",
+        _RE_R["broll_cesitliligi"]["olculdu"] is False
+        and _RE_R["broll_cesitliligi"]["neden"] == _GQ.KOD_CEKIM_TURU_YOK
+        and _GQ.kapsam_ozeti()["uydurma_cekim_turu"] is False)
+kontrol("⭐ R-1d-e: hicbir sahneye SAHTE cekim turu yazilmiyor",
+        all(x["cekim_turu"] == "" for x in _re_cevir(_RE_8)))
+kontrol("⭐ R-1d-e: stabil kodlar kapsam ozetinde BEYAN EDILIYOR",
+        set(_GQ.kapsam_ozeti()["stabil_kodlar"])
+        == {_GQ.KOD_CEKIM_TURU_YOK, _GQ.KOD_PROVENANS_YOK, _GQ.KOD_SAHNE_YOK})
+
+# ── (5) ZINCIR: GERCEK KANIT KABUL, PLAN KANITI RED ──
+def _re_is(**ek):
+    k = dict(_ts_tam())
+    k.pop("edit_plani", None)
+    k["render_qa"] = {"durum": "PASS", "sahne": 8, "fail": 0, "warn": 0,
+                      "kapsam": {"kapsam_orani": 1.0},
+                      "medya_turu": {"olculdu": True},
+                      "kaynak_ses": {"olculdu": True, "temiz": True},
+                      "kaynak_kullanimi": {"olculdu": True, "temiz": True}}
+    k.update(ek)
+    return k
+
+
+kontrol("⭐ R-1d-e: `render_qa` kaniti zinciri GECIRIYOR",
+        _TS.zincir_raporu(_re_is(), dosya_var=True)["tam"] is True,
+        _TS.zincir_raporu(_re_is(), dosya_var=True)["eksik"])
+kontrol("⭐ R-1d-e BELIRLEYICI: YALNIZCA `edit_plani` varsa (render EDILMEYEN "
+        "plan) zincir GECMIYOR",
+        "pre_qa" in _TS.zincir_raporu(
+            dict(_re_is(render_qa={}),
+                 edit_plani={"ok": True, "sahne": 16,
+                             "qa": {"durum": "PASS",
+                                    "medya_turu": {"olculdu": True}}}),
+            dosya_var=True)["eksik"])
+kontrol("⭐ R-1d-e RED-FIRST: render_qa FAIL ise zincir GECMIYOR",
+        "pre_qa" in _TS.zincir_raporu(
+            _re_is(render_qa=dict(_re_is()["render_qa"], durum="FAIL")),
+            dosya_var=True)["eksik"])
+kontrol("⭐ R-1d-e RED-FIRST: render_qa OLCULEMEDI ise zincir GECMIYOR",
+        "pre_qa" in _TS.zincir_raporu(
+            _re_is(render_qa={"durum": "OLCULEMEDI", "neden": "x"}),
+            dosya_var=True)["eksik"])
+
+# ── (6) SINIRLAR + GERILEME ──
+kontrol("⭐ R-1d-e: modul AG/MEDYA ACMIYOR, DOSYA YAZMIYOR, RENDER ETMIYOR",
+        not any(a in _kod_yalniz(oku(KOK, "gercek_qa.py"))
+                for a in ("requests", "urllib", "subprocess", "ffmpeg",
+                          "open(", "os.remove"))
+        and _GQ.kapsam_ozeti()["render_eder"] is False)
+kontrol("⭐ R-1d-e: olcum patlarsa 'PASS' DENMIYOR (OLCULEMEDI)",
+        'OLCULEMEDI' in oku(KOK, "pipeline.py").split(
+            "RENDER-QA olculemedi")[0][-900:])
+kontrol("R-1d-e: gercek_qa.py derleniyor",
+        _derlenir(os.path.join(KOK, "gercek_qa.py")))
+kontrol("R-1d-e GERILEME YOK: 22 alan + K kapilari + render motoru DURUYOR",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22
+        and "KALITE-KAYNAK-SES-SIZINTI" in _qon.FAIL_KODLARI
+        and "hizli_render.ffmpeg_render(" in oku(KOK, "pipeline.py"))
 
 
 blok("§40h I-58 — IKI ADAY DUZENI KARSI-OLGU OLARAK OLCULDU (yalniz tanisal)")

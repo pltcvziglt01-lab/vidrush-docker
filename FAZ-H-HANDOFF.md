@@ -9310,3 +9310,86 @@ alamaz (ve `SHOT-TAVAN` kapısı da onu ayrıca fail ediyor).
 (sağlayıcıdan ikinci klip), ya da **beat süreleri/sayısı** mevcut aday
 sayısı ve `≤8 sn` tavanıyla **uyumlu türetilsin**. ⚠ Eşik gevşetmek
 YANLIŞ olur: kapsam gerçekten %50 ve `b011` gerçekten tavanın üstünde.
+
+---
+
+## 68. FAZ R-1d-e — PRE-QA KANITI **RENDER EDİLEN** ZAMAN ÇİZGİSİNDEN (14 Ağu)
+
+> **Durum: R-1d-e istenen biçimde DEĞİL, ölçülen gerçek blokaja göre
+> kuruldu (kullanıcı onayıyla). A–I yeşil. Mac'te medya ÜRETİLMEDİ. $0.00.**
+> Değişen: yeni `webapp/gercek_qa.py`; `webapp/pipeline.py`,
+> `webapp/teslim.py`, `webapp/testler/test_faz_i.py`.
+> `server.py`, `kimlik.py`, `kutuphane.py`, `imzali_url.py`, `kaynak.py`,
+> `medya_kopru.py`, `edit_kopru.py`, `editor/*`, `hizli_render.py`,
+> `deploy.sh`, `Video.tsx` ve **22 alan sözleşmesi DOKUNULMADI**.
+
+### ⛔ Ölçülen kusur — PRE-QA render EDİLMEYEN bir planı ölçüyordu
+
+`uret()` içindeki **sıra ölçüldü**:
+
+| satır | ne olur |
+|---|---|
+| **4655** | `hizli_render.ffmpeg_render(is_adi, props, ...)` — **video BURADA render edilir** |
+| 4787 | `sonuc = {...}` |
+| **4822** | editorv2 plan bloğu — **PRE-QA BURADA koşar** |
+
+Kodun kendi yorumu: *"⚠ Bu blok RENDER ETMEZ … gerçek render mevcut
+`VidrushVideo` yoluyla ZATEN yapıldı."* Doğrulandı: `_ep["props"]` yalnızca
+`len(...)` için kullanılıyor; `VidrushEditorV2` kompozisyonu **hiç
+çağrılmıyor**; `render_edilebilir: False`.
+
+İki artefakt **ölçümle** ayrıştı (`job_1786717796777`):
+
+| | teslim edilen MP4 | PRE-QA'nın ölçtüğü plan |
+|---|---|---|
+| çekim | **8 sahne** | **16 çekim** |
+| kesme | **8** (POST-QA, gerçek dosyada) | — |
+| kapsam | — | `{medya:8, fallback:8, oran:0.5}` |
+
+**Sonuç:** teslim zincirinin `pre_qa` halkası **teslim edilen videoya ait
+OLMAYAN** bir kanıt taşıyordu. O plandaki `kapsam_orani`'nı yükseltmek MP4'ü
+iyileştirmez; halkayı PASS'a döndürmek **yanlış bir kabul sinyali** üretirdi.
+Bu, R-1d-a'da kapatılan "içi boş PRE-QA" kusurunun **daha derin** biçimi.
+
+⚠ **Bu yüzden istenen R-1d-e (8/16 kapsam + `b011=8.075 sn`) YAPILMADI**:
+o semptomlar **teslim edilen videoda yok**. Kullanıcı, kanıtı gerçek zaman
+çizgisine bağlama seçeneğini onayladı.
+
+### Düzeltme — `webapp/gercek_qa.py`
+
+`props_sahneler` (**render EDİLEN** sahneler) → ölçüm sözleşmesi → **mevcut**
+ölçüm modülleri (`editor.kalite_kapisi`, `editor.ses_gurultu`).
+⚠ **Ölçüm modülleri değişmedi**; değişen tek şey **girdi** ve **zamanlama**
+(artık render'dan **önce** koşuyor).
+
+Ölçülen kapılar (hepsi **gerçek** timeline'dan): `kapsam` · `medya_turu` /
+**gerçek video oranı** · **`kaynak_ses = sifir`** · **aynı kaynak ≤ 8.0 sn**
+(tavan `saglayici_motoru` ile aynı sabitten) · **`SAGLAYICI-TEKEL`** (aynı
+%40 eşiği) · **`SUREKLILIK-AYNI-CEKIM`** · **`FACT-BAGLANTI-YOK`**.
+
+⚠ **UYDURMA YOK — türetilemeyen ölçüm ÜRETİLMEZ.** Gerçek hat sahneye
+`cekim_turu` **atamaz** (onun yerine `zoom`/`pan` kararları var). Bu yüzden
+çekim türü tabanlı B-roll görsel dili ölçümü bu zaman çizgisinde
+**uygulanamaz** ve **stabil kodla** bildirilir:
+**`GERCEK-TIMELINE-CEKIM-TURU-YOK`**. Sahte çekim türü **yazılmaz**
+(test her sahnenin `cekim_turu == ""` olduğunu kilitliyor).
+Diğer stabil kodlar: `GERCEK-TIMELINE-PROVENANS-YOK`,
+`GERCEK-TIMELINE-SAHNE-YOK`.
+
+**Deterministik politika:** provenansı **olmayan** sahne `medya` **sayılmaz**
+(fallback); hiç medya yoksa `GERCEK-KAPSAM-YOK` **fail**; ölçüm patlarsa
+durum **`OLCULEMEDI`** — "PASS" **denmez**.
+
+**`teslim.py`:** `pre_qa` kanıtı artık `render_qa`'dan okunuyor; `edit_plani`
+**kanıt sayılmıyor** (kayıtta bilgi olarak kalıyor).
+
+⚠ **Ek düzeltme:** `_kare_sayisi_oku` yalnızca editorv2 bloğunda tanımlıydı;
+render-QA'nın onu kullanabilmesi için **render öncesine** alındı.
+
+### Red-first — üç bileşen ayrı ölçüldü
+
+| geri alınan | sonuç |
+|---|---|
+| `gercek_qa.py` | `ModuleNotFoundError: No module named 'gercek_qa'` |
+| `teslim.py` | **4+ kırmızı** (zincir hâlâ `edit_plani` arıyor) |
+| `pipeline.py` | **1 kırmızı** (ölçüm render öncesinde koşmuyor) |

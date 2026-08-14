@@ -217,8 +217,16 @@ def zincir_raporu(kayit: dict, *, tenant_id: str = "",
     k = kayit if isinstance(kayit, dict) else {}
     t = _s(tenant_id) or _s(k.get("tenant_id"))
     sag = k.get("saglayici") if isinstance(k.get("saglayici"), dict) else {}
-    plan = k.get("edit_plani") if isinstance(k.get("edit_plani"), dict) else {}
-    plan_qa = plan.get("qa")
+    # ⚠ FAZ R-1d-e — PRE-QA KANITI **RENDER EDILEN** ZAMAN CIZGISINDEN.
+    # OLCULEN KUSUR (R-1d-d pilotu): `edit_plani` HICBIR ZAMAN RENDER
+    # EDILMEYEN alternatif bir plandir ve video ZATEN render edildikten
+    # SONRA uretilir. Olcumle ayristi: MP4 8 sahne / 8 kesme, plan 16 cekim.
+    # Yani o plandan gelen "PASS" TESLIM EDILEN videoya ait DEGILDI —
+    # halkayi onunla gecirmek YANLIS BIR KABUL SINYALI olurdu.
+    # ⚠ Artik kanit `render_qa` (gercek zaman cizgisi). `edit_plani`
+    # KANIT SAYILMAZ; yalnizca bilgi olarak kayitta kalir.
+    plan = k.get("render_qa") if isinstance(k.get("render_qa"), dict) else {}
+    plan_qa = plan
     on_durum = _qa_durum(plan_qa)
     # ⚠ FAZ R-1d-b — ICI BOS PRE-QA HUKMU KABUL EDILMEZ.
     # OLCULEN KUSUR (staging, 14 Agu): kopru manifesti doldurdu, `plan_kur`
@@ -238,7 +246,8 @@ def zincir_raporu(kayit: dict, *, tenant_id: str = "",
     except (TypeError, ValueError):
         on_sahne = 0
     _pq = plan_qa if isinstance(plan_qa, dict) else {}
-    on_olcumler = [a for a in ("medya_turu", "broll_cesitliligi")
+    on_olcumler = [a for a in ("kapsam", "medya_turu", "kaynak_ses",
+                               "kaynak_kullanimi", "broll_cesitliligi")
                    if isinstance(_pq.get(a), dict)]
     if isinstance(_pq.get("olcumler"), dict) and _pq["olcumler"]:
         on_olcumler.append("olcumler")
