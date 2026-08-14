@@ -9013,3 +9013,62 @@ QA'yı **özetliyor**: dönen sözlükte `olcumler` **anahtarı yok**, ölçüml
 özetin **üst seviyesinde** (`medya_turu`, `broll_cesitliligi`). Yani DOLU
 bir PRE-QA bile "boş" görünüyordu. Kontrol gerçek şemaya göre düzeltildi
 (doğrudan `qa_on` çıktısı gelirse `olcumler` de sayılır).
+
+### R-1d-b PİLOT 3 (son) — BLOKAJ KAPANDI, örnek KABUL EDİLMEDİ
+
+`job_1786714318058_r1dasm_7baa9a` · 8 sahne · 5 sahne köprüden geçti
+(`pexels/pexels-license`).
+
+```
+EDIT PLANI: QA=FAIL render_edilebilir=False  sahne=14
+TESLIM ...: RED — ZINCIR-EKSIK:pre_qa
+```
+
+**Blokaj kapandı:** PRE-QA artık **gerçekten koşuyor** — 14 çekim,
+`fail=4 warn=5`, ve ölçümler **gerçek** (B-roll çeşitliliği `olculdu: true`,
+4 video çekim). Zincir **gerçek kanıta dayanarak** reddediyor.
+
+**Teknik (PASS):** 1920×1080 · h264 · **57.88 sn** · aac 48 kHz ·
+**LUFS −14.0** · **TP −1.5 dBTP** · **LRA 3.3** · sessiz oran **%0.0**
+(tavan %15) · ölü final **0.0 sn** · hiss 21+ dB altta · **9 kesme** ·
+siyah **0** · donmuş **0** · **12 kare**, hiçbiri boş değil ·
+POST-QA **WARN**, FAIL yok · signed URL kendi oturumunda **200**,
+oturumsuz **401**.
+
+**Kalan FAIL'ler (gerçek bulgular):**
+
+| bulgu | ölçüm |
+|---|---|
+| **PRE-QA FAIL** | `fail=4 warn=5` üzerinden 14 çekim |
+| **B-roll çeşitliliği** | `video_islev_tur_tekrari`: b008 `aciklama/medium` (ilk 6), b009 `kanit/document` (ilk 3) |
+| `pix_fmt` **yuv444p** | yuv420p değil — birçok oynatıcı çözemez |
+| rumble marjı | 19.4 dB ⚠ 20 dB eşiği **BENİM**, projede kalibre DEĞİL |
+
+**ÖLÇÜLEMEDİ (3):** gerçek video oranı (`KARE-OKUYUCU-YOK`) · kaynak sesi
+sıfır · aynı kaynak ≤ 8 sn.
+⚠ Kök neden: `edit_kopru.plan_kur` PRE-QA'yı **özetlerken** yalnızca
+`durum/fail/warn/sorun_sayisi/medya_turu/broll_cesitliligi` taşıyor;
+`kapsam`, `tipografi`, `gecis`, `ses`, `islev`, `kaynak_ses` ve sorun
+KOD LİSTESİ **kayda geçmiyor**. Ölçülüyorlar ama iş kaydında yoklar.
+
+### ⚠ KÜTÜPHANEDE HATALI KABUL EDİLMİŞ 1 KAYIT VAR
+
+`job_1786712620354_r1dasm_45f951` (2. pilot) **içi boş PRE-QA kusuru
+düzeltilmeden önce** kabul edilmişti (`sahne=0`, tüm ölçümler boş).
+Sıkılaştırma sonrası aynı iş **reddedilirdi**. Kayıt hâlâ
+`veri/kutuphane.json`'da duruyor ve `/api/kutuphane` onu **kabul edilmiş**
+gösteriyor. **Silinmedi** — canlı veri, kararı sahibi versin.
+Temizlik: o `is_id`'yi `veri/kutuphane.json`'dan düşürmek yeterli
+(dosya silmeye gerek yok).
+
+### SONRAKİ ATOM (R-1d-c) — yalnız ölçülen eksikten
+
+1. **PRE-QA özeti ölçümleri kırpıyor**: sorun KOD listesi + `kapsam` /
+   `tipografi` / `gecis` / `ses` / `islev` / `kaynak_ses` iş kaydına
+   yazılmalı — aksi halde teslim raporu 6 kriteri **ölçemiyor**.
+2. **`medya_turu` için kare okuyucu verilmiyor** (`KARE-OKUYUCU-YOK`) →
+   **gerçek video oranı** hiç ölçülemiyor.
+3. **B-roll çeşitliliği GERÇEKTEN ihlal ediliyor** (ölçüldü) — çekim türü
+   ataması aynı işlevde tekrar ediyor.
+4. **`pix_fmt` yuv444p**: mux çıktısı yuv420p olmalı.
+5. Kütüphanedeki hatalı kabul kaydı (yukarıda).
