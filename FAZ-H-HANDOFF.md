@@ -209,6 +209,7 @@ Küçük, doğrulanabilir adımlar; her adım kendi commit'i.
 | 13 Ağu | **I-40 önizleme yolu Remotion geometrisine bağlandı** | `3253e62` | ✅ **push edildi**, `y_orani/punto/x` artık SPEC'ten (sabit 0.70/0.80/`h-th-14` gitti) + modülün İLK testi; 1080p pilot **11/11 kare SHA-256 aynı** (gerileme yok), önizleme yazısı **BLOKE** (yerel ffmpeg'de drawtext yok), deploy YOK |
 | 13 Ağu | **I-41 `kaynakYazi` üretim hattında kayıpsız taşınıyor** | `6179484` | ✅ **push edildi**, künye props sınırında düşüyordu → **iki renderer da** çizemiyordu; artık sağ üstte **çiziliyor** (kareyle doğrulandı), 22 alan sözleşmesi değişmedi; VidrushVideo pilotu **POST-QA FAIL** (nedenleri I-41 dışı, ayrıştırıldı), editorv2 **11/11 kare aynı**, deploy YOK |
 | 13 Ağu | **I-42 açılış çekimi durağanlığı** | `2262833` | ✅ **push edildi**, indeks 0 daima %0.4/sn kovasına düşüyordu → ölçülerek 0.062'ye taşındı (0.032 bıçak sırtı olduğu için **seçilmedi**); pilotta s0 optik **1.421 → 4.016**, durağan seri 3.0 → 0.0 sn; eşik gevşetilmedi, POST-QA **FAIL** (kapsam dışı s1/s2), deploy YOK |
+| 14 Ağu | **R-1c-b tenant başına son 3 kabul edilmiş video** | `PENDING` | ✅ **push edildi**, yeni `webapp/kutuphane.py` — **saf metadata**, modül **medya açmıyor/dosya silmiyor/ağa çıkmıyor**; kabul kapısı: `bitti`+QA **PASS/WARN** girer, **QA FAIL / QA ölçülmemiş / başarısız / videosuz** ⛔ girmez (*"muhtemelen iyidir" denmez*); retention **tenant başına 3**, 4. kabulde **en eski** **silme kuyruğuna** alınır (`TAVAN-ASILDI`) — ⚠ gerçek silme **remote lifecycle işinin** işi; sıralama **en yeni önce**, geç gelen eski kayıt en yeniyi **düşürmez**, aynı iş **idempotan**; tenant izolasyonu **iki savunma hattı** (listeleme + kaydın sahibi kontrolü), kimlik yoksa **red**; signed URL **kayıtta saklanmıyor**, `listele()` sırasında **talep anında** ve **tenant korumalı** üretiliyor, imzalayıcı yoksa **sessiz boş link yok** (`imzalanamadi: True`); metadata **QA+provenance+provider+model+credit+zaman** taşıyor, **eksik alan uydurulmuyor**, fallback nedeni **görünür**; 26 red-first kontrol (tenant sızıntısı, sıralama, retention, signed URL); uçların oturuma bağlanması + dashboard UI **sonraki atom**; deploy YOK, $0.00 |
 | 14 Ağu | **R-1c-a zorunlu oturum + tenant izolasyonu temeli** | `16d449c` | ✅ **push edildi**, yeni `webapp/kimlik.py`; ⚠ **parola sözleşmesi FAIL-CLOSED**: yalnız **Argon2id/bcrypt**, güçlü algoritma yoksa hesap açma/giriş **başlamaz** → stabil kod **`KIMLIK-KDF-YOK`**, **zayıf fallback YOK** (ilk taslaktaki scrypt→PBKDF2 zinciri kullanıcı kararıyla **geri alındı**); bağımlılık repo yönetiminde **sabit** (`argon2-cffi==23.1.0`, her iki Dockerfile), Argon2id 64 MiB/3 tur/4 paralellik; ⚠ **geçiş ayrı ve açık yol** — eski `scrypt`/`pbkdf2` yalnız `eski_hash_dogrula()` ile doğrulanır ve `yeniden_hashle` ister, normal doğrulama bu biçimleri **geçirmez**; oturum **HMAC** mühürlü (**önce imza, sonra süre** — bilgi sızmaz), çerez **HttpOnly+SameSite+Secure**, **CSRF double-submit** sabit zamanlı, giriş **5/300sn IP başına** kayan pencere (kalıcı kilit yok); tenant izolasyonu: **kimlik yoksa erişim yok**, başka tenant → `BASKA-TENANT`, ⚠ **sahipsiz kayıt "herkese açık" sayılmıyor** → `KAYNAK-SAHIPSIZ`; provisioning **yalnız env/stdin**, parola **koda/commit'e/argümana yazılmadı**, dönen kayıtta düz metin **yok**, her hesaba ayrı `tenant_id`; ⚠ **gerçek hesap OLUŞTURULMADI**; 33 red-first güvenlik/sızıntı kontrolü; uçların oturuma bağlanması ve son-3-video yaşam döngüsü **R-1c-b**; deploy YOK, $0.00 |
 | 14 Ağu | **R-1b tenant provider zinciri (adapter→motor→timeline)** | `4fb1d3a` | ✅ **push edildi**, **gerçek OAuth YOK / kredi TÜKETİLMEDİ** — test-double + ücretsiz stok fallback; yeni `medya/saglayici_motoru.py`: planlayıcı(`shot_istegi`: semantik sorgu+negatifler+oran+süre+kalite hedefi) → **provider registry** (tenant izolasyonlu) → **job-scope token** → **MCP capability discovery** → edinim → ölçüm → **provenance** → **timeline**; dış dünyanın tamamı **enjekte** (modül ağa çıkmaz/medya açmaz, testli); ⚠ **uydurma yok**: stok arama yoksa üretim, o da yoksa dönüşüm, hiçbiri yoksa **ücretsiz stok**, her durumda **`provider_used`+`fallback_reason`** görünür; ⚠ **şifreleme uydurulmadı** — `cryptography` sunucuda **yok**, gerçek çözücü verilmezse token **kullanılmaz** ve **düz metin token kabul edilmez** (R-1c ön koşulu); **tenant tokeni istemciye çıkmıyor** (`baglanti_ozeti` token vermez); başka tenant bağlantısı **asla** seçilmiyor; kullanıcı açıkça Magnific dediyse **sessiz geçiş yok**; provenance auto modda **`model_unknown/auto`** yazıyor; timeline **semantik→gerçek video→piksel→bitrate** ile sıralıyor, **negatif ihlali eleniyor**, **aynı kaynak ≤8 sn**, **kaynak sesi sıfır**; 26 red-first entegrasyon kontrolü; Mac'te medya **üretilmedi**; deploy YOK, $0.00 |
 | 14 Ağu | **R-1a sunucu kapasite ölçümü + imzalı çıktı URL** | `4846264` | ✅ **push edildi**, teslim odağı: sunucu **salt-okunur** denetlendi — ⚠ canlı IP CLAUDE.md'deki değil **185.23.17.240**; konteynerde **bellek/CPU limiti YOK**, `RENDER_MOTOR=ffmpeg`, `EDITOR_V2` **kapalı**, `PEXELS_KEY` boş; **kapasite ölçüldü: 60 sn 1080p30 CRF18 render = 18 sn, tepe RSS 968 MB** → 55–65 sn 1080p **blokaj değil** (önceki bellek endişem yanlıştı); yeni `webapp/imzali_url.py`: `/ciktilar/` ucu **imzasızdı** (dosya adını bilen herkes indirebiliyordu) → **HMAC-SHA256 + sabit zamanlı karşılaştırma + zorunlu TTL**, anahtar env→`veri/.imza_anahtari` (**0600**)→üretilir, **repoda değil/loglanmıyor**, kurulamazsa uç **503** (sessizce korumasız çalışmaz), path traversal kesildi; iş sözleşmesi imzalı `video_url`+`manifest_url` üretiyor, **imzalayıcı yoksa eski davranış korunuyor**; ⚠ imzasız istek artık **403** (404 değil — varlık sızdırılmaz), `test_faz_h` bu gerekçeyle güncellendi; 16 red-first kontrol; Mac'te medya **üretilmedi**; deploy YOK, $0.00 |
@@ -5682,6 +5683,67 @@ POST-QA **PASS**, kenar 0/101, LUFS −14.27. I-39 render'ıyla **11 karenin
 2. **Önizlemede altyazı hiç çizilmiyor** (I-40'ta ölçüldü).
 3. **Medya seçiminde semantik doğrulama yok** (b001/b002/b005) — ayrı ve
    daha büyük atom; I-34/I-35'te iki seçenek ölçülüp elendi.
+
+---
+
+## 88. FAZ R-1c-b — TENANT BAŞINA SON 3 KABUL EDİLMİŞ VİDEO (14 Ağu)
+
+> **Durum: kütüphane yaşam döngüsü + listeleme sözleşmesi kuruldu.
+> **Saf metadata** — Mac'te medya üretilmedi/saklanmadı, modül dosya
+> **silmiyor**. A–I yeşil (**3938**, 0 hata, 2 bilinen BLOKE).
+> Deploy YOK. $0.00.**
+> Değişen: **yeni** `webapp/kutuphane.py`, `webapp/testler/test_faz_i.py`
+> (§40t, 26 kontrol).
+
+### Kabul kapısı — belirsizse girmez
+
+Kütüphaneye **yalnızca** başarılı **ve** QA'dan kabul edilmiş final video
+girer:
+
+| Durum | Sonuç |
+|---|---|
+| `bitti` + QA **PASS** | ✅ girer |
+| `bitti` + QA **WARN** | ✅ girer (uyarı teslim edilebilirliği bozmaz) |
+| QA **FAIL** | ⛔ girmez |
+| QA **ölçülmemiş** | ⛔ girmez — *"muhtemelen iyidir" denmez* |
+| `hata` / `uretiliyor` | ⛔ girmez |
+| video dosyası yok | ⛔ girmez |
+
+### Retention — güvenli yaşam döngüsü
+
+Tenant başına **en fazla 3**. 4. kabul edilince **en eski** kayıt
+**silme kuyruğuna** alınır (`sebep: TAVAN-ASILDI`) ve kütüphaneden düşer.
+
+⚠ **Modül dosya SİLMEZ** — yalnızca kuyruk döndürür; gerçek silme
+**remote lifecycle işinin** işidir. Sıralama **en yeni önce**; geç gelen
+eski tarihli kayıt en yeniyi **düşürmez**; aynı iş iki kez eklenince
+**çoğalmaz** (idempotan).
+
+### Tenant izolasyonu — iki savunma hattı
+
+1. Listeleme yalnız **o tenant'ın** kayıtlarını döndürür
+2. ⚠ İkinci hat: kaydın `tenant_id`'si isteyenle **eşleşmiyorsa** eleniyor
+   (veri yanlış yazılmış olsa bile sızmaz)
+
+Tenant kimliği yoksa listeleme **reddediliyor**.
+
+### Signed URL — talep anında, saklanmadan
+
+Kayıtta `video_url` **yok** (`signed_url_saklanir: False`). `listele()`
+sırasında **talep anında** üretiliyor ve **tenant korumalı**. İmzalayıcı
+yoksa **sessiz boş link yok** — `imzalanamadi: True` açıkça işaretleniyor.
+
+### Metadata
+
+`qa(durum/fail/warn/puan)` · `provenance(provider_used, fallback_reason,
+model, kredi_tuketildi, lisanslar, kaynaklar)` · `kabul_zamani` ·
+`sure_sn`. ⚠ **Eksik alan uydurulmuyor** — bilinmiyorsa `None`.
+Fallback nedeni de taşınıyor (görünür kalıyor).
+
+### Kalan
+
+Uçların (`/api/generate`, `/api/job`, `/ciktilar`) oturuma **bağlanması**
+ve dashboard UI hâlâ **yapılmadı** — sonraki atom.
 
 ---
 

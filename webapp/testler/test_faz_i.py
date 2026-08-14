@@ -8401,6 +8401,135 @@ kontrol("R-1c-a GERILEME YOK: 22 alan + K/R kapilari DURUYOR",
         and "KALITE-BASLIK-SURESI" in _qon.FAIL_KODLARI)
 
 
+blok("§40t R-1c-b — TENANT BASINA SON 3 KABUL EDILMIS VIDEO")
+
+# ⚠ MEDYASIZ: dosya URETILMEZ/SILINMEZ, yalniz METADATA yasam dongusu.
+
+_KT = __import__("kutuphane")
+
+
+def _kt_is(qa="PASS", durum="bitti", video="ciktilar/x.mp4"):
+    return {"durum": durum, "video": video,
+            "qa": {"durum": qa, "fail": 0, "warn": 1, "puan": 100},
+            "provenance": {"provider_used": "magnific",
+                           "fallback_reason": "STOK-ARAMA-YETENEGI-YOK",
+                           "model": "model_unknown/auto",
+                           "kredi_tuketildi": True,
+                           "lisanslar": ["cc-by"], "kaynaklar": ["u1"]}}
+
+
+def _kt_kayit(t, n, zaman):
+    return _KT.kayit_kur(is_id=f"j{n}", tenant_id=t, dosya=f"v{n}.mp4",
+                         kayit=_kt_is(), kabul_zamani=zaman)
+
+
+# ── (1) KABUL KAPISI: yalnizca BASARILI + QA KABUL ──
+kontrol("⭐ R-1c-b: basarili + QA PASS is kutuphaneye GIRER",
+        _KT.kabul_edilebilir_mi(_kt_is())["kabul"] is True)
+kontrol("⭐ R-1c-b: QA WARN da KABUL (uyari teslim edilebilirligi bozmaz)",
+        _KT.kabul_edilebilir_mi(_kt_is(qa="WARN"))["kabul"] is True)
+kontrol("⭐ R-1c-b RED-FIRST: QA FAIL olan cikti GIRMEZ",
+        _KT.kabul_edilebilir_mi(_kt_is(qa="FAIL"))["kabul"] is False)
+kontrol("⭐ R-1c-b RED-FIRST: QA OLCULMEMIS cikti GIRMEZ "
+        "('muhtemelen iyidir' DENMEZ)",
+        _KT.kabul_edilebilir_mi(_kt_is(qa=""))["kabul"] is False
+        and "QA:" in _KT.kabul_edilebilir_mi(_kt_is(qa=""))["neden"])
+kontrol("⭐ R-1c-b RED-FIRST: BASARISIZ / yarim is GIRMEZ",
+        _KT.kabul_edilebilir_mi(_kt_is(durum="hata"))["kabul"] is False
+        and _KT.kabul_edilebilir_mi(_kt_is(durum="uretiliyor"))["kabul"]
+        is False)
+kontrol("⭐ R-1c-b RED-FIRST: VIDEOSU olmayan is GIRMEZ",
+        _KT.kabul_edilebilir_mi(_kt_is(video=""))["kabul"] is False)
+
+# ── (2) RETENTION: son 3, 4. gelince EN ESKI KUYRUGA ──
+_KTB: dict = {}
+_KT_SIL = []
+for _i in range(1, 4):
+    _r = _KT.ekle(_KTB, _kt_kayit("t1", _i, 100.0 + _i))
+    _KT_SIL += _r["silinecek"]
+kontrol("⭐ R-1c-b: uc kabul sonrasi kutuphanede 3 kayit, silme kuyrugu BOS",
+        len(_KTB["t1"]) == 3 and _KT_SIL == [], _KT_SIL)
+_R4 = _KT.ekle(_KTB, _kt_kayit("t1", 4, 104.0))
+kontrol("⭐ R-1c-b BELIRLEYICI: 4. kabul edilince EN ESKI kayit SILME "
+        "KUYRUGUNA aliniyor ve kutuphane 3'te kaliyor",
+        len(_KTB["t1"]) == 3 and len(_R4["silinecek"]) == 1
+        and _R4["silinecek"][0]["is_id"] == "j1"
+        and _R4["silinecek"][0]["sebep"] == "TAVAN-ASILDI",
+        _R4["silinecek"])
+kontrol("⭐ R-1c-b: modul DOSYA SILMIYOR — yalniz kuyruk donuyor "
+        "(gercek silme remote lifecycle isi)",
+        _KT.kapsam_ozeti()["dosya_siler"] is False
+        and "kuyruga alinir" in _KT.kapsam_ozeti()["silme"])
+kontrol("⭐ R-1c-b: siralama EN YENI once (kabul zamanina gore)",
+        [x["is_id"] for x in _KTB["t1"]] == ["j4", "j3", "j2"],
+        [x["is_id"] for x in _KTB["t1"]])
+kontrol("⭐ R-1c-b: GEC gelen ESKI tarihli kayit en yeniyi DUSURMUYOR",
+        [x["is_id"] for x in _KT.ekle(
+            dict(_KTB), _kt_kayit("t1", 9, 1.0))["kutuphane"]]
+        == ["j4", "j3", "j2"])
+kontrol("⭐ R-1c-b: AYNI is iki kez eklenince COGALMIYOR (idempotan)",
+        len(_KT.ekle(dict(_KTB), _kt_kayit("t1", 4, 104.0))["kutuphane"])
+        == 3)
+
+# ── (3) TENANT SIZINTISI ──
+_KT.ekle(_KTB, _kt_kayit("t2", 7, 200.0))
+kontrol("⭐ R-1c-b BELIRLEYICI: bir tenant DIGERININ videolarini GORMUYOR",
+        [v["is_id"] for v in _KT.listele(_KTB, "t2")["videolar"]] == ["j7"]
+        and "j7" not in [v["is_id"]
+                         for v in _KT.listele(_KTB, "t1")["videolar"]])
+kontrol("⭐ R-1c-b: TENANT KIMLIGI YOKSA listeleme REDDEDILIYOR",
+        _KT.listele(_KTB, "")["ok"] is False
+        and _KT.listele(_KTB, "")["videolar"] == [])
+kontrol("⭐ R-1c-b: kaydin sahibi baska tenant ise IKINCI SAVUNMA eliyor",
+        _KT.listele({"t1": [_kt_kayit("t2", 8, 1.0)]}, "t1")["videolar"]
+        == [])
+kontrol("⭐ R-1c-b: tenant'i olmayan kayit EKLENMIYOR",
+        _KT.ekle({}, _kt_kayit("", 1, 1.0))["neden"] == "TENANT-YOK")
+
+# ── (4) SIGNED URL: TALEP ANINDA, SAKLANMADAN ──
+kontrol("⭐ R-1c-b: signed URL kayitta SAKLANMIYOR",
+        "video_url" not in _kt_kayit("t1", 1, 1.0)
+        and _KT.kapsam_ozeti()["signed_url_saklanir"] is False)
+_KT_L = _KT.listele(_KTB, "t1", imzalayici=_IU.imzala)
+kontrol("⭐ R-1c-b: listeleme signed URL'i TALEP ANINDA uretiyor",
+        all("sig=" in (v["video_url"] or "") for v in _KT_L["videolar"])
+        and all(v["imzalanamadi"] is False for v in _KT_L["videolar"]))
+kontrol("⭐ R-1c-b: imzalayici YOKSA sessiz bos link YOK — `imzalanamadi` "
+        "ACIKCA isaretleniyor",
+        all(v["video_url"] is None and v["imzalanamadi"] is True
+            for v in _KT.listele(_KTB, "t1")["videolar"]))
+
+# ── (5) METADATA SOZLESMESI ──
+_KT_V = _KT_L["videolar"][0]
+kontrol("⭐ R-1c-b: kayit QA + provenance + provider + model + credit + "
+        "zaman damgasi tasiyor",
+        _KT_V["qa"]["durum"] == "PASS"
+        and _KT_V["provenance"]["provider_used"] == "magnific"
+        and _KT_V["provenance"]["model"] == "model_unknown/auto"
+        and _KT_V["provenance"]["kredi_tuketildi"] is True
+        and _KT_V["kabul_zamani"] is not None, _KT_V["provenance"])
+kontrol("⭐ R-1c-b: fallback nedeni de tasiniyor (gorunur kalir)",
+        _KT_V["provenance"]["fallback_reason"] == "STOK-ARAMA-YETENEGI-YOK")
+kontrol("⭐ R-1c-b: EKSIK alan UYDURULMUYOR (bilinmiyorsa None)",
+        _KT.kayit_kur(is_id="j", tenant_id="t", dosya="d.mp4", kayit={},
+                      kabul_zamani=1.0)["provenance"]["model"] is None)
+kontrol("⭐ R-1c-b: listeleme sozlesmesi tavani da bildiriyor",
+        _KT_L["tavan"] == 3 and _KT_L["sayi"] == 3)
+
+# ── (6) SINIRLAR ──
+kontrol("⭐ R-1c-b: modul MEDYA ACMIYOR / AGA CIKMIYOR / DOSYA SILMIYOR",
+        not any(a in _kod_yalniz(oku(KOK, "kutuphane.py"))
+                for a in ("open(", "os.remove", "requests", "subprocess",
+                          "ffmpeg")))
+kontrol("R-1c-b: kutuphane.py derleniyor",
+        _derlenir(os.path.join(KOK, "kutuphane.py")))
+kontrol("R-1c-b GERILEME YOK: 22 alan + kimlik/imza kapilari DURUYOR",
+        len(set(re.findall(r"\{ad: '(\w+)'",
+                           oku(KOK, "static/js/api.js")))) == 22
+        and _KM.kapsam_ozeti()["fail_closed"] is True
+        and _IU.kapsam_ozeti()["ttl_zorunlu"] is True)
+
+
 blok("§40h I-58 — IKI ADAY DUZENI KARSI-OLGU OLARAK OLCULDU (yalniz tanisal)")
 
 # ⚠ YALNIZ TANISAL. Uretim davranisi DEGISMEDI, kapi/esik eklenmedi.
