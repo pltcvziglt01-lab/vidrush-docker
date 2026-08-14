@@ -8656,9 +8656,12 @@ def _ts_tam(**ek):
          "video": "ciktilar/j1.mp4", "sure": 60.0, "durum": "bitti",
          # ⚠ R-1d-b: PRE-QA kaniti artik HUKUM + GERCEK OLCUM ister
          # (sifir cekimli plan uzerindeki hukum KANIT SAYILMAZ).
+         # ⚠ R-1d-b: sema GERCEK `edit_kopru.plan_kur` ozetidir — `olcumler`
+         # anahtari YOKTUR, olcumler UST SEVIYEDE durur.
          "edit_plani": {"ok": True, "sahne": 8,
-                        "qa": {"durum": "PASS",
-                               "olcumler": {"kapsam": {"cekim": 8}}}},
+                        "qa": {"durum": "PASS", "fail": 0, "warn": 1,
+                               "medya_turu": {"olculdu": True},
+                               "broll_cesitliligi": {"olculdu": True}}},
          "qa": {"durum": "PASS", "fail": 0, "warn": 0}}
     k.update(ek)
     return k
@@ -8685,12 +8688,13 @@ kontrol("⭐ R-1d-a BELIRLEYICI: depolama OLCULMEDIYSE 'vardir' SAYILMIYOR "
              if h["asama"] == "depolama"][0]["neden"] == "DEPOLAMA-OLCULMEDI")
 kontrol("⭐ R-1d-a: PRE-QA WARN teslimi ENGELLEMIYOR, FAIL ENGELLIYOR",
         _TS.zincir_raporu(_ts_tam(edit_plani={
-            "sahne": 8, "qa": {"durum": "WARN", "olcumler": {"kapsam": {}}}}),
+            "sahne": 8, "qa": {"durum": "WARN",
+                               "medya_turu": {"olculdu": True}}}),
             dosya_var=True)["tam"] is True
         and "pre_qa" in _TS.zincir_raporu(
             _ts_tam(edit_plani={"sahne": 8,
                                 "qa": {"durum": "FAIL",
-                                       "olcumler": {"kapsam": {}}}}),
+                                       "medya_turu": {"olculdu": True}}}),
             dosya_var=True)["eksik"])
 
 # ⚠ FAZ R-1d-b — ICI BOS PRE-QA HUKMU (staging'de OLCULEN kusur).
@@ -8710,18 +8714,27 @@ kontrol("⭐ R-1d-b: reddin NEDENI 'PRE-QA-BOS' olarak ACIKCA yaziliyor "
                                 "qa": {"durum": "WARN", "olcumler": {}}}),
             dosya_var=True)["halkalar"]
          if h["asama"] == "pre_qa"][0].startswith("PRE-QA-BOS:"))
-kontrol("⭐ R-1d-b RED-FIRST: sahne VAR ama OLCUM BOS ise de gecmiyor",
+kontrol("⭐ R-1d-b RED-FIRST: sahne VAR ama OLCUM YOKSA da gecmiyor",
         "pre_qa" in _TS.zincir_raporu(
-            _ts_tam(edit_plani={"sahne": 8,
-                                "qa": {"durum": "PASS", "olcumler": {}}}),
+            _ts_tam(edit_plani={"sahne": 8, "qa": {"durum": "PASS"}}),
             dosya_var=True)["eksik"])
-kontrol("⭐ R-1d-b: sahne VAR ve OLCUM VAR ise halka GECIYOR "
-        "(kapi asiri sikilastirilmadi)",
+kontrol("⭐ R-1d-b BELIRLEYICI: olcum GERCEK sema ile (`olcumler` DEGIL, "
+        "ust seviye `medya_turu`) taninıyor — dolu PRE-QA 'bos' sayilmiyor",
+        _TS.zincir_raporu(
+            _ts_tam(edit_plani={"sahne": 10,
+                                "qa": {"durum": "PASS", "fail": 0, "warn": 1,
+                                       "medya_turu": {"olculdu": True},
+                                       "broll_cesitliligi": {"olculdu": True}}}),
+            dosya_var=True)["tam"] is True)
+kontrol("⭐ R-1d-b: dogrudan `qa_on` ciktisi (`olcumler` dolu) da KABUL",
         _TS.zincir_raporu(
             _ts_tam(edit_plani={"sahne": 8,
                                 "qa": {"durum": "PASS",
                                        "olcumler": {"kapsam": {"cekim": 8}}}}),
             dosya_var=True)["tam"] is True)
+kontrol("⭐ R-1d-b: anlatim metni props sinirinda TASINIYOR "
+        "(bos metin -> beat plani kurulamiyor -> sifir cekim)",
+        '"anlatim": metin,' in oku(KOK, "pipeline.py"))
 kontrol("⭐ R-1d-b: sahne kimligi props sinirinda TASINIYOR "
         "(cumle <-> manifest bagi kopmasin)",
         '"scene_id": str(s.get("scene_id") or f"s{n:03d}")'

@@ -8989,3 +8989,27 @@ kapsamalı **VE** PRE-QA gerçekten ölçüm yazmış olmalı. Aksi halde
 durum artık **reddediliyor**. Red-first ölçüldü: `teslim.py` sıkılaştırması
 geri alınınca 3 kontrol kırmızı; `pipeline.py` `scene_id` geri alınınca 1
 kontrol kırmızı.
+
+### R-1d-b PİLOT 2 — `sahne=0`'ın GERÇEK kök nedeni (sunucuda ölçüldü)
+
+`scene_id` düzeltmesi **yetmedi**: ikinci pilotta plan yine `sahne=0` verdi.
+Sunucuda `edit_kopru.plan_kur`'u **doğrudan** çağıran bir tanı koşuldu
+(salt-okuma, medya yok) ve fark net çıktı:
+
+| girdi | sonuç |
+|---|---|
+| tanıdaki cümleler (metin **DOLU**) | **10 çekim**, `medya_turu`/`broll` **ölçüldü**, QA=FAIL (`FACT-BAGLANTI-YOK`×4, `SAGLAYICI-TEKEL`) |
+| üretimdeki cümleler (metin **BOŞ**) | **0 çekim**, tüm ölçümler boş, QA vakumda WARN |
+
+**Kök neden:** `plan_kur(cumleler=...)` her cümlenin metnini
+`x.get("anlatim")`'dan okuyor ama **`props_sahneler` bu alanı hiç
+taşımıyordu** → her cümle boş metinle gidiyor → beat planı kurulamıyor →
+sıfır çekim. **Düzeltme:** props'a `"anlatim": metin` (aynı döngüdeki
+mevcut değişken). Video.tsx bu alanı okumaz.
+
+**İkinci şema hatası (kendi kodumda):** sıkılaştırmayı yazarken ölçümü
+`edit_plani.qa["olcumler"]` altında aramıştım. Oysa `edit_kopru.plan_kur`
+QA'yı **özetliyor**: dönen sözlükte `olcumler` **anahtarı yok**, ölçümler
+özetin **üst seviyesinde** (`medya_turu`, `broll_cesitliligi`). Yani DOLU
+bir PRE-QA bile "boş" görünüyordu. Kontrol gerçek şemaya göre düzeltildi
+(doğrudan `qa_on` çıktısı gelirse `olcumler` de sayılır).

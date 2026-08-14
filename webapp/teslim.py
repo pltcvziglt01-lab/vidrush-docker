@@ -228,17 +228,27 @@ def zincir_raporu(kayit: dict, *, tenant_id: str = "",
     # Bu, "kanitsiz halka gecmez" sozlesmesinin ihlaliydi.
     # ⚠ Artik hukum YETMEZ, OLCULMUS OLMAK da sart: plan en az 1 cekim
     # kapsamali VE PRE-QA gercekten olcum yazmis olmali.
+    # ⚠ OLCUM NEREDE: `edit_kopru.plan_kur` QA'yi OZETLIYOR — donen sozlukte
+    # `olcumler` ANAHTARI YOKTUR; olcumler ozetin UST SEVIYESINDE durur
+    # (`medya_turu`, `broll_cesitliligi`). Ilk yazimda `olcumler` aranmisti
+    # ve DOLU bir PRE-QA bile "bos" gorunuyordu (sunucuda dogrulandi).
+    # Yine de `olcumler` verilirse (dogrudan `qa_on` ciktisi) o da sayilir.
     try:
         on_sahne = int(plan.get("sahne") or 0)
     except (TypeError, ValueError):
         on_sahne = 0
-    on_olcum = (plan_qa.get("olcumler") if isinstance(plan_qa, dict) else None)
-    on_olculdu = bool(on_sahne >= 1 and isinstance(on_olcum, dict) and on_olcum)
+    _pq = plan_qa if isinstance(plan_qa, dict) else {}
+    on_olcumler = [a for a in ("medya_turu", "broll_cesitliligi")
+                   if isinstance(_pq.get(a), dict)]
+    if isinstance(_pq.get("olcumler"), dict) and _pq["olcumler"]:
+        on_olcumler.append("olcumler")
+    on_olculdu = bool(on_sahne >= 1 and on_olcumler)
     on_neden = ""
     if on_durum not in QA_KABUL:
         on_neden = f"PRE-QA:{on_durum or 'olculmedi'}"
     elif not on_olculdu:
-        on_neden = f"PRE-QA-BOS:sahne={on_sahne},olcum={len(on_olcum or {})}"
+        on_neden = (f"PRE-QA-BOS:sahne={on_sahne},"
+                    f"olcum={len(on_olcumler)}")
     son_durum = _qa_durum(k.get("qa"))
     sahne = k.get("sahne_sayisi")
     try:
@@ -269,7 +279,7 @@ def zincir_raporu(kayit: dict, *, tenant_id: str = "",
          "neden": "" if (_s(k.get("video")) and sure > 0) else "RENDER-KANITI-YOK"},
         {"asama": "pre_qa", "tamam": not on_neden,
          "kanit": {"durum": on_durum or None, "sahne": on_sahne,
-                   "olcum_sayisi": len(on_olcum or {})},
+                   "olcumler": on_olcumler},
          "neden": on_neden},
         {"asama": "post_qa", "tamam": son_durum in QA_KABUL,
          "kanit": {"durum": son_durum or None},

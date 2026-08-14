@@ -4517,6 +4517,14 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             # ⚠ Video.tsx bu alani OKUMAZ; bilinmeyen props anahtari cizimi
             # etkilemez (22 alan sozlesmesi de DEGISMEDI).
             "scene_id": str(s.get("scene_id") or f"s{n:03d}"),
+            # ⚠ FAZ R-1d-b: ANLATIM METNI. `edit_kopru.plan_kur(cumleler=...)`
+            # her cumlenin metnini `x.get("anlatim")`dan okuyor ama
+            # `props_sahneler` bu alani HIC TASIMIYORDU -> her cumle BOS
+            # metinle gidiyor, beat plani kurulamiyor ve plan SIFIR cekimle
+            # donuyordu (olculdu: `sahne=0`, PRE-QA vakumda hukum veriyor).
+            # ⚠ Sunucuda dogrulandi: ayni cagri DOLU metinle 10 cekim ve
+            # GERCEK olcumler uretiyor. Video.tsx bu alani OKUMAZ.
+            "anlatim": metin,
             "tur": tur, "medya": medya, "ses": syol, "sure": round(sure, 3),
             **({"zoom": "yok", "pan": "yok"} if not zoom_acik else
                (lambda k: (_son_kurgu.update(k), {"zoom": k["zoom"], "pan": k["pan"]})[1])(
