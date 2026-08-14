@@ -14295,9 +14295,11 @@ _SIYAH_ERR = ("[blackdetect @ 0x1] black_start:34.542 black_end:40.458 "
 _DONMUS_ERR = "[freezedetect @ 0x1] lavfi.freezedetect.freeze_start: 34.542\n"
 
 
-def _kos(siyah="", donmus=""):
+def _kos(siyah="", donmus="", rc=0):
+    """⚠ Kosucu sozlesmesi (rc, stderr) — yalniz stderr donmek `rc != 0`
+    durumunda olcumu "TEMIZ" gosteriyordu (bagimsiz denetim bulgusu)."""
     def _c(komut):
-        return siyah if "blackdetect" in " ".join(komut) else donmus
+        return (rc, siyah if "blackdetect" in " ".join(komut) else donmus)
     return _c
 
 
@@ -14323,6 +14325,60 @@ kontrol("⭐ R-1d-h RED-FIRST: kosucu PATLARSA stabil kod",
                 )["kod"] == "KATMAN-OLCULEMEDI")
 
 # ── ILK BOZULAN KATMAN (uretim sirasi: kaynak -> segment -> birlesik -> final)
+# ── RUNNER SOZLESMESI: rc ATILAMAZ (bagimsiz denetim bulgusu) ──
+# ⚠ Eski sozlesme YALNIZ stderr donduruyordu. Dosya YOK / decoder hatasi /
+# rc != 0 durumunda blackdetect eslesmesi CIKMAZ ve olcum "olculdu=True,
+# TEMIZ" sayilirdi -> BOZUK CIKTI TESLIM KAPISINDAN GECERDI.
+kontrol("⭐ R-1d-h BELIRLEYICI RED-FIRST: `rc != 0` ise olcum TEMIZ "
+        "SAYILMIYOR (KATMAN-OLCULEMEDI, temiz_mi False)",
+        _KO.olc("/x.mp4", kosucu=_kos(rc=1))["olculdu"] is False
+        and _KO.olc("/x.mp4", kosucu=_kos(rc=1))["kod"] == "KATMAN-OLCULEMEDI"
+        and _KO.temiz_mi(_KO.olc("/x.mp4", kosucu=_kos(rc=1))) is False)
+kontrol("⭐ R-1d-h: IKI komuttan YALNIZ BIRI basarisiz olsa da OLCULEMEDI",
+        _KO.olc("/x.mp4", kosucu=lambda k: (
+            (0, "") if "blackdetect" in " ".join(k) else (1, "bozuk")
+        ))["kod"] == "KATMAN-OLCULEMEDI")
+kontrol("⭐ R-1d-h RED-FIRST: SADECE METIN donen ESKI bicim KABUL EDILMIYOR "
+        "(donus kodu bilinmeden 'olculdu' DENMEZ)",
+        _KO.olc("/x.mp4", kosucu=lambda k: "")["kod"] == "KATMAN-OLCULEMEDI"
+        and _KO.olc("/x.mp4", kosucu=lambda k: "")["neden"] == "DONUS-KODU-YOK")
+kontrol("⭐ R-1d-h: `subprocess.CompletedProcess` bicimi de kabul ediliyor",
+        _KO.olc("/x.mp4", kosucu=lambda k: subprocess.CompletedProcess(
+            k, 0, "", ""))["olculdu"] is True)
+kontrol("⭐ R-1d-h: TIMEOUT/baslatma hatasi AYNI stabil kodla fail-closed",
+        _KO.olc("/x.mp4", kosucu=lambda k: (_ for _ in ()).throw(
+            subprocess.TimeoutExpired(k, 1)))["kod"] == "KATMAN-OLCULEMEDI")
+
+# ⚠ GERCEK DAVRANIS TESTI — EKSIK DOSYA. ffmpeg gercekten calisir ama
+# hicbir MEDYA/KARE URETMEZ (girdi yok, cikti `-f null`); Mac'te artefakt
+# OLUSMAZ.
+import shutil as _sh  # noqa: E402
+if not _sh.which("ffmpeg"):
+    bloke_yaz("R-1d-h eksik dosya gercek testi", "ffmpeg kurulu degil")
+else:
+    def _gercek_kos(komut):
+        _r = subprocess.run(komut, capture_output=True, text=True, timeout=60)
+        return _r.returncode, (_r.stderr or "")
+
+    _YOK = os.path.join(tempfile.mkdtemp(prefix="yok_"), "olmayan.mp4")
+    _O_YOK = _KO.olc(_YOK, kosucu=_gercek_kos)
+    kontrol("⭐ R-1d-h BELIRLEYICI (gercek ffmpeg): OLMAYAN dosya TEMIZ "
+            "SAYILMIYOR — KATMAN-OLCULEMEDI ve teslim REDDI",
+            _O_YOK["olculdu"] is False
+            and _O_YOK["kod"] == "KATMAN-OLCULEMEDI"
+            and _KO.temiz_mi(_O_YOK) is False, _O_YOK.get("neden"))
+    kontrol("⭐ R-1d-h (gercek ffmpeg): olculemeyen katman `atif`ta da "
+            "TEMIZ sayilmiyor",
+            _KO.ilk_bozulan_katman({"final": _O_YOK})["bozuk"] is False
+            and _KO.atif({"final": _O_YOK})["final_bozuk"] is False)
+
+kontrol("⭐ R-1d-h: uretim kosucusu rc TASIYOR (stderr'i tek basina "
+        "DONDURMUYOR)",
+        "return r.returncode, (r.stderr or \"\")" in oku(KOK, "hizli_render.py")
+        and "kosucu=_ffmpeg_kos" in oku(KOK, "hizli_render.py"))
+kontrol("⭐ R-1d-h: uretim kosucusunda timeout/baslatma hatasi rc=1 doner",
+        "return 1, f\"{type(e).__name__}" in oku(KOK, "hizli_render.py"))
+
 kontrol("⭐ R-1d-h BELIRLEYICI: bozukluk KAYNAK klipte basliyorsa suc "
         "`kaynak`a yazilir (xfade'e DEGIL)",
         _KO.ilk_bozulan_katman({

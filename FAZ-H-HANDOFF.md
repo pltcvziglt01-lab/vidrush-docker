@@ -9842,3 +9842,24 @@ Sahte ffmpeg stderr enjekte edilerek **gerçek fonksiyonlar** çağrılıyor:
 * ölçülemeyen **temiz sayılmıyor**.
 
 Modül kaldırılınca: **`ModuleNotFoundError: No module named 'katman_olcum'`**.
+
+### R-1d-h (devam) — BAĞIMSIZ DENETİM: `returncode` ATILIYORDU
+
+⚠ Denetim haklıydı: `_ffmpeg_stderr` **yalnız stderr** döndürüyordu.
+Dosya yok / decoder hatası / `rc != 0` durumunda `blackdetect` eşleşmesi
+**çıkmaz** → `olc()` bunu **`olculdu=True` ve TEMİZ** sayardı → **bozuk
+çıktı teslim kapısından GEÇERDİ**. Yani kapı fail-closed **değildi**.
+
+**Düzeltme — koşucu sözleşmesi `(rc, stderr)`:**
+* iki komuttan **herhangi biri** `rc != 0` → **`KATMAN-OLCULEMEDI`**,
+  `olculdu=False` → `temiz_mi=False` → **teslim reddi**;
+* **sadece metin** dönen eski biçim **kabul edilmiyor**
+  (`DONUS-KODU-YOK`) — dönüş kodu bilinmeden "ölçüldü" **denmez**;
+* `subprocess.CompletedProcess` de kabul;
+* **timeout / başlatma hatası** aynı stabil kodla fail-closed
+  (üretim koşucusu `rc=1` döner).
+
+**Gerçek davranış testi (string değil):** olmayan bir dosya yolu ile
+**gerçek ffmpeg** çağrılıyor → `KATMAN-OLCULEMEDI`, `temiz_mi=False`.
+⚠ Bu test **hiçbir medya/kare üretmez** (girdi yok, çıktı `-f null`);
+Mac'te artefakt oluşmaz — doğrulandı.

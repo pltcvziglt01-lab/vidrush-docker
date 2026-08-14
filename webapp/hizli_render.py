@@ -1005,10 +1005,17 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
             print("  hizli motor: xfade basarisiz -> Remotion", file=sys.stderr)
             return False
 
-        def _ffmpeg_stderr(komut):
-            r = subprocess.run(komut, capture_output=True, text=True,
-                               timeout=300)
-            return r.stderr or ""
+        def _ffmpeg_kos(komut):
+            """⚠ (rc, stderr) DONER. Yalniz stderr dondurmek, `rc != 0`
+            (dosya yok / decoder hatasi) durumunda olcumu "TEMIZ" gosteriyor
+            ve bozuk cikti teslim kapisindan GECIYORDU. Timeout/baslatma
+            hatasi da acikca basarisiz donus kodu olur."""
+            try:
+                r = subprocess.run(komut, capture_output=True, text=True,
+                                   timeout=300)
+                return r.returncode, (r.stderr or "")
+            except Exception as e:                           # noqa: BLE001
+                return 1, f"{type(e).__name__}: {str(e)[:160]}"
 
         def _siyah_donmus_kapisi(yol):
             """FAZ R-1d-h — SIYAH/DONMUS KARE: ILK BOZULAN KATMANI KANITLA.
@@ -1023,21 +1030,21 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
             EDILMEZ (Remotion'a duser) — izleyicinin gordugu bir kusurla
             teslim yapilmaz.
             """
-            fin = katman_olcum.olc(yol, kosucu=_ffmpeg_stderr)
+            fin = katman_olcum.olc(yol, kosucu=_ffmpeg_kos)
             if katman_olcum.temiz_mi(fin):
                 return True
             # ⚠ Nihai bozuk -> SUCU DOGRU KATMANA yaz (tahmin YOK).
             katmanlar = {"final": fin}
             try:
                 katmanlar["segment"] = [
-                    katman_olcum.olc(y, kosucu=_ffmpeg_stderr)
+                    katman_olcum.olc(y, kosucu=_ffmpeg_kos)
                     for y in list(seg_yollar.values())[:8] if y]
                 if os.path.exists(birlesik):
                     katmanlar["birlesik"] = katman_olcum.olc(
-                        birlesik, kosucu=_ffmpeg_stderr)
+                        birlesik, kosucu=_ffmpeg_kos)
                 katmanlar["kaynak"] = [
                     katman_olcum.olc(os.path.join(PUBLIC, str(s0.get("medya"))),
-                                     kosucu=_ffmpeg_stderr)
+                                     kosucu=_ffmpeg_kos)
                     for s0 in sahneler[:8]
                     if str(s0.get("medya") or "").endswith(".mp4")]
             except Exception as e:                           # noqa: BLE001

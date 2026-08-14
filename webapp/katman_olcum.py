@@ -64,17 +64,48 @@ def _donmus_ayikla(stderr: str) -> list:
     return out
 
 
+def _rc_stderr(cevap) -> tuple:
+    """Kosucu cevabini (rc, stderr) olarak NORMALIZE et.
+
+    Kabul edilen bicimler: `(rc, stderr)` ikilisi ya da `returncode`/`stderr`
+    alanlari olan bir nesne (`subprocess.CompletedProcess`).
+    ⚠ SADECE metin donen eski bicim KABUL EDILMEZ: donus kodu bilinmeden
+    "olculdu" DENEMEZ (bagimsiz denetim bulgusu).
+    """
+    if isinstance(cevap, (tuple, list)) and len(cevap) == 2:
+        return int(cevap[0]), str(cevap[1] or "")
+    rc = getattr(cevap, "returncode", None)
+    if rc is not None:
+        return int(rc), str(getattr(cevap, "stderr", "") or "")
+    return None, ""
+
+
 def olc(yol, *, kosucu) -> dict:
     """Tek dosyanin siyah/donmus araliklari. ⚠ Olculemezse UYDURULMAZ.
 
-    `kosucu(komut) -> stderr` DISARIDAN verilir (bu modul surec ACMAZ).
+    `kosucu(komut) -> (rc, stderr)` DISARIDAN verilir (bu modul surec ACMAZ).
+
+    ⚠ OLCULEN KUSUR (bagimsiz denetim): eski sozlesme YALNIZ stderr
+    donduruyordu. Dosya YOK / decoder hatasi / `rc != 0` durumunda
+    `blackdetect` eslesmesi CIKMAZ ve olcum "olculdu=True, TEMIZ" sayilirdi
+    — yani bozuk cikti TESLIM KAPISINDAN GECERDI.
+    ⚠ Artik IKI komuttan HERHANGI BIRI `rc != 0` ise (ya da donus kodu
+    okunamiyorsa) hukum `KATMAN-OLCULEMEDI`, `olculdu=False` -> `temiz_mi`
+    False -> TESLIM REDDI. Timeout/baslatma hatasi da AYNI kodla dusar.
     """
     try:
-        s_err = kosucu(siyah_komutu(yol))
-        d_err = kosucu(donmus_komutu(yol))
+        s_rc, s_err = _rc_stderr(kosucu(siyah_komutu(yol)))
+        d_rc, d_err = _rc_stderr(kosucu(donmus_komutu(yol)))
     except Exception as e:                                   # noqa: BLE001
         return {"olculdu": False, "kod": KOD_OLCULEMEDI,
                 "neden": f"{type(e).__name__}", "yol": str(yol)}
+    if s_rc is None or d_rc is None:
+        return {"olculdu": False, "kod": KOD_OLCULEMEDI,
+                "neden": "DONUS-KODU-YOK", "yol": str(yol)}
+    if s_rc != 0 or d_rc != 0:
+        return {"olculdu": False, "kod": KOD_OLCULEMEDI,
+                "neden": f"FFMPEG-RC:{s_rc}/{d_rc}", "yol": str(yol),
+                "stderr": (s_err or d_err)[-200:]}
     return {"olculdu": True, "yol": str(yol),
             "siyah": _siyah_ayikla(s_err), "donmus": _donmus_ayikla(d_err)}
 
