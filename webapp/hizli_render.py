@@ -558,7 +558,19 @@ def _kadraj_vf(kod: int, indeks: int) -> str:
 # kullaniyordu; `gercek_qa` bunu "j_l_cut: 0 (YAPISAL)" diye raporluyordu.
 # Bu sabit, J/L secilen gecislerde ses capraz gecisini KISALTARAK siniri
 # ayirir. Kucuk tutulur: gozle fark edilir ama ritmi bozmaz.
-JL_OFFSET_SN = float(os.environ.get("JL_OFFSET_SN", "0.22"))
+# ⚠ FAZ Y-9 / Y9-JL-HARDCUT — HARD-CUT'TA DA J/L URETILIR.
+# OLCULEN KUSUR: belgesel profili `motion: "sinematik"` -> sahnelerde
+# `gecisImza` YOK -> gecis suresi `g = min(g, 2/fps)` ile 2 KAREYE
+# (0.067 sn) duser. Y-6'nin kosulu `g > JL_OFFSET_SN + 0.02` (0.24) idi ve
+# HICBIR hard-cut gecisinde saglanmadi: gercek iste `Y6-JL-URETIM: 0`.
+# ⚠ COZUM: goruntu 2 karede keserken SES capraz gecisi UZATILIR
+# (`ga = g + JL_OFFSET_SN`); ses siniri goruntu sinirindan AYRISIR —
+# J/L-cut tanimi tam olarak budur.
+# ⚠ BEDEL: `acrossfade` toplam ses suresini `d` kadar kisaltir; her J/L
+# ~offset kadar ses kaybi demektir. Bu yuzden offset KUCUK ve sayi
+# SINIRLI: 0.12 x 3 = 0.36 sn < `POST-OLU-FINAL` esigi 0.5 sn.
+JL_OFFSET_SN = float(os.environ.get("JL_OFFSET_SN", "0.12"))
+JL_MAKS = int(os.environ.get("JL_MAKS", "3"))
 # Uretilen gercek J/L-cut sayisi — `gercek_qa` OLCUM olarak okur.
 _JL_SON = {"sayi": 0, "offset_sn": JL_OFFSET_SN}
 
@@ -996,9 +1008,14 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
                           if sahne_dilimi and i < len(sahne_dilimi) else "")
                 _jl = ("j" if _islev in ("kanit", "vurgu")
                        else ("l" if _islev == "sonuc" else ""))
+                # ⚠ FAZ Y-9 / Y9-JL-HARDCUT: goruntu 2 karede keserken SES
+                # capraz gecisi UZATILIR -> sinir AYRISIR. Eski kosul
+                # (`g > JL_OFFSET_SN + 0.02`) hard-cut'ta hic saglanmiyordu.
+                # Sayi `JL_MAKS` ile sinirli: her J/L ~offset kadar ses
+                # kaybi demek ve toplam olu final esiginin altinda kalmali.
                 ga = g
-                if _jl and g > JL_OFFSET_SN + 0.02:
-                    ga = round(max(0.02, g - JL_OFFSET_SN), 3)
+                if _jl and jl_sayisi[0] < JL_MAKS:
+                    ga = round(g + JL_OFFSET_SN, 3)
                     jl_sayisi[0] += 1
                 filt.append(f"[{son_v}][{i}:v]xfade=transition={tur}:duration={g:.3f}:"
                             f"offset={offset:.3f}[{vo}]")
