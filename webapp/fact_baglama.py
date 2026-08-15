@@ -69,7 +69,6 @@ KOD_GROUNDED_ARASTIRMA_HATA = "GROUNDED-ARASTIRMA-HATA"
 KOD_GROUNDED_FACT_YOK = "GROUNDED-FACT-YOK"
 KOD_GROUNDED_KANIT_COZULEMEDI = "GROUNDED-KANIT-COZULEMEDI"
 KOD_GROUNDED_BOLUM_KAPSAMI = "GROUNDED-BOLUM-KAPSAMI-YETERSIZ"
-KOD_ENTAIL_YENI_DEGER = "FACT-ENTAIL-YENI-DEGER"
 KOD_ENTAIL_ILGISIZ = "FACT-ENTAIL-ILGISIZ"
 KOD_STATUS_ACCEPTED_DEGIL = "FACT-STATUS-ACCEPTED-DEGIL"
 # ⚠ OLCULEN KUSUR (`Y11B1-ONERME-QUOTE-UYUMSUZ`, denetim): belge ve quote
@@ -92,16 +91,41 @@ KOD_CEVRE_CURUTUYOR = "FACT-SPAN-CEVRESI-CURUTUYOR"
 # cumlesi ("Did the agency record ...?") TAM ESITLIK sozlesmesini gecer
 # ama HICBIR SEY ONERMEZ.
 KOD_SPAN_IDDIA_DEGIL = "FACT-SPAN-IDDIA-DEGIL"
+# ⚠ `Y11B2-SHOT-RAPORU-YOK`: `grounded_kapisi` tum-shot bilgisi OLMADAN
+# PASS veremez — "olculemedi" GECTI demek DEGILDIR.
+KOD_SHOT_RAPORU_YOK = "SHOT-RAPORU-YOK"
+# ⚠ `Y11B2-KANONIK-BYPASS`: ayni sahnede HEM kanonik (`chapter_id`/
+# `beat_role`) HEM ham (`bolum`/`islev`) alan varsa otorite BELIRSIZDIR.
+KOD_PROJEKSIYON_BELIRSIZ = "SHOT-PROJEKSIYON-BELIRSIZ"
+# ⚠ OLCULEN KUSUR (`Y11B2-RESOLVER-AYRISMASI`, exact-matcher denetimi):
+# tahsis kapisi konusulan metni `voiceover > anlatim > narration` diye
+# COZUYORDU, ama TTS YALNIZCA ham `voiceover` alanini okuyor
+# (`metin = str(s.get("voiceover", "")).strip()`). Iki resolver ayrisinca
+# `voiceover` bos/None/False/0/[]/{} iken `anlatim` kanonik olabiliyor;
+# shot yetkili kimligi ve all-shot kapisini GECIYOR ama DOGRULANAN CUMLE
+# HIC SESLENDIRILMIYORDU. Tek ortak resolver + fail-closed sozlesme.
+KOD_KONUSULAN_ALAN_GECERSIZ = "SHOT-KONUSULAN-ALAN-GECERSIZ"
+# ⚠ `Y11B2-SURE-CATISMASI`: kanonik fact cumleleri kelime bandindan MUAF
+# oldugu icin hedef sure tutturulamayabilir. Sessiz uzatma YOK.
+KOD_GROUNDED_SURE_YETERSIZ = "GROUNDED-SURE-YETERSIZ"
+# ⚠ `Y11B2-HEURISTIK-SONSUZ`: anlatim tarafindaki SEZGISEL polarite/
+# baglam/kapsam kodlari OTORITE OLMAKTAN CIKARILDI ve KALDIRILDI (olu
+# karmasiklik birakilmadi). Yerine TEK, DAR, fail-closed kural:
+# konusulan metin KANONIK onerme ile normalize BIREBIR AYNI olmali.
+KOD_ENTAIL_EXTRACTIVE_DEGIL = "FACT-ENTAIL-EXTRACTIVE-DEGIL"
 
 KODLAR = (KOD_KANIT_EKSIK, KOD_KANIT_BAYAT, KOD_KANIT_ALINAMADI,
           KOD_STANCE_DESTEK_DEGIL, KOD_CELISKI, KOD_BILESIK_CLAIM,
           KOD_SHOT_FACT_YOK, KOD_SHOT_FACT_ALLOWLIST_DISI,
           KOD_GROUNDED_ARASTIRMA_YOK, KOD_GROUNDED_ARASTIRMA_HATA,
           KOD_GROUNDED_FACT_YOK, KOD_GROUNDED_KANIT_COZULEMEDI,
-          KOD_GROUNDED_BOLUM_KAPSAMI, KOD_ENTAIL_YENI_DEGER,
+          KOD_GROUNDED_BOLUM_KAPSAMI,
           KOD_ENTAIL_ILGISIZ, KOD_STATUS_ACCEPTED_DEGIL,
           KOD_ONERME_QUOTE_UYUMSUZ, KOD_REFUTE_COZULMEDI,
-          KOD_KIMLIK_UYUMSUZ, KOD_CEVRE_CURUTUYOR, KOD_SPAN_IDDIA_DEGIL)
+          KOD_KIMLIK_UYUMSUZ, KOD_CEVRE_CURUTUYOR, KOD_SPAN_IDDIA_DEGIL,
+          KOD_SHOT_RAPORU_YOK,
+          KOD_PROJEKSIYON_BELIRSIZ, KOD_ENTAIL_EXTRACTIVE_DEGIL,
+          KOD_KONUSULAN_ALAN_GECERSIZ, KOD_GROUNDED_SURE_YETERSIZ)
 
 # ⚠ Cozulemeyen getirme imzalari — hicbiri FALLBACK uretmez.
 _COZULEMEYEN = ("403", "401", "paywall", "subscribe", "javascript", "js",
@@ -503,25 +527,160 @@ def allowlist_kur(paketler, *, belgeler=None) -> dict:
 # birebir ayni kural).
 SONUC_ROLLERI = ("sonuc", "closing")
 
+# ── ORTAK YAY PROJEKSIYONU (Y-18 ile TEK KAYNAK) ──
+# ⚠ OLCULEN KUSUR (`Y11B2-DURAGAN-PROJEKSIYON`, final denetim): pipeline
+# projeksiyonu `chapter_id = bolum or "c01"` biciminde DURAGANDI. Uretim
+# planinda `bolum` basligi YALNIZCA bolumun ILK sahnesinde dolar; araya
+# giren sahneler bos gelir. Duragan projeksiyon bunlarin hepsini "c01"e
+# yiginca CH2'nin kapanisi CH1'in fact'lerini "onceki" sayiyor ve chapter
+# kapsami YANLIS olculuyordu. Dogru davranis `yay_plani_kur` ile AYNI:
+# bolum basligi dolu olan sahne YENI bolum acar, sonrakiler ona AITTIR.
+ISLEV_YAY_ROLU = {
+    "acilis": "hook", "soru": "hook",
+    "aciklama": "baglam", "gecmis": "baglam",
+    "vurgu": "kanit", "liste": "kanit", "ornek": "kanit",
+    "karsilastir": "karsitlik",
+    "sonuc": "sonuc",
+    "kapanis": "closing",
+}
 
-def tahsis_et(paketler, sahneler, *, allowlist=None) -> dict:
+
+# ⚠ OLCULEN KUSUR (`Y11B2-KANONIK-BYPASS`, final denetim): projeksiyon HAM
+# alanlari (`bolum`/`islev`) okuyup KANONIK alanlari EZIYORDU. Iki somut
+# kacak olculdu: (a) `beat_role="kapanis"` NORMALIZE EDILMEDIGI icin
+# `SONUC_ROLLERI` ("sonuc"/"closing") ile eslesmiyor ve KAPANIS YASAGINI
+# ATLIYORDU; (b) acikca verilmis `chapter_id="c02"` ham sayac tarafindan
+# "c01"e INDIRILIYOR, ikinci bolumun kapanisi birinci bolumun fact'lerini
+# "onceki" sayiyordu. Kanonik alanlar KORUNUR ve NORMALIZE edilir; ham
+# alanlar DURUM TASIYAN sayacla eslenir; IKISI KARISIRSA fail-closed.
+_BOLUM_NO = re.compile(r"^c(\d+)$", re.I)
+
+
+def rol_normalize(deger: str) -> str:
+    """Ham ya da kanonik rolu KANONIK bicime indirger ("kapanis"->"closing")."""
+    d = str(deger or "").strip().lower()
+    return ISLEV_YAY_ROLU.get(d, d)
+
+
+def yay_rolu(sahne) -> str:
+    """Sahnenin YAPISAL yay rolu. ⚠ Metinden SEZILMEZ, IMAL EDILMEZ."""
+    d = sahne if isinstance(sahne, dict) else {}
+    return rol_normalize(
+        str(d.get("beat_role") or "").strip()
+        or ("kapanis" if d.get("kapanis") is True else "")
+        or str(d.get("islev") or ""))
+
+
+def yay_projeksiyonu(sahneler) -> list:
+    """`(chapter_id, beat_role)` — kanonik KORUNUR, ham DURUMLA eslenir.
+
+    ⚠ `yay_plani_kur` ile AYNI mantik (tek kaynak): `bolum` basligi dolu
+    olan sahne yeni bolum acar; araya girenler ONCEKI bolume aittir.
+    ⚠ Ayni sahnede HEM kanonik HEM ham alan varsa hangisinin otorite
+    oldugu BELIRSIZDIR -> `("", "")` (fail-closed).
+    """
+    cikti, cno = [], 0
+    for s in (sahneler or []):
+        d = s if isinstance(s, dict) else {}
+        kanonik_c = str(d.get("chapter_id") or "").strip()
+        ham_b = str(d.get("bolum") or d.get("bolum_id") or "").strip()
+        kanonik_r = str(d.get("beat_role") or "").strip()
+        ham_r = (str(d.get("islev") or "").strip()
+                 or ("kapanis" if d.get("kapanis") is True else ""))
+        if (kanonik_c and ham_b) or (kanonik_r and ham_r):
+            cikti.append(("", ""))          # ⚠ BELIRSIZ -> fail-closed
+            continue
+        if kanonik_c:
+            cid = kanonik_c                 # ⚠ KANONIK KIMLIK KORUNUR
+            m = _BOLUM_NO.match(cid)
+            if m:                           # ham sayac kanonikle SENKRON
+                cno = max(cno, int(m.group(1)))
+        else:
+            if ham_b or cno == 0:
+                cno += 1
+            cid = f"c{cno:02d}"
+        cikti.append((cid, rol_normalize(kanonik_r or ham_r)))
+    return cikti
+
+
+# ⚠ OLCULEN KUSUR (`Y11B2-VOICEOVER-KOR`, pozitif kontrol kosumu): bu
+# cozumleyicinin ilk surumu URETIM sahnelerinin anlatimi tasidigi
+# `voiceover` alanini HIC OKUMUYORDU (`pipeline.py`:
+# `metin = str(s.get("voiceover", "")).strip()`). Entailment BOS METIN
+# olcuyor, her sahne ilgisiz sayiliyor ve grounded belgesel HER ZAMAN
+# duruyordu. Kusur, 0-call olcumunun bos olup olmadigini sinayan pozitif
+# kontrolde ortaya cikti: kapi gecildiginde downstream spy'lari hic
+# ateslenmiyordu.
+#
+# ⚠ OLCULEN KUSUR (`Y11B2-YETKI-AKLAMA`, adversarial denetim): duzeltmenin
+# ilk hali konusulan metni YARDIMCI alanlarla (`iddia_metni`,
+# `footage_sorgu`, `scene_prompt`, `gorsel_prompt`) BIRLESTIRIYORDU.
+# `iddia_metni` zaten FACT'IN KENDI METNI oldugu icin, izleyicinin DUYDUGU
+# cumle fact'le tamamen ILGISIZ olsa bile skor yardimci alanlardan geliyor
+# ve tahsis PASS aliyordu — kimlik AKLANIYORDU.
+#
+# Her ikisi de asagidaki TEK fail-closed cozumleyiciyle kapandi: yetkili
+# konusulan alan YALNIZCA `voiceover`dir; yardimci alanlar skoru
+# ARTIRAMAZ ve `anlatim`/`narration` fallback'i KALDIRILMISTIR.
+def konusulan_alan(sahne) -> tuple:
+    """TEK ORTAK RESOLVER: `(metin, kod, neden)`.
+
+    ⚠ `Y11B2-RESOLVER-AYRISMASI`: grounded belgeselde SESLENDIRILEN alan
+    YALNIZCA `voiceover`dir ve BOS OLMAYAN GERCEK BIR DIZGE olmak
+    zorundadir. `None`/`False`/`0`/`[]`/`{}`/bos dizge — ya da alternatif
+    bir alanda (`anlatim`/`narration`) metin bulunmasi — FAIL-CLOSED'dur:
+    aksi halde dogrulanan cumle ile SESLENDIRILEN cumle AYRISIR.
+    ⚠ TTS de AYNI ciktiyi tuketir; ikinci bir cozumleme YOKTUR.
+    """
+    d = sahne if isinstance(sahne, dict) else {}
+    v = d.get("voiceover", None)
+    if isinstance(v, str) and v.strip():
+        return v.strip(), "", ""
+    alternatif = [k for k in ("anlatim", "narration")
+                  if str(d.get(k) or "").strip()]
+    if v is None and not alternatif:
+        return "", KOD_KONUSULAN_ALAN_GECERSIZ, "voiceover YOK"
+    return "", KOD_KONUSULAN_ALAN_GECERSIZ, (
+        f"voiceover gecersiz ({type(v).__name__}={v!r:.24}); "
+        f"alternatif alan: {alternatif or 'yok'}")
+
+
+def sahne_metni(sahne) -> str:
+    """Sahnenin YETKILI konusulan metni. ⚠ Gecersizse BOS (fail-closed)."""
+    return konusulan_alan(sahne)[0]
+
+
+def tahsis_et(paketler, sahneler, *, allowlist) -> dict:
     """accepted FactPacket -> SectionPlan -> FactBeat -> shot tahsisi.
 
-    ⚠ DETERMINISTIK ve SIRA BAGIMSIZ: paketler `fact_id`ye gore siralanir,
-    sahneler girdi sirasini korur ama tahsis yalnizca (chapter, sira)
-    fonksiyonudur — ayni girdi kumesi her zaman AYNI snapshot'i verir.
+    ⚠ OLCULEN KUSUR (`Y11B2-BENZERLIK-OTORITESI`, 1a8c013 sonrasi denetim):
+    uretim yolu `arastirma_kopru.fact_bagla` idi ve tahsisi **0.16 JACCARD**
+    ile yapiyordu. Davranissal kanit: allowlist'te OLMAYAN
+    `UYDURMA-KIMLIK-000` kimligi, yalnizca kelime ortusmesiyle bir footage
+    sahnesine YAZILDI (`baglanan=1`). Kimlik BENZERLIKLE BULUNMAZ.
+    ⚠ OLCULEN KUSUR (`Y11B2-KOR-ROUND-ROBIN`): bu fonksiyonun ilk surumu
+    fact'i sahneye `(bolum, sira)` moduloyla — yani sahnenin NE ANLATTIGINA
+    HIC BAKMADAN — dagitiyordu. Tahsis artik `entail_dogrula` ile OLCULUR;
+    hicbir fact sahneyi entail etmiyorsa sahne fact ALMAZ (uydurma yok).
+    ⚠ `allowlist` ZORUNLUDUR: paketin kendisi kendi yetkisi olamaz.
+    ⚠ DETERMINISTIK ve SIRA BAGIMSIZ: esit entailment puaninda `fact_id`
+    alfabetik kazanir; ayni girdi her zaman AYNI snapshot'i verir.
     ⚠ Ayni fact BIRDEN COK shotta kullanilabilir.
 
     Doner: {"tahsis": {scene_id: fact_id}, "bolum_kapsami": {cid: n},
-            "snapshot": str, "kod": str, "neden": str}
+            "bosluklar": [...], "snapshot": str, "kod": str, "neden": str}
     """
-    izin = set(allowlist) if allowlist is not None else {
-        getattr(p, "fact_id", "") for p in (paketler or [])}
-    havuz = sorted({getattr(p, "fact_id", "") for p in (paketler or [])}
-                   & izin)
+    if allowlist is None:
+        return {"tahsis": {}, "bolum_kapsami": {}, "bosluklar": [],
+                "snapshot": "", "kod": KOD_GROUNDED_FACT_YOK,
+                "neden": "allowlist verilmedi (paket kendi yetkisi DEGIL)"}
+    izin = set(allowlist)
+    paket_ile = {getattr(p, "fact_id", ""): p for p in (paketler or [])
+                 if getattr(p, "fact_id", "") in izin}
+    havuz = sorted(paket_ile)
     liste = [s for s in (sahneler or []) if isinstance(s, dict)]
-    bos = {"tahsis": {}, "bolum_kapsami": {}, "snapshot": "", "kod": "",
-           "neden": ""}
+    bos = {"tahsis": {}, "bolum_kapsami": {}, "bosluklar": [],
+           "snapshot": "", "kod": "", "neden": ""}
     if not liste:
         return {**bos, "kod": KOD_SHOT_FACT_YOK, "neden": "sahne yok"}
     if not havuz:
@@ -530,35 +689,99 @@ def tahsis_et(paketler, sahneler, *, allowlist=None) -> dict:
 
     # ── SectionPlan: chapter sirasi KORUNUR ──
     bolum_sira, bolum_sahne = [], {}
+    # ⚠ TEK KAYNAK: bolum/rol ORTAK projeksiyondan gelir (`yay_plani_kur`
+    # ile AYNI). Ham `islev`/`bolum` da, kanonik alanlar da BURADA cozulur.
+    _proj = yay_projeksiyonu(liste)
+    belirsiz = [i for i, (c, _) in enumerate(_proj) if not c]
+    if belirsiz:
+        return {**bos, "kod": KOD_PROJEKSIYON_BELIRSIZ,
+                "neden": (f"{len(belirsiz)} sahnede kanonik ve ham yay alani "
+                          f"BIRLIKTE: {belirsiz[:6]}")}
     for i, s in enumerate(liste):
-        cid = str(s.get("chapter_id") or s.get("bolum_id") or "c01")
+        cid = _proj[i][0]
         if cid not in bolum_sahne:
             bolum_sahne[cid] = []
             bolum_sira.append(cid)
         bolum_sahne[cid].append((i, s))
 
-    tahsis, kapsam = {}, {}
-    for b_i, cid in enumerate(bolum_sira):
-        # ⚠ Chapter havuzu: DETERMINISTIK dilim (bolum indeksinden kayar).
-        n = len(havuz)
-        c_havuz = [havuz[(b_i + k) % n] for k in range(n)]
+    tahsis, kapsam, bosluklar = {}, {}, []
+    for cid in bolum_sira:
         kullanilan = []
-        for j, (idx, s) in enumerate(bolum_sahne[cid]):
+        for idx, s in bolum_sahne[cid]:
             sid = str(s.get("scene_id") or f"s{idx + 1:03d}")
-            rol = str(s.get("beat_role") or "").lower()
-            if rol in SONUC_ROLLERI and kullanilan:
-                # ⚠ Sonuc/kapanis YENI fact GETIREMEZ.
-                fid = kullanilan[0]
-            else:
-                fid = c_havuz[j % len(c_havuz)]
-                kullanilan.append(fid)
-            tahsis[sid] = fid
+            metin, _kkod, _kneden = konusulan_alan(s)
+            if _kkod:
+                bosluklar.append({"sahne": sid, "kod": _kkod,
+                                  "neden": _kneden})
+                continue
+            rol = _proj[idx][1]
+            # ⚠ Onceden yazili kimlik DOGRULANMADAN kabul EDILMEZ
+            # (`Y11B-PREFILLED-KABUL`): allowlist'te olmali VE entail etmeli.
+            # ⚠ OLCULEN KUSUR (`Y11B2-PREFILL-NORMALIZE-BYPASS`, adversarial
+            # denetim): `primary_fact_id or fact_id` FALLBACK'i uc kacaga
+            # izin veriyordu — yalniz `primary_fact_id`, yalniz `fact_id`,
+            # ve `primary=gecerli` + `fact_id=BOGUS`. Ucu de sessizce
+            # NORMALIZE edilip final esitlik kapisini GECIYORDU. Girdide
+            # HERHANGI bir prefill alani varsa IKISI DE zorunlu, BIREBIR
+            # esit, allowlist'te ve entail eden olmalidir.
+            _pid = str(s.get("primary_fact_id") or "").strip()
+            _aid = str(s.get("fact_id") or "").strip()
+            onceki = ""
+            if _pid or _aid:
+                if not _pid or not _aid or _pid != _aid:
+                    bosluklar.append({
+                        "sahne": sid, "kod": KOD_SHOT_FACT_YOK,
+                        "neden": (f"prefill eksik/uyusmaz: "
+                                  f"primary_fact_id={_pid!r} "
+                                  f"fact_id={_aid!r}")})
+                    continue
+                onceki = _pid
+                if onceki not in izin:
+                    bosluklar.append({
+                        "sahne": sid, "kod": KOD_SHOT_FACT_ALLOWLIST_DISI,
+                        "neden": f"prefilled {onceki!r} allowlist disi"})
+                    continue
+            # ⚠ Sonuc/kapanis YENI fact GETIREMEZ — bolumde gecen fact'lerle
+            # sinirli. ⚠ OLCULEN KUSUR (`Y11B2-ILK-SAHNE-CLOSING`, mid-WIP
+            # denetim): chapter'in ILK sahnesi closing ise `kullanilan` BOS
+            # oldugu icin kapi atlaniyor ve kapanis sahnesi YEPYENI bir fact
+            # ALIYORDU. Kapanis yeni fact getiremez: fail-closed RED.
+            if rol in SONUC_ROLLERI and not kullanilan:
+                bosluklar.append({"sahne": sid, "kod": KOD_SHOT_FACT_YOK,
+                                  "neden": "chapter ILK sahnesi closing: "
+                                           "yeni fact getiremez"})
+                continue
+            aday = ([f for f in havuz if f in set(kullanilan)]
+                    if rol in SONUC_ROLLERI else list(havuz))
+            if onceki:
+                aday = [onceki] if onceki in aday else []
+            en_iyi, en_puan = "", -1.0
+            for fid in aday:
+                d = entail_dogrula(metin, paket_ile[fid])
+                if not d.get("gecti"):
+                    continue
+                puan = float(d.get("ortusme") or 0.0)
+                if puan > en_puan:          # esitlikte alfabetik ILK kazanir
+                    en_iyi, en_puan = fid, puan
+            if not en_iyi:
+                # ⚠ UYDURMA fact_id YOK: entail edilemeyen sahne kimlik ALMAZ.
+                bosluklar.append({"sahne": sid, "kod": KOD_ENTAIL_ILGISIZ,
+                                  "neden": "hicbir allowlist fact'i sahneyi "
+                                           "entail etmiyor"})
+                continue
+            tahsis[sid] = en_iyi
+            kullanilan.append(en_iyi)
         kapsam[cid] = len(set(kullanilan))
     snap = hashlib.sha256(
         "|".join(f"{k}={tahsis[k]}" for k in sorted(tahsis)).encode()
     ).hexdigest()[:16]
-    return {"tahsis": tahsis, "bolum_kapsami": kapsam, "snapshot": snap,
-            "kod": "", "neden": ""}
+    kod, neden = "", ""
+    if bosluklar:
+        kod = str(bosluklar[0].get("kod") or KOD_SHOT_FACT_YOK)
+        neden = f"{len(bosluklar)} sahne tahsis edilemedi: {bosluklar[:3]}"
+    return {"tahsis": tahsis, "bolum_kapsami": kapsam,
+            "bosluklar": bosluklar, "snapshot": snap,
+            "kod": kod, "neden": neden}
 
 
 def getirme_sonucu_degerlendir(sayfa) -> dict:
@@ -584,11 +807,19 @@ def shot_fact_dogrula(shotlar, *, allowlist) -> dict:
     liste = [s for s in (shotlar or []) if isinstance(s, dict)]
     bos, disi, kullanilan = [], [], []
     for i, s in enumerate(liste):
-        fid = str(s.get("primary_fact_id") or s.get("fact_id") or "").strip()
+        # ⚠ OLCULEN KUSUR (`Y11B2-FACT-ID-FALLBACK`, final denetim):
+        # `primary_fact_id or fact_id` FALLBACK'i, birincil alani BOS olan
+        # bir shot'un ikincil alanla gecmesine izin veriyordu. Iki alan da
+        # ZORUNLU ve BIREBIR AYNI olmalidir; aksi halde hangi kimligin
+        # otorite oldugu BELIRSIZDIR.
+        pid = str(s.get("primary_fact_id") or "").strip()
+        aid = str(s.get("fact_id") or "").strip()
         sid = str(s.get("scene_id") or f"#{i + 1}")
-        if not fid:
+        if not pid or not aid or pid != aid:
             bos.append(sid)
-        elif fid not in izin:
+            continue
+        fid = pid
+        if fid not in izin:
             disi.append(f"{sid}:{fid}")
         else:
             kullanilan.append(fid)
@@ -596,7 +827,12 @@ def shot_fact_dogrula(shotlar, *, allowlist) -> dict:
     bagli = len(kullanilan)
     kapsam = round(bagli / hedef, 4) if hedef else 0.0
     kod, neden = "", ""
-    if disi:
+    # ⚠ OLCULEN KUSUR (`Y11B2-BOS-SHOT-PASS`, mid-WIP denetim): shot listesi
+    # BOSKEN `hedef=0` olup hicbir kod uretilmiyordu -> "0 shot denetlendi"
+    # PASS sayiliyordu. OLCULEMEDI GECTI DEGILDIR.
+    if not liste:
+        kod, neden = KOD_SHOT_FACT_YOK, "denetlenecek shot YOK (bos liste)"
+    elif disi:
         kod, neden = (KOD_SHOT_FACT_ALLOWLIST_DISI,
                       f"allowlist disi fact_id: {disi[:6]}")
     elif bos:
@@ -609,7 +845,8 @@ def shot_fact_dogrula(shotlar, *, allowlist) -> dict:
 
 def grounded_kapisi(*, mod: str, arastirma_calisti: bool,
                     arastirma_hatasi: str, allowlist,
-                    cozulemeyen: int = 0, bolum_kapsami=None) -> dict:
+                    cozulemeyen: int = 0, bolum_kapsami=None,
+                    shot_raporu=None) -> dict:
     """Grounded belgesel FAIL-CLOSED kapisi.
 
     ⚠ `Y11B-GROUNDED-FAIL-OPEN`: eski kapi `if _olgular:` blogunun
@@ -650,84 +887,88 @@ def grounded_kapisi(*, mod: str, arastirma_calisti: bool,
                 "kod": KOD_GROUNDED_BOLUM_KAPSAMI,
                 "neden": (f"bolum fact kapsami yetersiz: {zayif[:6]}"
                           if zayif else "bolum fact kapsami olculmedi")}
+    # ⚠ OLCULEN KUSUR (`Y11B2-SHOT-RAPORU-YOK`, mid-WIP denetim): kapi
+    # TUM-SHOT denetimi HIC KOSMADAN da PASS verebiliyordu. "Olculemedi"
+    # GECTI demek DEGILDIR: shot raporu YOKSA ya da bir shot fact
+    # tasimiyorsa kapi FAIL-CLOSED durur.
+    if not isinstance(shot_raporu, dict) or not shot_raporu:
+        return {"gecti": False, "kapsam_disi": False,
+                "kod": KOD_SHOT_RAPORU_YOK,
+                "neden": "tum-shot fact denetimi KOSMADI (rapor yok)"}
+    if str(shot_raporu.get("kod") or ""):
+        return {"gecti": False, "kapsam_disi": False,
+                "kod": str(shot_raporu["kod"]),
+                "neden": str(shot_raporu.get("neden") or "")[:160]}
+    _hedef = int(shot_raporu.get("hedef") or 0)
+    if _hedef <= 0 or int(shot_raporu.get("bagli") or 0) != _hedef:
+        return {"gecti": False, "kapsam_disi": False,
+                "kod": KOD_SHOT_FACT_YOK,
+                "neden": (f"tum shot kapsanmadi: "
+                          f"{shot_raporu.get('bagli')}/{_hedef}")}
     return {"gecti": True, "kapsam_disi": False, "kod": "", "neden": ""}
 
 
-# ── ENTAILMENT ──
-# Fact'in TASIYICI unsurlari: sayilar, yillar, birimler, ozel adlar/yerler.
-_BIRIM = re.compile(r"\b(%|yuzde|percent|kisi|vaka|case[s]?|deaths?|olum|"
-                    r"yil|year[s]?|ay|month[s]?|gun|day[s]?|km|m|kg|ton|"
-                    r"tl|usd|eur|dolar|euro|milyon|milyar|bin|thousand|"
-                    r"million|billion)\b", re.I)
-_OZEL_AD = re.compile(r"\b([A-ZÇĞİÖŞÜ][\wçğıöşü]{2,})\b")
-_ENTAIL_ASGARI_ORTUSME = 0.34
+# ── ENTAILMENT: EN DAR GUVENLI SOZLESME (EXTRACTIVE) ──
+# ⚠ OLCULEN KUSUR (`Y11B2-HEURISTIK-SONSUZ`, kirmizi takim final denetimi):
+# Y-11b-2 tahsis kapisi bir SEZGISEL KURAL YIGINIYDI — polarite kelime/ek
+# listeleri, baglac ayiricilari, cue kumeleri, retorik istisnalari,
+# kapsam esikleri. Her tur denetim YENI bir kacak buldu ve her seferinde
+# listeye bir madde daha eklendi:
+#   · `or` / `after` / `before` ile olumsuzluk yer degistirmesi
+#   · Turkce `-miyor` simdiki zaman olumsuzu
+#   · cue'nun FACT ICINDE de gecmesiyle self-exemption ("rumor")
+#   · `may have` / `reportedly` / `unverified` / `guya`
+#   · NOKTALAMASIZ soru ("did the agency record 76941 cases")
+#   · desteklenmemis YENI YUKLEM
+#   · sayi BUYUKLUK degisimi (39.4 -> 394; 76,941 -> 769.41)
+#   · komedi/ironi kaynakli yanlis negatifler
+# Bu enumerasyon SONSUZDUR: dogal dil ustunde sezgisel bir kapi, kapali
+# bir kume degildir. Karar: sezgisel kod ARTIK OTORITE DEGIL ve
+# BIRAKILMADI (olu karmasiklik yok). Yerine Y-11b-1'in EXACT-SUPPORT
+# sozlesmesiyle TUTARLI, EN DAR guvenli kural konuldu:
+#
+#   Yetkili fact tasiyan KONUSULAN alan, FactPacket'in KANONIK onermesi
+#   (`onerme` == `exact_quote`, Y-11b-1 TAM ESITLIK sozlesmesi) ile
+#   NORMALIZE EDILMIS bicimde BIREBIR AYNI olmadan `fact_id` TAHSIS
+#   EDILMEZ.
+#
+# Normalizasyon YALNIZCA bosluk/buyuk-kucuk harf/duz tirnaktir
+# (`factpacket.normalize`); icerik DEGISTIRILMEZ. Ek olgusal ya da
+# retorik yantumce, modal, cue, soru, paraphrase, sayi bicim/buyukluk
+# degisimi -> hepsi TEK ve STABIL kodla fail-closed.
+#
+# ⚠ KAPSAM SINIRI (handoff'ta da yazili): SERBEST PARAPHRASE ve NLI bu
+# atomda DESTEKLENMIYOR. Planlayici, fact cumlesini SAHNE METNINE
+# BIREBIR KOPYALAMAK zorundadir; bir shotta BIR kanonik fact.
+def kanonik_onerme(paket) -> str:
+    """Paketin KANONIK onermesi — normalize edilmis tek dogru metin.
 
-
-def _entail_belirtec(metin: str) -> set:
-    return {k.lower() for k in re.findall(
-        r"[0-9a-zA-ZçğıöşüÇĞİÖŞÜ]{4,}", str(metin or ""))
-        if k.lower() not in {
-            "olarak", "icin", "sonuc", "bunu", "bunun", "daha", "gibi",
-            "kadar", "sonra", "once", "olan", "oldu", "ancak", "yani",
-            "this", "that", "with", "from", "have", "been", "were",
-            "their", "which", "about", "there", "these", "those"}}
+    ⚠ Y-11b-1 support sozlesmesi geregi `onerme` ile `exact_quote`
+    normalize edilmis bicimde AYNIDIR; ikisi ayrisirsa paket zaten
+    allowlist'e GIREMEZ.
+    """
+    return _fp_uyum.normalize(str(getattr(paket, "onerme", "") or ""))
 
 
 def entail_dogrula(metin: str, paket) -> dict:
-    """Anlatim/shot, primary fact'i GERCEKTEN entail ediyor mu?
+    """Konusulan metin, yetkili fact'in KANONIK onermesi MI?
 
-    ⚠ OLCULEN KUSUR (`Y11B-ENTAIL-TEK-YONLU`, denetim): ilk yazim YALNIZCA
-    "yeni sayi/yil eklendi mi" diye bakiyordu. Bu yuzden fact'le HIC
-    ILGISI OLMAYAN bir cumle ("Sonuc olarak tablo degisti") PASS
-    aliyordu — entailment OLCULMUYORDU, yalnizca kirlilik olculuyordu.
-
-    ⚠ Iki yonlu olcum:
-      A) ILGI — metin, fact'in tasiyici unsurlarindan (sayi/yil/ozel ad/
-         anahtar kelime) YETERINCE pay tasimali; taşımıyorsa ILGISIZ.
-      B) KIRLILIK — metin, fact'te GECMEYEN sayi/yil/birim/ozel ad
-         EKLEYEMEZ (entity/name/unit/time/place/scope farki).
+    ⚠ EXTRACTIVE SOZLESME: normalize edilmis BIREBIR ESITLIK disinda
+    HICBIR SEY kabul edilmez (`Y11B2-HEURISTIK-SONSUZ`). Sezgisel
+    polarite/baglam/kapsam olcumleri OTORITE DEGILDIR ve KALDIRILMISTIR.
     """
-    kaynak = f"{getattr(paket, 'onerme', '')} {getattr(paket, 'exact_quote', '')}"
-    m = str(metin or "")
-
-    izinli_sayi = _norm_sayi(kaynak)
-    izinli_yil = set(_YIL.findall(kaynak))
-    izinli_birim = {x.lower() for x in _BIRIM.findall(kaynak)}
-    izinli_ad = {x.lower() for x in _OZEL_AD.findall(kaynak)}
-    izinli_bt = _entail_belirtec(kaynak)
-
-    m_sayi, m_yil = _norm_sayi(m), set(_YIL.findall(m))
-    m_birim = {x.lower() for x in _BIRIM.findall(m)}
-    m_ad = {x.lower() for x in _OZEL_AD.findall(m)}
-    m_bt = _entail_belirtec(m)
-
-    # ── (A) ILGI: fact'in tasiyici unsurlarindan pay ──
-    tasiyici = (izinli_sayi | izinli_yil | izinli_ad) or izinli_bt
-    ortak = (m_sayi | m_yil | m_ad | m_bt) & tasiyici
-    ortusme = (len(ortak) / len(tasiyici)) if tasiyici else 0.0
-    if not ortak or ortusme < _ENTAIL_ASGARI_ORTUSME:
-        return {"gecti": False, "kod": KOD_ENTAIL_ILGISIZ,
-                "ortusme": round(ortusme, 3), "yeni_sayi": [], "yeni_yil": [],
-                "neden": (f"metin fact'i entail etmiyor "
-                          f"(ortusme {ortusme:.2f} < "
-                          f"{_ENTAIL_ASGARI_ORTUSME:.2f})")}
-
-    # ── (B) KIRLILIK: allowlist disi deger/entity ──
-    yeni_yil = sorted(m_yil - izinli_yil)
-    yeni_sayi = sorted(s for s in (m_sayi - izinli_sayi) if s not in yeni_yil)
-    # ⚠ Birim TEK BASINA ihlal DEGILDIR: fact "cases" derken anlatim
-    # "vaka" diyebilir (dil/es anlam). Ihlal, YENI BIR SAYIYA baglanan
-    # birimdir — yani olcek/kapsam GERCEKTEN degismistir.
-    yeni_birim = (sorted(m_birim - izinli_birim)
-                  if (yeni_sayi or yeni_yil) else [])
-    yeni_ad = sorted(m_ad - izinli_ad)
-    if yeni_sayi or yeni_yil or yeni_birim or yeni_ad:
-        return {"gecti": False, "kod": KOD_ENTAIL_YENI_DEGER,
-                "ortusme": round(ortusme, 3),
-                "yeni_sayi": yeni_sayi[:6], "yeni_yil": yeni_yil[:4],
-                "yeni_birim": yeni_birim[:4], "yeni_ad": yeni_ad[:4],
-                "neden": (f"fact disi unsur: sayi={yeni_sayi[:3]} "
-                          f"yil={yeni_yil[:3]} birim={yeni_birim[:3]} "
-                          f"ad={yeni_ad[:3]}")}
-    return {"gecti": True, "kod": "", "ortusme": round(ortusme, 3),
+    m = _fp_uyum.normalize(str(metin or ""))
+    kanonik = kanonik_onerme(paket)
+    alinti = _fp_uyum.normalize(str(getattr(paket, "exact_quote", "") or ""))
+    if not m or not kanonik:
+        return {"gecti": False, "kod": KOD_ENTAIL_EXTRACTIVE_DEGIL,
+                "ortusme": 0.0, "yeni_sayi": [], "yeni_yil": [],
+                "neden": "konusulan metin ya da kanonik onerme BOS"}
+    if m != kanonik and m != alinti:
+        return {"gecti": False, "kod": KOD_ENTAIL_EXTRACTIVE_DEGIL,
+                "ortusme": 0.0, "yeni_sayi": [], "yeni_yil": [],
+                "neden": ("konusulan metin kanonik onerme ile BIREBIR AYNI "
+                          "DEGIL (paraphrase/ek/modal/soru/sayi bicimi "
+                          "DESTEKLENMIYOR)")}
+    return {"gecti": True, "kod": "", "ortusme": 1.0,
             "yeni_sayi": [], "yeni_yil": []}

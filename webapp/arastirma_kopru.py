@@ -82,6 +82,14 @@ class Sonuc:
     # `fact_baglama.allowlist_kur` OLMALI; olgular ONDAN turemeli.
     paketler: list = field(default_factory=list)          # accepted FactPacket
     replay_belgeleri: dict = field(default_factory=dict)  # {source_id: metin}
+    # ── FAZ Y-11b-2 ──
+    # ⚠ OLCULEN KUSUR (`Y11B2-SONUC-ALAN-YOK`, final denetim): grounded
+    # kapi `hata` ve `cozulemeyen` alanlarini OKUYOR ama `Sonuc` bunlari
+    # TASIMIYORDU (`getattr(..., "hata", "")` her zaman "" doner). Yani
+    # "arastirma hata verdi" ve "kanit cozulemedi" dallari URETIMDE HIC
+    # TETIKLENEMEZDI — kapi kagit uzerinde vardi.
+    hata: str = ""                     # motor cokme/anahtar/ag hatasi
+    cozulemeyen: int = 0               # fetch/parse/verify cozulemeyen kanit
     # ⚠ OLCULEN KUSUR (`Y11B1-HAM-DICT-OTORITE`, denetim): `grounded_sonuc_hukmu`
     # ve `brief_kur` HAM, MUTABLE `olgular` dictlerini otorite sayiyordu;
     # elle yazilmis sahte bir dict `ok=True` uretiyordu. Otorite artik
@@ -89,6 +97,12 @@ class Sonuc:
     # ⚠ `Y11B1-SIGNER-ORACLE`: damga (public hash ya da HMAC) OTORITE
     # DEGILDIR. Otorite `paketler` + `replay_belgeleri` ile YENIDEN
     # KOSULAN dogrulamadir; `olgular` yalnizca GORUNUMDUR.
+
+    def hata_yaz(self, asama: str, neden: str, etki: str) -> None:
+        """Dusus KAYDEDER ve `hata` alanini DOLDURUR (grounded kapi okur)."""
+        self.dusus_ekle(asama, neden, etki)
+        if not self.hata:
+            self.hata = gizle(f"{asama}: {neden}")[:200]
 
     def dusus_ekle(self, asama: str, neden: str, etki: str) -> None:
         # ⚠ `neden` KULLANICIYA GORUNUR (is sozlugu -> /api/job -> arayuz).
@@ -444,6 +458,48 @@ def yetkili_olgular(sonuc: Sonuc) -> list:
         belgeler=getattr(sonuc, "replay_belgeleri", None) or {})
 
 
+def yetkili_tahsis(sonuc: Sonuc, sahneler) -> dict:
+    """TUM shotlari YETKILI allowlist'e entailment ile bagla.
+
+    ⚠ OLCULEN KUSUR (`Y11B2-BENZERLIK-OTORITESI`): uretim yolu
+    `fact_bagla` idi; tahsisi 0.16 JACCARD ile yapiyor, allowlist'te
+    OLMAYAN kimlikleri sahneye yaziyor ve footage OLMAYAN sahneleri fact
+    zorunlulugundan MUAF tutuyordu (`Y11B-SADECE-FOOTAGE`).
+    ⚠ Otorite BURADA yeniden kosar: paket + replay belgesi ->
+    `allowlist_kur` -> `tahsis_et` (entailment). Belge yoksa allowlist
+    BOSTUR ve hicbir sahne fact ALMAZ (fail-closed).
+
+    Doner: `fact_baglama.tahsis_et` sozlugu + `"allowlist"`.
+    ⚠ Sahneleri YERINDE gunceller: yalnizca TAHSIS EDILEN sahneye
+    `primary_fact_id` + `fact_id` + `iddia_metni` yazilir.
+    """
+    import fact_baglama as _fbg
+    _paketler = [p for p in (getattr(sonuc, "paketler", None) or [])
+                 if p is not None]
+    _belgeler = getattr(sonuc, "replay_belgeleri", None) or {}
+    if not _paketler or not _belgeler:
+        return {"tahsis": {}, "bolum_kapsami": {}, "bosluklar": [],
+                "snapshot": "", "allowlist": set(),
+                "kod": _fbg.KOD_GROUNDED_FACT_YOK,
+                "neden": "yetkili paket/replay belgesi YOK"}
+    _kabul = _fbg.allowlist_kur(_paketler, belgeler=_belgeler)
+    _izin = set(_kabul["allowlist"])
+    _rapor = _fbg.tahsis_et(_kabul["paketler"], sahneler, allowlist=_izin)
+    _metin = {getattr(p, "fact_id", ""): str(getattr(p, "onerme", ""))
+              for p in _kabul["paketler"]}
+    for _i, _s in enumerate(sahneler or []):
+        if not isinstance(_s, dict):
+            continue
+        _sid = str(_s.get("scene_id") or f"s{_i + 1:03d}")
+        _fid = _rapor["tahsis"].get(_sid)
+        if not _fid:
+            continue
+        _s["primary_fact_id"] = _fid
+        _s["fact_id"] = _fid
+        _s["iddia_metni"] = _metin.get(_fid, "")[:FACT_METIN_SINIRI]
+    return {**_rapor, "allowlist": _izin}
+
+
 def olgu_otoritesi_gecerli_mi(sonuc: Sonuc) -> bool:
     """Otorite (muhurlu kayit) VAR ve GECERLI mi?"""
     return bool(yetkili_olgular(sonuc))
@@ -483,11 +539,26 @@ def brief_kur(story: str, sonuc: Sonuc) -> str:
     blok = olgu_blogu_paketten(yetkili_olgular(sonuc))
     if not blok:
         return story
+    # ⚠ `Y11B2-HEURISTIK-SONSUZ` SOZLESMESI: tahsis kapisi EXTRACTIVE'dir —
+    # sahnenin konusulan metni, olgu cumlesiyle NORMALIZE EDILMIS BIREBIR
+    # AYNI olmadan `fact_id` almaz. Bu yuzden planlayiciya "olgulara
+    # dayandir" demek YETMEZ; cumleyi AYNEN KOPYALAMASI istenir. Serbest
+    # paraphrase bu atomda DESTEKLENMIYOR (bkz. handoff kapsam siniri).
     return (
         f"{story.strip()}\n\n"
         f"--- DOGRULANMIS OLGULAR (bagimsiz kaynaklarla teyit edildi) ---\n"
-        f"Asagidakiler arastirma sonucu DOGRULANMIS olgulardir. Anlatimi bunlara\n"
-        f"dayandir. Burada OLMAYAN bir rakam, tarih ya da isim UYDURMA.\n"
+        f"Asagidakiler arastirma sonucu DOGRULANMIS olgulardir.\n"
+        f"ZORUNLU BICIM KURALI:\n"
+        f"  1. Olgu tasiyan her sahnenin `voiceover` alani, asagidaki olgu\n"
+        f"     cumlelerinden BIRINI KELIMESI KELIMESINE (harfi harfine)\n"
+        f"     ICERMELIDIR — ekleme, cikarma, yeniden yazma, ozetleme,\n"
+        f"     baglac/soru/kosul ekleme ve sayi bicimini degistirme YASAK.\n"
+        f"  2. Bir sahnede YALNIZCA BIR olgu cumlesi bulunur.\n"
+        f"  3. Olgu cumlesinin disina ek cumle YAZMA; retorik giris/cikis\n"
+        f"     cumlesi EKLEME.\n"
+        f"  4. Burada OLMAYAN bir rakam, tarih ya da isim UYDURMA.\n"
+        f"Bu kurala uymayan sahne dogrulanmis olguya BAGLANAMAZ ve is\n"
+        f"FACT-ENTAIL-EXTRACTIVE-DEGIL koduyla DURUR.\n"
         f"{blok}\n"
         f"--- OLGU LISTESI SONU ---"
     )
@@ -544,9 +615,9 @@ def arastir_ve_zenginlestir(story: str, *, mod: str, is_adi: str,
             onbellek=onbellek, defter=defter, sinir=sinir)
     except Exception as e:
         s.sure_sn = time.time() - t0
-        s.dusus_ekle("arastirma", f"{type(e).__name__}: {e}",
-                     "Kaynak toplanamadi; anlatim yalnizca kullanici metnine "
-                     "dayaniyor.")
+        s.hata_yaz("arastirma", f"{type(e).__name__}: {e}",
+                   "Kaynak toplanamadi; anlatim yalnizca kullanici metnine "
+                   "dayaniyor.")
         return story, s
 
     # ── DOGRULAMA: guven karari researcher'in degil fact_checker'in isi ──
@@ -556,9 +627,9 @@ def arastir_ve_zenginlestir(story: str, *, mod: str, is_adi: str,
         fact_checker.dogrula(manifest, bugun=_bugun(), onbellek=onbellek,
                              defter=defter, sinir=sinir)
     except Exception as e:
-        s.dusus_ekle("dogrulama", f"{type(e).__name__}: {e}",
-                     "Iddialar dogrulanamadi; DOGRULANMAMIS hicbir iddia "
-                     "anlatiya SOKULMADI (guvenli taraf).")
+        s.hata_yaz("dogrulama", f"{type(e).__name__}: {e}",
+                   "Iddialar dogrulanamadi; DOGRULANMAMIS hicbir iddia "
+                   "anlatiya SOKULMADI (guvenli taraf).")
 
     try:
         fact_checker.celiskileri_isaretle(manifest, bugun=_bugun())

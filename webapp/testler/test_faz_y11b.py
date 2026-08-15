@@ -284,8 +284,10 @@ kontrol("basarili getirme unresolved DEGIL",
 blok("Y-11b/5 — TUM SHOTLAR: %100 KAPSAM, PREFILLED RED")
 
 _izin = _a["allowlist"]
+# ⚠ Y-11b-2 SOZLESMESI (`Y11B2-FACT-ID-FALLBACK`): `primary_fact_id` VE
+# `fact_id` ZORUNLU ve BIREBIR AYNI; `or` fallback'i KALDIRILDI.
 _shotlar = [{"scene_id": f"s{i:03d}", "kaynak": k,
-             "primary_fact_id": P1.fact_id}
+             "primary_fact_id": P1.fact_id, "fact_id": P1.fact_id}
             for i, k in enumerate(["footage", "fallback", "ai", "footage"], 1)]
 _sr = fb.shot_fact_dogrula(_shotlar, allowlist=_izin)
 kontrol("footage OLMAYAN shotlar da denetlenir",
@@ -296,19 +298,21 @@ kontrol("ayni fact BIRDEN COK shotta kullanilabilir",
 
 _16_17 = [dict(x) for x in _shotlar] + [{"scene_id": "s005",
                                          "kaynak": "footage",
-                                         "primary_fact_id": ""}]
+                                         "primary_fact_id": "",
+                                         "fact_id": ""}]
 _s16 = fb.shot_fact_dogrula(_16_17, allowlist=_izin)
 kontrol("4/5 kapsam -> RED", _s16["kod"] == fb.KOD_SHOT_FACT_YOK, f"{_s16}")
 kontrol("kapsam 1.0 degil", _s16["kapsam"] < 1.0, f"{_s16}")
 
 _unknown = [dict(x) for x in _shotlar]
 _unknown[2]["primary_fact_id"] = "f0000000000000000"
+_unknown[2]["fact_id"] = "f0000000000000000"
 _su = fb.shot_fact_dogrula(_unknown, allowlist=_izin)
 kontrol("allowlist disi (unknown) fact -> RED",
         _su["kod"] == fb.KOD_SHOT_FACT_ALLOWLIST_DISI, f"{_su}")
 
 _prefilled = [{"scene_id": "s001", "kaynak": "footage",
-               "primary_fact_id": "f001"}]
+               "primary_fact_id": "f001", "fact_id": "f001"}]
 kontrol("PREFILLED ordinal fact_id enjeksiyonu -> RED",
         fb.shot_fact_dogrula(_prefilled, allowlist=_izin)["kod"]
         == fb.KOD_SHOT_FACT_ALLOWLIST_DISI)
@@ -319,10 +323,24 @@ kontrol("allowlist BOSSA hicbir shot gecemez",
 
 blok("Y-11b/6 — GROUNDED MOD FAIL-CLOSED")
 
+# ⚠ Y-11b-2 SOZLESMESI: kapi GERCEK all-shot raporu OLMADAN PASS VERMEZ
+# (`Y11B2-SHOT-RAPORU-YOK`). Saglikli fixture kendi GERCEK raporunu verir.
+_saglikli_shot = fb.shot_fact_dogrula(_shotlar, allowlist=_izin)
+kontrol("saglikli fixture all-shot raporu TEMIZ",
+        not _saglikli_shot["kod"]
+        and _saglikli_shot["bagli"] == _saglikli_shot["hedef"] > 0,
+        f"{_saglikli_shot}")
 _ok = fb.grounded_kapisi(mod="documentary", arastirma_calisti=True,
                          arastirma_hatasi="", allowlist=_izin,
-                         cozulemeyen=0, bolum_kapsami={"c01": 2})
+                         cozulemeyen=0, bolum_kapsami={"c01": 2},
+                         shot_raporu=_saglikli_shot)
 kontrol("saglikli grounded is GECER", _ok["gecti"] is True, f"{_ok}")
+kontrol("AYNI is shot raporu OLMADAN GECMEZ",
+        fb.grounded_kapisi(mod="documentary", arastirma_calisti=True,
+                           arastirma_hatasi="", allowlist=_izin,
+                           cozulemeyen=0, bolum_kapsami={"c01": 2},
+                           shot_raporu=None)["kod"]
+        == fb.KOD_SHOT_RAPORU_YOK)
 
 for ad, kw, kod in (
         ("arastirma kapali", {"arastirma_calisti": False},
@@ -351,35 +369,47 @@ for _mod in ("animasyon", "hikaye"):
             _gm["gecti"] is True and _gm.get("kapsam_disi") is True, f"{_gm}")
 
 
-blok("Y-11b/7 — ENTAILMENT: ALLOWLIST DISI SAYI/TARIH EKLENEMEZ")
+blok("Y-11b/7 — ENTAILMENT: EXTRACTIVE SOZLESME (paraphrase YOK)")
 
-kontrol("fact'i entail eden anlatim GECER",
-        fb.entail_dogrula("2024'te 76,941 vaka kaydedildi", P1)["gecti"]
-        is True,
-        f"{fb.entail_dogrula('2024te 76,941 vaka kaydedildi', P1)}")
-_yeni_sayi = fb.entail_dogrula("2024'te 76,941 vaka; artis %212 oldu", P1)
-kontrol("allowlist disi SAYI eklenirse RED",
-        _yeni_sayi["gecti"] is False
-        and _yeni_sayi["kod"] == fb.KOD_ENTAIL_YENI_DEGER, f"{_yeni_sayi}")
-_yeni_yil = fb.entail_dogrula("1998'de 76,941 vaka kaydedildi", P1)
-kontrol("allowlist disi TARIH eklenirse RED",
-        _yeni_yil["gecti"] is False, f"{_yeni_yil}")
-# ⚠ DENETIM: fact ile ILGISI OLMAYAN metin PASS ALMAMALI.
-_ilgisiz = fb.entail_dogrula("Sonuc olarak tablo degisti", P1)
-kontrol("fact'le ILGISIZ metin RED",
-        _ilgisiz["gecti"] is False
-        and _ilgisiz["kod"] == fb.KOD_ENTAIL_ILGISIZ, f"{_ilgisiz}")
-kontrol("ilgisiz metin ortusme raporlar",
-        _ilgisiz.get("ortusme") is not None, f"{_ilgisiz}")
-_yeni_ad = fb.entail_dogrula(
-    "2024'te Osaka'da 76,941 vaka kaydedildi", P1)
-kontrol("allowlist disi YER/ENTITY eklenirse RED",
-        _yeni_ad["gecti"] is False
-        and _yeni_ad["kod"] == fb.KOD_ENTAIL_YENI_DEGER, f"{_yeni_ad}")
-_yeni_birim = fb.entail_dogrula(
-    "National Police Agency 76,941 vaka; 12 milyar TL kayip", P1)
-kontrol("allowlist disi BIRIM eklenirse RED",
-        _yeni_birim["gecti"] is False, f"{_yeni_birim}")
+# ⚠ SOZLESME DEGISIKLIGI (`Y11B2-HEURISTIK-SONSUZ`, kirmizi takim final
+# denetimi): entailment kapisi SEZGISEL bir kural yigini idi (ortusme
+# esigi, yeni sayi/yil/birim/ozel ad kirliligi, polarite/baglam
+# cozumlemesi). Kirmizi takim her turda YENI bir kacak buldu; sezgisel
+# enumerasyon SONSUZ oldugu icin kapi Y-11b-1'in EXACT-SUPPORT
+# sozlesmesiyle TUTARLI en dar bicime cekildi:
+#   konusulan metin, KANONIK onerme ile NORMALIZE EDILMIS BIREBIR AYNI
+#   olmadan tahsis YOK -> TEK stabil kod `FACT-ENTAIL-EXTRACTIVE-DEGIL`.
+# Bu YUZDEN eski "paraphrase GECER" beklentisi ARTIK GECERLI DEGILDIR:
+# paraphrase da, yeni deger de, ilgisiz metin de AYNI kodla RED alir.
+# ⚠ SERBEST PARAPHRASE/NLI bu atomda DESTEKLENMIYOR (kapsam siniri).
+kontrol("KANONIK onerme BIREBIR GECER",
+        fb.entail_dogrula(P1.onerme, P1)["gecti"] is True,
+        f"{fb.entail_dogrula(P1.onerme, P1)}")
+kontrol("yalniz BOSLUK/CASE farki GECER",
+        fb.entail_dogrula("  " + P1.onerme.upper() + " ", P1)["gecti"] is True)
+_KARSI7 = (
+    ("PARAPHRASE (eski sozlesmede GECIYORDU)",
+     "2024'te 76,941 vaka kaydedildi"),
+    ("allowlist disi SAYI", "2024'te 76,941 vaka; artis %212 oldu"),
+    ("allowlist disi TARIH", "1998'de 76,941 vaka kaydedildi"),
+    ("fact'le ILGISIZ metin", "Sonuc olarak tablo degisti"),
+    ("allowlist disi YER/ENTITY", "2024'te Osaka'da 76,941 vaka kaydedildi"),
+    ("allowlist disi BIRIM",
+     "National Police Agency 76,941 vaka; 12 milyar TL kayip"),
+)
+for _ad7, _t7 in _KARSI7:
+    _d7 = fb.entail_dogrula(_t7, P1)
+    kontrol(f"RED: {_ad7}", _d7["gecti"] is False, f"{_d7}")
+    kontrol(f"{_ad7}: TEK stabil kod",
+            _d7["kod"] == fb.KOD_ENTAIL_EXTRACTIVE_DEGIL, f"{_d7}")
+kontrol("sezgisel kodlar KALDIRILDI (olu karmasiklik yok)",
+        not hasattr(fb, "KOD_ENTAIL_YENI_DEGER")
+        and not hasattr(fb, "KOD_ENTAIL_POLARITE")
+        and not hasattr(fb, "polarite"),
+        "sezgisel otorite hala tanimli")
+kontrol("sessiz ALIAS eklenmedi (uretim tuketicisi yok)",
+        "KOD_ENTAIL_YENI_DEGER" not in
+        open(os.path.join(KOK, "fact_baglama.py"), encoding="utf-8").read())
 
 
 blok("Y-11b/8 — DETERMINIZM: SIRA DEGISSE KIMLIK/SNAPSHOT AYNI")

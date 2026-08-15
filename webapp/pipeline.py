@@ -31,6 +31,7 @@ import uret as uretmod  # seslendir, altyazi_parcala (DIKKAT: bu dosyada 'uret' 
 
 import kaynak  # YT/Pexels footage + Magnific upscale
 import arastirma_kopru  # Faz H: arastirma motorunu bu hatta baglar (bkz. modul basligi)
+import fact_baglama          # Faz Y-11b: grounded fail-closed kapi + tahsis
 import qa_kopru         # Faz H: render sonrasi kalite kapisi (bkz. modul basligi)
 import medya_kopru      # Faz I-6: Faz B medya avcisi (OPT-IN, varsayilan KAPALI)
 import edit_kopru       # Faz I-10: EditorV2 plan orkestrasyonu (OPT-IN, KAPALI)
@@ -603,14 +604,10 @@ def ducking_gain_olcumu(stem_on: str, stem_son: str, zarf: list, *,
 # `primary_fact_id`. Asagidaki eslesme SERBEST METIN SEZGISI DEGILDIR —
 # hattin KENDI yapisal `bolum` ve `islev` alanlarindan DETERMINISTIK
 # turetilir.
-ISLEV_YAY_ROLU = {
-    "acilis": "hook", "soru": "hook",
-    "aciklama": "baglam", "gecmis": "baglam",
-    "vurgu": "kanit", "liste": "kanit", "ornek": "kanit",
-    "karsilastir": "karsitlik",
-    "sonuc": "sonuc",
-    "kapanis": "closing",
-}
+# ⚠ TEK KAYNAK (`Y11B2-ORTAK-PROJEKSIYON`): eslesme ve bolum sayaci
+# `fact_baglama` ile PAYLASILIR; kopya mantik BIRAKILMAZ. Tahsis kapisi
+# ile yay plani AYNI (chapter_id, beat_role) projeksiyonunu gorur.
+ISLEV_YAY_ROLU = fact_baglama.ISLEV_YAY_ROLU
 
 
 def yay_plani_kur(props_sahneler: list) -> list:
@@ -622,19 +619,16 @@ def yay_plani_kur(props_sahneler: list) -> list:
     ⚠ SON sahne, `sonuc` rolu tasiyorsa VIDEONUN KAPANISI olarak
     `closing` isaretlenir — bu bir EK beat degil, son beat'in rolu.
     """
-    beatler, cno = [], 0
-    for i, s0 in enumerate(props_sahneler or []):
-        if not isinstance(s0, dict):
-            continue
-        if str(s0.get("bolum") or "").strip() or cno == 0:
-            cno += 1
+    _gecerli = [s0 for s0 in (props_sahneler or []) if isinstance(s0, dict)]
+    # ⚠ ORTAK PROJEKSIYON: bolum sayaci + rol eslesmesi `fact_baglama`dan.
+    _proj = fact_baglama.yay_projeksiyonu(_gecerli)
+    beatler = []
+    for i, s0 in enumerate(_gecerli):
         # ⚠ `closing` YAPISAL alandan gelir; islevden TURETILMEZ ve
         # otomatik IMAL EDILMEZ (Y18B-KAPANIS-IMALATI).
-        rol = (str(s0.get("beat_role") or "").strip().lower()
-               or ("closing" if s0.get("kapanis") is True else "")
-               or ISLEV_YAY_ROLU.get(str(s0.get("islev") or ""), ""))
+        _cid, rol = _proj[i]
         beatler.append({
-            "chapter_id": f"c{cno:02d}",
+            "chapter_id": _cid,
             "scene_id": str(s0.get("scene_id") or f"s{i + 1:03d}"),
             "beat_role": rol,
             "primary_fact_id": str(s0.get("fact_id") or ""),
@@ -1139,7 +1133,17 @@ MEDYA_VIDEO_YOK = "MEDYA-VIDEO-YOK"
 # yetersiz havuzla render'a girip ~10 dk sonra teslim kapisinda dusmek
 # yerine, is BASTA ve NEDENIYLE durur. Env ile gevsetilebilir ama
 # varsayilan qa_on ile TUTARLIDIR.
-FACT_KAPSAM_ESIGI = float(os.environ.get("FACT_KAPSAM_ESIGI", "1.0"))
+# ⚠ OLCULEN KUSUR (`Y11B2-ENV-KAPI-GEVSETME`, mid-WIP denetim): kapsam
+# esigi ENV'den okunuyordu; `FACT_KAPSAM_ESIGI=0` ile kapi tamamen
+# KAPATILABILIYORDU. Kapi ENV ile GEVSETILEMEZ — yalnizca SIKILASTIRILABILIR.
+# ⚠ `Y11B2-SURE-TEK-YONLU`: grounded exact sozlesmesinde anlatim ne
+# uzatilabilir ne kirpilabilir; hedef sure IKI YONLU deterministik bantla
+# tutulur. Bant ENV ile GEVSETILEMEZ.
+GROUNDED_SURE_ALT = 0.92
+GROUNDED_SURE_UST = 1.15
+FACT_KAPSAM_TABANI = 1.0
+FACT_KAPSAM_ESIGI = max(FACT_KAPSAM_TABANI,
+                        float(os.environ.get("FACT_KAPSAM_ESIGI", "1.0")))
 
 # ─────────────────────────── EDIT STILLERI ───────────────────────────
 # Gercek belgesel kanallarindan turetilen 3 profesyonel kurgu profili.
@@ -3277,7 +3281,28 @@ def kelime_butcesi(prof, ses_secim: str) -> int:
 
 
 # ⚠ `unlu` main'den geldi (unlu modu): gercek kisi ismi promptta YAZILIR.
-def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet="", unlu=False):
+# ⚠ `Y11B2-SURE-CATISMASI`: grounded belgeselde EXACT-COPY kurali SYSTEM
+# promptun parcasidir ve kelime bandi/uzatma/devam kurallarindan MUAFTIR.
+GROUNDED_EXACT_SISTEM = (
+    "\n=== GROUNDED DOCUMENTARY — EXACT FACT CONTRACT (OVERRIDES ALL "
+    "LENGTH RULES) ===\n"
+    "EVERY scene must carry EXACTLY ONE verified fact sentence.\n"
+    "The scene's `voiceover` MUST BE that fact sentence copied VERBATIM, "
+    "character for character, from the DOGRULANMIS OLGULAR list.\n"
+    "Do NOT add, remove, reorder or reword a single word. Do NOT add an "
+    "intro, outro, transition, question or rhetorical clause. Do NOT "
+    "change number formatting.\n"
+    "The word-count band, the expansion rule and the continuation rule DO "
+    "NOT APPLY to these voiceover lines: a fact sentence is used at its "
+    "natural length even if it is much shorter or longer than the band.\n"
+    "If there are fewer fact sentences than scenes, REUSE fact sentences "
+    "verbatim across scenes rather than inventing or padding text.\n"
+    "A scene that violates this stops the job with "
+    "FACT-ENTAIL-EXTRACTIVE-DEGIL.\n")
+
+
+def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet="", unlu=False,
+                grounded_exact=False):
     footage = prof["footage_pct"]
     mag_var = bool(prof.get("mag"))
     overlay_kural = (
@@ -3502,6 +3527,59 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet="", unlu=False)
         f"\"{onceki_ozet[:600]}\". Do NOT repeat it; continue the narrative naturally from where it "
         "left off, developing NEW points/scenes."
         if devam else "")
+    # ⚠ OLCULEN KUSUR (`Y11B2-SURE-CATISMASI`, exact-matcher denetimi):
+    # exact-copy talimati YALNIZCA kullanici brief'indeydi ve "olgu tasiyan
+    # sahne" diyordu; oysa all-shot kapisi HER sahneye fact zorunlu tutuyor.
+    # Ustelik bu SYSTEM prompt her `voiceover`i kelime bandina zorluyor.
+    # Sonuc: kisa kanonik fact cumlesi bandi tutturmak icin YENIDEN
+    # YAZILIYOR ve exact kapi ZORUNLU RED veriyordu. Kural SYSTEM promptun
+    # PARCASI ve BANTTAN MUAF.
+    if grounded_exact:
+        return (
+        "You are a professional video editor and scene planner. The user gives a story/script. "
+        "The main CHARACTER is provided separately as a REFERENCE IMAGE, so never describe the "
+        "character's appearance.\n"
+        f"MODE/STYLE: {prof['ad']} — {prof['ozet']}.\n"
+        f"{devam_kural}\n"
+        "Rules:\n"
+        "1) Detect the language of the story.\n"
+        + kelime_kural +
+        "8) Also return \"ozet\": a 2-sentence summary (in the story's language) of what THIS part "
+        "covered, for continuity.\n"
+        f"{footage_kural} {sahne_kural}"
+        f"4) {overlay_kural}\n"
+        "5) Choose a Microsoft Azure neural voice by language: tr->tr-TR-EmelNeural, "
+        "en->en-US-AndrewMultilingualNeural, es->es-ES-AlvaroNeural, de->de-DE-ConradNeural, "
+        "fr->fr-FR-HenriNeural; else a fitting one.\n"
+        "6) Thumbnail: object with text = a punchy 2-5 word hook in the ORIGINAL language ALL CAPS, "
+        "and prompt = a dramatic 16:9 scene featuring the character, strong emotion, high contrast.\n"
+        f"{hd_kural}\n"
+        f"{grafik_kural}"
+        f"{bolum_kural}"
+        f"{etiket_kural}"
+        # UNLU MODU: kullanici acikca sectiyse (Gemini yolu benzerlik destekliyor) gercek isim
+        # YAZILIR — her sahne ayni taninabilir kisiyi gosterir. Normal modda isim YASAK:
+        # gorsel API'leri isimli talebi reddediyor (400) -> tarif yazilir.
+        + ("REAL PEOPLE: this video is ABOUT a real public figure and the image engine supports "
+           "likeness — you SHOULD write the person's real name in scene_prompt and thumbnail.prompt "
+           "so every scene depicts the SAME recognizable person accurately in their era.\n"
+           if unlu else
+           "REAL PEOPLE: NEVER write a real person's name inside scene_prompt or thumbnail.prompt "
+           "(image APIs reject named-likeness requests). Instead describe an era-appropriate figure by "
+           "APPEARANCE only: build, outfit, hairstyle, pose, decade styling — without naming or claiming "
+           "identity (e.g. 'a slim pop star in a red leather jacket, 1980s stage lighting'). Real names "
+           "ARE allowed in footage_sorgu (stock search).\n")
+        + "Respond ONLY valid JSON: {\"language\":\"en\",\"voice\":\"...\",\"ozet\":\"...\","
+        "\"thumbnail\":{\"text\":\"...\",\"prompt\":\"...\"},"
+        "\"scenes\":[{\"n\":1,\"voiceover\":\"...\",\"kaynak\":\"ai|footage\","
+        "\"scene_prompt\":\"...\",\"footage_sorgu\":\"...\",\"overlay\":\"...\",\"hd\":false"
+        + (",\"grafik\":{...}" if prof.get("edit_paketi") else "")
+        + (",\"bolum\":\"\",\"bolum_yeri\":\"orta|ust\"" if prof.get("bolumler") else "")
+        + (",\"alt_band\":{},\"etiketler\":[],\"vurgu_kutu\":{}"
+           if prof.get("saha_etiketi") else "")
+        + "}]}"
+    ) + GROUNDED_EXACT_SISTEM
+
     return (
         "You are a professional video editor and scene planner. The user gives a story/script. "
         "The main CHARACTER is provided separately as a REFERENCE IMAGE, so never describe the "
@@ -3549,12 +3627,13 @@ def plan_sistem(prof, hedef_sahne=None, devam=False, onceki_ozet="", unlu=False)
 
 
 def plan_uret(story: str, prof: dict, hedef_sahne=40, devam=False, onceki_ozet="",
-              bolum_yonergesi="", unlu=False) -> dict:
+              bolum_yonergesi="", unlu=False, grounded_exact=False) -> dict:
     # max_tokens sahne sayisina gore OLCEKLI. Sabit 16000, dusuk-kademe OpenAI hesabinda
     # TPM (dakikadaki token) limitini asip HER cagriyi 429'a sokuyordu — retry bile kurtarmaz.
     # ~250 token/sahne yeterli; tavan 12000, taban 2000.
     mt = int(min(12000, max(2000, hedef_sahne * 250 + 1200)))
-    sistem = plan_sistem(prof, hedef_sahne, devam, onceki_ozet, unlu=unlu)
+    sistem = plan_sistem(prof, hedef_sahne, devam, onceki_ozet, unlu=unlu,
+                         grounded_exact=grounded_exact)
     if bolum_yonergesi:   # paralel planlamada her parcaya "SEN SU BOLUMU anlat" yonergesi
         sistem += f"\nPART DIRECTIVE: {bolum_yonergesi}\n"
     body = {
@@ -3640,7 +3719,8 @@ def _iskelet_cikar(story: str, n_parca: int) -> list:
     return parts
 
 
-def _uzun_plan_sirali(story: str, prof: dict, hedef_sahne: int, parca=40, unlu=False) -> dict:
+def _uzun_plan_sirali(story: str, prof: dict, hedef_sahne: int, parca=40,
+                      unlu=False, grounded_exact: bool = False) -> dict:
     """ESKI guvenilir yol: parca parca SIRALI planla (her parca oncekinin ozetini bekler).
     Paralel yolun iskeleti cikarilamazsa buraya dusulur."""
     toplam_plan = None
@@ -3650,7 +3730,9 @@ def _uzun_plan_sirali(story: str, prof: dict, hedef_sahne: int, parca=40, unlu=F
         kalan = hedef_sahne - len(scenes)
         bu = min(parca, kalan)
         try:
-            p = plan_uret(story, prof, hedef_sahne=bu, devam=bool(scenes), onceki_ozet=ozet, unlu=unlu)
+            p = plan_uret(story, prof, hedef_sahne=bu, devam=bool(scenes),
+                          onceki_ozet=ozet, unlu=unlu,
+                          grounded_exact=grounded_exact)
         except Exception as e:
             # Bir parca yine de basarisizsa (retry'lar tukendi): elde sahne varsa onlarla
             # devam et, yoksa hatayi firlat. Boylece tek parca 30dk isi oldurmez.
@@ -3754,7 +3836,8 @@ def _plan_kelime(plan: dict) -> int:
                for sc in (plan.get("scenes") or []))
 
 
-def satirlari_uzat(plan: dict, prof: dict, hedef_kel: int) -> dict:
+def satirlari_uzat(plan: dict, prof: dict, hedef_kel: int,
+                   grounded_exact: bool = False) -> dict:
     """Sahne SAYISINI degistirmeden her sahnenin anlatimini hedef uzunluga getirir.
 
     NEDEN VAR (11 Agu 2026 olcumu): sure_tamamla eksik sureyi SAHNE EKLEYEREK
@@ -3765,6 +3848,14 @@ def satirlari_uzat(plan: dict, prof: dict, hedef_kel: int) -> dict:
     """
     scenes = plan.get("scenes") or []
     if not scenes:
+        return plan
+    # ⚠ OLCULEN KUSUR (`Y11B2-SURE-CATISMASI`): bu fonksiyon her satiri
+    # kelime bandina UZATIYOR. Grounded exact sozlesmesinde `voiceover`
+    # KANONIK fact cumlesidir; tek kelime degisirse exact kapi ZORUNLU
+    # RED verir. Grounded modda satir MUTASYONU YASAKTIR.
+    if grounded_exact:
+        print("  grounded exact: satir uzatma ATLANDI (kanonik fact korunur)",
+              file=sys.stderr)
         return plan
     satirlar = [{"i": i, "voiceover": str(sc.get("voiceover") or "")}
                 for i, sc in enumerate(scenes)]
@@ -3808,7 +3899,8 @@ def satirlari_uzat(plan: dict, prof: dict, hedef_kel: int) -> dict:
 
 
 def sure_tamamla(plan: dict, story: str, prof: dict, sure_dk: float,
-                 bildir=None, hedef_sahne: int = 0) -> dict:
+                 bildir=None, hedef_sahne: int = 0,
+                 grounded_exact: bool = False) -> dict:
     """Plan hedef SUREYI tutuyor mu? Tutmuyorsa sahne EKLEYEREK tamamlar.
 
     NEDEN GEREKLI (7 Agu 2026, canli iste olculdu): 1 dakika istenen bir belgesel
@@ -3823,6 +3915,27 @@ def sure_tamamla(plan: dict, story: str, prof: dict, sure_dk: float,
     wpm = float(prof.get("_wpm") or 150)
     butce = sure_dk * 60 * wpm / 60.0
     kel_sahne = max(4, float(prof.get("kelime") or 15))
+    if grounded_exact:
+        # ⚠ `Y11B2-SURE-CATISMASI`: kanonik fact cumleleri YENIDEN
+        # YAZILAMAZ. Sure yalnizca SAHNE SAYISIYLA (fact cumlelerinin
+        # birebir TEKRARIYLA) tutturulabilir. Yetmiyorsa SESSIZ UZATMA
+        # YOK: is medya/TTS/render'dan ONCE stabil kodla durur.
+        # ⚠ OLCULEN KUSUR (`Y11B2-SURE-TEK-YONLU`, bagimsiz denetim): kapi
+        # yalnizca ALT siniri olcuyordu. 1 dk / 150 wpm hedefinde butce 150
+        # kelime iken 300 ya da 600 kelimelik bir plan da PASS aliyordu —
+        # yani video hedefin IKI-DORT KATI uzun cikacakken kapi susuyordu.
+        # Kanonik fact metni YENIDEN YAZILAMADIGI icin fazlalik da
+        # KIRPILAMAZ; iki yonlu DETERMINISTIK tolerans uygulanir.
+        mevcut = _plan_kelime(plan)
+        _alt, _ust = butce * GROUNDED_SURE_ALT, butce * GROUNDED_SURE_UST
+        if mevcut < _alt or mevcut > _ust:
+            raise RuntimeError(
+                f"{fact_baglama.KOD_GROUNDED_SURE_YETERSIZ}: kanonik fact "
+                f"metni {mevcut:.0f} kelime, hedef bant "
+                f"{_alt:.0f}-{_ust:.0f} kelime (hedef {butce:.0f}). "
+                f"Grounded exact sozlesmesinde anlatim YENIDEN YAZILAMAZ; "
+                f"dogrulanmis olgu sayisi ya da hedef sure ayarlanmali.")
+        return plan
     for tur in range(2):
         mevcut = _plan_kelime(plan)
         if mevcut >= butce * 0.92:
@@ -3873,12 +3986,15 @@ def sure_tamamla(plan: dict, story: str, prof: dict, sure_dk: float,
 
 # ⚠ `unlu` main'den geldi; plan_uret -> plan_sistem'e kadar tasinir.
 def uzun_plan(story: str, prof: dict, sure_dk: float, bildir=None,
-              unlu: bool = False) -> dict:
+              unlu: bool = False, grounded_exact: bool = False) -> dict:
     hedef_sahne = int(min(MAKS_SAHNE, max(1, (sure_dk * 60) / prof["sahne_sn"])))
     if hedef_sahne <= 55:
         return sure_tamamla(plan_uret(story, prof, hedef_sahne=hedef_sahne,
-                                      unlu=unlu),
-                            story, prof, sure_dk, bildir, hedef_sahne=hedef_sahne)
+                                      unlu=unlu,
+                                      grounded_exact=grounded_exact),
+                            story, prof, sure_dk, bildir,
+                            hedef_sahne=hedef_sahne,
+                            grounded_exact=grounded_exact)
     # ── PARALEL PLANLAMA ──
     # Eskiden parcalar SIRALI yaziliyordu (her biri oncekinin ozetini bekler; 30 dk video
     # ~8-10 dk plan). Simdi: 1 ucuz cagriyla hikaye ISKELETI (bolum ozetleri) cikar, sonra
@@ -3889,7 +4005,8 @@ def uzun_plan(story: str, prof: dict, sure_dk: float, bildir=None,
         bolumler = _iskelet_cikar(story, n_parca)
     except Exception as e:
         print(f"  iskelet cikarilamadi ({str(e)[:120]}) -> sirali plana donuluyor", file=sys.stderr)
-        return _uzun_plan_sirali(story, prof, hedef_sahne, parca, unlu=unlu)
+        return _uzun_plan_sirali(story, prof, hedef_sahne, parca, unlu=unlu,
+                                 grounded_exact=grounded_exact)
     gorevler = []
     for i in range(n_parca):
         bu = min(parca, hedef_sahne - parca * i)
@@ -3900,7 +4017,13 @@ def uzun_plan(story: str, prof: dict, sure_dk: float, bildir=None,
         gorevler.append((i, bu, yon))
     sonuc = [None] * n_parca
     with ThreadPoolExecutor(max_workers=min(4, n_parca)) as havuz:
-        isler_f = {havuz.submit(plan_uret, story, prof, bu, i > 0, "", yon, unlu): i
+        # ⚠ OLCULEN KUSUR (`Y11B2-PARALEL-BAYRAK-KAYBI`, bagimsiz denetim):
+        # `submit` POZISYONEL cagriliyordu ve `grounded_exact` HIC
+        # gecmiyordu. 55'ten fazla sahnede (paralel yol) exact sozlesme
+        # SESSIZCE dusuyor, planlayici kelime bandina donuyor ve exact kapi
+        # ZORUNLU RED veriyordu. Bayrak artik KEYWORD ile zincirlenir.
+        isler_f = {havuz.submit(plan_uret, story, prof, bu, i > 0, "", yon,
+                                unlu, grounded_exact=grounded_exact): i
                    for i, bu, yon in gorevler}
         for f in as_completed(isler_f):
             i = isler_f[f]
@@ -3921,7 +4044,8 @@ def uzun_plan(story: str, prof: dict, sure_dk: float, bildir=None,
         toplam_plan["_eksik_oran"] = round(len(scenes) / hedef_sahne, 2)
     # Uzun (paralel) yolda da SURE denetimi: parcalar kisa yazdiysa eksik kapatilir
     return sure_tamamla(toplam_plan, story, prof, sure_dk, bildir,
-                        hedef_sahne=hedef_sahne)
+                        hedef_sahne=hedef_sahne,
+                        grounded_exact=grounded_exact)
 
 
 def on_ciz_16x9(yol: str) -> bool:
@@ -4529,6 +4653,31 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     story, arastirma_sonuc = arastirma_kopru.arastir_ve_zenginlestir(
         story, mod=mod, is_adi=is_adi, cikti_dizin=CIKTI_DIR, bildir=bildir)
 
+    # ── FAZ Y-11b-2: GROUNDED ON-KAPI (PREFLIGHT) ──
+    # ⚠ OLCULEN KUSUR (`Y11B2-GEC-PREFLIGHT`, final denetim): grounded kapi
+    # `uzun_plan`dan SONRA kosuyordu. Arastirma HIC kosmadiysa ya da 0
+    # kabul edilmis paket dondurduyse sonuc ZATEN bellidir; buna ragmen
+    # hat LLM plan cagrisini, metin islev analizini ve is dizini
+    # olusturmayi YAPIYORDU. Karar arastirma DONER DONMEZ verilir.
+    _grounded = str(mod or "") in fact_baglama.GROUNDED_MODLAR
+    if _grounded:
+        if not getattr(arastirma_sonuc, "calisti", False):
+            raise RuntimeError(
+                f"{fact_baglama.KOD_GROUNDED_ARASTIRMA_YOK}: grounded "
+                f"belgeselde arastirma KOSMADI")
+        if str(getattr(arastirma_sonuc, "hata", "") or "").strip():
+            raise RuntimeError(
+                f"{fact_baglama.KOD_GROUNDED_ARASTIRMA_HATA}: "
+                f"{str(arastirma_sonuc.hata)[:160]}")
+        if int(getattr(arastirma_sonuc, "cozulemeyen", 0) or 0) > 0:
+            raise RuntimeError(
+                f"{fact_baglama.KOD_GROUNDED_KANIT_COZULEMEDI}: "
+                f"{arastirma_sonuc.cozulemeyen} kanit cozulemedi")
+        if not arastirma_kopru.yetkili_olgular(arastirma_sonuc):
+            raise RuntimeError(
+                f"{fact_baglama.KOD_GROUNDED_FACT_YOK}: kabul edilmis "
+                f"FactPacket YOK (0 yetkili olgu)")
+
     bildir("Hikaye sahnelere bölünüyor...", 5)
     # UNLU MODU: yalniz hikaye + GEMINI_KEY varken aktif (Gemini benzerlige tolerans).
     # Anahtar yoksa sessizce normal moda duser (OpenAI isimli talebi reddeder cunku).
@@ -4539,7 +4688,8 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         print("  UNLU modu istendi ama XAI/GEMINI anahtari yok -> tarif-bazli normal mod", file=sys.stderr)
     if unlu_aktif:
         print(f"  UNLU MODU AKTIF: gercek isimler + {unlu_motor} gorsel yolu", file=sys.stderr)
-    plan = uzun_plan(story, prof, sure_dk, unlu=unlu_aktif)
+    plan = uzun_plan(story, prof, sure_dk, unlu=unlu_aktif,
+                     grounded_exact=_grounded)
     scenes = plan["scenes"]
     # ── METIN DERIN ANALIZI: her satirin anlatim islevi -> sahne bazinda kurgu ──
     # Basarisiz olursa bos liste doner ve asagida eski mekanik atamaya dusulur.
@@ -4578,14 +4728,73 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # varsa calisir. Arastirma kapali/basarisizsa `olgular` bos kalir, hicbir
     # sahne degistirilmez ve hat ESKISIYLE BIT-BIT ayni surer.
     # ⚠ UYDURMA fact_id YOK: eslesmeyen sahne kimlik ALMAZ, bosluk GORUNUR.
+    # ⚠ FAZ Y-11b-2 — TAHSIS OTORITESI BENZERLIK DEGIL, ENTAILMENT.
+    # OLCULEN KUSUR (`Y11B2-BENZERLIK-OTORITESI`, davranissal kanit):
+    #   fact_bagla([footage sahne], [{"fact_id": "UYDURMA-KIMLIK-000", ...}])
+    #   -> baglanan=1, sahne["fact_id"] == "UYDURMA-KIMLIK-000"
+    # Allowlist'te OLMAYAN uydurma bir kimlik, yalnizca 0.16 JACCARD
+    # kelime ortusmesiyle sahneye YAZILIYORDU. Ayrica `yalnizca_footage`
+    # varsayilani True oldugu icin AI/fallback sahneler fact
+    # zorunlulugundan MUAFTI (`Y11B-SADECE-FOOTAGE`).
+    # ⚠ FAZ Y-11b-2: GROUNDED MODDA ARASTIRMA/OLGU YOKLUGU KOSULSUZ FAIL.
+    # OLCULEN KUSUR (`Y11B2-KOSULSUZ-DEGIL`): tek fail-closed durus
+    # `if _olgular:` blogunun ICINDEYDI; arastirma KOSMADI/HATA/0 yetkili
+    # olgu durumunda kapi HIC KOSMUYOR ve hat medya+TTS+render'a
+    # SESSIZCE devam ediyordu. Kapi artik BU SATIRDA, medya/TTS/render
+    # cagrilarindan ONCE ve KOSULSUZ.
+    _olgular = (arastirma_kopru.yetkili_olgular(arastirma_sonuc)
+                if getattr(arastirma_sonuc, "calisti", False) else [])
+    if _grounded:
+        if not getattr(arastirma_sonuc, "calisti", False):
+            raise RuntimeError(
+                f"{fact_baglama.KOD_GROUNDED_ARASTIRMA_YOK}: grounded "
+                f"belgeselde arastirma KOSMADI")
+        if str(getattr(arastirma_sonuc, "hata", "") or "").strip():
+            raise RuntimeError(
+                f"{fact_baglama.KOD_GROUNDED_ARASTIRMA_HATA}: "
+                f"{str(arastirma_sonuc.hata)[:160]}")
+        if not _olgular:
+            raise RuntimeError(
+                f"{fact_baglama.KOD_GROUNDED_FACT_YOK}: kabul edilmis "
+                f"FactPacket YOK (0 yetkili olgu)")
+        # ⚠ URETIM SAHNELERI -> SectionPlan projeksiyonu: `tahsis_et`
+        # `chapter_id`/`beat_role` bekler; uretim sahneleri bunlari
+        # `bolum`/`islev` adlariyla tasir. Projeksiyon OLMAZSA her sahne
+        # tek "c01" bolumune duser ve kapanis rolu GORULMEZ.
+        # ⚠ OLCULEN KUSUR (`Y11B2-DURAGAN-PROJEKSIYON`, final denetim):
+        # ilk yazim `chapter_id = bolum or "c01"` biciminde DURAGANDI.
+        # Uretim planinda `bolum` basligi YALNIZCA bolumun ILK sahnesinde
+        # dolar; araya girenler BOS gelir ve hepsi "c01"e yigiliyordu.
+        # Ayrica rol `islev` degerinin KENDISI yaziliyordu ("kapanis"),
+        # oysa kanonik rol `closing`tir — kapanis kapisi GORULMUYORDU.
+        # Projeksiyon artik `yay_plani_kur` ile AYNI ortak helper'dan gelir.
+        # ⚠ OLCULEN KUSUR (`Y11B2-KANONIK-BYPASS`, final denetim): ilk
+        # duzeltme projeksiyonu HAM sahneye GERI YAZIYORDU. Bu, sahneyi
+        # "hem kanonik hem ham alan tasiyor" durumuna sokuyor ve otoriteyi
+        # BELIRSIZ yapiyordu. Sahneye kanonik alan YAZILMAZ: projeksiyon
+        # `tahsis_et`/`yay_plani_kur` icinde ORTAK helper'la cozulur.
+        _gecerli = [x for x in scenes if isinstance(x, dict)]
+        for _i, _s in enumerate(_gecerli):
+            _s.setdefault("scene_id", f"s{_i + 1:03d}")
     _fact_rapor = None
     if getattr(arastirma_sonuc, "calisti", False):
-        _olgular = list(getattr(arastirma_sonuc, "olgular", None) or [])
         if _olgular:
-            _fact_rapor = arastirma_kopru.fact_bagla(scenes, _olgular)
-            print(f"  OLGU BAGI: {_fact_rapor['baglanan']}/"
-                  f"{_fact_rapor['hedef']} footage sahnesi dogrulanmis iddiaya "
-                  f"baglandi (%{_fact_rapor['kapsam_pct']}), "
+            _tahsis = arastirma_kopru.yetkili_tahsis(arastirma_sonuc, scenes)
+            _bagli_n = len(_tahsis["tahsis"])
+            _hedef_n = len([s for s in scenes if isinstance(s, dict)])
+            _fact_rapor = {
+                "baglanan": _bagli_n, "hedef": _hedef_n,
+                "kapsam_pct": round(100.0 * _bagli_n / _hedef_n, 1)
+                if _hedef_n else 0.0,
+                "bosluklar": list(_tahsis["bosluklar"]),
+                "olgu_sayisi": len(_olgular),
+                "kullanilan_fact": sorted(set(_tahsis["tahsis"].values())),
+                "bolum_kapsami": dict(_tahsis["bolum_kapsami"]),
+                "allowlist": set(_tahsis["allowlist"]),
+                "snapshot": _tahsis["snapshot"]}
+            print(f"  OLGU BAGI: {_bagli_n}/{_hedef_n} sahne (footage OLSUN "
+                  f"OLMASIN) yetkili olguya ENTAILMENT ile baglandi "
+                  f"(%{_fact_rapor['kapsam_pct']}), "
                   f"{len(_fact_rapor['bosluklar'])} kapsam boslugu",
                   file=sys.stderr)
             # ⚠ FAZ Y-10 / Y10-HAVUZ-YETERSIZ — ERKEN VE FAIL-CLOSED DURUS.
@@ -4612,6 +4821,32 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                         f"Her cekim dogrulanmis bir olguya baglanmali; "
                         f"konu daha somut/olgusal yazilmali ya da arastirma "
                         f"kaynaklari genisletilmeli.")
+    # ── FAZ Y-11b-2: GROUNDED FAIL-CLOSED KAPISI — KOSULSUZ ──
+    # ⚠ OLCULEN KUSUR (`Y11B2-KAPI-CAGRILMIYOR`): `fact_baglama.grounded_kapisi`
+    # ve `shot_fact_dogrula` TANIMLIYDI ama `pipeline.py` ikisini de HIC
+    # CAGIRMIYORDU (`grep grounded_kapisi pipeline.py` -> 0 eslesme). Yani
+    # kapi OLU KODDU. Ustelik tek fail-closed durus `if _olgular:` blogunun
+    # ICINDEYDI: arastirma KAPALI/HATALI ya da 0 olgu ise HIC KOSMUYOR, is
+    # kullanici metniyle SESSIZCE devam ediyordu (`Y11B-GROUNDED-FAIL-OPEN`).
+    # ⚠ Bu kapi medya/TTS/render'dan ONCE kosar; grounded OLMAYAN modlar
+    # KAPSAM DISIDIR (davranis BIT-BIT ayni kalir).
+    _shot = fact_baglama.shot_fact_dogrula(
+        scenes, allowlist=(_fact_rapor or {}).get("allowlist") or set())
+    _kapi = fact_baglama.grounded_kapisi(
+        shot_raporu=_shot,
+        mod=mod,
+        arastirma_calisti=bool(getattr(arastirma_sonuc, "calisti", False)),
+        arastirma_hatasi=str(getattr(arastirma_sonuc, "hata", "") or ""),
+        allowlist=(_fact_rapor or {}).get("allowlist") or set(),
+        cozulemeyen=int(getattr(arastirma_sonuc, "cozulemeyen", 0) or 0),
+        bolum_kapsami=(_fact_rapor or {}).get("bolum_kapsami"))
+    if not _kapi["gecti"]:
+        raise RuntimeError(f"{_kapi['kod']}: {_kapi['neden']}")
+    if not _kapi.get("kapsam_disi"):
+        # ⚠ TUM shotlar denetlenir — footage OLSUN OLMASIN.
+        print(f"  GROUNDED KAPI: {_shot['bagli']}/{_shot['hedef']} shot "
+              f"yetkili fact tasiyor ({_shot['benzersiz_fact']} benzersiz)",
+              file=sys.stderr)
     # ── FAZ I-2d: GORSEL IMZA KAYNAGI ──
     # Bilesik profil varsa efekt/gecis imzasi ONDAN turetilir. Eski stil
     # kimliklerinde `_profil` blogu YOKTUR -> `None` kalir ve `efekt_ata` /
@@ -4699,8 +4934,11 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     paralel = max(1, int(os.environ.get("GORSEL_PARALEL", "4")))
 
     islenecek = []   # (i, n, sahne, metin, overlay) — bos voiceover'lar elenmis, sira sabit
+    # ⚠ `Y11B2-RESOLVER-AYRISMASI`: TTS ve tahsis kapisi AYNI resolver'i
+    # tuketir; ikinci bir cozumleme YOKTUR. Grounded belgeselde gecersiz
+    # konusulan alan ZATEN tahsis kapisinda fail-closed durur.
     for i, s in enumerate(scenes):
-        metin = str(s.get("voiceover", "")).strip()   # model sayi/null verirse .strip() patlamasin
+        metin = fact_baglama.sahne_metni(s)
         if not metin:
             continue
         islenecek.append((i, i + 1, s, metin,
@@ -5361,7 +5599,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             # GERCEK olcumler uretiyor. Video.tsx bu alani OKUMAZ.
             "anlatim": metin,
             # ⚠ FAZ Y-7 / Y7-FACT-PROPS-SINIRI — FACT ZINCIRI BURADA
-            # KOPUYORDU. `arastirma_kopru.fact_bagla()` fact_id'yi GERCEKTEN
+            # KOPUYORDU. `arastirma_kopru.yetkili_tahsis()` fact_id'yi GERCEKTEN
             # yaziyor (`s["fact_id"] = ...`) ve ayni `s` sozlugu medya
             # avcisina fact_id'yi basariyla veriyor. AMA bu props sozlugu
             # `fact_id` anahtarini HIC TASIMIYORDU; `edit_kopru.plan_kur`

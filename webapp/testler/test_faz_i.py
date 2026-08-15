@@ -3071,9 +3071,13 @@ finally:
 blok("22c. I-8 — pipeline baglantisi ve KORUMALAR aynen")
 
 _PP5 = oku(KOK, "pipeline.py")
+# ⚠ Y-11b-2 SOZLESMESI: olgu bagi artik BENZERLIKLE (`fact_bagla`,
+# 0.16 Jaccard) degil, YETKILI allowlist + ENTAILMENT ile kurulur.
 kontrol("pipeline olgu bagini YALNIZCA arastirma kostuysa kuruyor",
         'if getattr(arastirma_sonuc, "calisti", False):' in _PP5
-        and "arastirma_kopru.fact_bagla(scenes, _olgular)" in _PP5)
+        and "arastirma_kopru.yetkili_tahsis(arastirma_sonuc, scenes)" in _PP5)
+kontrol("eski benzerlik yolu uretimden KALDIRILDI",
+        "arastirma_kopru.fact_bagla(" not in _PP5)
 kontrol("olgu yoksa bag KURULMUYOR", "if _olgular:" in _PP5)
 kontrol("olgu bagi ozeti YALNIZCA bag kuruldugunda ise yaziliyor",
         "if _fact_rapor is not None:" in _PP5 and 'sonuc["olgu_bagi"]' in _PP5)
