@@ -5216,6 +5216,15 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
              "sure": round(sum(s["sure"] for s in props_sahneler), 1),
              "sahne_sayisi": len(props_sahneler),
              "edit": prof["ad"],
+             # ⚠ FAZ Y-8 / Y8-HEDEF-SURE: KULLANICININ ISTEDIGI SURE.
+             # Is boyunca KAYIPSIZ tasinir ve POST-QA'da BAGLAYICI olur.
+             # Olculen kusur: hedef hicbir yere yazilmadigi icin 96 sn
+             # istenen bir iste 83.5 sn cikti uretildi ve POST-QA "temiz"
+             # dedi (yalnizca uretilmis timeline'in KENDI toplamina
+             # bakiyordu). Kayiplarin kaynagi ayri (taban yuvarlama, %92
+             # butce tolerani, kelime tavani, dusen TTS sahnesi) — bu alan
+             # onlari GORUNUR ve HESAP VERILEBILIR kilar.
+             "hedef_sure_sn": round(float(sure_dk) * 60.0, 1),
              # CC kliplerin atif metni. Lisans atfi ACIKLAMADA istiyor; ekrandaki kucuk
              # kunye yazisi ek. Bu liste bos ise videoda CC klip kullanilmamis demektir.
              "atiflar": kaynak.atif_listesi(),
@@ -5343,7 +5352,15 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     try:
         _qa = qa_kopru.denetle(
             son_video, bildir=bildir,
+            # ⚠ FAZ Y-8 / Y8-HEDEF-SURE — IKI AYRI OLCUT.
+            # `sure_sn` URETILMIS timeline toplamidir; ona karsi olcmek
+            # yalnizca "render plandan kisaldi mi" der. KULLANICININ
+            # ISTEDIGI SURE bugune kadar POST-QA'da HIC denetlenmiyordu:
+            # gercek iste 96 sn istendi, 83.5 sn uretildi ve POST-QA TEMIZ
+            # gecti. `hedef_sure_sn` kullanici hedefini KAYIPSIZ tasir ve
+            # `qa_son` ona karsi FAIL-CLOSED olcer.
             beklenen={"sure_sn": sonuc["sure"],
+                      "hedef_sure_sn": sonuc.get("hedef_sure_sn"),
                       "cekim_sayisi": sonuc["sahne_sayisi"],
                       "genislik": 1920, "yukseklik": 1080})
         sonuc["qa"] = qa_kopru.ozet(_qa)

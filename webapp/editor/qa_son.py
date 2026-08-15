@@ -26,6 +26,13 @@ from . import kalite_kapisi
 from . import kalite_kapisi as kalite_kapisi_mod
 from .profil import EditProfili, VARSAYILAN
 
+# ⚠ FAZ Y-8 / Y8-HEDEF-SURE — KULLANICI HEDEFINDEN IZIN VERILEN SAPMA.
+# Mevcut `POST-SURE-SAPMA` (plan karsilastirmasi) %8 kullaniyor; hedef
+# karsilastirmasi biraz daha genis tutulur cunku TTS suresi metne bagli
+# olarak dogal degisir. %12: 105 sn hedefte 92.4-117.6 sn — kullanicinin
+# 90-120 sn bandiyla ortusur. Gercek olay (96 -> 83.5 sn, %13) FAIL olur.
+HEDEF_SURE_TOLERANS = 0.12
+
 
 def varsayilan_kosucu(komut: list, zaman_asimi: int = 120) -> dict:
     """Gercek komut kosucusu. Doner {"rc","stdout","stderr"}."""
@@ -287,6 +294,26 @@ def denetle(video_yolu: str, *, beklenen: Optional[dict] = None,
                        f"cikti {v.get('sure_sn')} sn, plan {beklenen['sure_sn']} sn "
                        f"(fark {fark:.1f})",
                        "gecis kisalmasi ya da eksik segment olabilir")
+        # ⚠ FAZ Y-8 / Y8-HEDEF-SURE — KULLANICI HEDEFI AYRI ve BAGLAYICI.
+        # OLCULEN KUSUR: yukaridaki kontrol `beklenen["sure_sn"]`e bakar, o
+        # da URETILMIS timeline'in KENDI toplamidir. Yani "render plandan
+        # kisaldi mi" sorusunu yanitlar; KULLANICININ ISTEDIGI SURE hicbir
+        # yerde denetlenmezdi. Gercek olay: 96 sn istendi, 83.5 sn uretildi,
+        # POST-QA TEMIZ gecti (hedefin %13 alti).
+        # ⚠ FAIL-CLOSED: sessizce kisa video TESLIM EDILMEZ.
+        if beklenen.get("hedef_sure_sn"):
+            _hedef = float(beklenen["hedef_sure_sn"])
+            _hf = abs(v.get("sure_sn", 0) - _hedef)
+            q.olcumler["hedef_sure_sn"] = round(_hedef, 1)
+            q.olcumler["hedef_sure_farki_sn"] = round(_hf, 2)
+            if _hedef > 0 and _hf > _hedef * HEDEF_SURE_TOLERANS:
+                q.ekle("POST-HEDEF-SURE-SAPMA", "fail",
+                       f"cikti {v.get('sure_sn')} sn, kullanici hedefi "
+                       f"{_hedef:.1f} sn (fark {_hf:.1f}, tavan "
+                       f"%{HEDEF_SURE_TOLERANS * 100:.0f})",
+                       "sahne sayisi/kelime butcesi hedefe gore yeniden "
+                       "planlanmali (taban yuvarlama + %92 butce tolerani + "
+                       "kelime tavani + dusen TTS sahnesi kayip veriyor)")
 
     if q.olcumler.get("siyah_araliklar"):
         n = len(q.olcumler["siyah_araliklar"])
