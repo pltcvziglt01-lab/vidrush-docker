@@ -28,6 +28,7 @@ girer; hicbir ifadesi eylem olarak yorumlanmaz.
 from __future__ import annotations
 
 import datetime
+import hashlib
 import json
 import os
 import re
@@ -71,6 +72,23 @@ class Sonuc:
     # asgari alanlar tutulur. `sozluk()` BU ALANI YAZMAZ — is sozlesmesi ve
     # arayuz sozlesmesi DEGISMEDI.
     olgular: list = field(default_factory=list)   # [{fact_id, metin, ...}]
+    # ── FAZ Y-11b-1 ──
+    # ⚠ OLCULEN KUSUR (`Y11B1-PAKET-SONUCA-TASINMIYOR`): `factpacket.
+    # havuz_kur` KANIT-ONCE paketleri uretiyordu ama HICBIR YERDEN
+    # CAGRILMIYORDU; uretim hatti `olgular`i hala CLAIM-FIRST zincirinden
+    # (`manifest.kullanilabilir_iddialar()`) turetiyordu.
+    # ⚠ OLCULEN KUSUR (`Y11B1-ALLOWLIST-OTORITE-DEGIL`): kimlikler kanit/
+    # durum REPLAY'i olmadan tasiniyordu. Kabul otoritesi
+    # `fact_baglama.allowlist_kur` OLMALI; olgular ONDAN turemeli.
+    paketler: list = field(default_factory=list)          # accepted FactPacket
+    replay_belgeleri: dict = field(default_factory=dict)  # {source_id: metin}
+    # ⚠ OLCULEN KUSUR (`Y11B1-HAM-DICT-OTORITE`, denetim): `grounded_sonuc_hukmu`
+    # ve `brief_kur` HAM, MUTABLE `olgular` dictlerini otorite sayiyordu;
+    # elle yazilmis sahte bir dict `ok=True` uretiyordu. Otorite artik
+    # DOGRULANMIS, ICERIGE BAGLI snapshot'tir.
+    # ⚠ `Y11B1-SIGNER-ORACLE`: damga (public hash ya da HMAC) OTORITE
+    # DEGILDIR. Otorite `paketler` + `replay_belgeleri` ile YENIDEN
+    # KOSULAN dogrulamadir; `olgular` yalnizca GORUNUMDUR.
 
     def dusus_ekle(self, asama: str, neden: str, etki: str) -> None:
         # ⚠ `neden` KULLANICIYA GORUNUR (is sozlugu -> /api/job -> arayuz).
@@ -200,6 +218,103 @@ def olgu_listesi(manifest, sinir: int = 200) -> list:
     return [o for o in cikti if o["fact_id"] and o["metin"]]
 
 
+def paketlerden_olgular(paketler=None, *, belgeler=None) -> list:
+    """Olgu sozlukleri — TUKETICI KANITI YENIDEN DOGRULAYARAK uretir.
+
+    ⚠ OLCULEN KUSUR (`Y11B1-SIGNER-ORACLE`, denetim): dogrulama ciktisini
+    (public snapshot ya da HMAC muhuru) OTORITE saymak, imzalayiciyi bir
+    ORACLE haline getiriyordu — muhurleme yolu erisilebilir oldugu surece
+    cagiran istedigi icerigi "dogrulanmis" gosterebiliyordu.
+    ⚠ Y-11b-1 SOZLESMESI: otorite bir DAMGA DEGIL, YENIDEN KOSULAN
+    DOGRULAMADIR. Tuketici PAKETLERI ve REPLAY BELGELERINI verir;
+    `fact_baglama.allowlist_kur` BURADA yeniden kosar ve olgular yalnizca
+    o kosumun DONDURDUGU dogrulanmis paketlerden turer.
+    ⚠ Belge verilmezse HICBIR olgu uretilmez (fail-closed).
+    ⚠ IC API (`Y11B1-IC-API`): DISARIDAN `allowlist_sonucu` GIRISI YOKTUR.
+    Otorite yalnizca `arastir_ve_zenginlestir`in IC yolundan gelir; o yol
+    paketleri ve GUVENILIR GETIRME MAKBUZUNU (`replay_belgeleri`) birlikte
+    tasir. ⚠ TEHDIT MODELI: surec ICINDE kotu niyetli bir cagiran
+    (kendi sahte paketini + kendi sahte belgesini uyduran kod) KAPSAM
+    DISIDIR; bu modul kaynak/ag kaynakli zehirlenmeye karsi korur.
+    """
+    import fact_baglama as _fbg
+    _liste = [p for p in (paketler or []) if p is not None]
+    if not _liste or belgeler is None:
+        return []
+    # ⚠ TEK OTORITE: BURADA yeniden kosulur.
+    sonuc = _fbg.allowlist_kur(_liste, belgeler=belgeler)
+    cikti = []
+    for p in sorted(sonuc["paketler"], key=lambda x: getattr(x, "fact_id", "")):
+        cikti.append({
+            "fact_id": str(getattr(p, "fact_id", "")),
+            "metin": str(getattr(p, "onerme", "")),
+            "guven": "dogrulandi",
+            "kategori": str(getattr(p, "kategori", "")),
+            "kritik": bool(getattr(p, "kritik", False)),
+            "kaynaklar": [{"alan": str(getattr(p, "alan", "")),
+                           "url": str(getattr(p, "url", "")),
+                           "tur": str(getattr(p, "source_class", ""))}],
+            "exact_quote": str(getattr(p, "exact_quote", "")),
+            "locator": str(getattr(p, "locator", "")),
+            "document_hash": str(getattr(p, "document_hash", "")),
+            "source_id": str(getattr(p, "source_id", "")),
+            "stance": str(getattr(p, "stance", "")),
+        })
+    return cikti
+
+
+def paket_havuzu_kur(konu: str, urller, *, erisim_tarihi: str,
+                     getirici=None, cikarici=None, onbellek=None,
+                     defter=None) -> dict:
+    """KANIT-ONCE havuz: belge -> FactPacket -> allowlist -> olgu.
+
+    ⚠ `allowlist_kur` TEK OTORITEDIR: paket kabul damgasi ve kanit replay'i
+    oradan gecmeden hicbir olgu uretilmez.
+    ⚠ Getirilen belgeler `replay_belgeleri` olarak DONER; boylece kanit
+    daha sonra da REPLAY EDILEBILIR (bayat/uydurma tespiti).
+    ⚠ ISTISNA FIRLATMAZ.
+    """
+    bos = {"paketler": [], "olgular": [], "allowlist": set(),
+           "replay_belgeleri": {}, "redler": [], "snapshot": "",
+           "ham_kaynak": 0}
+    try:
+        from arastirma import factpacket as _fp
+        from arastirma import source_fetcher as _sf
+        import fact_baglama as _fbg
+    except Exception as e:                                   # noqa: BLE001
+        return {**bos, "redler": [{"kod": "FACT-MODUL-YOK",
+                                   "neden": f"{type(e).__name__}: {e}"}]}
+    belgeler = {}
+
+    def _getir(url):
+        fn = getirici or (lambda u: _sf.sayfa_getir(u, onbellek=onbellek))
+        sayfa = fn(url) or {}
+        if sayfa.get("ok") and str(sayfa.get("metin") or "").strip():
+            belgeler[_fp.source_id_uret(url)] = str(sayfa["metin"])
+        return sayfa
+
+    cik = cikarici or _fp.llm_cikarici(onbellek=onbellek, defter=defter)
+    try:
+        paketler, rapor = _fp.havuz_kur(konu, list(urller or []),
+                                        erisim_tarihi=erisim_tarihi,
+                                        getirici=_getir, cikarici=cik)
+    except Exception as e:                                   # noqa: BLE001
+        return {**bos, "replay_belgeleri": belgeler,
+                "redler": [{"kod": "FACT-HAVUZ-HATASI",
+                            "neden": f"{type(e).__name__}: {str(e)[:120]}"}]}
+    # ⚠ TEK OTORITE: kanit REPLAY EDILEREK suzulur.
+    izin = _fbg.allowlist_kur(paketler, belgeler=belgeler)
+    kabul = izin["paketler"]
+    _olg = paketlerden_olgular(kabul, belgeler=belgeler)
+    return {"paketler": kabul,
+            "olgular": _olg,
+            "allowlist": izin["allowlist"],
+            "replay_belgeleri": belgeler,
+            "redler": list(rapor.get("redler") or []) + list(izin["redler"]),
+            "snapshot": izin["snapshot"],
+            "ham_kaynak": int(rapor.get("ham_kaynak") or 0)}
+
+
 def fact_bagla(scenes, olgular, *, esik: float = None,
                yalnizca_footage: bool = True) -> dict:
     """Sahneleri DOGRULANMIS iddialara bagla. Sahneleri YERINDE gunceller.
@@ -292,13 +407,80 @@ def fact_bagla(scenes, olgular, *, esik: float = None,
     return rapor
 
 
-def brief_kur(story: str, manifest, sonuc: Sonuc) -> str:
-    """Kullanici metnini DOGRULANMIS OLGULARLA zenginlestir.
+def olgu_blogu_paketten(olgular, sinir: int = MAKS_OLGU) -> str:
+    """ACCEPTED paketlerden turemis olgulari plan promptu blogu yap.
+
+    ⚠ OLCULEN KUSUR (`Y11B1-PLANNER-ESKI-CLAIM`, denetim): `brief_kur`
+    `olgu_blogu(manifest)` cagiriyordu — yani planner/narration promptu
+    hala CLAIM-FIRST zincirinden (`manifest.kullanilabilir_iddialar()`)
+    besleniyordu. `Sonuc.olgular` kanit-once havuzdan gelse bile MODELE
+    giden metin eski iddialardi: IKI FARKLI OTORITE.
+    ⚠ Artik TEK OTORITE: accepted FactPacket -> `Sonuc.olgular` -> prompt.
+    """
+    liste = [o for o in (olgular or []) if isinstance(o, dict)][:sinir]
+    if not liste:
+        return ""
+    satirlar = []
+    for o in liste:
+        alanlar = [a for a in (alan_adi(k.get("url", ""))
+                               for k in (o.get("kaynaklar") or [])) if a]
+        kaynak_not = (f" [{', '.join(sorted(set(alanlar))[:3])}]"
+                      if alanlar else "")
+        satirlar.append(f"- {o.get('metin', '')}{kaynak_not}")
+    return "\n".join(satirlar)
+
+
+def yetkili_olgular(sonuc: Sonuc) -> list:
+    """YETKILI olgu listesi — YALNIZCA MUHURLU kayitlardan TUREtilir.
+
+    ⚠ `Y11B1-HAM-DICT-OTORITE` + `-SIGNER-ORACLE`: `sonuc.olgular` HAM,
+    MUTABLE dictlerdi; damga temelli otorite ise imzalayiciyi ORACLE
+    yapiyordu.
+    ⚠ Artik otorite `sonuc.paketler` + `sonuc.replay_belgeleri` uzerinden
+    BURADA YENIDEN KOSULAN dogrulamadir. `sonuc.olgular` yalnizca GORUNUM.
+    """
+    return paketlerden_olgular(
+        getattr(sonuc, "paketler", None) or [],
+        belgeler=getattr(sonuc, "replay_belgeleri", None) or {})
+
+
+def olgu_otoritesi_gecerli_mi(sonuc: Sonuc) -> bool:
+    """Otorite (muhurlu kayit) VAR ve GECERLI mi?"""
+    return bool(yetkili_olgular(sonuc))
+
+
+def grounded_sonuc_hukmu(sonuc: Sonuc) -> dict:
+    """Grounded arastirmanin HUKMU. ⚠ TEK OLCUT: accepted paket sayisi.
+
+    ⚠ `Y11B1-PLANNER-ESKI-CLAIM`: hukum eskiden `dogrulanmis_iddia`
+    (CLAIM-FIRST zinciri) uzerindendi; manifestte claim varsa 0 accepted
+    paketle bile `ok=True` olup story ZENGINLESTIRILIYORDU.
+    """
+    yetkili = yetkili_olgular(sonuc)
+    ham = len(getattr(sonuc, "olgular", None) or [])
+    if ham and not yetkili:
+        # ⚠ Olgu GORUNUYOR ama MUHURLU otorite YOK/BOZUK.
+        return {"ok": False, "kod": "GROUNDED-OLGU-OTORITESI-YOK",
+                "accepted": 0,
+                "neden": "olgular MUHURLU kayitla dogrulanamadi"}
+    if yetkili:
+        return {"ok": True, "kod": "", "accepted": len(yetkili)}
+    return {"ok": False, "kod": "GROUNDED-FACT-YOK", "accepted": 0,
+            "neden": (f"{getattr(sonuc, 'dogrulanmis_iddia', 0)} claim-first "
+                      f"iddia KABUL GEREKCESI DEGIL")}
+
+
+def brief_kur(story: str, sonuc: Sonuc) -> str:
+    """Kullanici metnini ACCEPTED FactPacket olgulariyla zenginlestir.
 
     ⚠ Kullanicinin kendi metni HER ZAMAN birincil kalir; olgular EK bolumdur.
-    Hicbir olgu kullanicinin anlatisini ezmez, yalnizca dogruluk cercevesi verir.
+    ⚠ TEK OTORITE: yalnizca `sonuc.olgular` (accepted paketlerden turemis).
+    Accepted paket YOKSA metin AYNEN doner — eski manifest claim'i
+    story'ye GIREMEZ.
     """
-    blok = olgu_blogu(manifest)
+    # ⚠ `Y11B1-HAM-DICT-OTORITE`: otorite MUHURLU kayittir; ham
+    # `sonuc.olgular` KULLANILMAZ.
+    blok = olgu_blogu_paketten(yetkili_olgular(sonuc))
     if not blok:
         return story
     return (
@@ -392,11 +574,37 @@ def arastir_ve_zenginlestir(story: str, *, mod: str, is_adi: str,
                                 if getattr(i, "guven", "") == "celiskili")
         s.kaynak_sayisi = len(manifest.arastirma_url_kumesi)
         s.sorgular = list(manifest.arama_sorgulari)
-        # ⚠ YALNIZCA `senaryoya_girebilir` olanlar. `celiskili`/`cozulmedi`
-        # iddialar BURAYA GIRMEZ, dolayisiyla sahneye de giremez.
-        s.olgular = olgu_listesi(manifest)
     except Exception as e:
         s.dusus_ekle("sayim", f"{type(e).__name__}: {e}", "Sayilar okunamadi.")
+
+    # ── FAZ Y-11b-1: KANIT-ONCE HAVUZ, TEK OTORITE `allowlist_kur` ──
+    # ⚠ `Y11B1-PAKET-SONUCA-TASINMIYOR`: `olgular` eskiden CLAIM-FIRST
+    # zincirinden (`olgu_listesi(manifest)` -> `kullanilabilir_iddialar()`)
+    # geliyordu. Artik ARAMANIN BULDUGU GERCEK URL'ler indirilip belge
+    # metninden FactPacket cikarilir; kabul karari `allowlist_kur`indir.
+    # ⚠ Kanit REPLAY EDILEBILIR: getirilen belgeler `replay_belgeleri`
+    # olarak tasinir ve allowlist onlara karsi dogrulanir.
+    try:
+        _hav = paket_havuzu_kur(
+            s.konu, sorted(manifest.arastirma_url_kumesi),
+            erisim_tarihi=_bugun(), onbellek=onbellek, defter=defter)
+        s.paketler = list(_hav["paketler"])
+        s.replay_belgeleri = dict(_hav["replay_belgeleri"])
+        # ⚠ OLGULAR YALNIZCA ACCEPTED PAKETLERDEN TURER.
+        s.olgular = list(_hav["olgular"])
+        print(f"  FACTPACKET HAVUZU: {len(s.paketler)} kabul, "
+              f"{len(_hav.get('redler') or [])} red, "
+              f"{_hav.get('ham_kaynak')} belge, "
+              f"snapshot={_hav.get('snapshot')}", file=sys.stderr)
+        if not s.paketler:
+            s.dusus_ekle(
+                "factpacket",
+                "kanit-once havuzda KABUL EDILMIS paket yok",
+                "Anlatiya girebilecek kanitli olgu URETILEMEDI; "
+                "iddia UYDURULMADI.")
+    except Exception as e:                                   # noqa: BLE001
+        s.dusus_ekle("factpacket", f"{type(e).__name__}: {e}",
+                     "Kanit-once havuz kurulamadi; kanitli olgu YOK.")
 
     try:
         s.maliyet_usd = float(getattr(defter, "toplam", 0.0) or 0.0)
@@ -419,24 +627,66 @@ def arastir_ve_zenginlestir(story: str, *, mod: str, is_adi: str,
                      f"olguyla devam edildi.")
 
     s.sure_sn = time.time() - t0
-    if s.dogrulanmis_iddia == 0:
-        s.dusus_ekle("dogrulama", "hicbir iddia bagimsiz kaynakla dogrulanamadi",
-                     "Anlatim yalnizca kullanici metnine dayaniyor; videoda "
-                     "arastirma kaynakli olgu YOK.")
-        print(f"  ARASTIRMA: 0 dogrulanmis olgu ({s.iddia_sayisi} ham iddia, "
-              f"{s.kaynak_sayisi} kaynak) — metin zenginlestirilmedi", file=sys.stderr)
+    # ⚠ `Y11B1-PLANNER-ESKI-CLAIM`: hukum ARTIK accepted FactPacket
+    # sayisindan gelir. Eski `dogrulanmis_iddia` (claim-first zinciri)
+    # KABUL GEREKCESI DEGILDIR — manifestte claim olsa bile 0 accepted
+    # paket varsa sonuc BASARISIZDIR ve story ZENGINLESTIRILMEZ.
+    _hukum = grounded_sonuc_hukmu(s)
+    if not _hukum["ok"]:
+        s.dusus_ekle(
+            "factpacket",
+            "kanit-once havuzda KABUL EDILMIS paket yok "
+            f"({s.dogrulanmis_iddia} claim-first iddia KABUL GEREKCESI DEGIL)",
+            "Anlatim yalnizca kullanici metnine dayaniyor; videoda "
+            "kanitli olgu YOK.")
+        print(f"  ARASTIRMA: 0 KABUL EDILMIS paket "
+              f"({s.iddia_sayisi} ham iddia, {s.kaynak_sayisi} kaynak) — "
+              f"metin zenginlestirilmedi", file=sys.stderr)
         return story, s
 
     s.ok = True
-    print(f"  ARASTIRMA: {s.dogrulanmis_iddia}/{s.iddia_sayisi} olgu dogrulandi, "
-          f"{s.kaynak_sayisi} kaynak, {s.sure_sn:.0f} sn, ${s.maliyet_usd:.3f}",
-          file=sys.stderr)
-    return brief_kur(story, manifest, s), s
+    print(f"  ARASTIRMA: {len(s.olgular)} KABUL EDILMIS paket "
+          f"({s.iddia_sayisi} ham iddia, {s.kaynak_sayisi} kaynak), "
+          f"{s.sure_sn:.0f} sn, ${s.maliyet_usd:.3f}", file=sys.stderr)
+    return brief_kur(story, s), s
 
 
-def atif_satirlari(cikti_dizin: str, manifest_dosya: str, sinir: int = 40) -> list:
-    """Yazilmis manifestten kullaniciya gosterilecek kaynak listesi uret.
-    Dosya yoksa BOS liste doner (uydurma kaynak yazmaz)."""
+def atiflar_paketten(olgular, sinir: int = 40) -> list:
+    """ACCEPTED paketlerden atif/provenance satirlari.
+
+    ⚠ `Y11B1-IKI-OTORITE`: atiflar eskiden CLAIM-FIRST manifest dosyasindan
+    okunuyordu — planner bir otoriteden, atif BASKA bir otoriteden
+    besleniyordu; reddedilmis iddialarin URL'leri de kaynakcaya giriyordu.
+    ⚠ Artik atif da YALNIZCA accepted paketlerden turer.
+    """
+    gorulen, cikti = set(), []
+    for o in (olgular or []):
+        if not isinstance(o, dict):
+            continue
+        for k in (o.get("kaynaklar") or []):
+            u = str(k.get("url") or "")
+            if not u or u in gorulen:
+                continue
+            gorulen.add(u)
+            cikti.append({"url": u,
+                          "alan": str(k.get("alan") or alan_adi(u)),
+                          "tur": str(k.get("tur") or ""),
+                          "fact_id": str(o.get("fact_id") or "")})
+            if len(cikti) >= sinir:
+                return cikti
+    return cikti
+
+
+def atif_satirlari(cikti_dizin: str, manifest_dosya: str, sinir: int = 40,
+                   *, olgular=None) -> list:
+    """Kullaniciya gosterilecek kaynak listesi.
+
+    ⚠ `olgular` (accepted paketlerden turemis) verilirse TEK OTORITE odur;
+    manifest dosyasi OKUNMAZ. Geriye uyum icin `olgular` verilmezse eski
+    manifest yolu korunur.
+    """
+    if olgular is not None:
+        return atiflar_paketten(olgular, sinir)
     if not manifest_dosya:
         return []
     yol = os.path.join(cikti_dizin, manifest_dosya)

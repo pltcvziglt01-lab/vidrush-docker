@@ -315,10 +315,15 @@ def arastir(konu: str, *, erisim_tarihi: str, soru_adedi: int = 6,
                          (_kaynak_kur(h, erisim_tarihi) for h in (ham.get("kaynaklar") or []))
                          if k]
             if not kaynaklar:
-                # Model atif vermediyse aramanin genel atiflarina bakilir
-                kaynaklar = [k for k in
-                             (_kaynak_kur(h, erisim_tarihi)
-                              for h in (sonuc.get("atiflar") or [])[:2]) if k]
+                # ⚠ FAZ Y-11b (`Y11B-GENEL-ATIF-FALLBACK`) — KALDIRILDI.
+                # ESKI DAVRANIS: model bir iddiaya atif vermezse ARAMANIN
+                # GENEL ilk 2 atfi o iddiaya YAPISTIRILIYORDU. Iddia ile o
+                # sayfanin ilgisi OLCULMEMISTIR; bu, kod tarafindan
+                # UYDURULMUS bir iddia-kaynak bagidir ve manifestte birden
+                # cok iddianin ayni 2 URL'yi tasimasina yol aciyordu.
+                # ⚠ Artik iddia KAYNAKSIZ kalir ve GORUNUR olur.
+                manifest.notlar.append(
+                    f"KAYNAKSIZ-IDDIA: {metin[:100]}")
             if imza in gorulen_iddia:
                 mevcut = gorulen_iddia[imza]
                 var_url = {k.url for k in mevcut.kaynaklar}

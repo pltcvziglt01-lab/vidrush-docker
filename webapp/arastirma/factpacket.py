@@ -80,6 +80,8 @@ RED_KODLARI = (
     "Y11-FACT-ID-UYUMSUZ",      # fact_id icerikten turemiyor (elle yazilmis)
     "Y11-DESTEK-CELISKI",       # ayni onermeye support + refute
     "Y11-CIKARIM-BASARISIZ",    # cikarici hata verdi
+    "Y11-ONERME-QUOTE-UYUMSUZ", # onerme, kendi quote'unun soylemedigini iddia ediyor
+    "Y11-REFUTE-COZULMEDI",     # refute Y-11b-1'de fail-closed unresolved
 )
 
 # Bu dosyanin karar kodu — testler ve handoff bunu arar.
@@ -140,6 +142,318 @@ def fact_id_uret(onerme: str, exact_quote: str, source_id: str) -> str:
     """
     ham = f"{normalize(onerme)}|{normalize(exact_quote)}|{str(source_id or '')}"
     return "f" + hashlib.sha256(ham.encode("utf-8")).hexdigest()[:16]
+
+
+# ─────────────── ONERME <-> QUOTE UYUMU (STANCE-AWARE) ───────────────
+# ⚠ OLCULEN KUSUR (`Y11B1-ONERME-QUOTE-UYUMSUZ`): belge ve quote "76,941
+# cases" derken ONERME "999,999 cases" diyebiliyordu; `paket_dogrula`
+# yalnizca quote'un belgede gectigini olcuyor, onermenin QUOTE TARAFINDAN
+# desteklendigini HIC olcmuyordu.
+# ⚠ OLCULEN KUSUR (`Y11B1-UYUM-IMPORT-FAIL-OPEN`, denetim): ilk duzeltme
+# bu kontrolu `fact_baglama`dan IMPORT ediyor ve `except ImportError: pass`
+# ile GECIYORDU — import kirilirsa uydurma rakam KABUL EDILIYORDU. Kontrol
+# artik BU MODULUN ICINDE; capraz import YOK, fail-open YOK.
+# ⚠ OLCULEN KUSUR (`Y11B1-UYUM-STANCE-KOR`, denetim): kontrol `refute`
+# paketlere de SUPPORT entailment'i uyguluyordu. `refute` quote'unun
+# onermenin rakamini TEKRAR ETMESI beklenemez (celisen bir deger tasir);
+# sonuc: refute paket duser, support tek basina kabul edilir ve CELISKI
+# SESSIZCE SUPPORT LEHINE COZULURDU. Kapi artik STANCE-AWARE.
+_OZEL_AD_UYUM = re.compile(r"\b([A-ZÇĞİÖŞÜ][\wçğıöşü]{2,})\b")
+_BIRIM_UYUM = re.compile(
+    r"\b(%|yuzde|percent|kisi|vaka|case[s]?|deaths?|olum|km|kg|ton|tl|usd|"
+    r"eur|dolar|euro|milyon|milyar|bin|thousand|million|billion)\b", re.I)
+_YIL_UYUM = re.compile(r"\b(1[6-9]\d{2}|20\d{2})\b")
+_SAYI_UYUM = re.compile(r"\d[\d.,]*")
+# `refute` icin ACIK CELISKI isaretleri.
+_CELISKI_ISARETI = (
+    "no ", "not ", "never", "none", "contradict", "denies", "denied",
+    "disput", "refut", "false", "incorrect", "yok", "degil", "aksine",
+    "yalanla", "reddet",
+)
+
+
+def _uyum_sayilar(metin: str) -> set:
+    out = set()
+    for m in _SAYI_UYUM.finditer(str(metin or "")):
+        sade = m.group(0).rstrip(".,").replace(",", "").replace(".", "")
+        if sade.isdigit():
+            out.add(sade.lstrip("0") or "0")
+    return out
+
+
+def _uyum_ozel_adlar(metin: str) -> set:
+    """Cumle BASINDAKI buyuk harf ozel ad SAYILMAZ (yanlis pozitif)."""
+    d = str(metin or "").strip()
+    return {m.group(1).lower() for m in _OZEL_AD_UYUM.finditer(d)
+            if m.start() > 0}
+
+
+_UYUM_YAYGIN = frozenset({
+    "this", "that", "with", "from", "have", "been", "were", "their", "which",
+    "about", "there", "these", "those", "than", "then", "also", "into",
+    "more", "most", "over", "some", "such", "only", "other", "after",
+    "every", "each", "they", "them", "when", "what", "will", "would",
+    "icin", "ile", "olarak", "daha", "gibi", "kadar", "sonra", "once",
+    "olan", "oldu", "ancak", "yani", "bunu", "bunun",
+})
+# ⚠ POLARITE isaretleri. Onerme ile quote'un polaritesi AYNI olmali;
+# aksi halde quote onermeyi DESTEKLEMEZ, CURUTUR.
+_POLARITE = re.compile(
+    r"(?:^|\W)(not|no|never|none|nor|without|n't|cannot|"
+    r"degil|değil|yok|hic|hiç|asla|olmadan)(?:\W|$)", re.I)
+
+
+def _uyum_icerik(metin: str) -> set:
+    return {k.lower() for k in re.findall(
+        r"[0-9a-zA-ZçğıöşüÇĞİÖŞÜ]{4,}", str(metin or ""))
+        if k.lower() not in _UYUM_YAYGIN}
+
+
+def _polarite(metin: str) -> bool:
+    """Metin OLUMSUZ mu? (basit, deterministik polarite isareti)"""
+    return bool(_POLARITE.search(str(metin or "")))
+
+
+# Olumsuzlamanin ERISTIGI pencere (token). Yuklem + nesne icin 3 yeter.
+_NEG_PENCERE = 3
+
+
+def _negatif_kapsam(metin: str) -> set:
+    """Hangi ICERIK terimleri OLUMSUZLANIYOR? (kapsam bagi)
+
+    ⚠ OLCULEN KUSUR (`Y11B1-NEGATION-SCOPE-KOR`, denetim): TEK bir global
+    polarite bayragi kapsami AYIRT EDEMIYOR. "Drug does not increase
+    mortality but reduce hospitalization" ile "Drug increase mortality but
+    does not reduce hospitalization" ikisinde de BIR olumsuzlama var —
+    global bayrak esit cikiyor ve TERS ANLAM PASS aliyordu.
+    ⚠ Bu fonksiyon olumsuzlama isaretinden SONRAKI icerik terimlerini
+    dondurur; support tarafinda bu KUMELERIN ESIT olmasi sart.
+    """
+    d = str(metin or "")
+    parcalar = re.findall(r"[0-9A-Za-zçğıöşüÇĞİÖŞÜ']+", d)
+    kucuk = [t.lower() for t in parcalar]
+    neg = {"not", "no", "never", "none", "nor", "without", "cannot",
+           "n't", "degil", "değil", "yok", "hic", "hiç", "asla", "olmadan"}
+    kapsam = set()
+    for i, t in enumerate(kucuk):
+        if t not in neg:
+            continue
+        alindi = 0
+        for j in range(i + 1, len(kucuk)):
+            if alindi >= _NEG_PENCERE:
+                break
+            k = kucuk[j]
+            if k in neg:
+                break
+            if len(k) >= 4 and k not in _UYUM_YAYGIN:
+                kapsam.add(k)
+                alindi += 1
+    return kapsam
+
+
+_EKLER = ("ies", "ing", "ed", "es", "s")
+
+
+def _kok(terim: str) -> str:
+    """Cok hafif, SOZLUKSUZ kok: yalnizca yaygin cekim ekleri atilir.
+
+    ⚠ Amac PARAPHRASE toleransi (record/recorded), ANTONIM toleransi
+    DEGIL: reduce/increase, approve/reject, earn/spend, death/birth
+    kokleri de FARKLI kalir.
+    """
+    t = str(terim or "").lower()
+    if len(t) <= 4:
+        return t
+    for ek in _EKLER:
+        if t.endswith(ek) and len(t) - len(ek) >= 4:
+            return t[: -len(ek)]
+    return t
+
+
+# ⚠ TAM ZAMAN KAPSAMI: yil TEK BASINA yetmez (`Y11B1-ZAMAN-KAPSAMI-KABA`).
+_TARIH = re.compile(r"\b((?:1[6-9]|20)\d{2})(?:[-/.](\d{1,2}))?(?:[-/.](\d{1,2}))?\b")
+# Bilesik claim baglaclari — ATOMIK sozlesme (`Y11B1-BILESIK-CLAIM-GECIYOR`).
+_BILESIK = re.compile(
+    r"(?:^|\W)(but|however|whereas|while|although|though|yet|"
+    r"ama|fakat|ancak|oysa|buna ragmen)(?:\W|$)|;", re.I)
+
+
+def _zaman_kapsami(metin: str) -> set:
+    """Metindeki ZAMAN kapsamlari: `YYYY`, `YYYY-MM`, `YYYY-MM-DD`."""
+    out = set()
+    for y, ay, gun in _TARIH.findall(str(metin or "")):
+        if ay and gun:
+            out.add(f"{y}-{int(ay):02d}-{int(gun):02d}")
+        elif ay:
+            out.add(f"{y}-{int(ay):02d}")
+        else:
+            out.add(y)
+    return out
+
+
+def zaman_ortusur(a: set, b: set) -> bool:
+    """Iki kapsam AYNI mi? ⚠ EN INCE granulariteden karsilastirilir.
+
+    ⚠ `Y11B1-ZAMAN-KAPSAMI-KABA`: yalnizca YIL karsilastirmak
+    2024-01 destegi ile 2024-02 reddini AYNI kapsam sayiyordu.
+    """
+    if not a or not b:
+        return False
+    a_ince = max((x.count("-") for x in a), default=0)
+    b_ince = max((x.count("-") for x in b), default=0)
+    ince = min(a_ince, b_ince)
+
+    def _kes(k):
+        return {"-".join(x.split("-")[: ince + 1]) for x in k}
+    return bool(_kes(a) & _kes(b))
+
+
+def atomik_mi(metin: str) -> bool:
+    """Onerme TEK bir onerme mi? ⚠ Bilesik claim FAIL-CLOSED reddedilir."""
+    return not bool(_BILESIK.search(str(metin or "")))
+
+
+def _cekirdek(metin: str) -> set:
+    """Claim'in TASIYICI cekirdegi: icerik terimleri eksi sayilar/yillar.
+
+    ⚠ Sayilar ve yillar AYRI kurallarla denetlenir; cekirdek ozne +
+    yuklem + olcu terimlerini tasir.
+    """
+    yil = set(_YIL_UYUM.findall(str(metin or "")))
+    return {_kok(t) for t in _uyum_icerik(metin)
+            if not t.isdigit() and t not in yil}
+
+
+def onerme_quote_uyumu(onerme: str, exact_quote: str,
+                       stance: str = "support") -> tuple:
+    """ONERME ile kendi `exact_quote`u UYUMLU mu? `(ok, kod, neden)`.
+
+    ⚠ STANCE-AWARE ve FAIL-CLOSED. Bag-of-words ORANI DEGIL; claim'in
+    TASIYICI CEKIRDEGI (ozne + yuklem + olcu) ve POLARITESI olculur.
+
+    · `support` — ENTAILMENT, uc sart BIRLIKTE:
+        (a) onermedeki her AYIRT EDICI deger (sayi/yil/ozel ad/birim)
+            quote'ta GECMELI,
+        (b) onermenin TASIYICI CEKIRDEGININ TAMAMI quote'ta GECMELI
+            (%100; oran esigi YOK),
+        (c) POLARITE ayni olmali.
+      ⚠ ONCEKI TUR (`Y11B1-SUPPORT-BOSLUK-FAIL-OPEN`): sayi/yil/entity/
+      birim TASIMAYAN iki ILGISIZ cumle, "eksik deger yok" diye VAKUMDA
+      PASS aliyordu; icerik ortusmesi sarti eklendi.
+      ⚠ OLCULEN KUSUR (`Y11B1-SUPPORT-POLARITE-KOR`, denetim): %50
+      bag-of-words esigi TERS ANLAMLI ciftleri geciriyordu —
+      "treatment reduces mortality" / "treatment increases mortality",
+      "policy improves public health" / "policy harms public health",
+      "agency approved vaccine" / "agency rejected vaccine",
+      "court found defendant guilty" / "court found defendant not guilty".
+      Ilk uc (b) ile, dorduncusu (c) ile duser.
+
+    · `refute` — ACIK CELISKI, dort sart BIRLIKTE:
+        (a) AYNI OZNE (onermenin ozel adlari quote'ta),
+        (b) AYNI ZAMAN KAPSAMI (iki taraf da yil tasiyorsa kesismeli),
+        (c) AYNI YUKLEM/OLCU CEKIRDEGI (cekirdegin TAMAMI quote'ta),
+        (d) CELISKI: ayni olcu icin FARKLI deger ya da ACIK olumsuzlama.
+      ⚠ ONCEKI TUR (`Y11B1-REFUTE-ESIK-GEVSEK`): "ortak birim + farkli
+      sayi" celiski sayiliyordu (Japan/France, Tokyo/Osaka, Alpha/Beta);
+      ozne ve zaman kapsami sartlari eklendi.
+      ⚠ OLCULEN KUSUR (`Y11B1-REFUTE-METRIK-KOR`, denetim): ayni ozne ve
+      ayni yil YETMIYOR — "unemployment 5%" / "inflation 9%",
+      "recorded 100 deaths" / "200 births", "earned 5m USD" / "spent 7m
+      USD" farkli OLCU/YUKLEM tasidigi icin CELISKI DEGILDIR.
+    """
+    o, q = str(onerme or ""), str(exact_quote or "")
+    d = str(stance or "support").lower()
+    o_yil, q_yil = set(_YIL_UYUM.findall(o)), set(_YIL_UYUM.findall(q))
+    o_sayi = {x for x in _uyum_sayilar(o) if not (len(x) == 4 and x in o_yil)}
+    q_sayi = {x for x in _uyum_sayilar(q) if not (len(x) == 4 and x in q_yil)}
+    o_ad, q_ad = _uyum_ozel_adlar(o), _uyum_ozel_adlar(q)
+    o_birim = {x.lower() for x in _BIRIM_UYUM.findall(o)}
+    q_birim = {x.lower() for x in _BIRIM_UYUM.findall(q)}
+    o_cek, q_cek = _cekirdek(o), _cekirdek(q)
+    eksik_cek = sorted(o_cek - q_cek)
+
+    if d == "refute":
+        # ⚠ OLCULEN KUSUR (`Y11B1-REFUTE-NLI-YOK`, denetim): "celiski"
+        # kararini token/pattern kurallariyla vermek her turda yeni bir
+        # kacak uretti (farkli ozne, farkli olcu, farkli donem, ilgisiz
+        # olumsuzlama, soylenti/soru cumleleri...). ⚠ Y-11b-1'de refute
+        # paketleri FAIL-CLOSED `unresolved`'dir: allowlist'e GIRMEZ ve
+        # CELISKI KURMAZ (gecerli support'u ZEHIRLEYEMEZ). Gercek NLI
+        # dogrulayicisi gelene kadar bu sozlesme GEVSETILMEZ.
+        return (False, "Y11-REFUTE-COZULMEDI",
+                "refute Y-11b-1'de fail-closed UNRESOLVED "
+                "(dedicated NLI dogrulayicisi yok)")
+    if False:
+        if not (atomik_mi(o) and atomik_mi(q)):
+            return (False, "Y11-ONERME-QUOTE-UYUMSUZ",
+                    "refute BILESIK: atomik tek-onerme sozlesmesi ihlali")
+        eksik_ozne = sorted(o_ad - q_ad)
+        if eksik_ozne:
+            return (False, "Y11-ONERME-QUOTE-UYUMSUZ",
+                    f"refute FARKLI OZNE: {eksik_ozne[:3]}")
+        o_zaman, q_zaman = _zaman_kapsami(o), _zaman_kapsami(q)
+        if o_zaman and q_zaman and not zaman_ortusur(o_zaman, q_zaman):
+            return (False, "Y11-ONERME-QUOTE-UYUMSUZ",
+                    f"refute FARKLI DONEM: {sorted(o_zaman)} vs "
+                    f"{sorted(q_zaman)}")
+        if eksik_cek:
+            return (False, "Y11-ONERME-QUOTE-UYUMSUZ",
+                    f"refute FARKLI YUKLEM/OLCU: quote'ta gecmeyen cekirdek "
+                    f"{eksik_cek[:4]}")
+        farkli_deger = bool(q_sayi and o_sayi and (q_sayi - o_sayi))
+        # ⚠ OLCULEN KUSUR (`Y11B1-REFUTE-POLARITE-TEK-YONLU`, denetim):
+        # yalnizca "quote olumsuz, onerme olumlu" celiski sayiliyordu.
+        # NEGATIF bir claim'i POZITIF bir quote da CURUTUR.
+        # Celiski: global polarite farki YA DA olumsuzlama KAPSAMI farki.
+        olumsuz = (_polarite(q) != _polarite(o)
+                   or _negatif_kapsam(q) != _negatif_kapsam(o))
+        if not (farkli_deger or olumsuz):
+            return (False, "Y11-ONERME-QUOTE-UYUMSUZ",
+                    "refute ACIK CELISKI tasimiyor "
+                    "(farkli deger ya da olumsuzlama yok)")
+        return True, "", ""
+
+    # ── support: TAM ESITLIK (EN GUVENLI MVP) ──
+    # ⚠ OLCULEN KUSUR (`Y11B1-EXTRACTIVE-YETMEZ`, denetim): "onerme
+    # quote'un BIR PARCASI" kurali bile quote BAGLAMINI kaybettiriyordu —
+    # "It is false that X", "Officials denied X", soru/soylenti cumleleri
+    # icindeki X, quote'un ALT DIZGISI oldugu icin DESTEKLENMIS sayiliyordu.
+    # ⚠ Gevsek kural EKLEMEK yerine EN DAR sozlesme: onerme, normalize
+    # edilmis `exact_quote` ile TAM ESIT olmali. Paraphrase/alt-dizgi YOK.
+    # Boylece "quote sunu soyluyor" iddiasi TANIM GEREGI dogrudur.
+    if not atomik_mi(o):
+        return (False, "Y11-ONERME-QUOTE-UYUMSUZ",
+                "onerme BILESIK: atomik tek-onerme sozlesmesi ihlali")
+    if normalize(o) != normalize(q):
+        return (False, "Y11-ONERME-QUOTE-UYUMSUZ",
+                "onerme exact_quote ile TAM ESIT degil "
+                "(alt-dizgi/paraphrase KABUL EDILMEZ)")
+    return True, "", ""
+
+
+def _kullanilmayan_support_kontrolleri(o, q, o_sayi, q_sayi, o_yil, q_yil,
+                                       o_ad, q_ad, o_birim, q_birim,
+                                       eksik_cek):
+    """⚠ TARIHSEL: TAM ESITLIK sozlesmesinden ONCEKI parcali kontroller.
+    Artik cagrilmiyor; sozlesme degisirse referans olsun diye korunuyor."""
+    eksik_sayi = sorted(o_sayi - q_sayi)
+    eksik_yil = sorted(o_yil - q_yil)
+    eksik_ad = sorted(o_ad - q_ad)
+    eksik_birim = sorted(o_birim - q_birim)
+    if eksik_sayi or eksik_yil or eksik_ad or eksik_birim or eksik_cek:
+        return False
+    if _polarite(o) != _polarite(q):
+        return (False, "Y11-ONERME-QUOTE-UYUMSUZ",
+                f"POLARITE ters: onerme={'olumsuz' if _polarite(o) else 'olumlu'}"
+                f", quote={'olumsuz' if _polarite(q) else 'olumlu'}")
+    # ⚠ `Y11B1-NEGATION-SCOPE-KOR`: global polarite esit olsa bile
+    # OLUMSUZLAMANIN NEYE bagli oldugu FARKLI olabilir.
+    o_neg, q_neg = _negatif_kapsam(o), _negatif_kapsam(q)
+    if o_neg != q_neg:
+        return (False, "Y11-ONERME-QUOTE-UYUMSUZ",
+                f"OLUMSUZLAMA KAPSAMI farkli: onerme={sorted(o_neg)[:4]} "
+                f"quote={sorted(q_neg)[:4]}")
+    return True, "", ""
 
 
 # ─────────────────────────── KANIT DOGRULAMA ───────────────────────────
@@ -214,6 +528,11 @@ class FactPacket:
     kategori: str = "baglam"
     kritik: bool = False
     rol: str = ""                   # bolum plani atar (hook|baglam|kanit|karsitlik|sonuc)
+    # ⚠ FAZ Y-11b: KABUL DURUMU. ⚠ VARSAYILAN BOS — "accepted" YALNIZCA
+    # `paket_dogrula` gectikten sonra URETICI tarafindan damgalanir.
+    # Alan bos ise `fact_baglama.allowlist_kur` paketi REDDEDER; boylece
+    # "alan yoksa accepted say" gevsemesi YAPISAL OLARAK imkansizdir.
+    verification_status: str = ""
 
     def sozluk(self) -> dict:
         return {
@@ -225,6 +544,7 @@ class FactPacket:
             "yayin_tarihi": self.yayin_tarihi,
             "erisim_tarihi": self.erisim_tarihi, "birincil": self.birincil,
             "kategori": self.kategori, "kritik": self.kritik, "rol": self.rol,
+            "verification_status": self.verification_status,
         }
 
 
@@ -279,6 +599,14 @@ def paket_dogrula(paket: FactPacket, belge_metni: str) -> dict:
         return _red("Y11-ALINTI-SAYFADA-YOK", "alinti belgede birebir gecmiyor")
     if str(paket.stance or "").lower() not in STANCE_DEGERLERI:
         return _red("Y11-STANCE-GECERSIZ", f"stance={paket.stance!r}")
+    # ⚠ FAZ Y-11b-1: quote belgede gecse bile ONERME quote'un SOYLEMEDIGI
+    # bir deger iddia edemez. ⚠ Kontrol BU MODULUN ICINDE (capraz import
+    # ve `except ImportError: pass` FAIL-OPEN'i KALDIRILDI).
+    _ok, _kod, _neden = onerme_quote_uyumu(paket.onerme, paket.exact_quote,
+                                           paket.stance)
+    if not _ok:
+        # ⚠ Donen KODU olduğu gibi tasi (refute -> `Y11-REFUTE-COZULMEDI`).
+        return _red(_kod or "Y11-ONERME-QUOTE-UYUMSUZ", _neden)
     beklenen = fact_id_uret(paket.onerme, paket.exact_quote, paket.source_id)
     if paket.fact_id != beklenen:
         return _red("Y11-FACT-ID-UYUMSUZ",
@@ -379,6 +707,9 @@ def havuz_kur(konu: str, urller, *, erisim_tarihi: str,
                     stance=str(ham.get("stance") or "support"))
                 karar = paket_dogrula(paket, metin)
                 if karar["kabul"]:
+                    # ⚠ FAZ Y-11b: KABUL DAMGASI yalnizca dogrulama
+                    # GECTIKTEN sonra basilir.
+                    paket.verification_status = "accepted"
                     adaylar.append(paket)
                 else:
                     redler.append({"kod": karar["kod"], "url": u,
@@ -412,9 +743,17 @@ def havuz_kur(konu: str, urller, *, erisim_tarihi: str,
     return kabul, rapor
 
 
-def allowlist(paketler) -> set:
-    """Cekimlerin tasiyabilecegi TEK gecerli fact_id kumesi."""
-    return {p.fact_id for p in (paketler or []) if getattr(p, "fact_id", "")}
+def allowlist(paketler, *_a, **_k):
+    """⚠ KALDIRILDI (`Y11B1-IKINCI-OTORITE`).
+
+    OLCULEN KUSUR (denetim): bu yardimci, `verification_status` ve KANIT
+    REPLAY'i HIC bakmadan ham `fact_id` kumesi donduruyordu — yani
+    "allowlist" adiyla IKINCI, DOGRULAMASIZ bir otorite yaratiyordu.
+    ⚠ TEK OTORITE `fact_baglama.allowlist_kur(paketler, belgeler=...)`.
+    """
+    raise NotImplementedError(
+        "Y11B1-IKINCI-OTORITE: factpacket.allowlist KALDIRILDI. "
+        "fact_baglama.allowlist_kur(paketler, belgeler=...) kullanin.")
 
 
 def havuz_yeterli_mi(paketler, *, gereken: int) -> dict:

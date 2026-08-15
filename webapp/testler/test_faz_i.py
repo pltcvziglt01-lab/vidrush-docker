@@ -2961,8 +2961,18 @@ kontrol("olgu listesi kaynak/alan bilgisini TASIYOR",
 
 # Celiskili bir iddia ELLE havuza konsa bile sahneye giremez mi?
 # (havuz `olgu_listesi`den gelir; bu test filtrenin TEK kapi oldugunu kilitler)
-kontrol("sahneye giren havuz YALNIZCA olgu_listesi'nden kuruluyor",
-        "s.olgular = olgu_listesi(manifest)" in oku(KOK, "arastirma_kopru.py"))
+# ⚠ FAZ Y-11b-1 — BU IDDIA BILINCLI OLARAK DEGISTIRILDI.
+# ESKI IDDIA: "sahneye giren havuz YALNIZCA `olgu_listesi`'nden kuruluyor".
+# `olgu_listesi` CLAIM-FIRST zincirinden besleniyordu
+# (`manifest.kullanilabilir_iddialar()`), yani havuz MODELIN cumlelerine
+# dayaniyordu. Y-11b-1 havuzu KANIT-ONCE yaptı: indirilen belge ->
+# FactPacket -> `fact_baglama.allowlist_kur` (TEK OTORITE) -> olgu.
+_AK_KAYNAK_Y11B1 = oku(KOK, "arastirma_kopru.py")
+kontrol("⭐ Y-11b-1: sahneye giren havuz ACCEPTED FactPacket'ten kuruluyor",
+        "paketlerden_olgular(" in _AK_KAYNAK_Y11B1
+        and "paket_havuzu_kur(" in _AK_KAYNAK_Y11B1
+        and "allowlist_kur" in _AK_KAYNAK_Y11B1,
+        "havuz hala claim-first zincirinden besleniyor")
 
 # ── ACIK SECIM KORUNUYOR ──
 _S2 = _sahneler()

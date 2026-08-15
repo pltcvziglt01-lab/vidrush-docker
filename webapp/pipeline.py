@@ -5757,8 +5757,19 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
              # Uretim sirasinda hesaplanacak" YAZIYORDU ama hicbir zaman
              # hesaplanmiyordu. Artik gercek sayilar burada.
              "arastirma": arastirma_sonuc.sozluk(),
+             # ⚠ FAZ Y-11b-1 (`Y11B1-IKI-OTORITE`): atiflar da planner ile
+             # AYNI otoriteden — accepted FactPacket'lerden turemis
+             # `olgular`dan — gelir. Eskiden CLAIM-FIRST manifest dosyasi
+             # okunuyordu ve REDDEDILMIS iddialarin URL'leri de kaynakcaya
+             # giriyordu.
+             # ⚠ FAZ Y-11b-1 (`Y11B1-RAW-ATIF`): atiflar HAM
+             # `arastirma_sonuc.olgular` dictlerinden uretiliyordu; o liste
+             # mutable bir GORUNUMDUR ve zehirli URL tasiyabilir. Artik
+             # `yetkili_olgular` ile paket+replay belgeleri uzerinden
+             # YENIDEN DOGRULANMIS otoriteden turer.
              "kaynaklar": arastirma_kopru.atif_satirlari(
-                 CIKTI_DIR, arastirma_sonuc.manifest_dosya),
+                 CIKTI_DIR, arastirma_sonuc.manifest_dosya,
+                 olgular=arastirma_kopru.yetkili_olgular(arastirma_sonuc)),
              # Gorunur dusus kayitlari: hangi asamada neden geri duselduği.
              "dususler": list(arastirma_sonuc.dususler),
              # ⚠ FAZ R-1d-e: RENDER EDILEN zaman cizgisinin PRE-QA'si.

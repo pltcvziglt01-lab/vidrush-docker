@@ -90,6 +90,11 @@ SAYFA_C = (
     "Daily blog\n\n"
     "Some say the number of solitary deaths in Japan was 21,000 in 2024, "
     "which contradicts the police figure.\n"
+    # ⚠ Y-11b-1: `refute` kapisi ACIK CELISKI ister (ayni konu + farkli
+    # deger ya da olumsuzlama). Bu cumle AYNI olguyu ozel adlariyla ele
+    # alip olumsuzluyor; celiski kurgusu bunun uzerine kuruluyor.
+    "The National Police Agency recorded no such cases of people who died "
+    "alone at home.\n"
 )
 
 URL_A = "https://www.npa.go.jp/english/report-2024.html?utm_source=x"
@@ -253,13 +258,13 @@ _getir = sahte_getirici({
 _cikar = sahte_cikarici({
     URL_A: [
         # 1) gercek kanit
-        {"onerme": "In 2024 the National Police Agency recorded 76,941 cases "
-                   "of people who died alone at home",
-         "alinti": "the National Police Agency recorded 76,941 cases of people "
-                   "who died alone at home",
+        {"onerme": "In 2024, the National Police Agency recorded 76,941 "
+                   "cases of people who died alone at home",
+         "alinti": "In 2024, the National Police Agency recorded 76,941 "
+                   "cases of people who died alone at home",
          "kategori": "rakam", "stance": "support"},
         # 2) gercek kanit
-        {"onerme": "39.4% of those cases were aged 75 or older",
+        {"onerme": "Of these, 39.4% were aged 75 or older",
          "alinti": "Of these, 39.4% were aged 75 or older",
          "kategori": "rakam", "stance": "support"},
         # 3) UYDURMA — sayfada gecmiyor
@@ -318,33 +323,65 @@ kontrol("yeterlilik ham kaynaga DEGIL kabul edilen pakete bakar",
         "bos havuz yeterli sayildi")
 
 
-blok("Y-11/9 — DESTEK/RED CELISKISI IKI PAKETI DE DUSURUR")
+blok("Y-11/9 — REFUTE FAIL-CLOSED UNRESOLVED; SUPPORT ZEHIRLENMEZ")
 
+# ⚠ FAZ Y-11b-1 — SOZLESME BILINCLI DEGISTI (`Y11B1-REFUTE-NLI-YOK`).
+# ESKI IDDIA: "destek/red celiskisi IKI PAKETI DE dusurur". O celiski
+# karari token/pattern kurallariyla veriliyordu ve her denetim turunda yeni
+# bir kacak uretti (farkli ozne, farkli olcu, farkli donem, ilgisiz
+# olumsuzlama, "It is false that ...", soylenti/soru cumleleri).
+# ⚠ YENI SOZLESME: `refute` paketleri Y-11b-1'de FAIL-CLOSED
+# `unresolved`dir — allowlist'e GIRMEZ ve CELISKI KURMAZ. Boylece GECERLI
+# bir support paketi UYDURMA ya da ILGISIZ bir refute ile ZEHIRLENEMEZ.
+# Gercek celiski karari DEDICATED NLI dogrulayicisiyla gelecek.
 _getir3 = sahte_getirici({
     URL_A: {"baslik": "NPA report 2024", "metin": SAYFA_A},
     URL_C: {"baslik": "Daily blog", "metin": SAYFA_C},
 })
+_ONERME_CELISKI = ("In 2024, the National Police Agency recorded 76,941 "
+                   "cases of people who died alone at home")
 _cikar3 = sahte_cikarici({
-    URL_A: [{"onerme": "Japan recorded 76,941 solitary deaths in 2024",
-             "alinti": "recorded 76,941 cases of people who died alone at home",
+    URL_A: [{"onerme": _ONERME_CELISKI, "alinti": _ONERME_CELISKI,
              "kategori": "rakam", "stance": "support"}],
-    URL_C: [{"onerme": "Japan recorded 76,941 solitary deaths in 2024",
-             "alinti": "the number of solitary deaths in Japan was 21,000 in 2024",
+    URL_C: [{"onerme": _ONERME_CELISKI,
+             "alinti": "The National Police Agency recorded no such cases "
+                       "of people who died alone at home",
              "kategori": "rakam", "stance": "refute"}],
 })
 _h3, _r3 = fp.havuz_kur("konu", [URL_A, URL_C], erisim_tarihi="2026-08-15",
                         getirici=_getir3, cikarici=_cikar3)
-kontrol("celiskili onerme HICBIR pakette kabul edilmez", len(_h3) == 0,
-        f"kabul={len(_h3)}: {[p.onerme for p in _h3]}")
-kontrol("celiski red kodu yazilir",
-        any(r.get("kod") == "Y11-DESTEK-CELISKI"
+kontrol("refute paketi havuza GIRMEZ (unresolved)",
+        all(p.stance != "refute" for p in _h3), f"{[p.stance for p in _h3]}")
+kontrol("refute red kodu yazilir",
+        any(r.get("kod") == "Y11-REFUTE-COZULMEDI"
             for r in (_r3.get("redler") or [])),
         f"redler: {_r3.get('redler')}")
+kontrol("GECERLI support refute ile ZEHIRLENMEZ",
+        any(p.onerme == _ONERME_CELISKI and p.stance == "support"
+            for p in _h3),
+        f"kabul={[p.onerme for p in _h3]}")
 
 
 blok("Y-11/10 — BILINMEYEN / ONCEDEN DOLDURULMUS fact_id REDDEDILIR")
 
-_izin = fp.allowlist(_havuz)
+# ⚠ FAZ Y-11b-1 (`Y11B1-IKINCI-OTORITE`): `factpacket.allowlist` KALDIRILDI
+# — `verification_status` ve KANIT REPLAY'ine bakmadan ham fact_id kumesi
+# donduruyordu, yani ikinci ve DOGRULAMASIZ bir otoriteydi. TEK OTORITE
+# `fact_baglama.allowlist_kur(paketler, belgeler=...)`.
+import fact_baglama as _fbg_y11   # noqa: E402
+
+kontrol("eski ikinci otorite KALDIRILDI",
+        (lambda: (fp.allowlist([]), False)[1])() if False else True)
+try:
+    fp.allowlist([])
+    _kaldirildi = False
+except NotImplementedError:
+    _kaldirildi = True
+kontrol("factpacket.allowlist artik NotImplementedError", _kaldirildi,
+        "ikinci otorite hala calisiyor")
+_izin = _fbg_y11.allowlist_kur(
+    _havuz, belgeler={fp.source_id_uret(URL_A): SAYFA_A,
+                      fp.source_id_uret(URL_B): SAYFA_B})["allowlist"]
 kontrol("allowlist yalnizca kabul edilen fact_id'leri icerir",
         _izin == {p.fact_id for p in _havuz}, "allowlist havuzla ortusmuyor")
 kontrol("bilinmeyen fact_id allowlist'te degil",
