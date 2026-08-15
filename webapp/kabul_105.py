@@ -293,21 +293,39 @@ def _k_jl(o) -> tuple:
 
 
 def _k_sfx_ducking(o) -> tuple:
+    """⚠ FAZ Y-14b — YAPILANDIRMA DEGERI KABUL URETEMEZ.
+
+    OLCULEN KUSUR (`Y14B-DUCKING-BEYAN-OLCUM-SANILDI`): ilk surumde
+    `derinlik_db` okunuyordu ve o alan `SFX_DUCKING_DB` YAPILANDIRMA
+    degerini tasiyordu. `threshold`/`ratio` secimi gercek gain
+    reduction'in o deger olmasini GARANTI ETMEZ; filtre hic etki etmese
+    bile kriter PASS verirdi.
+    ⚠ Artik YALNIZCA `olculen_reduction_db` (stem'in sidechain oncesi ve
+    sonrasi RMS farki) okunur ve `olculdu is True` sart.
+    """
     s = _blok(o, "sfx")
     d = _blok(o, "ducking")
     n = _tam_sayi(s, "semantik_sayi")
-    db = _sayi(d, "derinlik_db")
+    olculen = _sayi(d, "olculen_reduction_db")
+    yapi = _sayi(d, "yapilandirilmis_db")
     if not _olculdu(s) or n is None:
         return False, "SFX olculmedi"
     if n < SFX_ASGARI:
         return False, f"semantik SFX {n} < {SFX_ASGARI}"
     if not _olculdu(d):
-        return False, "ducking OLCULMEDI"
-    if db is None:
-        return False, "ducking beyan edildi ama derinligi olculmedi"
-    if db > DUCKING_TAVANI_DB:
-        return False, f"ducking {db:.1f} dB > {DUCKING_TAVANI_DB:.0f} dB"
-    return True, f"{n} SFX, ducking {db:.1f} dB"
+        return False, "ducking gain reduction OLCULMEDI"
+    if olculen is None:
+        # ⚠ Yapilandirma varsa bile KABUL URETMEZ.
+        return False, (f"ducking yapilandirmasi var "
+                       f"({'yok' if yapi is None else f'{yapi:.1f} dB'}) ama "
+                       f"GERCEK azalma olculmedi")
+    if olculen > DUCKING_TAVANI_DB:
+        return False, (f"olculen azalma {olculen:.1f} dB > "
+                       f"{DUCKING_TAVANI_DB:.0f} dB "
+                       f"(yapilandirma {'-' if yapi is None else f'{yapi:.1f}'} dB "
+                       f"ETKI ETMEMIS)")
+    return True, (f"{n} SFX, OLCULEN azalma {olculen:.1f} dB "
+                  f"({_tam_sayi(d, 'pencere') or 0} pencere)")
 
 
 def _k_ort_plan(o) -> tuple:

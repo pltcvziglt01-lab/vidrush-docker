@@ -394,8 +394,127 @@ def sfx_zarfi_kur(parcalar: list, *, ducking_db: float = None,
     return zarf
 
 
+KOD_DUCKING_GAIN_OLCULMEDI = "DUCKING-GAIN-OLCULMEDI"
+
+# ⚠ OLCULEN KUSUR (`Y14B-DUCKING-BEYAN-OLCUM-SANILDI`, denetim 15 Agu):
+#   Y-14 gercek `sidechaincompress` filtresini kurdu (yon dogru), ama
+#   zarfin ucuncu alanina DOGRUDAN `SFX_DUCKING_DB = -9.0` yaziliyordu.
+#   Bu bir YAPILANDIRMA degeridir, akustik olcum DEGIL: `threshold`/`ratio`
+#   secimi gercek gain reduction'in -9 dB olmasini GARANTI ETMEZ (giris
+#   seviyesi, tepe/ortalama farki ve makeup sonucu degistirir). `gercek_qa`
+#   bunu `derinlik_db` diye raporluyordu ve `kabul_105` "olculdu" sayip
+#   GECIRIYORDU: filtre hic etki etmese bile kriter PASS verirdi.
+# ⚠ COZUM: AYNI SFX stem'inin sidechain ONCESI ve SONRASI hali, GERCEK SFX
+#   zaman pencerelerinde `astats` ile karsilastirilir. `yapilandirilmis_db`
+#   ile `olculen_reduction_db` AYRI ALANLARDIR ve kabul YALNIZCA olculeni
+#   okur.
+import re as _re_y14b   # ⚠ modul basi importlari bu satirdan SONRA
+_RMS_DESEN = _re_y14b.compile(
+    r"RMS level dB:\s*(-?\d+(?:\.\d+)?|-?inf)", _re_y14b.I)
+DUCKING_MAKS_PENCERE = int(os.environ.get("DUCKING_MAKS_PENCERE", "12"))
+
+
+def _ffmpeg_kos(komut: list) -> dict:
+    """Varsayilan kosucu. ⚠ Hata YUTULMAZ: `rc` cagirana doner."""
+    try:
+        r = subprocess.run(komut, capture_output=True, text=True, timeout=120)
+        return {"rc": r.returncode, "stdout": r.stdout or "",
+                "stderr": r.stderr or ""}
+    except (OSError, subprocess.SubprocessError) as e:
+        return {"rc": -1, "stdout": "", "stderr": f"{type(e).__name__}: {e}"}
+
+
+def ducking_stem_komutu(video: str, parcalar: list, *, ducking_db: float,
+                        stem_on: str, stem_son: str) -> list:
+    """Sidechain ONCESI ve SONRASI SFX stem'lerini TEK kosuda uret.
+
+    ⚠ Ikisi de AYNI filtre grafigi ve AYNI girdilerden turer; tek fark
+    sidechain uygulanip uygulanmamasidir. Baska hicbir sey degismez, yani
+    olculen fark YALNIZCA ducking'e atfedilebilir.
+    """
+    girdi = ["-i", video]
+    for _, y in (parcalar or []):
+        girdi += ["-i", y]
+    z = sfx_filtre_kur(parcalar, ducking_db=ducking_db)
+    return (["ffmpeg", "-y", "-loglevel", "error"] + girdi
+            + ["-filter_complex", ";".join(z["filtre"]),
+               "-map", "[sfx]", "-vn", "-c:a", "pcm_s16le", stem_on,
+               "-map", "[sfxduck]", "-vn", "-c:a", "pcm_s16le", stem_son])
+
+
+def rms_olc(yol: str, bas: float, bit: float, *, kosucu=None):
+    """Bir zaman penceresinin RMS seviyesi (dB). Olculemezse `None`.
+
+    ⚠ 0 ya da -inf UYDURULMAZ; okunamayan pencere `None` doner ve
+    cagiran onu olcum disi birakir.
+    """
+    kos = kosucu or _ffmpeg_kos
+    r = kos(["ffmpeg", "-hide_banner", "-nostats", "-i", str(yol),
+             "-af", f"atrim=start={float(bas):.3f}:end={float(bit):.3f},astats",
+             "-f", "null", "-"]) or {}
+    if int(r.get("rc", -1)) != 0:
+        return None
+    m = _RMS_DESEN.search(str(r.get("stderr") or "") + str(r.get("stdout") or ""))
+    if not m:
+        return None
+    ham = m.group(1).lower()
+    if "inf" in ham:
+        return None
+    try:
+        return float(ham)
+    except ValueError:
+        return None
+
+
+def ducking_gain_olcumu(stem_on: str, stem_son: str, zarf: list, *,
+                        yapilandirilmis_db: float,
+                        kosucu=None,
+                        maks_pencere: int = DUCKING_MAKS_PENCERE) -> dict:
+    """GERCEK gain reduction: pencere basina `rms_son - rms_on`.
+
+    Doner: {"olculdu", "olculen_reduction_db", "p50_db", "p95_db",
+            "pencere", "yapilandirilmis_db", "kod"}
+    ⚠ Hicbir pencere olculemezse `olculdu: False` + stabil kod; 0 dB
+    UYDURULMAZ ve `olculen_reduction_db` SAYI OLARAK SUNULMAZ.
+    """
+    yapi = float(yapilandirilmis_db)
+    pencereler = [z for z in (zarf or [])
+                  if isinstance(z, (list, tuple)) and len(z) >= 2][:maks_pencere]
+    atlanan = max(0, len([z for z in (zarf or [])
+                          if isinstance(z, (list, tuple)) and len(z) >= 2])
+                  - len(pencereler))
+    temel = {"olculdu": False, "olculen_reduction_db": None,
+             "p50_db": None, "p95_db": None, "pencere": 0,
+             "yapilandirilmis_db": yapi, "atlanan_pencere": atlanan,
+             "kod": KOD_DUCKING_GAIN_OLCULMEDI}
+    if not pencereler:
+        return {**temel, "neden": "olculecek SFX penceresi yok"}
+    farklar = []
+    for z in pencereler:
+        bas, bit = float(z[0]), float(z[1])
+        a = rms_olc(stem_on, bas, bit, kosucu=kosucu)
+        b = rms_olc(stem_son, bas, bit, kosucu=kosucu)
+        if a is None or b is None:
+            continue
+        farklar.append(round(b - a, 2))
+    if not farklar:
+        return {**temel, "neden": "hicbir pencere olculemedi (astats)"}
+    sirali = sorted(farklar)                      # en negatif (agir) basta
+    p50 = sirali[len(sirali) // 2] if len(sirali) % 2 else \
+        round((sirali[len(sirali) // 2 - 1] + sirali[len(sirali) // 2]) / 2.0, 2)
+    p95 = sirali[max(0, int(round(0.05 * (len(sirali) - 1))))]
+    if atlanan:
+        # ⚠ SESSIZ KIRPMA YOK: kac pencerenin olculmedigi raporlanir.
+        print(f"  ducking olcumu: {atlanan} pencere tavan ({maks_pencere}) "
+              f"nedeniyle olculmedi", file=sys.stderr)
+    return {"olculdu": True, "olculen_reduction_db": p50,
+            "p50_db": p50, "p95_db": p95, "pencere": len(farklar),
+            "yapilandirilmis_db": yapi, "atlanan_pencere": atlanan, "kod": ""}
+
+
 def sfx_bindir(video: str, sahneler: list, is_dizini: str, *,
-               ducking_db: float = None, sure_okuyucu=None) -> tuple:
+               ducking_db: float = None, sure_okuyucu=None,
+               kosucu=None) -> tuple:
     """Sahne baslangiclarina ses efekti bindirir + GERCEK ducking uygular.
 
     Doner: `(video_yolu, olcum)`.
@@ -462,18 +581,53 @@ def sfx_bindir(video: str, sahneler: list, is_dizini: str, *,
         return _bos(KOD_SFX_BINDIRME_BASARISIZ, neden=r.stderr[-160:])
 
     zarf = sfx_zarfi_kur(parcalar, ducking_db=db, sure_okuyucu=sure_okuyucu)
-    print(f"  ses efekti: {len(parcalar)} nokta bindirildi, "
-          f"ducking {db:.1f} dB (sidechaincompress ratio="
-          f"{_z['parametreler']['ratio']}), zarf={len(zarf)} aralik",
-          file=sys.stderr)
+
+    # ── FAZ Y-14b: GERCEK GAIN REDUCTION OLCUMU ──
+    # ⚠ Y14B-DUCKING-BEYAN-OLCUM-SANILDI: yapilandirma degeri kanit degildir.
+    # Ayni stem'in sidechain ONCESI/SONRASI hali gercek SFX pencerelerinde
+    # karsilastirilir. Olculemezse `olculdu: False` + stabil kod.
+    _stem_on = os.path.join(is_dizini, "sfx_stem_on.wav")
+    _stem_son = os.path.join(is_dizini, "sfx_stem_son.wav")
+    _kos = kosucu or _ffmpeg_kos
+    _gain = {"olculdu": False, "olculen_reduction_db": None,
+             "yapilandirilmis_db": db, "kod": KOD_DUCKING_GAIN_OLCULMEDI,
+             "neden": "stem uretilemedi"}
+    try:
+        _sr = _kos(ducking_stem_komutu(video, parcalar, ducking_db=db,
+                                       stem_on=_stem_on, stem_son=_stem_son))
+        if int((_sr or {}).get("rc", -1)) == 0:
+            _gain = ducking_gain_olcumu(_stem_on, _stem_son, zarf,
+                                        yapilandirilmis_db=db, kosucu=kosucu)
+        else:
+            print(f"  {KOD_DUCKING_GAIN_OLCULMEDI}: stem uretilemedi "
+                  f"({str((_sr or {}).get('stderr'))[-160:]})", file=sys.stderr)
+    except Exception as e:                                   # noqa: BLE001
+        _gain = {"olculdu": False, "olculen_reduction_db": None,
+                 "yapilandirilmis_db": db,
+                 "kod": KOD_DUCKING_GAIN_OLCULMEDI,
+                 "neden": f"{type(e).__name__}: {str(e)[:120]}"}
+    finally:
+        for _s in (_stem_on, _stem_son):
+            try:
+                os.remove(_s)
+            except OSError:
+                pass
+
+    print(f"  ses efekti: {len(parcalar)} nokta bindirildi | ducking "
+          f"yapilandirma {db:.1f} dB (ratio={_z['parametreler']['ratio']}) | "
+          f"OLCULEN azalma "
+          f"{_gain.get('olculen_reduction_db') if _gain.get('olculdu') else 'OLCULMEDI'}"
+          f" dB ({_gain.get('pencere', 0)} pencere)", file=sys.stderr)
     return cikti, {
         "bindirilen": len(parcalar),
         "olculdu": True,
         "kod": "",
         "islev_dagilimi": dagilim,
-        "ducking_db": db,
+        # ⚠ BEYAN ile OLCUM AYRI ALANLAR — kabul yalnizca olculeni okur.
+        "yapilandirilmis_db": db,
         "ducking_parametreleri": _z["parametreler"],
         "ducking_zarfi": zarf,
+        "ducking_olcum": _gain,
     }
 
 
@@ -5582,7 +5736,8 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                 olgu_raporu=_fact_rapor),
             jl_raporu=_jl_rapor or None,
             artefakt_sha256=_artefakt_ozet,
-            ducking_zarfi=(_sfx_olcum or {}).get("ducking_zarfi"))
+            ducking_zarfi=(_sfx_olcum or {}).get("ducking_zarfi"),
+            ducking_olcum=(_sfx_olcum or {}).get("ducking_olcum"))
         if isinstance(_render_qa, dict):
             _render_qa["ses"] = _ses_son
             _olc = _render_qa.get("olcumler")

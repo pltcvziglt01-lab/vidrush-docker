@@ -191,16 +191,22 @@ _r = GQ.ses_kurgu_olcumu(
     artefakt_sha256="a" * 64,
     ducking_zarfi=_zarf)
 _d = _r.get("ducking") or {}
-kontrol("ducking OLCULDU", _d.get("olculdu") is True, f"{_d}")
-kontrol("derinlik -9.0 dB", _d.get("derinlik_db") == -9.0, f"{_d}")
-kontrol("aralik sayisi 2", _d.get("aralik") == 2, f"{_d}")
+# ⚠ FAZ Y-14b: zarf TEK BASINA olcum degildir. Zarf pencereleri verir;
+# gercek gain reduction ayri olculur (bkz. test_faz_y14b.py).
+kontrol("zarf pencereleri raporlanir", _d.get("aralik") == 2, f"{_d}")
+kontrol("zarf tek basina olcum SAYILMAZ", _d.get("olculdu") is False, f"{_d}")
 
 import kabul_105 as KB  # noqa: E402
 
 _kr = KB._k_sfx_ducking({
     "sfx": {"semantik_sayi": 2, "olculdu": True},
-    "ducking": {"derinlik_db": _d.get("derinlik_db"), "olculdu": True}})
-kontrol("kabul kriteri KABUL-SFX-DUCKING gecer", _kr[0] is True, f"{_kr}")
+    "ducking": {"yapilandirilmis_db": -9.0,
+                "olculen_reduction_db": -8.4, "pencere": 2,
+                "olculdu": True}})
+kontrol("GERCEK olcumle KABUL-SFX-DUCKING gecer", _kr[0] is True, f"{_kr}")
+kontrol("YALNIZ zarfla kriter GECMEZ",
+        KB._k_sfx_ducking({"sfx": {"semantik_sayi": 2, "olculdu": True},
+                           "ducking": _d})[0] is False, f"{_d}")
 
 
 blok("Y-14/6 — PIPELINE ZARFI OLCUME GECIRIR")

@@ -48,6 +48,9 @@ KOD_PROVENANS_YOK = "GERCEK-TIMELINE-PROVENANS-YOK"
 KOD_SAHNE_YOK = "GERCEK-TIMELINE-SAHNE-YOK"
 KOD_GECIS_YOK = "GERCEK-TIMELINE-GECIS-YOK"
 KOD_DUCKING_YOK = "GERCEK-TIMELINE-DUCKING-VERISI-YOK"
+# ⚠ FAZ Y-14b: yapilandirma degeri KANIT DEGIL — gercek gain
+# reduction olculmediginde bu kod doner.
+KOD_DUCKING_GAIN_OLCULMEDI = "DUCKING-GAIN-OLCULMEDI"
 # ⚠ FAZ Y-13a — J/L olcumu artik ENJEKTE edilir; bayat modul global'i
 # (`hizli_render._JL_SON`) KANIT SAYILMAZ. Bkz. `ses_kurgu_olcumu`.
 KOD_JL_OLCULMEDI = "GERCEK-TIMELINE-JL-OLCULMEDI"
@@ -160,28 +163,56 @@ def gecis_olcumu(sahneler: list) -> dict:
             "imza_dagilimi": dagilim}
 
 
-def _ducking_olcumu(ducking_zarfi) -> dict:
-    """Ducking zarfindan GERCEK olcum. Zarf yoksa UYDURULMAZ."""
+def _ducking_olcumu(ducking_zarfi, ducking_olcum=None) -> dict:
+    """Ducking raporu. ⚠ BEYAN ile OLCUM AYRI.
+
+    ⚠ OLCULEN KUSUR (`Y14B-DUCKING-BEYAN-OLCUM-SANILDI`): ilk surumde
+    zarfin ucuncu alanindaki YAPILANDIRMA degeri (`SFX_DUCKING_DB`)
+    `derinlik_db` diye raporlaniyordu ve kabul kriteri onu "olculdu"
+    sayiyordu. `threshold`/`ratio` secimi gercek gain reduction'in o
+    deger olmasini GARANTI ETMEZ — filtre hic etki etmese bile kriter
+    PASS verirdi.
+
+    ── SOZLESME ──
+      · `zarf` yalnizca PENCERELERI verir (kac aralik, ne kadar sure).
+      · GERCEK azalma `ducking_olcum` ile DISARIDAN gelir
+        (`pipeline.ducking_gain_olcumu`: stem'in sidechain oncesi/sonrasi
+        RMS farki). Yoksa `olculdu: False` KALIR.
+      · `yapilandirilmis_db` ve `olculen_reduction_db` AYRI alanlardir.
+    """
     zarf = [z for z in (ducking_zarfi or [])
             if isinstance(z, (list, tuple)) and len(z) >= 3]
-    if not zarf:
-        return {"olculdu": False, "kod": KOD_DUCKING_YOK,
-                "neden": "gercek zaman cizgisi ducking zarfi tasimiyor"}
+    olcum = ducking_olcum if isinstance(ducking_olcum, dict) else {}
     try:
-        derinlikler = [float(z[2]) for z in zarf]
         toplam_sn = round(sum(float(z[1]) - float(z[0]) for z in zarf), 3)
-    except (TypeError, ValueError) as e:
-        return {"olculdu": False, "kod": KOD_DUCKING_YOK,
-                "neden": f"zarf okunamadi: {type(e).__name__}"}
-    return {"olculdu": True, "kod": "", "aralik": len(zarf),
-            "derinlik_db": round(min(derinlikler), 2),
-            "ortalama_db": round(sum(derinlikler) / len(derinlikler), 2),
-            "toplam_sn": toplam_sn}
+        yapi = round(min(float(z[2]) for z in zarf), 2) if zarf else None
+    except (TypeError, ValueError):
+        toplam_sn, yapi = 0.0, None
+    if olcum.get("yapilandirilmis_db") is not None:
+        yapi = olcum.get("yapilandirilmis_db")
+    temel = {"aralik": len(zarf), "toplam_sn": toplam_sn,
+             "yapilandirilmis_db": yapi}
+    if not zarf:
+        return {**temel, "olculdu": False, "kod": KOD_DUCKING_YOK,
+                "olculen_reduction_db": None,
+                "neden": "gercek zaman cizgisi ducking zarfi tasimiyor"}
+    if not olcum or olcum.get("olculdu") is not True:
+        # ⚠ Zarf TEK BASINA kabul uretmez: pencere var ama azalma OLCULMEDI.
+        return {**temel, "olculdu": False,
+                "kod": str(olcum.get("kod") or KOD_DUCKING_GAIN_OLCULMEDI),
+                "olculen_reduction_db": None,
+                "neden": str(olcum.get("neden")
+                             or "gercek gain reduction olcumu verilmedi")}
+    return {**temel, "olculdu": True, "kod": "",
+            "olculen_reduction_db": olcum.get("olculen_reduction_db"),
+            "p50_db": olcum.get("p50_db"), "p95_db": olcum.get("p95_db"),
+            "pencere": olcum.get("pencere"),
+            "atlanan_pencere": olcum.get("atlanan_pencere")}
 
 
 def ses_kurgu_olcumu(sahneler: list, *, jl_raporu: Optional[dict] = None,
                      artefakt_sha256: str = "",
-                     ducking_zarfi=None) -> dict:
+                     ducking_zarfi=None, ducking_olcum=None) -> dict:
     """FAZ R-1d-j / Y-13a — SES KURGUSU (J/L-cut + ducking).
 
     ⚠ OLCULEN KUSUR (`Y13-OLCUM-NIYETI-OKUYOR`): bu fonksiyon eskiden
@@ -209,7 +240,7 @@ def ses_kurgu_olcumu(sahneler: list, *, jl_raporu: Optional[dict] = None,
     """
     liste = [x for x in (sahneler or []) if isinstance(x, dict)]
     ses_gecis = max(0, len(liste) - 1)
-    ducking = _ducking_olcumu(ducking_zarfi)
+    ducking = _ducking_olcumu(ducking_zarfi, ducking_olcum)
     if ses_gecis < 1:
         return {"olculdu": False, "kod": KOD_GECIS_YOK,
                 "neden": "en az iki sahne gerekir", "tam": False,
@@ -258,7 +289,7 @@ def ses_kurgu_olcumu(sahneler: list, *, jl_raporu: Optional[dict] = None,
 
 def olc(sahneler: list, *, kare_okuyucu: Optional[Callable] = None,
         jl_raporu: Optional[dict] = None, artefakt_sha256: str = "",
-        ducking_zarfi=None) -> dict:
+        ducking_zarfi=None, ducking_olcum=None) -> dict:
     """Gercek zaman cizgisinin PRE-QA olcumu + hukmu.
 
     ⚠ Olcum fonksiyonlari DEGISMEDI; yalnizca girdi gercek zaman cizgisi.
@@ -354,7 +385,8 @@ def olc(sahneler: list, *, kare_okuyucu: Optional[Callable] = None,
     # "olculmedi" doner — 0 UYDURULMAZ.
     ses_kurgu = ses_kurgu_olcumu(liste, jl_raporu=jl_raporu,
                                  artefakt_sha256=artefakt_sha256,
-                                 ducking_zarfi=ducking_zarfi)
+                                 ducking_zarfi=ducking_zarfi,
+                                 ducking_olcum=ducking_olcum)
 
     broll = {"olculdu": False, "neden": KOD_CEKIM_TURU_YOK,
              "video_cekim_sayisi": sum(1 for s in medya

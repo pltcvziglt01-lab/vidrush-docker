@@ -198,13 +198,40 @@ kontrol("0 J/L olculur ama tam degil",
 
 blok("Y-13a/8 — DUCKING: ZARF VERILIRSE OLCULUR")
 
+# ⚠ FAZ Y-14b — SOZLESME BILINCLI DEGISTI.
+# ESKI IDDIA (buradaydi): "zarf verilince ducking OLCULUR" ve
+# "derinlik_db == -9.0". O deger zarfin ucuncu alanindaki YAPILANDIRMA
+# degeriydi (`SFX_DUCKING_DB`), akustik olcum DEGIL: `threshold`/`ratio`
+# secimi gercek gain reduction'in -9 dB olmasini GARANTI ETMEZ. Filtre hic
+# etki etmese bile bu iddia PASS uretirdi — SAHTE PASS.
+# ⚠ YENI SOZLESME: zarf yalnizca PENCERELERI verir; gercek azalma
+# `ducking_olcum` ile DISARIDAN gelir (stem'in sidechain oncesi/sonrasi
+# RMS farki). Tam sozlesme: webapp/testler/test_faz_y14b.py
+_ZARF8 = [(0.0, 3.2, -9.0), (5.0, 8.0, -9.0)]
 _r8 = GQ.ses_kurgu_olcumu(UC, jl_raporu=rapor(), artefakt_sha256=SHA,
-                          ducking_zarfi=[(0.0, 3.2, -9.0), (5.0, 8.0, -9.0)])
+                          ducking_zarfi=_ZARF8)
 _d8 = _r8.get("ducking") or {}
-kontrol("zarf verilince ducking olculur", _d8.get("olculdu") is True,
+kontrol("zarf TEK BASINA olcum sayilmaz", _d8.get("olculdu") is False,
         f"ducking={_d8}")
-kontrol("ducking derinligi rapor edilir", _d8.get("derinlik_db") == -9.0,
-        f"derinlik={_d8.get('derinlik_db')}")
+kontrol("zarf tek basinayken stabil kod yazilir",
+        _d8.get("kod") == GQ.KOD_DUCKING_GAIN_OLCULMEDI,
+        f"kod={_d8.get('kod')!r}")
+kontrol("olculmemis azalma SAYI olarak sunulmaz",
+        _d8.get("olculen_reduction_db") is None, f"{_d8}")
+kontrol("pencereler yine de raporlanir", _d8.get("aralik") == 2, f"{_d8}")
+
+_r8b = GQ.ses_kurgu_olcumu(
+    UC, jl_raporu=rapor(), artefakt_sha256=SHA, ducking_zarfi=_ZARF8,
+    ducking_olcum={"olculdu": True, "olculen_reduction_db": -8.4,
+                   "p50_db": -8.4, "p95_db": -9.1, "pencere": 2,
+                   "yapilandirilmis_db": -9.0})
+_d8b = _r8b.get("ducking") or {}
+kontrol("GERCEK olcum verilince ducking olculur",
+        _d8b.get("olculdu") is True, f"{_d8b}")
+kontrol("olculen azalma tasinir",
+        _d8b.get("olculen_reduction_db") == -8.4, f"{_d8b}")
+kontrol("yapilandirma AYRI alanda kalir",
+        _d8b.get("yapilandirilmis_db") == -9.0, f"{_d8b}")
 kontrol("zarf yokken ducking olculmedi KALIR",
         (GQ.ses_kurgu_olcumu(UC, jl_raporu=rapor(), artefakt_sha256=SHA)
          .get("ducking") or {}).get("olculdu") is False,
@@ -220,9 +247,18 @@ _ses = (_o.get("ses") or {})
 kontrol("olc jl_raporu'nu ses olcumune gecirir",
         _ses.get("olculdu") is True and _ses.get("j_l_cut") == 2,
         f"ses={_ses}")
-kontrol("olc ducking_zarfi'ni gecirir",
-        (_ses.get("ducking") or {}).get("olculdu") is True,
+kontrol("olc ducking_zarfi'ni gecirir (pencere gorunur)",
+        (_ses.get("ducking") or {}).get("aralik") == 1,
         f"ducking={_ses.get('ducking')}")
+kontrol("olc ducking_olcum'u gecirir",
+        (GQ.olc([sahne("s1"), sahne("s2"), sahne("s3")],
+                jl_raporu=rapor(), artefakt_sha256=SHA,
+                ducking_zarfi=[(0.0, 3.0, -9.0)],
+                ducking_olcum={"olculdu": True,
+                               "olculen_reduction_db": -7.7,
+                               "yapilandirilmis_db": -9.0})
+         .get("ses") or {}).get("ducking", {}).get("olculdu") is True,
+        "gercek olcum olc() uzerinden gecmiyor")
 kontrol("olc parametresiz cagrilinca da patlamaz (geriye uyum)",
         isinstance(GQ.olc([sahne("s1"), sahne("s2")]), dict))
 
