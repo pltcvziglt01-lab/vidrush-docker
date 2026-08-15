@@ -692,6 +692,14 @@ def oai_chat(body: dict, timeout: int = 180, deneme: int = 6) -> dict:
 # (zoom'lu statik kare) kullanici karariyla KALDIRILDI (15 Agu 2026).
 MEDYA_VIDEO_YOK = "MEDYA-VIDEO-YOK"
 
+# ⚠ FAZ Y-10 / Y10-HAVUZ-YETERSIZ — HER CEKIM DOGRULANMIS OLGUYA BAGLI.
+# `qa_on` her cekim icin `FACT-BAGLANTI-YOK` (fail) verir, yani kapsam
+# hedefi ZATEN %100'dur. Bu esik AYNI sozlesmeyi URETIMDEN ONCE uygular:
+# yetersiz havuzla render'a girip ~10 dk sonra teslim kapisinda dusmek
+# yerine, is BASTA ve NEDENIYLE durur. Env ile gevsetilebilir ama
+# varsayilan qa_on ile TUTARLIDIR.
+FACT_KAPSAM_ESIGI = float(os.environ.get("FACT_KAPSAM_ESIGI", "1.0"))
+
 # ─────────────────────────── EDIT STILLERI ───────────────────────────
 # Gercek belgesel kanallarindan turetilen 3 profesyonel kurgu profili.
 # motion -> Remotion Video.tsx gecis modu; footage_pct -> gercek footage sahne orani;
@@ -4122,6 +4130,30 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                   f"baglandi (%{_fact_rapor['kapsam_pct']}), "
                   f"{len(_fact_rapor['bosluklar'])} kapsam boslugu",
                   file=sys.stderr)
+            # ⚠ FAZ Y-10 / Y10-HAVUZ-YETERSIZ — ERKEN VE FAIL-CLOSED DURUS.
+            # OLCULEN ISRAF (is job_1786792477656_y71414_df7e2a):
+            #   ARASTIRMA: 1/11 olgu dogrulandi, 9 kaynak
+            #   ... ~10 dk render ...
+            #   TESLIM: False | KABUL-YOK:...:FACT-BAGLANTI-YOK
+            # Havuz yetersizligi BURADA (medya/TTS/render'dan ONCE) bellidir;
+            # buna ragmen hat butun medyayi indirip TTS uretip render ediyor
+            # ve ancak teslim kapisinda dusuyordu.
+            # ⚠ FACT UYDURULMAZ, KAPI GEVSETILMEZ: `FACT-BAGLANTI-YOK` fail
+            # olarak KALIR (qa_on). Bu kapi yalnizca kaybi ERKENE ceker ve
+            # NEDENINI stabil kodla soyler.
+            _hedef_n = int(_fact_rapor.get("hedef") or 0)
+            _bagli_n = int(_fact_rapor.get("baglanan") or 0)
+            if _hedef_n > 0:
+                _kapsam = _bagli_n / float(_hedef_n)
+                if _kapsam < FACT_KAPSAM_ESIGI:
+                    raise RuntimeError(
+                        f"ARASTIRMA-HAVUZ-YETERSIZ: {_bagli_n}/{_hedef_n} "
+                        f"sahne dogrulanmis olguya baglanabildi "
+                        f"(%{_kapsam * 100:.0f} < %{FACT_KAPSAM_ESIGI * 100:.0f}). "
+                        f"Dogrulanmis olgu havuzu {len(_olgular)} iddia. "
+                        f"Her cekim dogrulanmis bir olguya baglanmali; "
+                        f"konu daha somut/olgusal yazilmali ya da arastirma "
+                        f"kaynaklari genisletilmeli.")
     # ── FAZ I-2d: GORSEL IMZA KAYNAGI ──
     # Bilesik profil varsa efekt/gecis imzasi ONDAN turetilir. Eski stil
     # kimliklerinde `_profil` blogu YOKTUR -> `None` kalir ve `efekt_ata` /
