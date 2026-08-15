@@ -40,6 +40,46 @@ KABUL_QA = ("PASS", "WARN")
 # video "kabul edilmis final" sayilip son-3 kutuphanesine giriyordu.
 KURGU_QA_RED = "Y1-KURGU-QA-FAIL"
 
+# ⚠ FAZ Y-3 — TESLIMI ENGELLEYEN KURGU KAPILARI (DONDURULMUS KAPSAM).
+# Kullanici karari (15 Agu 2026) teslim yolunu dondurdu ve teslimi
+# engelleyecek kapilari ACIKCA saydi. Bu liste O KAPSAMIN kod karsiligidir.
+#
+# ⚠ OLCULEN OLAY (is job_1786787306483_y21248_d01800): icerik hedefteydi
+# (fps 30, 1920x1080, gercek_video=1.0, footage 12/12, AI gorsel 0,
+# magnific 0) ama kurgu QA FAIL verdi. FAIL'in TEK kaynagi
+# `FACT-BAGLANTI-YOK` x22 idi — bir GAZETECILIK IZLENEBILIRLIK kapisi
+# (her cekim DOGRULANMIS bir olguya baglanmali). Arastirma motoru o iste
+# 1/11 olgu dogrulayabildigi icin hicbir cekim baglanamadi.
+#
+# ⚠ QA GEVSETILMEDI: `qa_on`/`qa_son` kapilari, seviyeleri ve
+# `edit_kopru` karari AYNEN durur; rapor da AYNEN gorunur. Burada
+# belirlenen tek sey, TESLIM kararinin hangi FAIL kodlarina baktigidir.
+# Liste DISI bir FAIL teslimi engellemez ama kayitta GORUNUR kalir.
+YAYIN_KAPILARI = (
+    # hook / acilis
+    "HOOK-YOK",
+    # ritim ve plan suresi
+    "KALITE-RITIM-SABIT", "PACING-KISA-ORAN", "SHOT-COK-KISA",
+    # semantik cutaway / b-roll cesitliligi
+    "KALITE-BROLL-CESITLILIK", "KALITE-SEMANTIK-DONEM", "KALITE-MEDYA-TEKRAR",
+    "KALITE-MEDYASIZ-BEAT", "KALITE-BAG-KOPUK",
+    # gecis cesitliligi
+    "KALITE-GECIS-TEKDUZE", "GECIS-ASIRI", "GECIS-SEYREK-ASIRI",
+    "KALITE-MOTION-TEKRAR", "KALITE-MOTION-ISLEV-TEKRAR",
+    # altyazi / baslik guvenli alani
+    "KALITE-GUVENLI-ALAN", "KALITE-BASLIK-TASMA", "KALITE-BASLIK-KIRPIK",
+    "KALITE-BASLIK-SURESI", "KALITE-ALTYAZI-OKUNMAZ", "KALITE-YAZI-CAKISMA",
+    "KALITE-YAZI-SAHNE-DISI", "KALITE-YAZI-NEFES-YOK",
+    # guclu kapanis
+    "KALITE-OLU-FINAL",
+    # kaynak sesi sifir + muzik/TTS temiz
+    "KALITE-KAYNAK-SES-SIZINTI", "SES-LUFS-HEDEF-YOK", "SES-KOMPRESOR-YOK",
+    # provenance / kunye
+    "KALITE-KUNYE-EKSIK", "PROVENANCE-BELIRSIZ",
+    # ayni kaynak <= 8 sn
+    "TAVAN",
+)
+
 
 def _s(v) -> str:
     return str(v or "").strip()
@@ -68,10 +108,26 @@ def kabul_edilebilir_mi(kayit: dict) -> dict:
     ep = k.get("edit_plani")
     if isinstance(ep, dict) and ep:
         if not ep.get("render_edilebilir"):
-            _kqa = _s((ep.get("qa") or {}).get("durum")
-                      if isinstance(ep.get("qa"), dict) else "").upper()
-            _nd = _s(ep.get("neden")) or _kqa or "render_edilebilir=False"
-            eksik.append(f"{KURGU_QA_RED}:{_nd}")
+            # ⚠ FAZ Y-3: hangi FAIL'ler TESLIMI engeller? Dondurulmus kapsam
+            # (`YAYIN_KAPILARI`) icindekiler. Liste DISI bir FAIL (or.
+            # `FACT-BAGLANTI-YOK`) teslimi engellemez — ama rapor alaninda
+            # AYNEN gorunur, sessizce yutulmaz.
+            _qa = ep.get("qa") if isinstance(ep.get("qa"), dict) else {}
+            _sorunlar = _qa.get("sorunlar")
+            if isinstance(_sorunlar, list) and _sorunlar:
+                _engel = sorted({
+                    _s(x.get("kod")) for x in _sorunlar
+                    if isinstance(x, dict)
+                    and _s(x.get("seviye")).lower() == "fail"
+                    and _s(x.get("kod")) in YAYIN_KAPILARI})
+                if _engel:
+                    eksik.append(f"{KURGU_QA_RED}:{'+'.join(_engel)}")
+            else:
+                # ⚠ Sorun listesi YOKSA hukum verilemez -> FAIL-CLOSED.
+                # (plan kurulamadi / MEDYA-YOK / kanit yok)
+                _kqa = _s(_qa.get("durum")).upper()
+                _nd = _s(ep.get("neden")) or _kqa or "render_edilebilir=False"
+                eksik.append(f"{KURGU_QA_RED}:{_nd}")
     return {"kabul": not eksik, "neden": "+".join(eksik)}
 
 
