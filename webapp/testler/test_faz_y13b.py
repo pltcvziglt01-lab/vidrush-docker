@@ -365,7 +365,10 @@ def _cagri_satirlari(kaynak: str, ad: str) -> list:
 
 
 _s_render = _cagri_satirlari(_PL, "ffmpeg_render")
-_s_jl = _cagri_satirlari(_PL, "jl_raporu")
+# ⚠ FAZ Y-16: rapor artik `render_raporu` adiyla da okunuyor
+# (AYNI kayit; ad olcumun yalniz J/L olmadigini belirtir).
+_s_jl = (_cagri_satirlari(_PL, "jl_raporu")
+         + _cagri_satirlari(_PL, "render_raporu"))
 kontrol("pipeline uretici raporunu okuyor", bool(_s_jl),
         "jl_raporu() hic cagrilmiyor")
 kontrol("J/L olcumu RENDER'DAN SONRA okunuyor",

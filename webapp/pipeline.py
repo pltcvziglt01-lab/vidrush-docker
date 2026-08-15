@@ -5821,7 +5821,7 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             # ⚠ NIHAI dosyaya yeniden damgala; basarisizsa rapor damgasiz
             # kalir ve olcum "olculmedi" doner (fail-closed).
             _hr_son.jl_damgala(is_adi, son_video)
-            _jl_rapor = _hr_son.jl_raporu(is_adi)
+            _jl_rapor = _hr_son.render_raporu(is_adi)
             _artefakt_ozet = str(_jl_rapor.get("artefakt_sha256") or "")
         _ses_son = _gq_son.ses_kurgu_olcumu(
             _gq_son.sahneleri_cevir(
@@ -5837,6 +5837,19 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             _olc = _render_qa.get("olcumler")
             if isinstance(_olc, dict):
                 _olc["ses"] = _ses_son
+        # ── FAZ Y-16: ORTALAMA PLAN SURESI, RENDER EDILEN CEKIMLERDEN ──
+        # ⚠ Sahne suresinden TURETILMEZ: `_cekim_planla` sahneyi 8 sn
+        # tavaniyla bolen gercek cekimleri uretir ve onlari kaydeder.
+        _ritim = _gq_son.ritim_olcumu(cekim_raporu=_jl_rapor or None,
+                                      artefakt_sha256=_artefakt_ozet)
+        if isinstance(_render_qa, dict):
+            _render_qa["ritim"] = _ritim
+        sonuc["ritim"] = _ritim
+        print(f"  RENDER-SONRASI RITIM: olculdu={_ritim.get('olculdu')} "
+              f"ort={_ritim.get('ort_plan_sn')} sn "
+              f"cekim={_ritim.get('cekim')} "
+              f"bant_ici={_ritim.get('band_ici')} "
+              f"kod={_ritim.get('kod') or '-'}", file=sys.stderr)
         sonuc["artefakt_sha256"] = _artefakt_ozet
         sonuc["sfx"] = dict(_sfx_olcum or {})
         print(f"  RENDER-SONRASI SES (nihai artefakt): "

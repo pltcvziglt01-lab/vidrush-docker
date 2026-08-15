@@ -610,6 +610,13 @@ JL_KAYIT_TAVANI = 32          # es zamanli is sayisinin cok ustunde
 def _jl_bos(is_adi: str = "") -> dict:
     return {"is_adi": str(is_adi or ""), "sayi": 0,
             "offset_sn": JL_OFFSET_SN, "sinir_farklari_sn": [],
+            # ⚠ FAZ Y-16 (`Y16-SAHNE-CEKIM-KARISTI`): sahne suresi ile CEKIM
+            # suresi AYNI SEY DEGILDIR. `_cekim_planla` bir sahneyi 8 sn
+            # tavani ve %19 secici bolme kuraliyla 1-5 CEKIME boler.
+            # Ortalama plan suresi SAHNE suresinden hesaplanirsa gercek plan
+            # uzunlugu OLDUGUNDAN UZUN gorunur. Bu liste RENDER EDILEN
+            # gercek cekim surelerini tasir.
+            "cekim_kayitlari": {},
             "artefakt_sha256": "", "kaynak": "", "olculdu": False}
 
 
@@ -699,6 +706,46 @@ def jl_damga_gecerli_mi(is_adi: str, yol: str) -> bool:
     return _dosya_ozeti(yol) == ozet
 
 
+def cekim_kaydet(is_adi: str, segment_id, sureler) -> None:
+    """BASARILI bir segmentin GERCEK cekim surelerini kaydet.
+
+    ⚠ OLCULEN KUSUR (`Y16-CEKIM-KAYIT-IDEMPOTENT-DEGIL`, denetim): ilk
+    yazimda kayit `_segment_uret` icinde, ffmpeg segmenti BASARIYLA
+    olusmadan yapiliyordu. Iki sonuc:
+      · BASARISIZ deneme de olcume giriyordu (render edilmemis cekim,
+        "render edilmis timeline" kaniti olamaz).
+      · RETRY ayni segmenti IKI KEZ sayiyordu; ortalama plan suresi
+        sessizce kayiyordu.
+    ⚠ COZUM: kayit SEGMENT ANAHTARLIDIR — ayni segment yeniden yazilirsa
+    ONCEKI kayit EZILIR, birikmez. Cagri yalnizca segment BASARIYLA
+    uretildikten sonra yapilir.
+    ⚠ Bilinmeyen is icin HICBIR SEY yazilmaz (sessiz global kirlenme yok).
+    """
+    temiz = []
+    for d in (sureler or []):
+        try:
+            v = round(float(d), 3)
+        except (TypeError, ValueError):
+            continue
+        if v > 0:
+            temiz.append(v)
+    with _JL_KILIT:
+        r = _JL_KAYIT.get(str(is_adi or ""))
+        if r is None:
+            return
+        # ⚠ Ayni segment icin YENIDEN yazim -> onceki kayit EZILIR.
+        r["cekim_kayitlari"][str(segment_id)] = temiz
+
+
+def render_raporu(is_adi: str) -> dict:
+    """Bu ISIN tam render raporu (J/L + cekim sureleri + artefakt damgasi).
+
+    ⚠ `jl_raporu` ile AYNI kaydi doner; ad, olcumun yalnizca J/L olmadigini
+    belirtmek icin ayrilmistir.
+    """
+    return jl_raporu(is_adi)
+
+
 def jl_raporu(is_adi: str) -> dict:
     """O ISIN raporunun KOPYASI.
 
@@ -709,6 +756,11 @@ def jl_raporu(is_adi: str) -> dict:
         r = _JL_KAYIT.get(str(is_adi or ""))
         d = dict(r) if r else _jl_bos(is_adi)
     d["sinir_farklari_sn"] = list(d["sinir_farklari_sn"])
+    # ⚠ Cekim sureleri SEGMENT anahtarli tutulur (idempotent); rapora
+    # segment sirasina gore duz liste olarak cikar.
+    _k = d.get("cekim_kayitlari") or {}
+    d["cekim_kayitlari"] = dict(_k)
+    d["cekim_sureleri"] = [v for anahtar in sorted(_k) for v in _k[anahtar]]
     return d
 
 GECIS_SN_TAHMIN = 0.4       # HIZLI_GECIS_SN varsayilani (dip'i onune yerlestirmek icin)
@@ -817,7 +869,7 @@ def _efekt_ffmpeg(_ef: dict, sure: float, fps: int) -> str:
     return f
 
 
-def _segment_uret(sahne, gecis, fps, crf, seg_yol):
+def _segment_uret(sahne, gecis, fps, crf, seg_yol, is_adi=""):
     """Tek sahne segmentini uretir. Gorsel sahne: Ken Burns + kendi sesi.
     VIDEO sahne (Sora klibi / footage): klip 1080p'ye olceklenir, gerekirse dongulenir,
     uzerine sahnenin TTS sesi biner (klibin kendi sesi kullanilmaz)."""
@@ -827,6 +879,11 @@ def _segment_uret(sahne, gecis, fps, crf, seg_yol):
     if not (os.path.exists(medya) and os.path.exists(ses)) or sure <= 0:
         return False
     F = max(1, int(round(sure * fps)))
+    # ⚠ FAZ Y-16: bu segmentin PLANLANAN cekim sureleri. Olcume ancak
+    # segment BASARIYLA uretildikten sonra yazilir (asagida).
+    _seg_id = str(sahne.get("_indeks") if sahne.get("_indeks") is not None
+                  else os.path.basename(seg_yol))
+    _plan_sureleri = [sure]
     if sahne.get("tur") == "video":
         # Gercek video: Ken Burns YOK (klibin kendi hareketi var). Kisa klip donguyle uzar.
         # CEKIM BOLME: sahne CEKIM_BOL_ESIK'ten uzunsa ayni klipten farkli zaman
@@ -835,6 +892,7 @@ def _segment_uret(sahne, gecis, fps, crf, seg_yol):
         # zamanlamalari sahneye gore — cekim basina uygulansa her cekimde bastan baslar.
         sindeks = int(sahne.get("_indeks") or 0)
         cekimler = _cekim_planla(sure, sindeks)
+        _plan_sureleri = [d for _b, d, _k in cekimler]
         girisler, zincirler, etiketler = [], [], []
         for k, (bas, d, kadraj) in enumerate(cekimler):
             # -ss/-t GIRIS secenegi: her cekim klibin farkli anindan alinir.
@@ -886,7 +944,12 @@ def _segment_uret(sahne, gecis, fps, crf, seg_yol):
             if r.returncode != 0:
                 print(f"  ffmpeg video-segment hata: {r.stderr[-300:]}", file=sys.stderr)
                 return False
-            return os.path.exists(seg_yol) and os.path.getsize(seg_yol) > 1000
+            _ok = os.path.exists(seg_yol) and os.path.getsize(seg_yol) > 1000
+            if _ok:
+                # ⚠ Y-16: YALNIZCA basarili segment olcume girer; ayni
+                # segment yeniden uretilirse kayit EZILIR (idempotent).
+                cekim_kaydet(is_adi, _seg_id, _plan_sureleri)
+            return _ok
         except Exception as e:
             print(f"  ffmpeg video-segment istisna: {str(e)[:160]}", file=sys.stderr)
             return False
@@ -942,7 +1005,11 @@ def _segment_uret(sahne, gecis, fps, crf, seg_yol):
         if r.returncode != 0:
             print(f"  ffmpeg segment hata: {r.stderr[-300:]}", file=sys.stderr)
             return False
-        return os.path.exists(seg_yol) and os.path.getsize(seg_yol) > 1000
+        _ok = os.path.exists(seg_yol) and os.path.getsize(seg_yol) > 1000
+        if _ok:
+            # ⚠ Y-16: YALNIZCA basarili segment olcume girer (idempotent).
+            cekim_kaydet(is_adi, _seg_id, _plan_sureleri)
+        return _ok
     except Exception as e:
         print(f"  ffmpeg segment istisna: {str(e)[:160]}", file=sys.stderr)
         return False
@@ -1061,7 +1128,8 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
                     if i > 0:
                         sahneler[i - 1]["_karart_son"] = True
             isler = {havuz.submit(_segment_uret, s, gecis, fps, crf,
-                                  os.path.join(tmp, f"seg_{i:04d}.mp4")): i
+                                  os.path.join(tmp, f"seg_{i:04d}.mp4"),
+                                  is_adi): i
                      for i, s in enumerate(sahneler)}
             for g in as_completed(isler):
                 i = isler[g]

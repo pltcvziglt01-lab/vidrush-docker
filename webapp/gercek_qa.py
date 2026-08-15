@@ -61,6 +61,16 @@ KOD_DUCKING_GAIN_OLCULMEDI = "DUCKING-GAIN-OLCULMEDI"
 # (`hizli_render._JL_SON`) KANIT SAYILMAZ. Bkz. `ses_kurgu_olcumu`.
 KOD_JL_OLCULMEDI = "GERCEK-TIMELINE-JL-OLCULMEDI"
 KOD_JL_BAYAT = "GERCEK-TIMELINE-JL-BAYAT"
+# ⚠ FAZ Y-16 (`Y16-ORT-PLAN-OLCULMUYOR`): ortalama plan (cekim) suresi
+# repo genelinde HIC olculmuyordu — `kalite_kapisi.ritim_olcusu` YAYILIM
+# olcuyor, `qa_on` `ortalama_sn`i HIC RENDER EDILMEYEN EditorV2 planindan
+# aliyor, `profil.shot_*_sn` TEK CEKIM tavani. Kabul sarti olan
+# "ortalama plan 2.5-4.5 sn" icin olcum kaynagi YOKTU.
+KOD_RITIM_OLCULMEDI = "GERCEK-TIMELINE-RITIM-OLCULMEDI"
+KOD_RITIM_BAYAT = "GERCEK-TIMELINE-RITIM-BAYAT"
+KOD_RITIM_BANT_DISI = "GERCEK-TIMELINE-ORT-PLAN-BANT-DISI"
+# ⚠ Esik kabul kriteriyle AYNI kaynak olmali; tek yerde tanimli.
+ORT_PLAN_BANDI_SN = (2.5, 4.5)
 
 # Bir isin "tam" sayilmasi icin gereken en az gercek J/L-cut sayisi.
 # ⚠ `editor/qa_on.JL_EN_AZ` ile AYNI deger; orada plan uzerinden, burada
@@ -302,6 +312,54 @@ def ses_kurgu_olcumu(sahneler: list, *, jl_raporu: Optional[dict] = None,
         # ⚠ Esik OLCULEN degere uygulanir; olculmemislik `tam` uretemez.
         "tam": _jl >= JL_EN_AZ,
     }
+
+
+def ritim_olcumu(cekim_raporu: Optional[dict] = None, *,
+                 artefakt_sha256: str = "",
+                 band=None) -> dict:
+    """FAZ Y-16 — ORTALAMA PLAN SURESI, RENDER EDILEN CEKIMLERDEN.
+
+    ⚠ `Y16-SAHNE-CEKIM-KARISTI`: sahne suresi ile CEKIM suresi ayni sey
+    degildir. `hizli_render._cekim_planla` bir sahneyi 8 sn tavani ve %19
+    secici bolme kuraliyla 1-5 cekime boler; ortalamayi sahne suresinden
+    hesaplamak plan uzunlugunu OLDUGUNDAN UZUN gosterir. Bu yuzden olcum
+    YALNIZCA render'in kaydettigi gercek cekim listesinden yapilir.
+
+    ⚠ Rapor yoksa / damgasiz ise / BASKA artefakta aitse `olculdu: False`
+    ve ortalama SAYI OLARAK SUNULMAZ — uydurma yok.
+    """
+    alt, ust = tuple(band or ORT_PLAN_BANDI_SN)
+    temel = {"olculdu": False, "ort_plan_sn": None, "medyan_sn": None,
+             "cekim": 0, "band": (alt, ust), "band_ici": False}
+    r = cekim_raporu if isinstance(cekim_raporu, dict) else {}
+    if not r:
+        return {**temel, "kod": KOD_RITIM_OLCULMEDI,
+                "neden": "render cekim raporu verilmedi"}
+    if r.get("olculdu") is not True:
+        return {**temel, "kod": KOD_RITIM_OLCULMEDI,
+                "neden": "rapor NIHAI artefakta damgalanmamis"}
+    _ozet = str(r.get("artefakt_sha256") or "")
+    if not _ozet or (artefakt_sha256 and _ozet != str(artefakt_sha256)):
+        return {**temel, "kod": KOD_RITIM_BAYAT,
+                "neden": f"olcum baska artefakta ait ({_ozet[:12]} != "
+                         f"{str(artefakt_sha256)[:12]})"}
+    sureler = [float(x) for x in (r.get("cekim_sureleri") or [])
+               if _f(x) > 0]
+    if not sureler:
+        return {**temel, "kod": KOD_RITIM_OLCULMEDI,
+                "neden": "render hicbir cekim suresi kaydetmedi"}
+    sirali = sorted(sureler)
+    n = len(sirali)
+    ort = round(sum(sirali) / n, 2)
+    medyan = (sirali[n // 2] if n % 2
+              else round((sirali[n // 2 - 1] + sirali[n // 2]) / 2.0, 2))
+    ici = alt <= ort <= ust
+    return {"olculdu": True, "ort_plan_sn": ort, "medyan_sn": round(medyan, 2),
+            "cekim": n, "en_kisa_sn": round(sirali[0], 2),
+            "en_uzun_sn": round(sirali[-1], 2),
+            "band": (alt, ust), "band_ici": ici,
+            "artefakt_sha256": _ozet,
+            "kod": "" if ici else KOD_RITIM_BANT_DISI}
 
 
 def olc(sahneler: list, *, kare_okuyucu: Optional[Callable] = None,
