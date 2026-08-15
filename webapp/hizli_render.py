@@ -552,6 +552,16 @@ def _kadraj_vf(kod: int, indeks: int) -> str:
             f"scale=1920:1080:flags=lanczos")
 
 
+# ⚠ FAZ Y-6 / Y6-JL-URETIM — SES/GORUNTU SINIR AYRIMI.
+# J/L-cut TANIMI geregi ses ve goruntu sinirlarinin FARKLI olmasidir.
+# Bu hatta gecisler `xfade=duration=g` + `acrossfade=d=g` ile AYNI g'yi
+# kullaniyordu; `gercek_qa` bunu "j_l_cut: 0 (YAPISAL)" diye raporluyordu.
+# Bu sabit, J/L secilen gecislerde ses capraz gecisini KISALTARAK siniri
+# ayirir. Kucuk tutulur: gozle fark edilir ama ritmi bozmaz.
+JL_OFFSET_SN = float(os.environ.get("JL_OFFSET_SN", "0.22"))
+# Uretilen gercek J/L-cut sayisi — `gercek_qa` OLCUM olarak okur.
+_JL_SON = {"sayi": 0, "offset_sn": JL_OFFSET_SN}
+
 GECIS_SN_TAHMIN = 0.4       # HIZLI_GECIS_SN varsayilani (dip'i onune yerlestirmek icin)
 KARARTMA_DIP_SN = 0.24      # dip'in her yarisi
 KARARTMA_DIP = 0.13         # olculdu: 0.20 -> dip %32'ye iniyordu, referans %50
@@ -949,6 +959,10 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
             girdi, filt, offset = [], [], 0.0
             son_v, son_a = "0:v", "0:a"
             onceki = ""
+            # ⚠ FAZ Y-6: uretilen GERCEK J/L-cut sayisi. Liste kullaniliyor
+            # cunku ic kapsamdan yazilacak; rapora (`_JL_SON`) tasinir ve
+            # `gercek_qa` bunu OLCUM olarak okur (uydurmaz).
+            jl_sayisi = [0]
             for i, y in enumerate(yollar):
                 girdi += ["-i", y]
             for i in range(1, len(yollar)):
@@ -963,13 +977,48 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
                 if not imza:
                     g = min(g, 1.0 / max(1, fps) * 2)   # 2 kare = gozle sert kesme
                 onceki = tur
+                # ⚠ FAZ Y-6 / Y6-JL-URETIM — GERCEK J/L-CUT.
+                # OLCULEN KUSUR: burada ses ve goruntu AYNI `g` ile capraz
+                # geciyordu (`acrossfade=d=g` + `xfade=duration=g`), yani
+                # ses ve goruntu sinirlari TAM AYNI noktadaydi.
+                # `gercek_qa.ses_kurgu_olcumu` bunu "j_l_cut: 0, tam: False"
+                # diye raporluyordu — J/L-cut olculmuyor degildi, YAPISAL
+                # OLARAK URETILMIYORDU.
+                # ⚠ COZUM (deterministik, SAHNE SEMANTIGINDEN):
+                #   · `kanit`/`vurgu` -> J-CUT: ses goruntuden ONCE girsin
+                #   · `sonuc`         -> L-CUT: ses goruntuden SONRA bitsin
+                # Uygulama: o gecislerde ses capraz gecisi KISALTILIR
+                # (`ga < g`), boylece ses siniri goruntu sinirindan
+                # `g - ga` kadar AYRISIR. Ses akisi videodan uzun kalir ve
+                # asagida `-t` ile video suresine kirpilir (A/V senkronu
+                # BOZULMAZ; sessizlik EKLENMEZ).
+                _islev = (str((sahne_dilimi[i] or {}).get("islev") or "")
+                          if sahne_dilimi and i < len(sahne_dilimi) else "")
+                _jl = ("j" if _islev in ("kanit", "vurgu")
+                       else ("l" if _islev == "sonuc" else ""))
+                ga = g
+                if _jl and g > JL_OFFSET_SN + 0.02:
+                    ga = round(max(0.02, g - JL_OFFSET_SN), 3)
+                    jl_sayisi[0] += 1
                 filt.append(f"[{son_v}][{i}:v]xfade=transition={tur}:duration={g:.3f}:"
                             f"offset={offset:.3f}[{vo}]")
-                filt.append(f"[{son_a}][{i}:a]acrossfade=d={g:.3f}[{ao}]")
+                filt.append(f"[{son_a}][{i}:a]acrossfade=d={ga:.3f}[{ao}]")
                 son_v, son_a = vo, ao
+            # ⚠ FAZ Y-6: A/V SENKRONU. J/L gecislerinde ses capraz gecisi
+            # KISALDIGI icin ses akisi videodan uzun kalir. Toplam VIDEO
+            # suresi = son gecis offset'i + son segment suresi; ses buna
+            # KIRPILIR. Boylece sinir ayrisir ama senkron BOZULMAZ ve sona
+            # sessizlik EKLENMEZ (apad kullanilmaz).
+            _toplam_v = round(offset + sureler[-1], 3)
+            _JL_SON["sayi"] = jl_sayisi[0]
+            if jl_sayisi[0]:
+                print(f"  Y6-JL-URETIM: {jl_sayisi[0]} gercek J/L-cut "
+                      f"(ses siniri {JL_OFFSET_SN:.2f} sn ayristi)",
+                      file=sys.stderr)
             komut = (["ffmpeg", "-y", "-loglevel", "error"] + girdi +
                      ["-filter_complex", ";".join(filt),
                       "-map", f"[{son_v}]", "-map", f"[{son_a}]",
+                      "-t", f"{_toplam_v:.3f}",
                       "-c:v", "libx264", "-crf", str(crf), "-preset", "veryfast",
                       # ⚠ FAZ R-1d-f: `xfade` formati 4:4:4'e YUKSELTIYOR;
                       # segment filtresindeki `format=yuv420p` BURADA

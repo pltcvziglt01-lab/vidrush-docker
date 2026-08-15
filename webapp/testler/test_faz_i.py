@@ -14573,11 +14573,17 @@ kontrol("⭐ R-1d-j RED-FIRST: BOS timeline'da sabit PASS YOK",
 
 # ── (2) SES KURGUSU: J/L-cut ve ducking ──
 _S3 = _GQ.ses_kurgu_olcumu(_gj_cevir([_gj("s1"), _gj("s2"), _gj("s3")]))
-kontrol("⭐ R-1d-j BELIRLEYICI: J/L-cut OLCULUYOR — gercek hatta ses ve "
-        "video sinirlari AYNI (`acrossfade` = `xfade`) -> 0",
+# ⚠ FAZ Y-6: J/L-cut ARTIK URETILIYOR. Eski sozlesme "acrossfade = xfade
+# oldugu icin YAPISAL 0" diyordu; `hizli_render` artik sahne semantigine
+# gore (kanit/vurgu -> J, sonuc -> L) ses capraz gecisini kisaltiyor ve
+# sinir GERCEKTEN ayrisiyor. Olcum UYDURULMAZ: render'in yazdigi gercek
+# sayac okunur. Bu sentetik timeline'da islev eslesmedigi icin sayac 0'dir
+# ve `tam` False kalir — yani "0" hala SESSIZ bir PASS uretmiyor.
+kontrol("⭐ R-1d-j BELIRLEYICI: J/L-cut GERCEK SAYACTAN okunuyor "
+        "(uydurulmuyor); uretim yoksa 0 + tam=False",
         _S3["olculdu"] is True and _S3["j_l_cut"] == 0
-        and _S3["ses_gecis"] == 2
-        and "acrossfade" in str(_S3.get("gerekce", "")), _S3)
+        and _S3["ses_gecis"] == 2 and _S3["tam"] is False
+        and "jl_offset_sn" in _S3, _S3)
 kontrol("⭐ R-1d-j BELIRLEYICI RED-FIRST: DUCKING verisi gercek timeline'da "
         "YOK — 0 ya da PASS UYDURULMUYOR, stabil kod",
         _S3["ducking"]["olculdu"] is False

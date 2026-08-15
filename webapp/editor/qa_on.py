@@ -33,6 +33,14 @@ except Exception:             # noqa: BLE001
 from .profil import OLCULEN, EditProfili, VARSAYILAN
 
 # ── Sorun kodlari ve seviyeleri ──
+# ⚠ FAZ Y-6 — UST SEVIYE KURGU ESIKLERI (kullanici karari, BAGLAYICI).
+# Referans: `profil.gecis_dagilimi` j-cut %4 + l-cut %4 (~%8 gecis) —
+# esik UYDURULMADI, mevcut profil hedefinden turetildi.
+JL_EN_AZ = 2                 # yuksek kurgu presetinde en az 2 gercek J/L-cut
+JL_ASGARI_SURE_SN = 45.0     # bu sureden kisa videoda J/L kapisi aranmaz
+SFX_TAVAN_DK = 6.0           # SFX/dakika ust siniri (kota 6.0 sn ile tutarli)
+SFX_ASGARI_SURE_SN = 60.0    # bu sureden uzun videoda hic SFX yoksa uyar
+
 FAIL_KODLARI = {
     "LISANS-EKSIK", "LISANS-ATIF-EKSIK", "FACT-BAGLANTI-YOK",
     "EFEKT-SESSIZ-KAYIP", "SHOT-TAVAN-IHLAL", "ENTITY-DONEM",
@@ -530,12 +538,37 @@ def denetle(*, beat_plani, cekimler: list, yazi_katmanlari: list,
                                "sorun": tipo_sorun}
 
     # ═══ 8) SES ═══
+    _sfx_n = sum(1 for o in ses_plani.olaylar if o.tur == "sfx")
+    _jl_n = sum(1 for o in ses_plani.olaylar if o.tur in ("j-cut", "l-cut"))
     q.olcumler["ses"] = {
         "lufs_hedef": ses_plani.lufs_hedef,
         "tepe_tavan": ses_plani.tepe_tavan,
         "sfx_dakikada": ses_plani.sfx_yogunlugu(toplam),
+        "sfx_sayisi": _sfx_n,
+        "jl_sayisi": _jl_n,
         "on_zincir_adim": len(ses_plani.on_zincir),
         "ducking_araligi": len(ses_plani.ducking_zarfi)}
+
+    # ⚠ FAZ Y-6 — UST SEVIYE KURGU: J/L-CUT ve OLCULU SFX KAPILARI.
+    # Kullanici karari (BAGLAYICI): bunlar tam PASS icin ZORUNLU.
+    # ⚠ Kapilar YALNIZ olcum degil URETIM de gerektirir: `hizli_render`
+    # J/L gecislerinde ses capraz gecisini kisaltir (Y6-JL-URETIM) ve
+    # `pipeline.sfx_bindir` SFX'i gercekten bindirir.
+    if toplam >= JL_ASGARI_SURE_SN and _jl_n < JL_EN_AZ:
+        q.ekle(Sorun("KURGU-JL-YOK", "warn",
+                     detay=f"{_jl_n} J/L-cut (en az {JL_EN_AZ} beklenir)",
+                     oneri="kanit/vurgu beat'inde j-cut, sonuc beat'inde "
+                           "l-cut planla"))
+    # SFX bandi CIFT TARAFLI: ne sessiz ne asiri.
+    _sfx_dk = ses_plani.sfx_yogunlugu(toplam)
+    if toplam >= SFX_ASGARI_SURE_SN and _sfx_n == 0:
+        q.ekle(Sorun("SES-SFX-BANT", "warn",
+                     detay=f"hic SFX yok ({toplam:.0f} sn)",
+                     oneri="hook/kanit/donus islevlerine olculu SFX ekle"))
+    elif _sfx_dk > SFX_TAVAN_DK:
+        q.ekle(Sorun("SES-SFX-BANT", "warn",
+                     detay=f"{_sfx_dk}/dk > tavan {SFX_TAVAN_DK}/dk",
+                     oneri="SFX kotasini seyrelt"))
     if ses_plani.lufs_hedef != p.lufs_hedef:
         q.ekle(Sorun("SES-LUFS-HEDEF-YOK", "fail",
                      detay=f"plan {ses_plani.lufs_hedef}, profil {p.lufs_hedef}",

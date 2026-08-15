@@ -525,7 +525,14 @@ def uret(*, cumleler: list, medya_manifest: dict,
             "islev": b.islev, "perde": b.perde,
             "cekim_turu": c.cekim_turu, "hareket": c.hareket, "kadraj": c.kadraj,
             "kaynak_aralik": list(c.kaynak_aralik),
+            # ⚠ FAZ Y-6: renderer (`Ses.tsx`) `j_cut_sn`/`l_cut_sn` BEKLIYOR
+            # ama plan yalnizca BOOL yaziyordu -> renderer her zaman sabit
+            # varsayilana dusuyor, QA da olcecek bir SAYI bulamiyordu.
+            # Kaydirma sureleri `ses.py`nin urettigi olaylardan gelir
+            # (j-cut 0.35 / l-cut 0.40); burada AYNI sozlesme yazilir.
             "j_cut": b.j_cut, "l_cut": b.l_cut,
+            "j_cut_sn": (0.35 if b.j_cut else 0.0),
+            "l_cut_sn": (0.40 if b.l_cut else 0.0),
             "altyazi": _altyazi_dagit(altyazi_kupleri, b.bas_sn, b.sure_sn),
             "motion": [s for s in specler if s.get("beat_id") == b.beat_id],
             "gerekce": c.gerekce,

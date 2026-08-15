@@ -4870,6 +4870,21 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             # ⚠ Sunucuda dogrulandi: ayni cagri DOLU metinle 10 cekim ve
             # GERCEK olcumler uretiyor. Video.tsx bu alani OKUMAZ.
             "anlatim": metin,
+            # ⚠ FAZ Y-7 / Y7-FACT-PROPS-SINIRI — FACT ZINCIRI BURADA
+            # KOPUYORDU. `arastirma_kopru.fact_bagla()` fact_id'yi GERCEKTEN
+            # yaziyor (`s["fact_id"] = ...`) ve ayni `s` sozlugu medya
+            # avcisina fact_id'yi basariyla veriyor. AMA bu props sozlugu
+            # `fact_id` anahtarini HIC TASIMIYORDU; `edit_kopru.plan_kur`
+            # girdisi props'tan kuruldugu icin her cumle `fact_id: ""`
+            # aliyor -> `beat` bos -> `Cekim.fact_id=""` -> `qa_on` HER
+            # cekime `FACT-BAGLANTI-YOK` (fail) veriyordu. Gercek iste
+            # 22/22 fail bunu dogruladi.
+            # ⚠ `scene_id` (R-1d-b) ve `anlatim` (R-1d-b) ile BIREBIR AYNI
+            # SINIF kusur: uretimde veri VAR, props sinirinda DUSUYOR.
+            # ⚠ Video.tsx bu alanlari OKUMAZ; `/api/generate` 22 alan
+            # sozlesmesi DEGISMEZ.
+            "fact_id": str(s.get("fact_id") or ""),
+            "iddia_metni": str(s.get("iddia_metni") or ""),
             "tur": tur, "medya": medya, "ses": syol, "sure": round(sure, 3),
             **({"zoom": "yok", "pan": "yok"} if not zoom_acik else
                (lambda k: (_son_kurgu.update(k), {"zoom": k["zoom"], "pan": k["pan"]})[1])(

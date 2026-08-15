@@ -60,10 +60,21 @@ class SesPlani:
     uyarilar: list = field(default_factory=list)
 
     def sozluk(self) -> dict:
+        # ⚠ FAZ Y-6: J/L-cut ve kaydirma suresi OLCUM ALANI olarak yayinlanir.
+        # ESKI HAL: yalnizca `sfx_sayisi` disari veriliyordu; J/L olaylari
+        # `olaylar` icinde gomuluydu ve QA bir SAYI bulamiyordu (kapi
+        # kurulamiyordu). Kaydirma suresi de kodda SABITTI (0.35/0.4) —
+        # simdi olculen deger olarak disari cikiyor.
+        _j = [o for o in self.olaylar if o.tur == "j-cut"]
+        _l = [o for o in self.olaylar if o.tur == "l-cut"]
+        _kay = [float(o.sure_sn or 0.0) for o in (_j + _l)]
         return {"lufs_hedef": self.lufs_hedef, "tepe_tavan_dbtp": self.tepe_tavan,
                 "on_zincir": self.on_zincir,
                 "ducking_zarfi": [list(x) for x in self.ducking_zarfi],
                 "sfx_sayisi": sum(1 for o in self.olaylar if o.tur == "sfx"),
+                "j_cut_sayisi": len(_j), "l_cut_sayisi": len(_l),
+                "ort_kaydirma_sn": (round(sum(_kay) / len(_kay), 3)
+                                    if _kay else 0.0),
                 "uyarilar": self.uyarilar,
                 "olaylar": [asdict(o) for o in self.olaylar]}
 

@@ -169,17 +169,34 @@ def ses_kurgu_olcumu(sahneler: list) -> dict:
         return {"olculdu": False, "kod": KOD_GECIS_YOK,
                 "neden": "en az iki sahne gerekir", "tam": False,
                 "ducking": {"olculdu": False, "kod": KOD_DUCKING_YOK}}
+    # ⚠ FAZ Y-6 / Y6-JL-URETIM — J/L-CUT ARTIK URETILIYOR, OLCULUYOR.
+    # ESKI HAL: bu hatta her gecis `xfade=duration=g` ile BIRLIKTE
+    # `acrossfade=d=g` uyguluyordu; ses/video siniri AYRISMIYORDU ve burada
+    # sabit `j_l_cut: 0` donuluyordu (uydurma degil, YAPISALDI).
+    # YENI HAL: `hizli_render` sahne semantigine gore (`kanit`/`vurgu` ->
+    # J-cut, `sonuc` -> L-cut) ses capraz gecisini KISALTIYOR
+    # (`acrossfade d = g - JL_OFFSET_SN`), boylece sinir GERCEKTEN ayrisiyor.
+    # ⚠ SAYI UYDURULMAZ: render'in yazdigi gercek sayac okunur; renderer
+    # hic calismadiysa (0) yine 0 doner ve `tam` False kalir.
+    try:
+        import hizli_render as _hr
+        _jl = int((getattr(_hr, "_JL_SON", None) or {}).get("sayi") or 0)
+        _jl_off = float((getattr(_hr, "_JL_SON", None) or {}).get("offset_sn") or 0.0)
+    except Exception:                                        # noqa: BLE001
+        _jl, _jl_off = 0, 0.0
     return {
         "olculdu": True, "kod": "",
         "ses_gecis": ses_gecis,
-        "j_l_cut": 0,
-        "gerekce": ("her gecis `acrossfade=d=g` ile `xfade=duration=g` "
-                    "AYNI g ve AYNI offset'te uygulanir; ses/video siniri "
-                    "AYRISMAZ -> J/L-cut yok"),
+        "j_l_cut": _jl,
+        "jl_offset_sn": _jl_off,
+        "gerekce": (f"{_jl} gecisde ses capraz gecisi goruntununkinden "
+                    f"{_jl_off:.2f} sn KISA -> ses/video siniri AYRISTI"
+                    if _jl else
+                    "bu koşumda J/L secilen gecis olmadi (islev eslesmedi)"),
         # ⚠ Ducking VERISI YOK -> uydurulmaz.
         "ducking": {"olculdu": False, "kod": KOD_DUCKING_YOK,
                     "neden": "gercek zaman cizgisi ducking zarfi tasimiyor"},
-        "tam": False,
+        "tam": bool(_jl),
     }
 
 
