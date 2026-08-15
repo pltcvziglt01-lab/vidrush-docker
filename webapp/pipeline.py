@@ -596,6 +596,59 @@ def ducking_gain_olcumu(stem_on: str, stem_son: str, zarf: list, *,
             "yapilandirilmis_db": yapi, "atlanan_pencere": atlanan, "kod": ""}
 
 
+# ─────────────── FAZ Y-18 — YAPILANDIRILMIS YAY PLANI ───────────────
+# ⚠ `Y18-YAY-PROMPT-SEZGISI`: yay kurali yalnizca bir LLM prompt cumlesiydi
+# ve donen plan HIC dogrulanmiyordu. Olcum yapilabilmesi icin plan
+# YAPILANDIRILMIS alanlar tasimali: `chapter_id`, `beat_role`,
+# `primary_fact_id`. Asagidaki eslesme SERBEST METIN SEZGISI DEGILDIR —
+# hattin KENDI yapisal `bolum` ve `islev` alanlarindan DETERMINISTIK
+# turetilir.
+ISLEV_YAY_ROLU = {
+    "acilis": "hook", "soru": "hook",
+    "aciklama": "baglam", "gecmis": "baglam",
+    "vurgu": "kanit", "liste": "kanit", "ornek": "kanit",
+    "karsilastir": "karsitlik",
+    "sonuc": "sonuc",
+}
+
+
+def yay_plani_kur(props_sahneler: list) -> list:
+    """RENDER EDILEN sahnelerden yapilandirilmis beat plani.
+
+    ⚠ Rol, sahnenin `islev` alanindan (yapisal) turer; metinden SEZILMEZ.
+    ⚠ `chapter_id`, `bolum` basligi dolu olan sahnede yeni bolum acar;
+    araya girenler onceki bolume aittir.
+    ⚠ SON sahne, `sonuc` rolu tasiyorsa VIDEONUN KAPANISI olarak
+    `closing` isaretlenir — bu bir EK beat degil, son beat'in rolu.
+    """
+    beatler, cno = [], 0
+    for i, s0 in enumerate(props_sahneler or []):
+        if not isinstance(s0, dict):
+            continue
+        if str(s0.get("bolum") or "").strip() or cno == 0:
+            cno += 1
+        rol = ISLEV_YAY_ROLU.get(str(s0.get("islev") or ""), "")
+        beatler.append({
+            "chapter_id": f"c{cno:02d}",
+            "beat_role": rol,
+            "primary_fact_id": str(s0.get("fact_id") or ""),
+            "bas_sn": 0.0, "sure_sn": float(s0.get("sure") or 0.0),
+            "metin": str(s0.get("anlatim") or "")[:400],
+        })
+    t = 0.0
+    for b in beatler:
+        b["bas_sn"] = round(t, 3)
+        t += float(b.get("sure_sn") or 0.0)
+    # ⚠ Kapanis: son beat `sonuc` ise videonun KAPANISI odur.
+    if beatler and beatler[-1]["beat_role"] == "sonuc":
+        beatler[-1]["beat_role"] = "closing"
+        beatler.insert(len(beatler) - 1, {
+            **beatler[-1], "beat_role": "sonuc",
+            "primary_fact_id": beatler[-1].get("primary_fact_id", ""),
+            "sure_sn": 0.0})
+    return beatler
+
+
 def sfx_bindir(video: str, sahneler: list, is_dizini: str, *,
                ducking_db: float = None, sure_okuyucu=None,
                kosucu=None) -> tuple:
@@ -5858,6 +5911,41 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
               f"sizinti={_ses_sifir.get('sizinti')} "
               f"segment={_ses_sifir.get('segment')} "
               f"kod={_ses_sifir.get('kod') or '-'}", file=sys.stderr)
+
+        # ── FAZ Y-18: BOLUM YAYI + KAPANIS OLCUMU ──
+        # ⚠ Prompt varligi KABUL DEGIL: olcum yapilandirilmis plandan ve
+        # KABUL EDILMIS fact allowlist'inden yapilir. Sira bozuksa TEK
+        # deterministik yeniden plan denenir; hala bozuksa FAIL kalir.
+        try:
+            import anlati_yay as _ay
+            _izin = {str(o.get("fact_id") or "")
+                     for o in (getattr(arastirma_sonuc, "olgular", None) or [])
+                     if isinstance(o, dict) and o.get("fact_id")}
+            _beatler = yay_plani_kur(props_sahneler)
+            _yay = _ay.yay_olcumu(_beatler, allowlist=_izin,
+                                  render_sahne=len(_beatler))
+            if _yay.get("kod") == _ay.KOD_SIRA_BOZUK:
+                # ⚠ TEK deneme, DETERMINISTIK, beat EKLEMEZ/SILMEZ.
+                _yay2 = _ay.yay_olcumu(_ay.yeniden_planla(_beatler),
+                                       allowlist=_izin,
+                                       render_sahne=len(_beatler))
+                _yay = {**_yay2, "yeniden_planlandi": True}
+            if isinstance(_render_qa, dict):
+                _render_qa["anlati"] = _yay
+            sonuc["anlati"] = _yay
+            print(f"  RENDER-SONRASI ANLATI-YAY: "
+                  f"olculdu={_yay.get('olculdu')} "
+                  f"bolum={_yay.get('bolum')} "
+                  f"kapanis={_yay.get('kapanis_skoru')} "
+                  f"kod={_yay.get('kod') or '-'}", file=sys.stderr)
+        except Exception as e:                               # noqa: BLE001
+            _yay = {"olculdu": False, "kod": "ANLATI-YAY-OLCULMEDI",
+                    "neden": f"{type(e).__name__}: {str(e)[:120]}"}
+            if isinstance(_render_qa, dict):
+                _render_qa["anlati"] = _yay
+            sonuc["anlati"] = _yay
+            print(f"  ANLATI-YAY olculemedi: {type(e).__name__}",
+                  file=sys.stderr)
 
         # ── FAZ Y-16: ORTALAMA PLAN SURESI, RENDER EDILEN CEKIMLERDEN ──
         # ⚠ Sahne suresinden TURETILMEZ: `_cekim_planla` sahneyi 8 sn

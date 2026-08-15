@@ -269,12 +269,25 @@ def _k_fact_kapsam(o) -> tuple:
 
 
 def _k_bolum_yay(o) -> tuple:
+    """⚠ FAZ Y-18 — YAPILANDIRILMIS OLCUM, PROMPT SEZGISI DEGIL.
+
+    OLCULEN KUSUR (`Y18-YAY-PROMPT-SEZGISI`): yay kurali yalnizca bir LLM
+    prompt cumlesiydi; donen plan uzerinde hicbir dogrulama yoktu.
+    ⚠ Artik `anlati_yay.yay_olcumu`nun URETTIGI olcum okunur: chapter
+    bazinda halka tamligi, sira, rol tekrari, kanit-fact bagi, sonucta
+    yeni fact yasagi, kapanis gucu ve render kapsami. Olcumun tasidigi
+    HERHANGI bir stabil kod KABUL URETMEZ.
+    """
     a = _blok(o, "anlati")
     eksik = a.get("eksik_halka")
     kapanis = _sayi(a, "kapanis_skoru")
     bolum = _tam_sayi(a, "bolum")
     if not _olculdu(a):
         return False, "anlati yayi olculmedi"
+    kod = _metin(a, "kod")
+    if kod:
+        # ⚠ Olcum kendi hukmunu vermis; kabul onu EZEMEZ.
+        return False, f"{kod}: {_metin(a, 'neden') or 'yay sozlesmesi ihlali'}"
     if bolum is None or bolum < 1:
         return False, f"bolum sayisi: {bolum}"
     if not isinstance(eksik, list):
