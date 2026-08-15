@@ -291,6 +291,139 @@ kontrol("kabul kriteri kod tasiyan olcumu REDDEDER",
         "stabil kod varken kabul uretiliyor")
 
 
+blok("Y-18b — DENETIM KARSI ORNEKLERI")
+
+# (1) ⚠ Y18B-KAPANIS-IMALATI: `sonuc` son beat olsa bile AYRI bir
+# `closing` yoksa kapanis YOKTUR; kapi bunu IMAL ETMEZ.
+_sonuc_son = [b for b in _tam_plan() if b["beat_role"] != "closing"]
+_rs = ay.yay_olcumu(_sonuc_son, allowlist=IZIN, render_sahne=8)
+kontrol("sonuc son ama AYRI closing yok -> FAIL",
+        _rs.get("kod") == ay.KOD_KAPANIS_ZAYIF, f"{_rs}")
+_PLK0 = open(os.path.join(KOK, "pipeline.py"), encoding="utf-8").read()
+kontrol("karar kodu belgelendi: Y18B-KAPANIS-IMALATI",
+        "Y18B-KAPANIS-IMALATI" in _PLK0)
+kontrol("hat closing beat'i IMAL ETMIYOR",
+        'beat_role"] = "closing"' not in _PLK0,
+        "kapi kendi kapanisini uretiyor (totoloji)")
+
+# (2) ⚠ Y18B-KAPSAM-TOTOLOJI: olcum kendi listesini kapsam sanamaz.
+_9props = [f"s{i:03d}" for i in range(1, 10)]
+_10beat = _tam_plan() + [beat("c2", "kanit", F3, 27.0)]
+for i, b in enumerate(_10beat):
+    b["scene_id"] = f"s{i + 1:03d}"
+_rc = ay.yay_olcumu(_10beat, allowlist=IZIN, render_sahne=9,
+                    render_scene_idler=_9props)
+kontrol("9 props + 10 beat -> RENDER KAPSAMI FAIL",
+        _rc.get("kod") == ay.KOD_RENDER_KAPSAMI, f"{_rc}")
+kontrol("fazla beat kimlikle adlandirilir",
+        any("s010" in str(x) for x in (_rc.get("kapsam_eksik") or [])),
+        f"{_rc.get('kapsam_eksik')}")
+_tam_id = _tam_plan()
+for i, b in enumerate(_tam_id):
+    b["scene_id"] = f"s{i + 1:03d}"
+kontrol("birebir eslesen kimlikler GECER",
+        ay.yay_olcumu(_tam_id, allowlist=IZIN, render_sahne=9,
+                      render_scene_idler=_9props).get("kod") == "",
+        f"{ay.yay_olcumu(_tam_id, allowlist=IZIN, render_sahne=9, render_scene_idler=_9props)}")
+kontrol("scene_id tasimayan beat kapsam DOGRULATAMAZ",
+        ay.yay_olcumu(_tam_plan(), allowlist=IZIN, render_sahne=9,
+                      render_scene_idler=_9props).get("kod")
+        == ay.KOD_RENDER_KAPSAMI)
+kontrol("karar kodu belgelendi: Y18B-KAPSAM-TOTOLOJI",
+        "Y18B-KAPSAM-TOTOLOJI" in open(
+            os.path.join(KOK, "anlati_yay.py"), encoding="utf-8").read())
+
+# (3) ⚠ Y18B-POST-HOC-SIRALAMA: render SONRASI siralama PASS uretemez.
+kontrol("karar kodu belgelendi: Y18B-POST-HOC-SIRALAMA",
+        "Y18B-POST-HOC-SIRALAMA" in _PLK0)
+_i_render = _PLK0.find("hizli_render.ffmpeg_render(")
+_i_onarim = _PLK0.find("yeniden_planla(")
+kontrol("deterministik onarim RENDER'DAN ONCE",
+        0 < _i_onarim < _i_render, f"onarim@{_i_onarim} render@{_i_render}")
+kontrol("render SONRASI yeniden_planla CAGRISI YOK",
+        _PLK0.count("yeniden_planla(") == 1
+        and _PLK0.rfind("yeniden_planla(") < _i_render,
+        "olcum post-hoc siralanip makyajlaniyor")
+kontrol("on-onarim props_sahneler'i GERCEKTEN yeniden siralar",
+        "props_sahneler.sort(" in _PLK0,
+        "onarim timeline'i degistirmiyor")
+
+
+blok("Y-18c — CANLI HAT: KAPANIS GERCEKTEN URETILEBILIR")
+
+# ⚠ OLCULEN KUSUR (`Y18C-KAPANIS-URETILEMEZ`, denetim): otomatik imalat
+# kaldirilinca `closing` rolunu URETEBILECEK hicbir yol kalmamisti —
+# `props_sahneler` `beat_role`/`kapanis` alanini HIC yazmiyor ve
+# `ISLEV_TIPLERI` yalnizca `sonuc` iceriyordu. Tum isler duserdi.
+import shutil as _sh18   # noqa: E402
+import tempfile as _tf18  # noqa: E402
+
+_k18 = _tf18.mkdtemp(prefix="y18_kok_")
+_u18 = os.path.join(KOK, "..", "app", "uret.py")
+if os.path.exists(_u18):
+    _sh18.copy(_u18, os.path.join(_k18, "uret.py"))
+sys.path.insert(0, _k18)
+os.environ["VIDRUSH_KOK"] = os.path.abspath(_k18)
+os.environ.setdefault("CIKTI_DIR", os.path.join(_k18, "ciktilar"))
+import pipeline as PL18  # noqa: E402
+
+kontrol("ISLEV_TIPLERI `kapanis` iceriyor",
+        "kapanis" in PL18.ISLEV_TIPLERI, f"{sorted(PL18.ISLEV_TIPLERI)}")
+kontrol("rol eslemesi kapanis -> closing",
+        PL18.ISLEV_YAY_ROLU.get("kapanis") == "closing",
+        f"{PL18.ISLEV_YAY_ROLU}")
+kontrol("senaryo promptu AYRI kapanis zorluyor",
+        "CLOSING RULE" in _PLK0 and 'islev=\\"kapanis\\"' in _PLK0
+        or "CLOSING RULE" in _PLK0,
+        "prompt kapanisi ayri satir olarak zorlamiyor")
+
+# ── CANLI props -> beat plani: islev=kapanis GERCEK closing uretir ──
+_props_ok = [
+    {"scene_id": "s001", "bolum": "BOLUM 1", "islev": "acilis", "sure": 3.0,
+     "anlatim": "Tokyo'da kac kisi yalniz oluyor", "fact_id": ""},
+    {"scene_id": "s002", "islev": "aciklama", "sure": 3.0,
+     "anlatim": "Sehir hizla yaslaniyor", "fact_id": ""},
+    {"scene_id": "s003", "islev": "vurgu", "sure": 3.0,
+     "anlatim": "Polis 76,941 vaka kaydetti", "fact_id": F1},
+    {"scene_id": "s004", "islev": "sonuc", "sure": 3.0,
+     "anlatim": "Sayi bir esigi asti", "fact_id": F1},
+    {"scene_id": "s005", "islev": "kapanis", "sure": 3.0,
+     "anlatim": "Tokyo'da yalniz olenlerin sayisi bir esik", "fact_id": F1},
+]
+_b18 = PL18.yay_plani_kur(_props_ok)
+kontrol("canli props'ta islev=kapanis -> closing rolu",
+        _b18[-1]["beat_role"] == "closing", f"{[b['beat_role'] for b in _b18]}")
+kontrol("closing GERCEK scene_id tasir",
+        _b18[-1]["scene_id"] == "s005", f"{_b18[-1]}")
+kontrol("closing GERCEK sure tasir (0 sn sahte beat yok)",
+        float(_b18[-1].get("sure_sn") or 0) > 0, f"{_b18[-1]}")
+kontrol("beat sayisi props sayisina ESIT (imalat yok)",
+        len(_b18) == len(_props_ok), f"{len(_b18)} != {len(_props_ok)}")
+_o18 = ay.yay_olcumu(_b18, allowlist=IZIN, render_sahne=len(_props_ok),
+                     render_scene_idler=[p["scene_id"] for p in _props_ok])
+kontrol("canli plan yay olcumunden GECER", _o18.get("kod") == "", f"{_o18}")
+
+# ── YALNIZ sonuc ile biten plan FAIL ──
+_props_sonuc = [dict(x) for x in _props_ok[:-1]]
+_b18b = PL18.yay_plani_kur(_props_sonuc)
+kontrol("yalniz sonuc final -> closing URETILMEZ",
+        all(b["beat_role"] != "closing" for b in _b18b),
+        f"{[b['beat_role'] for b in _b18b]}")
+kontrol("yalniz sonuc final -> KAPANIS ZAYIF FAIL",
+        ay.yay_olcumu(_b18b, allowlist=IZIN, render_sahne=len(_props_sonuc),
+                      render_scene_idler=[p["scene_id"]
+                                          for p in _props_sonuc])
+        .get("kod") == ay.KOD_KAPANIS_ZAYIF, "kapanissiz plan geciyor")
+
+# ── Hicbir uretim alani yazmiyorsa STATIK test KIRMIZI olmali ──
+kontrol("uretimde closing uretebilecek EN AZ BIR yol var",
+        ("kapanis" in PL18.ISLEV_TIPLERI
+         and PL18.ISLEV_YAY_ROLU.get("kapanis") == "closing"),
+        "closing uretilemez — tum isler duser")
+kontrol("karar kodu belgelendi: Y18C-KAPANIS-URETILEMEZ",
+        "Y18C-KAPANIS-URETILEMEZ" in _PLK0)
+
+
 blok("Y-18/12 — HAT BAGLANTISI")
 
 _PLK = open(os.path.join(KOK, "pipeline.py"), encoding="utf-8").read()
@@ -302,6 +435,8 @@ kontrol("pipeline yay olcumunu kosuyor", "yay_olcumu(" in _PLK,
         "olcum hatta bagli degil")
 kontrol("pipeline tek yeniden plan denemesi yapiyor",
         "yeniden_planla(" in _PLK, "deterministik onarim denemesi yok")
+kontrol("pipeline GERCEK render sahne kimliklerini gecirir",
+        "render_scene_idler=" in _PLK, "kapsam kimlikle dogrulanmiyor")
 
 
 print(f"\n{'=' * 62}\nGECEN: {gecen}   BASARISIZ: {len(basarisiz)}")

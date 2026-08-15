@@ -159,13 +159,21 @@ def yeniden_planla(plan) -> list:
     return yeni
 
 
-def yay_olcumu(plan, *, allowlist=None, render_sahne=None) -> dict:
+def yay_olcumu(plan, *, allowlist=None, render_sahne=None,
+               render_scene_idler=None) -> dict:
     """Bolum yayi + kapanis olcumu. ⚠ FAIL-CLOSED, istisna firlatmaz.
 
     `allowlist` KABUL EDILMIS FactPacket kimlikleri (Y-11). Verilmezse
     kanit bagi DOGRULANAMAZ ve olcum "olculmedi" doner.
-    `render_sahne` render edilen sahne sayisi; verilmezse timeline
+    `render_sahne` GERCEK render edilen sahne sayisi; verilmezse timeline
     kapsami DOGRULANAMAZ ve olcum "olculmedi" doner.
+    `render_scene_idler` verilirse kapsam SAYIYLA degil BIREBIR KIMLIKLE
+    dogrulanir.
+
+    ⚠ OLCULEN KUSUR (`Y18B-KAPSAM-TOTOLOJI`, denetim): cagiran
+    `render_sahne=len(beatler)` gecirirse olcum KENDI LISTESINI kapsam
+    kaniti sayar ve kontrol anlamsizlasir. Kimlik listesi verildiginde bu
+    imkansizdir.
     """
     temel = {"olculdu": False, "bolum": 0, "eksik_halka": None,
              "kapanis_skoru": None, "sira_bozuk": [], "render_kapsam": None}
@@ -240,6 +248,21 @@ def yay_olcumu(plan, *, allowlist=None, render_sahne=None) -> dict:
     except (TypeError, ValueError):
         rs = -1
     kapsam_ok = rs == len(beatler)
+    kapsam_eksik = []
+    if render_scene_idler is not None:
+        # ⚠ BIREBIR kimlik eslesmesi: olcumdeki her beat gercekten render
+        # edilmis bir sahneye karsilik gelmeli ve tersi de dogru olmali.
+        _r = [str(x) for x in (render_scene_idler or [])]
+        _b = [str(x.get("scene_id") or "") for x in beatler]
+        if "" in _b:
+            kapsam_eksik = ["beat scene_id tasimiyor"]
+        else:
+            _fazla = sorted(set(_b) - set(_r))
+            _kayip = sorted(set(_r) - set(_b))
+            kapsam_eksik = ([f"olcumde-fazla:{x}" for x in _fazla[:5]]
+                            + [f"render-edilip-olculmeyen:{x}"
+                               for x in _kayip[:5]])
+        kapsam_ok = (not kapsam_eksik) and len(_b) == len(_r)
 
     kod, neden = "", ""
     if eksik:
@@ -261,7 +284,8 @@ def yay_olcumu(plan, *, allowlist=None, render_sahne=None) -> dict:
                  else f"kapanis gucu {skor:.2f} < {KAPANIS_ASGARI:.2f}")
     elif not kapsam_ok:
         kod = KOD_RENDER_KAPSAMI
-        neden = f"render {rs} sahne, plan {len(beatler)} beat"
+        neden = (f"render {rs} sahne, plan {len(beatler)} beat"
+                 + (f" | {kapsam_eksik[:6]}" if kapsam_eksik else ""))
 
     return {"olculdu": True, "bolum": len(bolumler),
             "beat": len(beatler),
@@ -271,4 +295,5 @@ def yay_olcumu(plan, *, allowlist=None, render_sahne=None) -> dict:
             "sonuc_yeni_fact": sonuc_yeni_fact,
             "kapanis_skoru": skor,
             "render_kapsam": (round(len(beatler) / rs, 3) if rs > 0 else 0.0),
+            "kapsam_eksik": kapsam_eksik,
             "kod": kod, "neden": neden}

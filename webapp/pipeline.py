@@ -609,6 +609,7 @@ ISLEV_YAY_ROLU = {
     "vurgu": "kanit", "liste": "kanit", "ornek": "kanit",
     "karsilastir": "karsitlik",
     "sonuc": "sonuc",
+    "kapanis": "closing",
 }
 
 
@@ -627,9 +628,14 @@ def yay_plani_kur(props_sahneler: list) -> list:
             continue
         if str(s0.get("bolum") or "").strip() or cno == 0:
             cno += 1
-        rol = ISLEV_YAY_ROLU.get(str(s0.get("islev") or ""), "")
+        # ⚠ `closing` YAPISAL alandan gelir; islevden TURETILMEZ ve
+        # otomatik IMAL EDILMEZ (Y18B-KAPANIS-IMALATI).
+        rol = (str(s0.get("beat_role") or "").strip().lower()
+               or ("closing" if s0.get("kapanis") is True else "")
+               or ISLEV_YAY_ROLU.get(str(s0.get("islev") or ""), ""))
         beatler.append({
             "chapter_id": f"c{cno:02d}",
+            "scene_id": str(s0.get("scene_id") or f"s{i + 1:03d}"),
             "beat_role": rol,
             "primary_fact_id": str(s0.get("fact_id") or ""),
             "bas_sn": 0.0, "sure_sn": float(s0.get("sure") or 0.0),
@@ -639,13 +645,12 @@ def yay_plani_kur(props_sahneler: list) -> list:
     for b in beatler:
         b["bas_sn"] = round(t, 3)
         t += float(b.get("sure_sn") or 0.0)
-    # ⚠ Kapanis: son beat `sonuc` ise videonun KAPANISI odur.
-    if beatler and beatler[-1]["beat_role"] == "sonuc":
-        beatler[-1]["beat_role"] = "closing"
-        beatler.insert(len(beatler) - 1, {
-            **beatler[-1], "beat_role": "sonuc",
-            "primary_fact_id": beatler[-1].get("primary_fact_id", ""),
-            "sure_sn": 0.0})
+    # ⚠ OLCULEN KUSUR (`Y18B-KAPANIS-IMALATI`, denetim): ilk yazimda son
+    # `sonuc` beat'i KOSULSUZ `closing` yapiliyor ve yerine 0 sn'lik
+    # SAHTE bir `sonuc` beat'i EKLENIYORDU. Yani EKSIK KAPANISI KAPININ
+    # KENDISI URETIYORDU — totoloji. Kapanis PLANLAYICININ AYRI, GERCEK
+    # bir sahnesi olmalidir; burada IMAL EDILMEZ.
+    # `closing` rolu YALNIZCA sahnenin kendi yapisal alanindan gelir.
     return beatler
 
 
@@ -3043,7 +3048,16 @@ ISLEV_TIPLERI = {
     "gecmis":      "a memory or flashback to the past",
     "karsilastir": "comparing two things",
     "soru":        "a direct question to the viewer",
-    "sonuc":       "the takeaway or closing line",
+    "sonuc":       "the takeaway of THIS chapter (its conclusion)",
+    # ⚠ FAZ Y-18c (`Y18C-KAPANIS-URETILEMEZ`, denetim): `closing` rolu
+    # `beat_role`/`kapanis` alanindan gelmeliydi ama HICBIR uretim yolu o
+    # alani YAZMIYORDU ve `ISLEV_TIPLERI`nde yalnizca `sonuc` vardi.
+    # Otomatik imalat (Y-18b) kaldirilinca closing ARTIK HIC OLUSMUYOR ve
+    # tum isler duserdi. Kapanis AYRI, GERCEK bir sahne olarak uretilir.
+    "kapanis":     ("the FINAL closing line of the WHOLE video — a separate "
+                    "sentence AFTER the last chapter's takeaway, calling back "
+                    "to the opening hook. Use it EXACTLY ONCE, on the LAST "
+                    "line, and never for a chapter takeaway."),
 }
 
 
@@ -3069,6 +3083,14 @@ def metin_islev_analizi(scenes: list) -> list:
         "(\"number nine\", \"rule three\", \"the fourth thing\"). Then give the item number and "
         "its subject as a very short ALL-CAPS title, max 3 words, e.g. \"9 GROCERY BILLS\". "
         "For every other line baslik MUST be an empty string.\n"
+        # ⚠ FAZ Y-18c: kapanis AYRI bir satirdir; son bolumun `sonuc`u ile
+        # KARISTIRILMAZ. Kapanis olcumu (anlati_yay) bunu ZORUNLU kilar.
+        "CLOSING RULE (mandatory): the LAST line of the script is the "
+        "video's closing. Mark it islev=\"kapanis\" — NOT \"sonuc\". "
+        "The line BEFORE it, which concludes the final chapter, is the one "
+        "that gets \"sonuc\". Use \"kapanis\" exactly once, only on the "
+        "last line. A closing must call back to the opening hook and must "
+        "NOT introduce any new figure, date or name.\n"
         "Return one entry for EVERY line, in order. No commentary.\n\n"
         + "\n".join(satirlar)[:14000]
     )
@@ -5494,6 +5516,33 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         except Exception:                                    # noqa: BLE001
             return None
 
+    # ── FAZ Y-18b: DETERMINISTIK YENIDEN PLAN, RENDER **ONCESI** ──
+    # ⚠ OLCULEN KUSUR (`Y18B-POST-HOC-SIRALAMA`, denetim): ilk yazimda
+    # yeniden plan RENDER SONRASI yalnizca OLCUM LISTESINI siraliyordu.
+    # Video zaman cizgisi DEGISMIYORDU — yani olcum MAKYAJLANIP PASS
+    # uretiliyordu. Onarim ANCAK render'dan ONCE, GERCEK `props_sahneler`
+    # uzerinde anlamlidir.
+    try:
+        import anlati_yay as _ay_on
+        _izin_on = {str(o.get("fact_id") or "")
+                    for o in (getattr(arastirma_sonuc, "olgular", None) or [])
+                    if isinstance(o, dict) and o.get("fact_id")}
+        _bt_on = yay_plani_kur(props_sahneler)
+        _yay_on = _ay_on.yay_olcumu(
+            _bt_on, allowlist=_izin_on,
+            render_sahne=len(props_sahneler or []))
+        if _yay_on.get("kod") == _ay_on.KOD_SIRA_BOZUK:
+            # ⚠ TEK deneme: sahneleri chapter ICINDE gercekten yeniden
+            # sirala; boylece RENDER EDILEN video da degisir.
+            _sira = {b.get("scene_id"): i for i, b
+                     in enumerate(_ay_on.yeniden_planla(_bt_on))}
+            props_sahneler.sort(
+                key=lambda x: _sira.get(str(x.get("scene_id") or ""), 1 << 30))
+            print("  Y18B-YENIDEN-PLAN: sahne sirasi chapter icinde "
+                  "duzeltildi (render ONCESI)", file=sys.stderr)
+    except Exception as e:                                   # noqa: BLE001
+        print(f"  yay on-onarimi atlandi: {type(e).__name__}", file=sys.stderr)
+
     # ── FAZ R-1d-e: PRE-QA **RENDER EDILEN** ZAMAN CIZGISINDEN, RENDER ONCESI ──
     # ⚠ OLCULEN KUSUR (R-1d-d pilotu): PRE-QA, video ZATEN render edildikten
     # SONRA calisan ve HICBIR ZAMAN RENDER EDILMEYEN editorv2 planini
@@ -5922,14 +5971,17 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                      for o in (getattr(arastirma_sonuc, "olgular", None) or [])
                      if isinstance(o, dict) and o.get("fact_id")}
             _beatler = yay_plani_kur(props_sahneler)
-            _yay = _ay.yay_olcumu(_beatler, allowlist=_izin,
-                                  render_sahne=len(_beatler))
-            if _yay.get("kod") == _ay.KOD_SIRA_BOZUK:
-                # ⚠ TEK deneme, DETERMINISTIK, beat EKLEMEZ/SILMEZ.
-                _yay2 = _ay.yay_olcumu(_ay.yeniden_planla(_beatler),
-                                       allowlist=_izin,
-                                       render_sahne=len(_beatler))
-                _yay = {**_yay2, "yeniden_planlandi": True}
+            # ⚠ Y18B-KAPSAM-TOTOLOJI (denetim): `render_sahne=len(_beatler)`
+            # olcumun KENDISINI kapsam kaniti sayiyordu. Artik GERCEK
+            # render edilen sahne kimlikleri verilir ve birebir eslesme
+            # DOGRULANIR.
+            _yay = _ay.yay_olcumu(
+                _beatler, allowlist=_izin,
+                render_sahne=len(props_sahneler or []),
+                render_scene_idler=[str(x.get("scene_id") or "")
+                                    for x in (props_sahneler or [])])
+            # ⚠ RENDER SONRASI YENIDEN PLAN YOK: video zaten uretildi;
+            # olcumu siralamak MAKYAJDIR. Onarim render ONCESI yapildi.
             if isinstance(_render_qa, dict):
                 _render_qa["anlati"] = _yay
             sonuc["anlati"] = _yay
