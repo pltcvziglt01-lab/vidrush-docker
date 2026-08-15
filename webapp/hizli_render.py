@@ -617,6 +617,9 @@ def _jl_bos(is_adi: str = "") -> dict:
             # uzunlugu OLDUGUNDAN UZUN gorunur. Bu liste RENDER EDILEN
             # gercek cekim surelerini tasir.
             "cekim_kayitlari": {},
+            # ⚠ FAZ Y-17 (`Y17-GRAF-KANITI-YOK`): her BASARILI segmentin
+            # URETILEN KOMUTUNDAN cikarilan kaynak-ses map kaniti.
+            "ses_kayitlari": {},
             "artefakt_sha256": "", "kaynak": "", "olculdu": False}
 
 
@@ -737,6 +740,194 @@ def cekim_kaydet(is_adi: str, segment_id, sureler) -> None:
         r["cekim_kayitlari"][str(segment_id)] = temiz
 
 
+def ses_map_kaniti(komut, klip_girdileri) -> dict:
+    """URETILEN ffmpeg komutundan KAYNAK-SES map kaniti cikar. ⚠ SAF.
+
+    ⚠ Kanit metadata DEGIL, komutun kendisidir: klip girdi indekslerinden
+    herhangi biri `-map <i>:a` ile ses olarak baglanmis mi?
+    """
+    idx = {str(int(i)) for i in (klip_girdileri or [])}
+    maplar, kaynak = [], False
+    k = list(komut or [])
+    for i, a in enumerate(k):
+        if a != "-map" or i + 1 >= len(k):
+            continue
+        hedef = str(k[i + 1])
+        # Filtre etiketi ([v]/[mix]) ses girdisi degildir; `N:a` bicimi ses.
+        if hedef.startswith("["):
+            continue
+        if ":a" in hedef:
+            maplar.append(hedef)
+            if hedef.split(":")[0] in idx:
+                kaynak = True
+    return {"klip_girdileri": [int(i) for i in (klip_girdileri or [])],
+            "ses_maplari": maplar, "kaynak_ses_map": kaynak}
+
+
+KAYNAK_SES_STEM_KODU = "SOURCE-AUDIO-STEM-OLCULEMEDI"
+def _kos_ffmpeg(komut) -> dict:
+    """Varsayilan kosucu. ⚠ Hata YUTULMAZ: `rc` cagirana doner."""
+    try:
+        r = subprocess.run(komut, capture_output=True, text=True, timeout=180)
+        return {"rc": r.returncode, "stdout": r.stdout or "",
+                "stderr": r.stderr or ""}
+    except (OSError, subprocess.SubprocessError) as e:
+        return {"rc": -1, "stdout": "", "stderr": f"{type(e).__name__}: {e}"}
+
+
+def kaynak_ses_stem_komutu(komut, stem_yol: str, ses_maplari=None) -> list:
+    """Segmentin KENDI komutundan SOURCE-CONTRIBUTION stem'i uret.
+
+    ⚠ Y17-YAPISAL-BEYAN-OLCUM-SANILDI: "klip sesi map edilmedi" YAPISAL
+    bir beyandir; sayisal kanit icin AYNI girdiler ve AYNI ses map'leriyle,
+    ANLATI GIRDISI SESSIZLIKLE degistirilmis bir stem kosulur: cikan sesin
+    TAMAMI kaynak-klip katkisidir. Sizinti yoksa DIJITAL SESSIZLIK olur ve
+    `astats` bunu OLCER.
+
+    ⚠ Y17-STEM-VIDEO-CIKISI (denetim): stem komutu VIDEO ile ilgili hicbir
+    sey TASIMAZ — `-filter_complex`, `-map [v]` ve video kodlayici
+    secenekleri ATILIR. Aksi halde `-vn` ile `-map [v]` CELISIR ve
+    filtre grafiginin video cikisi BAGLANMAMIS kalir; gercek ffmpeg duser.
+    ⚠ Saf fonksiyon: ffmpeg CALISTIRMAZ. Anlati girdisi ya da ses map'i
+    yoksa BOS liste doner (fail-closed).
+    """
+    k = list(komut or [])
+    ses_idx = [i for i, a in enumerate(k)
+               if a == "-i" and i + 1 < len(k)
+               and str(k[i + 1]).lower().endswith((".mp3", ".wav", ".m4a",
+                                                   ".aac"))]
+    if not ses_idx:
+        return []
+    # Girdiler: sirayla topla; anlati girdisini SESSIZLIKLE degistir.
+    girdiler, i = [], 0
+    while i < len(k):
+        if k[i] == "-i" and i + 1 < len(k):
+            if i == ses_idx[-1]:
+                girdiler += ["-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo"]
+            else:
+                # Girdiye ait onekleri (ornegin -stream_loop/-ss/-t) koru.
+                onek = []
+                j = i - 1
+                while j >= 0 and k[j] not in ("-i",) and not str(k[j]).startswith("/"):
+                    if str(k[j]).startswith("-") and j + 1 < len(k):
+                        onek = [k[j], k[j + 1]] + onek
+                        j -= 2
+                        continue
+                    break
+                girdiler += onek + ["-i", k[i + 1]]
+            i += 2
+            continue
+        i += 1
+    maplar = [m for m in (ses_maplari or []) if ":a" in str(m)]
+    if not maplar:
+        return []
+    # ⚠ Y17-STEM-SONSUZ-KAYNAK (denetim): `anullsrc` SONSUZDUR. Orijinal
+    # komutun CIKTI suresi (`-t`) tasinmazsa stem kosusu hic bitmez ve her
+    # segment zaman asimina ugrar. Sure BULUNAMAZSA komut URETILMEZ.
+    sure = ""
+    for i in range(len(k) - 1, 0, -1):
+        if k[i - 1] == "-t":
+            try:
+                if float(k[i]) > 0:
+                    sure = f"{float(k[i]):.3f}"
+                    break
+            except (TypeError, ValueError):
+                continue
+    if not sure:
+        return []
+    cikti = ["ffmpeg", "-y", "-loglevel", "error"] + girdiler
+    for m in maplar:
+        cikti += ["-map", str(m)]
+    # ⚠ Y17-STEM-METRIK-YOK (denetim): `astats` filtresi OLMADAN ffmpeg
+    # hicbir seviye METRIGI yazmaz ve olcum DAIMA None kalirdi.
+    # ⚠ VIDEO YOK: filtre grafigi ve video map'leri hic tasinmaz.
+    return cikti + ["-af", "astats=metadata=1:reset=0",
+                    "-vn", "-c:a", "pcm_s16le",
+                    "-t", sure, stem_yol]
+
+
+def ses_stem_olc(is_adi: str, segment_id, komut, klip_girdileri,
+                 stem_yol: str, *, kosucu=None) -> dict:
+    """BASARILI segment icin GERCEK sayisal source-contribution olcumu.
+
+    ⚠ Erisilebilirlik (denetim): bu fonksiyon URETIMDE cagrilir; aksi
+    halde her is `SOURCE-AUDIO-ZERO-OLCULMEDI` kalirdi.
+    ⚠ rc != 0, stem bos ya da `astats` cozulemezse SAYI YAZILMAZ.
+    Kayit SEGMENT ANAHTARLI ve IDEMPOTENT (retry ezer, biriktirmez).
+    """
+    kanit = ses_map_kaniti(komut, klip_girdileri=klip_girdileri)
+    kos = kosucu or _kos_ffmpeg
+    sk = kaynak_ses_stem_komutu(komut, stem_yol,
+                                ses_maplari=kanit.get("ses_maplari"))
+    olcum = {"leakage_db": None, "sample_peak": None,
+             "kod": KAYNAK_SES_STEM_KODU}
+    if sk:
+        try:
+            r = kos(sk) or {}
+            _bos = (not os.path.exists(stem_yol)
+                    or os.path.getsize(stem_yol) <= 0)
+            if int(r.get("rc", -1)) == 0 and not _bos:
+                a = astats_oku(str(r.get("stderr") or "")
+                               + str(r.get("stdout") or ""))
+                if a.get("sample_peak") is not None:
+                    olcum = {"leakage_db": (None if a.get("rms_db") is None
+                                            else (-120.0
+                                                  if a["rms_db"] == float("-inf")
+                                                  else round(a["rms_db"], 2))),
+                             "sample_peak": a["sample_peak"], "kod": ""}
+        except Exception as e:                               # noqa: BLE001
+            olcum["neden"] = f"{type(e).__name__}: {str(e)[:100]}"
+        finally:
+            try:
+                os.remove(stem_yol)
+            except OSError:
+                pass
+    kanit.update(olcum)
+    ses_grafi_kaydet(is_adi, segment_id, kanit)
+    return kanit
+
+
+def astats_oku(stderr: str) -> dict:
+    """`astats` ciktisindan tepe ve RMS. Okunamazsa None alanlar."""
+    import re as _re
+    metin = str(stderr or "")
+    def _bul(desen):
+        m = _re.search(desen, metin, _re.I)
+        if not m:
+            return None
+        ham = m.group(1).strip().lower()
+        if "inf" in ham:
+            # ⚠ `-inf` DIJITAL SESSIZLIKTIR; 0 dB ile KARISTIRILMAZ.
+            return float("-inf")
+        try:
+            return float(ham)
+        except ValueError:
+            return None
+    tepe_db = _bul(r"Peak level dB:\s*(-?\d+(?:\.\d+)?|-?inf)")
+    rms_db = _bul(r"RMS level dB:\s*(-?\d+(?:\.\d+)?|-?inf)")
+    m = _re.search(r"Max difference:\s*([0-9.]+)", metin)
+    tepe = None
+    if tepe_db is not None:
+        # dBFS -> dogrusal tepe (0..1). `-inf` = dijital sessizlik = 0.0
+        tepe = (0.0 if tepe_db == float("-inf")
+                else round(min(1.0, 10 ** (tepe_db / 20.0)), 6))
+    return {"tepe_db": tepe_db, "rms_db": rms_db, "sample_peak": tepe,
+            "ham": bool(m)}
+
+
+def ses_grafi_kaydet(is_adi: str, segment_id, kanit: dict) -> None:
+    """BASARILI bir segmentin kaynak-ses graf kanitini kaydet.
+
+    ⚠ SEGMENT ANAHTARLI ve IDEMPOTENT (retry iki kez saymaz).
+    ⚠ Bilinmeyen is icin HICBIR SEY yazilmaz.
+    """
+    with _JL_KILIT:
+        r = _JL_KAYIT.get(str(is_adi or ""))
+        if r is None:
+            return
+        r["ses_kayitlari"][str(segment_id)] = dict(kanit or {})
+
+
 def render_raporu(is_adi: str) -> dict:
     """Bu ISIN tam render raporu (J/L + cekim sureleri + artefakt damgasi).
 
@@ -760,6 +951,16 @@ def jl_raporu(is_adi: str) -> dict:
     # segment sirasina gore duz liste olarak cikar.
     _k = d.get("cekim_kayitlari") or {}
     d["cekim_kayitlari"] = dict(_k)
+    _sk = dict(d.get("ses_kayitlari") or {})
+    d["ses_kayitlari"] = _sk
+    # ⚠ Y-17: AGGREGATE — en KOTU (en yuksek) leak/tepe rapora tasinir.
+    # Herhangi bir segmentte olcum yoksa toplam da OLCULMEMISTIR.
+    _leaks = [v.get("leakage_db") for v in _sk.values()]
+    _peaks = [v.get("sample_peak") for v in _sk.values()]
+    d["kaynak_ses_leak_db"] = (None if not _leaks or any(x is None for x in _leaks)
+                               else max(_leaks))
+    d["kaynak_ses_peak"] = (None if not _peaks or any(x is None for x in _peaks)
+                            else max(_peaks))
     d["cekim_sureleri"] = [v for anahtar in sorted(_k) for v in _k[anahtar]]
     return d
 
@@ -949,6 +1150,12 @@ def _segment_uret(sahne, gecis, fps, crf, seg_yol, is_adi=""):
                 # ⚠ Y-16: YALNIZCA basarili segment olcume girer; ayni
                 # segment yeniden uretilirse kayit EZILIR (idempotent).
                 cekim_kaydet(is_adi, _seg_id, _plan_sureleri)
+                # ⚠ Y-17: kaynak-ses kaniti URETILEN KOMUTTAN cikarilir VE
+                # SAYISAL stem olcumu GERCEKTEN kosulur (yapisal beyan tek
+                # basina kabul uretmez).
+                ses_stem_olc(is_adi, _seg_id, komut,
+                             list(range(len(cekimler))),
+                             seg_yol + ".srcstem.wav")
             return _ok
         except Exception as e:
             print(f"  ffmpeg video-segment istisna: {str(e)[:160]}", file=sys.stderr)
@@ -1009,6 +1216,10 @@ def _segment_uret(sahne, gecis, fps, crf, seg_yol, is_adi=""):
         if _ok:
             # ⚠ Y-16: YALNIZCA basarili segment olcume girer (idempotent).
             cekim_kaydet(is_adi, _seg_id, _plan_sureleri)
+            # ⚠ Y-17: gorsel sahnede klip girdisi YOKTUR (girdi 0 = still
+            # gorsel), yine de kanit + SAYISAL olcum AYNI yoldan kosar.
+            ses_stem_olc(is_adi, _seg_id, komut, [0],
+                         seg_yol + ".srcstem.wav")
         return _ok
     except Exception as e:
         print(f"  ffmpeg segment istisna: {str(e)[:160]}", file=sys.stderr)

@@ -58,6 +58,7 @@ HEDEF_TOLERANS = 0.12          # kullanici hedefine +-%12
 VIDEO_KAPSAM_ASGARI = 1.0      # %100 lisansli gercek video
 KAYNAK_TAVANI_SN = 8.0         # global: ayni kaynak <= 8 sn
 KAYNAK_SES_TAVANI_DB = -60.0   # "mutlak 0" — sessizlik tabani
+KAYNAK_SES_TEPE_TAVANI = 0.001  # ⚠ FAZ Y-17: olculen sample peak tavani
 FACT_KAPSAM_ASGARI = 1.0       # her cekim 1 kabul edilmis primary_fact_id
 KAPANIS_ASGARI = 0.60
 GECIS_TURU_ASGARI = 3      # ⚠ FAZ Y-15: hat ve olcum ile AYNI deger
@@ -210,16 +211,43 @@ def _k_kaynak_tavan(o) -> tuple:
 
 
 def _k_kaynak_ses(o) -> tuple:
+    """⚠ FAZ Y-17 — METADATA BEYANI KABUL URETEMEZ.
+
+    OLCULEN KUSUR (`Y17-KAYNAK-SES-TOTOLOJI`): denetlenen alan
+    (`ses_kanali`) provenans bos birakinca POLITIKANIN KENDISIYLE
+    dolduruluyordu; kapi kendi girdisini uretiyordu ve sizinti kodu
+    ERISILEMEZDI.
+    ⚠ Artik YALNIZCA graf kaniti okunur: her BASARILI segmentin uretilen
+    KOMUTUNDAN cikarilan `kaynak_ses_map` bayragi + graf TAMLIGI. Olculen
+    tepe/leak degeri varsa MUTLAK SIFIR esigi de uygulanir.
+    """
     s = _blok(o, "kaynak_ses")
-    db = _sayi(s, "rms_db")
     if not _olculdu(s):
-        return False, "kaynak sesi olculmedi"
-    # ⚠ BEYAN KANIT DEGILDIR: gercek olculen deger sart.
-    if db is None:
-        return False, "kaynak sesi beyan edildi ama OLCULMEDI"
-    if db > KAYNAK_SES_TAVANI_DB:
-        return False, f"{db:.1f} dB > {KAYNAK_SES_TAVANI_DB:.0f} dB (sizinti)"
-    return True, f"{db:.1f} dB"
+        return False, "kaynak ses grafi OLCULMEDI"
+    if s.get("graf_tam") is not True:
+        return False, (f"graf EKSIK ({_tam_sayi(s, 'segment') or 0} segment "
+                       f"kaydi) — sifir KANITLANAMAZ")
+    if s.get("sizinti") is not False:
+        sizanlar = s.get("sizan_segmentler")
+        return False, (f"KAYNAK SES SIZINTISI"
+                       + (f": {sizanlar[:4]}" if isinstance(sizanlar, list)
+                          and sizanlar else ""))
+    # ⚠ Y17-YAPISAL-BEYAN-OLCUM-SANILDI: graf kaniti komutun neyi map
+    # ettigini soyler; URETILEN SESIN sessiz oldugunu OLCMEZ. Sayisal
+    # stem olcumu ZORUNLUDUR — ikisi de yoksa KABUL YOK.
+    tepe = _sayi(s, "sample_peak")
+    leak = _sayi(s, "leakage_db")
+    if tepe is None or leak is None:
+        return False, ("SAYISAL stem olcumu yok (leakage_db/sample_peak) — "
+                       "yapisal beyan TEK BASINA kabul uretmez")
+    if not _metin(s, "artefakt_sha256"):
+        return False, "olcum NIHAI artefakta bagli degil"
+    if tepe > KAYNAK_SES_TEPE_TAVANI:
+        return False, f"olculen tepe {tepe} > {KAYNAK_SES_TEPE_TAVANI}"
+    if leak > KAYNAK_SES_TAVANI_DB:
+        return False, f"olculen leak {leak:.1f} dB > {KAYNAK_SES_TAVANI_DB:.0f} dB"
+    return True, (f"{_tam_sayi(s, 'segment') or 0} segmentin hicbirinde klip "
+                  f"sesi map edilmedi; olculen tepe={tepe} leak={leak} dB")
 
 
 def _k_fact_kapsam(o) -> tuple:

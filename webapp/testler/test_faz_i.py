@@ -9445,10 +9445,29 @@ kontrol("⭐ R-1d-e RED-FIRST: sahne YOKSA 'PASS' DENMIYOR (stabil kod)",
         _GQ.olc([])["durum"] == "OLCULEMEDI"
         and _GQ.olc([])["neden"] == _GQ.KOD_SAHNE_YOK)
 
+from editor import ses_gurultu as _SG   # noqa: E402
+
 # ── (3) KAPILAR GERCEK OLCUMLE KORUNUYOR ──
-kontrol("⭐ R-1d-e: KAYNAK SESI SIFIR olculuyor ve TEMIZ",
+# ⚠ FAZ Y-17 — BU IDDIA BILINCLI OLARAK DEGISTIRILDI.
+# ESKI IDDIA: "kaynak sesi SIFIR olculuyor ve TEMIZ". O "olcum"
+# `sahneleri_cevir`in denetlenen alana POLITIKANIN KENDISINI yazmasindan
+# geliyordu (`_s(pv.get("ses_kanali")) or KAYNAK_SES_POLITIKASI`), yani
+# kapi KENDI GIRDISINI URETIYORDU ve `KAYNAK-SES-SIZINTI` kodu YAPISAL
+# OLARAK ERISILEMEZDI. Artik beyan yoksa "BEYAN-YOK" yazilir ve sozlesme
+# bunu IHLAL sayar. (Tam sozlesme: webapp/testler/test_faz_y17.py)
+kontrol("⭐ Y-17: provenans beyani YOKSA 'temiz' DENMIYOR (totoloji bitti)",
         _RE_R["kaynak_ses"]["olculdu"] is True
-        and _RE_R["kaynak_ses"]["temiz"] is True)
+        and _RE_R["kaynak_ses"]["temiz"] is False
+        and any("beyan-yok" in str(i).lower() for i in
+                (_RE_R["kaynak_ses"].get("ihlal") or [])),
+        str(_RE_R["kaynak_ses"])[:200])
+# Provenans ACIKCA "sifir" beyan ederse sozlesme TEMIZ doner.
+_RE_BEYAN = _re_cevir(_RE_8)
+for _s_b in _RE_BEYAN:
+    _s_b["ses_kanali"] = "sifir"
+kontrol("⭐ Y-17: provenans ACIKCA 'sifir' beyan ederse TEMIZ",
+        _SG.kaynak_ses_sozlesmesi(_RE_BEYAN)["temiz"] is True,
+        str(_SG.kaynak_ses_sozlesmesi(_RE_BEYAN))[:200])
 _RE_SIZ = _re_cevir(_RE_8)
 _RE_SIZ[0]["ses_kanali"] = "orijinal"
 kontrol("⭐ R-1d-e RED-FIRST: kaynak sesi SIFIR DEGILSE FAIL",

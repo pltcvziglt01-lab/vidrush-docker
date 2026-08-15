@@ -33,7 +33,10 @@ SEMA_SURUM = "1.0.0"
 # trafik, konusma, muzik) mikse GIREMEZ; miks yalnizca VidRush anlatim +
 # muzik + ambiyans + SFX'ten olusur.
 KAYNAK_SES_POLITIKASI = "sifir"
-KAYNAK_SES_KABUL_EDILEN = ("yok", "sifir", "mute", "muted", "")
+# ⚠ FAZ Y-17 (`Y17-KAYNAK-SES-TOTOLOJI`): BOS STRING KABUL KUMESINDEN
+# CIKARILDI. Bos beyan "sorun yok" DEGIL, "beyan yok" demektir; kumede
+# kaldigi surece `KAYNAK-SES-SIZINTI` kapisi ERISILEMEZ oluyordu.
+KAYNAK_SES_KABUL_EDILEN = ("yok", "sifir", "mute", "muted")
 
 
 # ═══════════════ ESIKLER ════════════════════════════════════════════════

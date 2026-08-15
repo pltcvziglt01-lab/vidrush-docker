@@ -5837,6 +5837,28 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             _olc = _render_qa.get("olcumler")
             if isinstance(_olc, dict):
                 _olc["ses"] = _ses_son
+        # ── FAZ Y-17: KAYNAK SESI MUTLAK SIFIR, GRAF KANITIYLA ──
+        # ⚠ Metadata beyani DEGIL: her basarili segmentin URETILEN
+        # komutundan cikarilan kaynak-ses map kaniti okunur ve graf
+        # TAMLIGI (kayit sayisi == render edilen sahne sayisi) aranir.
+        _ses_sifir = _gq_son.kaynak_ses_olcumu(
+            ses_raporu=_jl_rapor or None,
+            artefakt_sha256=_artefakt_ozet,
+            beklenen_segment=len(props_sahneler or []),
+            # ⚠ Y-17: SAYISAL stem olcumu (en kotu segment) rapordan gelir;
+            # yoksa kriter "olculmedi" kalir ve KABUL URETMEZ.
+            leakage_db=(_jl_rapor or {}).get("kaynak_ses_leak_db"),
+            sample_peak=(_jl_rapor or {}).get("kaynak_ses_peak"))
+        if isinstance(_render_qa, dict):
+            _render_qa["kaynak_ses"] = _ses_sifir
+        sonuc["kaynak_ses"] = _ses_sifir
+        print(f"  RENDER-SONRASI KAYNAK-SES: "
+              f"olculdu={_ses_sifir.get('olculdu')} "
+              f"graf_tam={_ses_sifir.get('graf_tam')} "
+              f"sizinti={_ses_sifir.get('sizinti')} "
+              f"segment={_ses_sifir.get('segment')} "
+              f"kod={_ses_sifir.get('kod') or '-'}", file=sys.stderr)
+
         # ── FAZ Y-16: ORTALAMA PLAN SURESI, RENDER EDILEN CEKIMLERDEN ──
         # ⚠ Sahne suresinden TURETILMEZ: `_cekim_planla` sahneyi 8 sn
         # tavaniyla bolen gercek cekimleri uretir ve onlari kaydeder.

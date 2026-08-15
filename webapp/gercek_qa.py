@@ -71,6 +71,15 @@ KOD_RITIM_BAYAT = "GERCEK-TIMELINE-RITIM-BAYAT"
 KOD_RITIM_BANT_DISI = "GERCEK-TIMELINE-ORT-PLAN-BANT-DISI"
 # ⚠ Esik kabul kriteriyle AYNI kaynak olmali; tek yerde tanimli.
 ORT_PLAN_BANDI_SN = (2.5, 4.5)
+# ⚠ FAZ Y-17 (`Y17-GRAF-KANITI-YOK`): "kaynak sesi sifir" iddiasi
+# `hizli_render`in klip girdilerini ses olarak MAP ETMEMESINE dayaniyordu
+# — dogru bir yapisal garanti ama HICBIR YERDE OLCULMUYOR ve TESLIM
+# EDILEN ARTEFAKTA BAGLANMIYORDU.
+KOD_KAYNAK_SES_OLCULMEDI = "SOURCE-AUDIO-ZERO-OLCULMEDI"
+KOD_KAYNAK_SES_LEAK = "SOURCE-AUDIO-LEAK"
+# Mutlak sifir esikleri (olculen deger varsa uygulanir).
+KAYNAK_SES_TEPE_TAVANI = 0.001        # sample peak (0..1)
+KAYNAK_SES_LEAK_TAVANI_DB = -60.0
 
 # Bir isin "tam" sayilmasi icin gereken en az gercek J/L-cut sayisi.
 # ⚠ `editor/qa_on.JL_EN_AZ` ile AYNI deger; orada plan uzerinden, burada
@@ -137,7 +146,13 @@ def sahneleri_cevir(props_sahneler: list, *, kok_dizin: str = "",
             # ⚠ K-2: kaynak sesi politikasi. Gercek hat harici klibi
             # `OffthreadVideo ... muted` ile ciziyor; sozlesme MAKINE OKUNUR
             # yazilir ki kapi denetleyebilsin.
-            "ses_kanali": _s(pv.get("ses_kanali")) or _sg.KAYNAK_SES_POLITIKASI,
+            # ⚠ FAZ Y-17 (`Y17-KAYNAK-SES-TOTOLOJI`): eskiden burada
+            # `or _sg.KAYNAK_SES_POLITIKASI` vardi — provenans beyan
+            # etmiyorsa DENETLENEN ALANA POLITIKANIN KENDISI yaziliyordu
+            # ve `kaynak_ses_sozlesmesi` her zaman "temiz" donuyordu.
+            # Kapi KENDI GIRDISINI URETIYORDU. Artik beyan yoksa ACIKCA
+            # "BEYAN-YOK" yazilir ve sozlesme bunu IHLAL sayar.
+            "ses_kanali": _s(pv.get("ses_kanali")) or "BEYAN-YOK",
             "islev": _s(s.get("islev")) or "aciklama",
             "sure_sn": _f(s.get("sure")),
             # ⚠ CEKIM TURU URETILMEZ (gercek hat atamiyor) — bos birakilir.
@@ -312,6 +327,80 @@ def ses_kurgu_olcumu(sahneler: list, *, jl_raporu: Optional[dict] = None,
         # ⚠ Esik OLCULEN degere uygulanir; olculmemislik `tam` uretemez.
         "tam": _jl >= JL_EN_AZ,
     }
+
+
+def kaynak_ses_olcumu(ses_raporu: Optional[dict] = None, *,
+                      artefakt_sha256: str = "",
+                      beklenen_segment: int = 0,
+                      leakage_db=None, sample_peak=None) -> dict:
+    """FAZ Y-17 — KAYNAK SESI MUTLAK SIFIR, GRAF KANITIYLA.
+
+    Kanit metadata DEGILDIR: her BASARILI video segmenti icin URETILEN
+    KOMUTTAN cikarilan `kaynak_ses_map` bayragidir (`hizli_render.
+    ses_map_kaniti`). Rapor is+segment anahtarli tutulur ve NIHAI
+    artefakta damgalanir.
+
+    ⚠ Graf TAM degilse (kayit sayisi beklenen segment sayisindan azsa)
+    `olculdu: False` + `SOURCE-AUDIO-ZERO-OLCULMEDI`; `sizinti` SAYI/BOOL
+    olarak SUNULMAZ. 0 UYDURULMAZ.
+    ⚠ Herhangi bir segmentte klip sesi map edilmisse `SOURCE-AUDIO-LEAK`.
+    ⚠ `leakage_db`/`sample_peak` verilirse MUTLAK SIFIR esigi de uygulanir.
+    """
+    temel = {"olculdu": False, "sizinti": None, "graf_tam": False,
+             "segment": 0, "sizan_segmentler": []}
+    r = ses_raporu if isinstance(ses_raporu, dict) else {}
+    if not r:
+        return {**temel, "kod": KOD_KAYNAK_SES_OLCULMEDI,
+                "neden": "ses graf raporu verilmedi"}
+    if r.get("olculdu") is not True:
+        return {**temel, "kod": KOD_KAYNAK_SES_OLCULMEDI,
+                "neden": "rapor NIHAI artefakta damgalanmamis"}
+    _ozet = str(r.get("artefakt_sha256") or "")
+    if not _ozet or (artefakt_sha256 and _ozet != str(artefakt_sha256)):
+        return {**temel, "kod": KOD_KAYNAK_SES_OLCULMEDI,
+                "neden": f"olcum baska artefakta ait ({_ozet[:12]} != "
+                         f"{str(artefakt_sha256)[:12]})"}
+    kayitlar = r.get("ses_kayitlari") or {}
+    n = len(kayitlar)
+    tam = bool(n) and (not beklenen_segment or n >= int(beklenen_segment))
+    if not tam:
+        return {**temel, "segment": n, "kod": KOD_KAYNAK_SES_OLCULMEDI,
+                "neden": f"graf EKSIK: {n}/{beklenen_segment} segment kaydi"}
+    sizanlar = sorted(k for k, v in kayitlar.items()
+                      if (v or {}).get("kaynak_ses_map") is True)
+    # ⚠ Y-17: acikca verilmediyse RAPORUN aggregate alanlari okunur
+    # (en KOTU segment degeri). Herhangi bir segmentte olcum yoksa
+    # aggregate de None'dir ve asagida "olculmedi" denir.
+    if leakage_db is None:
+        leakage_db = r.get("kaynak_ses_leak_db")
+    if sample_peak is None:
+        sample_peak = r.get("kaynak_ses_peak")
+    _leak = _f(leakage_db, None) if leakage_db is not None else None
+    _peak = _f(sample_peak, None) if sample_peak is not None else None
+    # ⚠ OLCULEN KUSUR (`Y17-YAPISAL-BEYAN-OLCUM-SANILDI`, denetim karsi
+    # ornegi): graf TAM + tum `kaynak_ses_map` False iken `olculdu: True`
+    # donuyordu. Bu YALNIZCA YAPISAL BEYANDIR — komutun neyi map ettigini
+    # soyler, uretilen SESIN gercekten sessiz oldugunu OLCMEZ. (Filtre
+    # zincirinde bir `amerge`/`amix` klip sesini map olmadan da tasiyabilir.)
+    # ⚠ Bu yuzden SAYISAL stem olcumu ZORUNLUDUR: `leakage_db` VE
+    # `sample_peak` ikisi de GERCEK is-kapsamli source-contribution stem
+    # olcumunden gelmelidir. Ikisi de yoksa "olculmedi" denir.
+    if _leak is None or _peak is None:
+        return {**temel, "segment": n, "graf_tam": True,
+                "sizan_segmentler": sizanlar,
+                "artefakt_sha256": _ozet,
+                "leakage_db": _leak, "sample_peak": _peak,
+                "kod": KOD_KAYNAK_SES_OLCULMEDI,
+                "neden": ("yapisal graf kaniti var ama SAYISAL stem olcumu "
+                          "yok (leakage_db/sample_peak)")}
+    esik_asildi = bool(_leak > KAYNAK_SES_LEAK_TAVANI_DB
+                       or _peak > KAYNAK_SES_TEPE_TAVANI)
+    sizinti = bool(sizanlar) or esik_asildi
+    return {"olculdu": True, "sizinti": sizinti, "graf_tam": True,
+            "segment": n, "sizan_segmentler": sizanlar,
+            "artefakt_sha256": _ozet,
+            "leakage_db": _leak, "sample_peak": _peak,
+            "kod": KOD_KAYNAK_SES_LEAK if sizinti else ""}
 
 
 def ritim_olcumu(cekim_raporu: Optional[dict] = None, *,
