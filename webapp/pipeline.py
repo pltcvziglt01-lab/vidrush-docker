@@ -463,21 +463,66 @@ def _ffmpeg_kos(komut: list) -> dict:
         return {"rc": -1, "stdout": "", "stderr": f"{type(e).__name__}: {e}"}
 
 
+def sfx_stem_filtresi(parcalar: list, *, ducking_db: float = None) -> dict:
+    """OLCUM icin STEM-ONLY filtre grafigi. ⚠ TUM CIKISLAR TUKETILIR.
+
+    ⚠ OLCULEN KUSUR (`Y14B-BAGLANMAMIS-CIKIS`, denetim): ilk surumde olcum
+    komutu `sfx_filtre_kur`'un TAM grafigini kullaniyordu. O grafik
+    `[anlati][sfxduck]amix...[mix]` uretir; olcum ise yalnizca `[sfx]` ve
+    `[sfxduck]` map ediyordu. `[mix]` BAGLANMAMIS CIKIS olarak kalir ve
+    GERCEK ffmpeg "Filter ... has an unconnected output" ile DUSER.
+    Sentetik kosucu bunu gormedigi icin test yesil, uretim ise HER ZAMAN
+    olcumsuz kalirdi (fail-closed ama ULASILAMAZ kriter).
+
+    ⚠ Bu grafik yalnizca IKI cikis uretir ve ikisi de map edilir:
+        [stem_on]  — sidechain ONCESI SFX katmani
+        [sfxduck]  — sidechain SONRASI SFX katmani
+    Anlati yalnizca sidechain ANAHTARI olarak tuketilir; `[mix]` YOKTUR.
+    """
+    db = SFX_DUCKING_DB if ducking_db is None else float(ducking_db)
+    if not parcalar:
+        return {"filtre": [], "ciktilar": (), "ducking_db": db}
+    par = sfx_filtre_kur(parcalar, ducking_db=db)["parametreler"]
+    filt = ["[0:a]anull[anahtar]"]
+    etiketler = []
+    for n, (bas, _y) in enumerate(parcalar, start=1):
+        ms = int(round(float(bas) * 1000))
+        etiketler.append(f"[s{n}]")
+        filt.append(f"[{n}:a]adelay={ms}|{ms},volume=0.8[s{n}]")
+    if len(parcalar) == 1:
+        filt.append("[s1]anull[sfxpre]")
+    else:
+        filt.append(f"{''.join(etiketler)}amix=inputs={len(parcalar)}"
+                    f":duration=longest:dropout_transition=0:normalize=0[sfxpre]")
+    # ⚠ Ayni stem ikiye ayrilir: biri OLCUM tabani, digeri sidechain girdisi.
+    filt.append("[sfxpre]asplit=2[stem_on][stem_sc]")
+    filt.append(
+        f"[stem_sc][anahtar]sidechaincompress=threshold={par['threshold']}"
+        f":ratio={par['ratio']}:attack={par['attack']}:release={par['release']}"
+        f":makeup={par['makeup']}:level_sc={par['level_sc']}[sfxduck]")
+    return {"filtre": filt, "ciktilar": ("stem_on", "sfxduck"),
+            "ducking_db": db, "parametreler": par}
+
+
 def ducking_stem_komutu(video: str, parcalar: list, *, ducking_db: float,
                         stem_on: str, stem_son: str) -> list:
     """Sidechain ONCESI ve SONRASI SFX stem'lerini TEK kosuda uret.
 
-    ⚠ Ikisi de AYNI filtre grafigi ve AYNI girdilerden turer; tek fark
-    sidechain uygulanip uygulanmamasidir. Baska hicbir sey degismez, yani
-    olculen fark YALNIZCA ducking'e atfedilebilir.
+    ⚠ Ikisi de AYNI grafik ve AYNI girdilerden turer; tek fark sidechain
+    uygulanip uygulanmamasidir — olculen fark YALNIZCA ducking'e
+    atfedilebilir.
+    ⚠ `sfx_stem_filtresi` kullanilir (TAM miks grafigi DEGIL): boylece
+    BAGLANMAMIS CIKIS kalmaz ve gercek ffmpeg dusmez.
     """
     girdi = ["-i", video]
     for _, y in (parcalar or []):
         girdi += ["-i", y]
-    z = sfx_filtre_kur(parcalar, ducking_db=ducking_db)
+    z = sfx_stem_filtresi(parcalar, ducking_db=ducking_db)
+    if not z["filtre"]:
+        return []
     return (["ffmpeg", "-y", "-loglevel", "error"] + girdi
             + ["-filter_complex", ";".join(z["filtre"]),
-               "-map", "[sfx]", "-vn", "-c:a", "pcm_s16le", stem_on,
+               "-map", "[stem_on]", "-vn", "-c:a", "pcm_s16le", stem_on,
                "-map", "[sfxduck]", "-vn", "-c:a", "pcm_s16le", stem_son])
 
 
@@ -634,12 +679,22 @@ def sfx_bindir(video: str, sahneler: list, is_dizini: str, *,
     try:
         _sr = _kos(ducking_stem_komutu(video, parcalar, ducking_db=db,
                                        stem_on=_stem_on, stem_son=_stem_son))
-        if int((_sr or {}).get("rc", -1)) == 0:
+        # ⚠ Y14B-BAGLANMAMIS-CIKIS: rc TEK BASINA yetmez. Iki stem de
+        # GERCEKTEN yazilmis ve BOS DEGIL olmali; aksi halde olcum
+        # "olculmedi" kalir (fail-closed).
+        _stem_ok = all(os.path.exists(_p) and os.path.getsize(_p) > 0
+                       for _p in (_stem_on, _stem_son))
+        if int((_sr or {}).get("rc", -1)) == 0 and _stem_ok:
             _gain = ducking_gain_olcumu(_stem_on, _stem_son, zarf,
                                         yapilandirilmis_db=db, kosucu=kosucu)
         else:
-            print(f"  {KOD_DUCKING_GAIN_OLCULMEDI}: stem uretilemedi "
-                  f"({str((_sr or {}).get('stderr'))[-160:]})", file=sys.stderr)
+            _neden = ("stem dosyasi yazilmadi/bos" if not _stem_ok
+                      else str((_sr or {}).get("stderr"))[-160:])
+            _gain = {"olculdu": False, "olculen_reduction_db": None,
+                     "yapilandirilmis_db": db,
+                     "kod": KOD_DUCKING_GAIN_OLCULMEDI, "neden": _neden}
+            print(f"  {KOD_DUCKING_GAIN_OLCULMEDI}: {_neden}",
+                  file=sys.stderr)
     except Exception as e:                                   # noqa: BLE001
         _gain = {"olculdu": False, "olculen_reduction_db": None,
                  "yapilandirilmis_db": db,

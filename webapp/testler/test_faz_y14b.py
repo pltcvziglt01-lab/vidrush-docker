@@ -118,12 +118,68 @@ _k = PL.ducking_stem_komutu(
     "/yok/video.mp4", [(2.0, "/sfx/a.wav"), (9.5, "/sfx/b.wav")],
     ducking_db=-9.0, stem_on="/tmp/on.wav", stem_son="/tmp/son.wav")
 _kmetin = " ".join(_k)
-kontrol("sidechain ONCESI stem map'lenir", "[sfx]" in _kmetin, _kmetin[:200])
+kontrol("sidechain ONCESI stem map'lenir", "[stem_on]" in _kmetin,
+        _kmetin[:220])
 kontrol("sidechain SONRASI stem map'lenir", "[sfxduck]" in _kmetin,
-        _kmetin[:200])
+        _kmetin[:220])
 kontrol("iki stem de ciktiya yazilir",
         "/tmp/on.wav" in _k and "/tmp/son.wav" in _k, f"{_k}")
 kontrol("video akisi yazilmaz (yalniz ses stem'i)", "-vn" in _k, f"{_k}")
+kontrol("SFX yoksa komut URETILMEZ",
+        PL.ducking_stem_komutu("/v.mp4", [], ducking_db=-9.0,
+                               stem_on="/a", stem_son="/b") == [])
+
+
+blok("Y-14b/2b — GRAFIKTE BAGLANMAMIS CIKIS YOK (gercek ffmpeg dusmez)")
+
+# ⚠ OLCULEN KUSUR (`Y14B-BAGLANMAMIS-CIKIS`, denetim): olcum komutu
+# `sfx_filtre_kur`'un TAM grafigini kullaniyordu. O grafik
+# `[anlati][sfxduck]amix...[mix]` uretir; komut ise yalniz [sfx]/[sfxduck]
+# map ediyordu -> `[mix]` BAGLANMAMIS CIKIS kalir ve GERCEK ffmpeg
+# "unconnected output" ile DUSER. Sentetik kosucu bunu goremiyordu.
+
+def _graf_coz(filtre_listesi):
+    """Her filtre adiminin TUKETTIGI ve URETTIGI etiketleri cikar."""
+    import re as _re
+    uretilen, tuketilen = [], []
+    for adim in filtre_listesi:
+        etiketler = _re.findall(r"\[([A-Za-z0-9_:]+)\]", adim)
+        # Adimin basindaki etiketler girdi, sonundakiler cikti.
+        bas = _re.match(r"^((?:\[[A-Za-z0-9_:]+\])+)", adim)
+        son = _re.search(r"((?:\[[A-Za-z0-9_:]+\])+)$", adim)
+        g = _re.findall(r"\[([A-Za-z0-9_:]+)\]", bas.group(1)) if bas else []
+        c = _re.findall(r"\[([A-Za-z0-9_:]+)\]", son.group(1)) if son else []
+        # Tek etiketli adimda (ornegin "[0:a]anull[x]") ayrim dogru calisir.
+        tuketilen += g
+        uretilen += [x for x in c if x not in g] or (
+            [etiketler[-1]] if etiketler and etiketler[-1] not in g else [])
+    return set(uretilen), set(tuketilen)
+
+
+_z = PL.sfx_stem_filtresi([(2.0, "/sfx/a.wav"), (9.5, "/sfx/b.wav")],
+                          ducking_db=-9.0)
+_uret, _tuket = _graf_coz(_z["filtre"])
+_map_edilen = {a.strip("[]") for a in _k if a.startswith("[")}
+_bagsiz = _uret - _tuket - _map_edilen
+kontrol("stem grafiginde BAGLANMAMIS CIKIS yok", not _bagsiz,
+        f"baglanmamis: {sorted(_bagsiz)} | uretilen={sorted(_uret)} "
+        f"tuketilen={sorted(_tuket)} map={sorted(_map_edilen)}")
+kontrol("stem grafigi [mix] URETMEZ (tam miks grafigi degil)",
+        "mix" not in _uret, f"uretilen={sorted(_uret)}")
+kontrol("stem grafigi iki cikis beyan eder",
+        tuple(_z.get("ciktilar") or ()) == ("stem_on", "sfxduck"),
+        f"{_z.get('ciktilar')}")
+kontrol("anlati YALNIZCA sidechain anahtari olarak tuketilir",
+        "anahtar" in _tuket and "anlati" not in _uret,
+        f"uretilen={sorted(_uret)}")
+# ⚠ TAM miks grafigi olcum icin KULLANILAMAZ — kanit: onun ciktisinda
+# baglanmamis etiket kalir.
+_zt = PL.sfx_filtre_kur([(2.0, "/sfx/a.wav")], ducking_db=-9.0)
+_ut, _tt = _graf_coz(_zt["filtre"])
+kontrol("TAM miks grafigi stem map'leriyle baglanmamis cikis BIRAKIR "
+        "(bu yuzden ayri grafik sart)",
+        bool(_ut - _tt - {"stem_on", "sfxduck"}),
+        "tam grafik de guvenli gorunuyor — kontrol anlamsizlasti")
 
 
 blok("Y-14b/3 — GERCEK AZALMA OLCULUR (PASS yolu)")
@@ -257,6 +313,21 @@ _olculmedi = KB._k_sfx_ducking({
     "ducking": {"yapilandirilmis_db": -9.0, "olculen_reduction_db": -8.2,
                 "olculdu": False}})
 kontrol("olculdu=False ise FAIL", _olculmedi[0] is False, f"{_olculmedi}")
+
+
+blok("Y-14b/7b — STEM DOSYASI YOKSA/BOSSA OLCUM PASS URETMEZ")
+
+_PLK2 = open(os.path.join(KOK, "pipeline.py"), encoding="utf-8").read()
+kontrol("karar kodu belgelendi: Y14B-BAGLANMAMIS-CIKIS",
+        "Y14B-BAGLANMAMIS-CIKIS" in _PLK2, "karar kodda belgelenmemis")
+kontrol("olcum kapisi rc TEK BASINA yetmiyor (dosya varligi+boyut sart)",
+        "os.path.getsize(_p) > 0" in _PLK2,
+        "stem dosyasi dogrulanmadan olcum kosuluyor")
+kontrol("stem'ler ducking_stem_komutu ile uretiliyor",
+        "ducking_stem_komutu(video, parcalar" in _PLK2)
+kontrol("olcum stem_filtresi grafigini kullaniyor",
+        "sfx_stem_filtresi(parcalar" in _PLK2,
+        "hala tam miks grafigi kullaniliyor")
 
 
 blok("Y-14b/8 — HAT: OLCUM SFX BINDIRMEDEN SONRA KOSAR")
