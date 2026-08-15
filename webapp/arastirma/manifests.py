@@ -166,8 +166,17 @@ class Iddia:
     kategori: str = ""                          # tarih | rakam | isim | cografya | siralama | alinti | teknik
 
     def dogrula(self) -> None:
-        if not re.fullmatch(r"f[0-9]{3,}", self.fact_id or ""):
-            raise ManifestHatasi(f"fact_id 'f001' biciminde olmali: {self.fact_id!r}")
+        # ⚠ FAZ Y-11: iki bicim gecerli.
+        #   `f001`            — eski SIRALI sayac (claim-first hat)
+        #   `f<16 hex>`       — CONTENT-ADDRESSED FactPacket kimligi
+        # Content-addressed bicim `arastirma.factpacket.fact_id_uret` ile
+        # (onerme, exact_quote, source_id) uclusunden turer; boylece bir
+        # cekimin tasidigi fact_id BENZERLIKTEN TAHMIN EDILEMEZ, yalnizca
+        # gercekten uretilmis bir paketle eslesir.
+        if not re.fullmatch(r"f([0-9]{3,}|[0-9a-f]{16})", self.fact_id or ""):
+            raise ManifestHatasi(
+                f"fact_id 'f001' ya da 'f<16 hex>' biciminde olmali: "
+                f"{self.fact_id!r}")
         if not str(self.metin).strip():
             raise ManifestHatasi(f"{self.fact_id}: metin bos")
         if self.guven not in GUVEN_DURUMLARI:
