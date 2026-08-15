@@ -4852,7 +4852,26 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
 
     if not props_sahneler:
         # Hicbir sahne yoksa: sebebi bakiye ise NET soyle (kullanici 'neden' bilsin)
-        raise RuntimeError(BAKIYE_MESAJI if bakiye_bitti else "Hiç sahne üretilemedi")
+        if bakiye_bitti:
+            raise RuntimeError(BAKIYE_MESAJI)
+        # ⚠ FAZ UI-6 — TESHIS EDILEBILIR HATA.
+        # OLCULEN OLAY (14 Agu 2026 23:04, anonim is): mesaj yalnizca
+        # "Hiç sahne üretilemedi" diyordu; HANGI KATMANIN coktugu
+        # GORUNMUYORDU. Kok neden ancak elle remote probe ile bulunabildi
+        # (bilesenler saglamdi; is bir AG KESINTISI penceresine denk
+        # gelmisti). Sahne ancak `n in sonuc_medya AND n in tts_sonuc`
+        # ise eklenir; bu iki kumeden hangisinin bosaldigi TANIYI belirler.
+        # ⚠ Uretim davranisi DEGISMEZ — yalnizca hata AYIRT EDILEBILIR olur.
+        _n_med, _n_tts = len(sonuc_medya), len(tts_sonuc)
+        _kod = ("SAHNE-YOK-MEDYA-VE-TTS" if not _n_med and not _n_tts else
+                "SAHNE-YOK-MEDYA" if not _n_med else
+                "SAHNE-YOK-TTS" if not _n_tts else
+                "SAHNE-YOK-KESISIM")
+        raise RuntimeError(
+            f"Hiç sahne üretilemedi ({_kod}): {len(islenecek)} sahne denendi, "
+            f"medya {_n_med}, seslendirme {_n_tts}. "
+            f"Iki kume de dolu ama kesisim bossa sahne kimlikleri uyusmuyor; "
+            f"biri bossa o katman (stok video / TTS) erisilemedi.")
     if bakiye_bitti:
         # KURTARMA: odenen sahneler cope gitmesin — kisa da olsa video teslim edilir
         plan["_bakiye_kesildi"] = len(props_sahneler)
