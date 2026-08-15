@@ -4382,6 +4382,43 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             # ⚠ FAZ R-1d-b: footage yolundan CIKIYORUZ (AI gorsele dusuluyor)
             # -> kapsam boslugu BURADA yazilir, RASTGELE STOKLA KAPANMAZ.
             _bosluk_yaz("footage bulunamadi; AI gorsele dusuldu")
+
+        # ⚠ FAZ UI-7 — UI7-GORSEL-YASAK-KAPISI (AI GORSEL YOLU HER KOSULDA KAPALI)
+        # OLCULEN KUSUR (gercek 120 sn is, gercek_video=0.531): yukaridaki
+        # footage blogu YALNIZCA `kaynak == "footage"` sahnelerde calisiyor.
+        # Planlayici bir sahneyi `kaynak="gorsel"` isaretleyince blok HIC
+        # calismiyor, dolayisiyla icindeki `gorsel_yasak` kontrolu de ATLANIYOR
+        # ve akis dogrudan AI gorsele dusuyordu (log: openai/uretilmis-eser).
+        # ⚠ Kapi artik blogun DISINDA ve `kaynak`/`footage_sorgu` alanlarindan
+        # BAGIMSIZ: gorsel_yasak stilde AI/statik gorsel URETILMEZ. Once bir
+        # kez daha GERCEK VIDEO aranir (sorgu yoksa anlatimdan turetilir),
+        # bulunamazsa sahne stabil kodla BOS birakilir.
+        if prof.get("gorsel_yasak"):
+            _vy = os.path.join(PUBLIC, "isler", is_adi, f"sahne_{n}.mp4")
+            _sorgu = (str(s.get("footage_sorgu") or "").strip()
+                      or str(s.get("anlatim") or "").strip()[:120])
+            _denenecek = ([_sorgu] + list(kaynak.genel_yedek_sorgular(_sorgu))
+                          if _sorgu else [])
+            for _sq in _denenecek:
+                if kaynak.footage_getir(_sq, _vy, yt_once=yt_once):
+                    _atif = kaynak.atif_al(_vy)
+                    if _atif.get("kanal"):
+                        s["kaynakYazi"] = _atif["kanal"]
+                    print(f"  sahne {n}: UI-7 kapisi gercek klip buldu "
+                          f"'{_sq[:40]}'", file=sys.stderr)
+                    _kopru_yaz(_vy)
+                    return ("video", f"isler/{is_adi}/sahne_{n}.mp4")
+            if _sorgu and kaynak.footage_getir(_sorgu, _vy, yt_once=yt_once,
+                                               tekrara_izin=True):
+                print(f"  sahne {n}: UI-7 kapisi klip TEKRARI", file=sys.stderr)
+                _kopru_yaz(_vy)
+                return ("video", f"isler/{is_adi}/sahne_{n}.mp4")
+            print(f"  sahne {n}: {MEDYA_VIDEO_YOK} (UI7-GORSEL-YASAK-KAPISI) — "
+                  f"AI/statik gorsele DUSULMUYOR", file=sys.stderr)
+            _bosluk_yaz(f"{MEDYA_VIDEO_YOK}: UI7-GORSEL-YASAK-KAPISI "
+                        f"(gercek video klip bulunamadi)")
+            return None
+
         # 2) AI gorsel (footage yoksa/basarisizsa)
         sp = str(s.get("scene_prompt", "")).strip() or str(s.get("footage_sorgu", "")).strip()
         # BEYAZ TUVAL sahnesi: gorsel, beyaz zemine YALITILMIS konu olarak uretilmeli.

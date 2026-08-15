@@ -93,9 +93,23 @@ MODERN_ISARET = (
 )
 # Tarihsel donem: sahne metninde bu yillar/kaliplar varsa "tarihsel" sayilir
 _YIL = re.compile(r"\b(1[0-8]\d{2}|19[0-4]\d)\b")
-_ESKI_ISARET = ("vintage", "historic", "archival", "black and white",
+_ESKI_ISARET = ("vintage", "archival", "black and white",
                 "sepia", "expedition of 19", "wooden ship", "sailing ship",
                 "steam ship", "schooner")
+
+# ⚠ FAZ UI-7 — "historic" TEK BASINA TARIHSEL SAYILMAZ.
+# OLCULEN KUSUR (gercek 120 sn Istanbul isi): cagdas bir sehir belgeselinde
+# "historic peninsula / historic walls / historic site" cok yaygindir. Bu
+# ifadeler sahneyi `tarihsel=True` yapinca `kare_kapisi` kareye bakip modern
+# isaret gordugu icin GERCEK klipleri eliyordu:
+#   KARE RED [pexels]: DONEM CELISKISI ... ['cars on bridge','modern boats']
+# Elenen sahneler AI gorsele dusuyor ve %100 video sozlesmesi bozuluyordu.
+# ⚠ DAR KAPSAM: "historic" yalnizca MEDYA TURU niteledigi zaman (arsiv
+# kaydi) tarihsel sayilir. Pre-1950 YIL ve diger isaretler AYNEN KORUNUR.
+_ESKI_MEDYA = re.compile(
+    r"\bhistoric(?:al)?\s+(?:footage|photo|photos|photograph|photographs|"
+    r"film|films|archive|archives|image|images|picture|pictures|reel|reels|"
+    r"recording|recordings|newsreel|newsreels)\b")
 
 _KELIME_SINIRI = r"(?<![0-9a-zà-ÿğüşıöç])%s(?![0-9a-zà-ÿğüşıöç])"
 
@@ -113,9 +127,18 @@ def biyom_bul(metin: str) -> set:
 
 
 def tarihsel_mi(metin: str) -> bool:
-    """Sahne tarihsel bir doneme mi ait (pre-1950 yil ya da donem isareti)."""
+    """Sahne tarihsel bir doneme mi ait (pre-1950 yil ya da donem isareti).
+
+    ⚠ FAZ UI-7: "historic/historical" YALNIZCA bir MEDYA TURUNU niteliyorsa
+    (footage/photograph/film/archive...) tarihsel sayilir. "historic
+    peninsula" gibi cagdas cekimlerde yaygin kullanimlar ARTIK tarihsel
+    DEGILDIR — aksi halde gercek modern klipler `kare_kapisi` tarafindan
+    eleniyor ve %100 video sozlesmesi bozuluyordu.
+    """
     d = " " + str(metin or "").lower() + " "
     if _YIL.search(d):
+        return True
+    if _ESKI_MEDYA.search(d):
         return True
     return any(_gecer_mi(i, d) for i in _ESKI_ISARET)
 
