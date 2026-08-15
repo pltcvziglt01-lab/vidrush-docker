@@ -30,6 +30,16 @@ KABUL_DURUMLARI = ("bitti",)
 # dusurur ama teslim edilebilir); "FAIL" ve olculmemis olan EDILMEZ.
 KABUL_QA = ("PASS", "WARN")
 
+# ⚠ FAZ Y-1 — KURGU (EDIT) QA HUKMU DE BAGLAYICIDIR.
+# OLCULEN KUSUR (`Y1-KARAR-UYGULANMIYOR`, is job_1786783360170_ui7114_9c21aa):
+#     EDIT PLANI: QA=FAIL render_edilebilir=False sahne=20
+#     TESLIM job_1786783360170_ui7114_9c21aa: KABUL
+# `edit_kopru.plan_kur()` dokumani "QA-ON FAIL ISE RENDER BASLATILMAZ" diyor
+# ve `render_edilebilir=False` donuyordu; ama bu karar YALNIZCA rapor alanina
+# yaziliyor, kabul kapisi onu HIC OKUMUYORDU. Sonuc: kurgu QA'si FAIL veren
+# video "kabul edilmis final" sayilip son-3 kutuphanesine giriyordu.
+KURGU_QA_RED = "Y1-KURGU-QA-FAIL"
+
 
 def _s(v) -> str:
     return str(v or "").strip()
@@ -50,6 +60,18 @@ def kabul_edilebilir_mi(kayit: dict) -> dict:
     if qa not in KABUL_QA:
         # ⚠ QA olculmemisse KABUL EDILMEZ — "muhtemelen iyidir" DENMEZ.
         eksik.append(f"QA:{qa or 'olculmedi'}")
+    # ⚠ FAZ Y-1: KURGU QA KAPISI (fail-closed).
+    # `edit_plani` alani VARSA hukmu BAGLAYICIDIR: `render_edilebilir=False`
+    # ise (kurgu QA FAIL ya da plan hic kurulamadi/MEDYA-YOK) is kabul
+    # EDILMEZ. Alan YOKSA eski kayitlar bozulmasin diye kapi UYGULANMAZ —
+    # sessiz siki(las)tirma YOK, acik ve geriye uyumlu bir karar.
+    ep = k.get("edit_plani")
+    if isinstance(ep, dict) and ep:
+        if not ep.get("render_edilebilir"):
+            _kqa = _s((ep.get("qa") or {}).get("durum")
+                      if isinstance(ep.get("qa"), dict) else "").upper()
+            _nd = _s(ep.get("neden")) or _kqa or "render_edilebilir=False"
+            eksik.append(f"{KURGU_QA_RED}:{_nd}")
     return {"kabul": not eksik, "neden": "+".join(eksik)}
 
 
