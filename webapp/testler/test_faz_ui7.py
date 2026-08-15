@@ -81,15 +81,20 @@ kontrol("stabil kod tanimli: UI7-GORSEL-YASAK-KAPISI",
 # "2) AI gorsel" blogundan ONCE gorsel_yasak kapisi olmali.
 _i_ai = _P.find("# 2) AI gorsel")
 kontrol("AI gorsel blogu bulundu", _i_ai > 0)
-_onceki = _P[max(0, _i_ai - 2200):_i_ai] if _i_ai > 0 else ""
+# ⚠ FAZ UI-8: kapi buyudu (ingilizce sorgu + sure koruma yeniden kullanimi),
+# bu yuzden pencere genisletildi. Olculen sey AYNI: kapi AI gorsel blogunun
+# ONUNDE mi?
+_onceki = _P[max(0, _i_ai - 9000):_i_ai] if _i_ai > 0 else ""
 kontrol("AI gorsel blogundan ONCE gorsel_yasak kapisi var",
         'prof.get("gorsel_yasak")' in _onceki
         and "MEDYA_VIDEO_YOK" in _onceki,
         "kapi yok — kaynak!=footage sahnede AI gorsele dusuluyor")
-kontrol("kapi `kaynak` alanindan BAGIMSIZ (footage_sorgu sarti degil)",
-        re.search(r'if prof\.get\("gorsel_yasak"\)[^\n]*:\s*\n(?:[^\n]*\n){0,30}?'
-                  r'[^\n]*UI7-GORSEL-YASAK-KAPISI', _P) is not None,
-        "kapi hala footage bloguna gomulu")
+# ⚠ Olcut GIRINTI: `_sahne_medya` govde seviyesi 8 bosluk; footage blogunun
+# ICI 12 bosluk. Kapi 8 boslukta ise `kaynak=="footage"` sartindan BAGIMSIZ
+# demektir (kusurun tam karsiligi). Satir mesafesi olcmek kirilgandi.
+kontrol("kapi `kaynak` alanindan BAGIMSIZ (footage blogunun DISINDA)",
+        re.search(r'\n        if prof\.get\("gorsel_yasak"\):', _P) is not None,
+        "kapi hala footage bloguna gomulu (girinti 12)")
 
 
 blok("UI-7/2 — DAR TARIHSEL TANI (cagdas konu yanlis siniflanmasin)")

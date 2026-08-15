@@ -4395,8 +4395,15 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         # bulunamazsa sahne stabil kodla BOS birakilir.
         if prof.get("gorsel_yasak"):
             _vy = os.path.join(PUBLIC, "isler", is_adi, f"sahne_{n}.mp4")
+            # ⚠ FAZ UI-8 / UI8-TURKCE-SORGU: SORGU INGILIZCE OLMALI.
+            # OLCULEN KUSUR: fallback `s["anlatim"]` idi ve o metin TURKCE.
+            # Pexels Turkce sorguyu karsilamiyor -> arama bos donuyor, sahne
+            # dusuyordu (olcum: kapi 0 klip buldu, 6 sahne MEDYA-VIDEO-YOK).
+            # Plan sozlesmesi `footage_sorgu`yu "specific ENGLISH stock-footage
+            # query" olarak uretir; `scene_prompt` de INGILIZCE'dir. Turkce
+            # anlatim ARTIK sorgu olarak KULLANILMAZ.
             _sorgu = (str(s.get("footage_sorgu") or "").strip()
-                      or str(s.get("anlatim") or "").strip()[:120])
+                      or str(s.get("scene_prompt") or "").strip()[:160])
             _denenecek = ([_sorgu] + list(kaynak.genel_yedek_sorgular(_sorgu))
                           if _sorgu else [])
             for _sq in _denenecek:
@@ -4413,8 +4420,53 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                 print(f"  sahne {n}: UI-7 kapisi klip TEKRARI", file=sys.stderr)
                 _kopru_yaz(_vy)
                 return ("video", f"isler/{is_adi}/sahne_{n}.mp4")
+            # ⚠ FAZ UI-8 / UI8-SURE-KORUNDU — SAHNE DUSMESIN, SURE KISALMASIN.
+            # OLCULEN KUSUR: 6 sahne dusunce 120 sn hedefli video 71.15 sn
+            # oldu (17 sahne planlandi, 11 kaldi). Video-only akista sahne
+            # dusmesi sureyi DETERMINISTIK olarak kisaltiyordu.
+            # ⚠ SON CARE: BU ISTE ZATEN INDIRILMIS GERCEK klipler yeniden
+            # kullanilir. Bu, "%100 gercek video" sozlesmesini BOZMAZ (hala
+            # lisansli stok video) ve `_kaynak_tavani_uygula` ayni kaynagin
+            # <=8 sn tavanini AYRICA uygular. Secim DETERMINISTIK (modulo).
+            import glob as _glob
+            _mevcut = sorted(_glob.glob(os.path.join(
+                PUBLIC, "isler", is_adi, "sahne_*.mp4")))
+            _mevcut = [p for p in _mevcut if os.path.basename(p) != f"sahne_{n}.mp4"
+                       and os.path.getsize(p) > 10000]
+            if _mevcut:
+                _sec = _mevcut[n % len(_mevcut)]
+                try:
+                    shutil.copy(_sec, _vy)
+                    # ⚠ Lisans/provenans KAYBOLMAZ: kaynak klibin kaydi tasinir.
+                    _pv = kaynak.stok_provenans_al(_sec) or {}
+                    if _pv:
+                        # ⚠ Lisans/atif KAYBOLMAZ: kaynak klibin provenansi
+                        # AYNEN tasinir (kare_dogrulandi bayragi da o klibin
+                        # GERCEK degeridir — uydurulmaz).
+                        kaynak.stok_provenans_kaydet(
+                            _vy, saglayici=str(_pv.get("saglayici") or ""),
+                            asset_id=str(_pv.get("asset_id") or ""),
+                            url=str(_pv.get("url") or ""),
+                            baslik=str(_pv.get("baslik") or ""),
+                            sorgu=str(_pv.get("sorgu") or ""),
+                            genislik=int(_pv.get("genislik") or 0),
+                            yukseklik=int(_pv.get("yukseklik") or 0),
+                            sure_sn=float(_pv.get("sure_sn") or 0.0),
+                            kare_dogrulandi=bool(_pv.get("kare_dogrulandi")))
+                    _atif2 = kaynak.atif_al(_vy)
+                    if _atif2.get("kanal"):
+                        s["kaynakYazi"] = _atif2["kanal"]
+                    print(f"  sahne {n}: UI8-SURE-KORUNDU — indirilmis gercek "
+                          f"klip yeniden kullanildi ({os.path.basename(_sec)})",
+                          file=sys.stderr)
+                    _kopru_yaz(_vy)
+                    return ("video", f"isler/{is_adi}/sahne_{n}.mp4")
+                except Exception as _e:                      # noqa: BLE001
+                    print(f"  sahne {n}: yeniden kullanim basarisiz: "
+                          f"{str(_e)[:90]}", file=sys.stderr)
             print(f"  sahne {n}: {MEDYA_VIDEO_YOK} (UI7-GORSEL-YASAK-KAPISI) — "
-                  f"AI/statik gorsele DUSULMUYOR", file=sys.stderr)
+                  f"hic gercek klip yok; AI/statik gorsele DUSULMUYOR",
+                  file=sys.stderr)
             _bosluk_yaz(f"{MEDYA_VIDEO_YOK}: UI7-GORSEL-YASAK-KAPISI "
                         f"(gercek video klip bulunamadi)")
             return None
@@ -4466,7 +4518,12 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         except Exception:                                    # noqa: BLE001
             pass                       # provenans yazilamazsa uretim DURMAZ
         renk_uydur(gyol_full, olcum_hedef, f"sahne {n}")
-        if mag_profil and s.get("hd"):   # OTOMATIK: sadece plan HD isaretlediyse
+        # ⚠ FAZ UI-8 / UI8-MAGNIFIC-KAPALI: VIDEO-ONLY AKISTA MAGNIFIC YOK.
+        # OLCULEN KUSUR: is sirasinda otomatik upscale denendi ve KREDI
+        # DENEMESI yapildi ("magnific POST 502: Error consuming credits").
+        # Kredi harcanmadi ama denenmemeliydi: `gorsel_yasak` (video-only)
+        # akista AI gorsel zaten URETILMEZ, dolayisiyla upscale ANLAMSIZDIR.
+        if mag_profil and s.get("hd") and not prof.get("gorsel_yasak"):
             kaynak.magnific_upscale(gyol_full, optimized_for=mag_profil, scale="2x")
         # 3) GERCEK VIDEO: acilis sahnesiyse gorseli canlandir. Motor zinciri:
         #    GROK once ($0.40/8sn — Sora'nin yarisi + unlu toleransli) -> SORA ($0.80) -> efekt.
@@ -4933,15 +4990,22 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                              stil_kilit=stil_kilit, yazi_yasak=False,
                              model=GORSEL_MODEL_DOC,
                              saglayici=unlu_motor if unlu_aktif else ""):   # kapak: en iyi model
-            if mag_profil:   # kapak: documentary'de her zaman HD (thumbnail kalitesi kritik)
+            # ⚠ FAZ UI-8 / UI8-MAGNIFIC-KAPALI: video-only akista kapak da
+            # Magnific'e GITMEZ — kredi denemesi olmamalidir.
+            if mag_profil and not prof.get("gorsel_yasak"):
                 kaynak.magnific_upscale(khedef, optimized_for=mag_profil, scale="2x")
             kapak_yolu = khedef
 
     # Render
     bildir("Video render ediliyor (birkaç dakika)...", 78)
-    # fps 30->24: %20 daha az kare = %20 hizli render (darbogaz Chromium kare uretimi).
-    # Statik gorsel + Ken Burns'te 24 fps sinematik durur, fark hissedilmez. VIDEO_FPS env ile geri alinir.
-    props = {"fps": int(os.environ.get("VIDEO_FPS", "24")), "genislik": 1920, "yukseklik": 1080,
+    # ⚠ FAZ UI-8 / UI8-FPS-30 — RENDER FPS ILE POST-QA BEKLENTISI AYNI.
+    # OLCULEN KUSUR: render 24 fps uretiyordu ama POST-QA profili 30 fps
+    # bekliyordu -> her iste `POST-FPS warn: 24.0 fps, beklenen 30.0` ve TAM
+    # PASS IMKANSIZ. Iki taraf 30'da birlestirildi (qa_son `beklenen.fps`
+    # profil degerini okur).
+    # ESKI NOT (gecersiz): "fps 30->24 %20 daha hizli render" — hiz kazanci
+    # tam PASS'i engelliyorsa kabul edilemez. VIDEO_FPS env ile geri alinir.
+    props = {"fps": int(os.environ.get("VIDEO_FPS", "30")), "genislik": 1920, "yukseklik": 1080,
              "gecis": motion, "altyaziStil": altyazi_stil,
              "altyaziAyar": altyazi_ayar_coz(altyazi_sablon), "sahneler": props_sahneler}
     props_yolu = os.path.join(is_dizini, "props.json")
