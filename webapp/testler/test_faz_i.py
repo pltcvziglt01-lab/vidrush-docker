@@ -14573,17 +14573,33 @@ kontrol("⭐ R-1d-j RED-FIRST: BOS timeline'da sabit PASS YOK",
 
 # ── (2) SES KURGUSU: J/L-cut ve ducking ──
 _S3 = _GQ.ses_kurgu_olcumu(_gj_cevir([_gj("s1"), _gj("s2"), _gj("s3")]))
-# ⚠ FAZ Y-6: J/L-cut ARTIK URETILIYOR. Eski sozlesme "acrossfade = xfade
-# oldugu icin YAPISAL 0" diyordu; `hizli_render` artik sahne semantigine
-# gore (kanit/vurgu -> J, sonuc -> L) ses capraz gecisini kisaltiyor ve
-# sinir GERCEKTEN ayrisiyor. Olcum UYDURULMAZ: render'in yazdigi gercek
-# sayac okunur. Bu sentetik timeline'da islev eslesmedigi icin sayac 0'dir
-# ve `tam` False kalir — yani "0" hala SESSIZ bir PASS uretmiyor.
-kontrol("⭐ R-1d-j BELIRLEYICI: J/L-cut GERCEK SAYACTAN okunuyor "
-        "(uydurulmuyor); uretim yoksa 0 + tam=False",
-        _S3["olculdu"] is True and _S3["j_l_cut"] == 0
-        and _S3["ses_gecis"] == 2 and _S3["tam"] is False
-        and "jl_offset_sn" in _S3, _S3)
+# ⚠ FAZ Y-13a — SOZLESME BILINCLI OLARAK DEGISTI.
+# ESKI IDDIA (buradaydi): "render'in yazdigi GERCEK sayac okunur; uretim
+# yoksa 0 + tam=False". Bu iddia YANLISTI ve bu satir kusuru KILITLIYORDU:
+# okunan sey `hizli_render._JL_SON` MODUL GLOBAL'iydi ve
+#   · `pipeline.py` `olc()`'u RENDER'DAN ONCE kosuyor (deger hicbir zaman
+#     o ise ait degil),
+#   · obek birlestirmesi sayaci 0'a EZIYOR (>12 sahnede yapisal 0),
+#   · global surec omurlu (A isinin QA'si B isinin sayisini raporluyor).
+# Yani "olculdu: True" bir YALANDI: hicbir sey olculmemisti.
+# ⚠ YENI SOZLESME: rapor ENJEKTE edilmezse `olculdu: False` + stabil kod;
+# `j_l_cut` SAYI OLARAK SUNULMAZ — "olculmemis 0" ile "olculen 0"
+# karistirilamaz. (Tam sozlesme: webapp/testler/test_faz_y13.py)
+kontrol("⭐ Y-13a BELIRLEYICI: J/L raporu enjekte edilmezse UYDURULMAZ "
+        "(olculdu=False + stabil kod, sayi sunulmaz)",
+        _S3["olculdu"] is False
+        and _S3["kod"] == _GQ.KOD_JL_OLCULMEDI
+        and _S3.get("j_l_cut") is None
+        and _S3["ses_gecis"] == 2 and _S3["tam"] is False, _S3)
+kontrol("⭐ Y-13a: render SONRASI artefakta bagli rapor OLCULUR",
+        (lambda r: r["olculdu"] is True and r["j_l_cut"] == 2
+         and r["tam"] is True)(
+            _GQ.ses_kurgu_olcumu(
+                _gj_cevir([_gj("s1"), _gj("s2"), _gj("s3")]),
+                jl_raporu={"sayi": 2, "offset_sn": 0.12,
+                           "kaynak": "render-sonrasi",
+                           "artefakt_sha256": "e" * 64},
+                artefakt_sha256="e" * 64)))
 kontrol("⭐ R-1d-j BELIRLEYICI RED-FIRST: DUCKING verisi gercek timeline'da "
         "YOK — 0 ya da PASS UYDURULMUYOR, stabil kod",
         _S3["ducking"]["olculdu"] is False

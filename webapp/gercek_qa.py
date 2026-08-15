@@ -48,6 +48,15 @@ KOD_PROVENANS_YOK = "GERCEK-TIMELINE-PROVENANS-YOK"
 KOD_SAHNE_YOK = "GERCEK-TIMELINE-SAHNE-YOK"
 KOD_GECIS_YOK = "GERCEK-TIMELINE-GECIS-YOK"
 KOD_DUCKING_YOK = "GERCEK-TIMELINE-DUCKING-VERISI-YOK"
+# ⚠ FAZ Y-13a — J/L olcumu artik ENJEKTE edilir; bayat modul global'i
+# (`hizli_render._JL_SON`) KANIT SAYILMAZ. Bkz. `ses_kurgu_olcumu`.
+KOD_JL_OLCULMEDI = "GERCEK-TIMELINE-JL-OLCULMEDI"
+KOD_JL_BAYAT = "GERCEK-TIMELINE-JL-BAYAT"
+
+# Bir isin "tam" sayilmasi icin gereken en az gercek J/L-cut sayisi.
+# ⚠ `editor/qa_on.JL_EN_AZ` ile AYNI deger; orada plan uzerinden, burada
+# URETILEN artefakt uzerinden olculur.
+JL_EN_AZ = 2
 
 # Kapilar. ⚠ Esikler MEVCUT kaynaklardan OKUNUR, burada YENIDEN TANIMLANMAZ.
 KAYNAK_TAVANI_SN = _kk.KAYNAK_BASINA_TAVAN_SN_PLAN
@@ -151,56 +160,105 @@ def gecis_olcumu(sahneler: list) -> dict:
             "imza_dagilimi": dagilim}
 
 
-def ses_kurgu_olcumu(sahneler: list) -> dict:
-    """FAZ R-1d-j — SES KURGUSU (J/L-cut + ducking), gercek zaman cizgisinden.
+def _ducking_olcumu(ducking_zarfi) -> dict:
+    """Ducking zarfindan GERCEK olcum. Zarf yoksa UYDURULMAZ."""
+    zarf = [z for z in (ducking_zarfi or [])
+            if isinstance(z, (list, tuple)) and len(z) >= 3]
+    if not zarf:
+        return {"olculdu": False, "kod": KOD_DUCKING_YOK,
+                "neden": "gercek zaman cizgisi ducking zarfi tasimiyor"}
+    try:
+        derinlikler = [float(z[2]) for z in zarf]
+        toplam_sn = round(sum(float(z[1]) - float(z[0]) for z in zarf), 3)
+    except (TypeError, ValueError) as e:
+        return {"olculdu": False, "kod": KOD_DUCKING_YOK,
+                "neden": f"zarf okunamadi: {type(e).__name__}"}
+    return {"olculdu": True, "kod": "", "aralik": len(zarf),
+            "derinlik_db": round(min(derinlikler), 2),
+            "ortalama_db": round(sum(derinlikler) / len(derinlikler), 2),
+            "toplam_sn": toplam_sn}
 
-    ⚠ J/L-CUT OLCULUR, UYDURULMAZ: gercek hatta her gecis
-    `xfade=...:duration=g:offset=o` ile BIRLIKTE `acrossfade=d=g` uygular —
-    yani ses ve video sinirlari AYNI noktadadir. J/L-cut tanimi geregi ses
-    ve goruntu sinirlarinin FARKLI olmasidir; bu hatta boyle bir ayrim
-    URETILMEZ, dolayisiyla olculen deger 0'dir (varsayim degil, YAPISAL).
-    ⚠ DUCKING: gercek zaman cizgisi (props) muzik/ambiyans ducking zarfi
-    TASIMAZ. Bu yuzden 0 ya da PASS UYDURULMAZ — `olculdu: False` +
-    STABIL KOD doner ve `tam` False kalir.
+
+def ses_kurgu_olcumu(sahneler: list, *, jl_raporu: Optional[dict] = None,
+                     artefakt_sha256: str = "",
+                     ducking_zarfi=None) -> dict:
+    """FAZ R-1d-j / Y-13a — SES KURGUSU (J/L-cut + ducking).
+
+    ⚠ OLCULEN KUSUR (`Y13-OLCUM-NIYETI-OKUYOR`): bu fonksiyon eskiden
+    `hizli_render._JL_SON` MODUL GLOBAL'INI okuyordu. Uc ayri kirilma:
+      1. SIRA — `pipeline.py` `gercek_qa.olc`'u RENDER'DAN ONCE kosuyor;
+         `_JL_SON` ise render SIRASINDA yaziliyor. Okunan deger o is icin
+         HICBIR ZAMAN taze degildi.
+      2. OBEK EZILMESI — `hizli_render` sayaci ATIYOR (`=`, `+=` degil) ve
+         obek birlestirmesi `sahne_dilimi=None` ile cagrildigi icin sayac
+         0'a EZILIYOR: 12'den uzun her iste olcum yapisal olarak 0.
+      3. KONTAMINASYON — `_JL_SON` surec omurlu ve is basi sifirlanmiyor;
+         uzun omurlu iscide A isinin QA'si B isinin sayisini raporluyor.
+    Bu, R-1d-e'de bir kez duzeltilen kusurun AYNISIDIR (o zaman hic render
+    edilmeyen `edit_plani` kanit sayiliyordu).
+
+    ── SOZLESME ──
+      · J/L raporu DISARIDAN enjekte edilir (`kare_okuyucu` deseniyle ayni).
+      · Rapor yoksa -> `olculdu: False` + `KOD_JL_OLCULMEDI`.
+        ⚠ 0 UYDURULMAZ; `j_l_cut` anahtari SAYI OLARAK SUNULMAZ, boylece
+        "olculmemis 0" ile "olculen 0" karistirilamaz.
+      · Rapor render'dan ONCE uretilmisse (`kaynak != "render-sonrasi"`) ya
+        da BASKA bir artefakta aitse -> `olculdu: False` + `KOD_JL_BAYAT`.
+      · `tam` yalnizca OLCULEN deger `JL_EN_AZ` esigini karsilarsa True.
+      · Ducking zarfi verilmezse `olculdu: False` KALIR (uydurma yok).
     """
     liste = [x for x in (sahneler or []) if isinstance(x, dict)]
     ses_gecis = max(0, len(liste) - 1)
+    ducking = _ducking_olcumu(ducking_zarfi)
     if ses_gecis < 1:
         return {"olculdu": False, "kod": KOD_GECIS_YOK,
                 "neden": "en az iki sahne gerekir", "tam": False,
-                "ducking": {"olculdu": False, "kod": KOD_DUCKING_YOK}}
-    # ⚠ FAZ Y-6 / Y6-JL-URETIM — J/L-CUT ARTIK URETILIYOR, OLCULUYOR.
-    # ESKI HAL: bu hatta her gecis `xfade=duration=g` ile BIRLIKTE
-    # `acrossfade=d=g` uyguluyordu; ses/video siniri AYRISMIYORDU ve burada
-    # sabit `j_l_cut: 0` donuluyordu (uydurma degil, YAPISALDI).
-    # YENI HAL: `hizli_render` sahne semantigine gore (`kanit`/`vurgu` ->
-    # J-cut, `sonuc` -> L-cut) ses capraz gecisini KISALTIYOR
-    # (`acrossfade d = g - JL_OFFSET_SN`), boylece sinir GERCEKTEN ayrisiyor.
-    # ⚠ SAYI UYDURULMAZ: render'in yazdigi gercek sayac okunur; renderer
-    # hic calismadiysa (0) yine 0 doner ve `tam` False kalir.
+                "ducking": ducking}
+
+    def _red(kod, neden):
+        # ⚠ `j_l_cut` BILEREK YOK: olculmemis deger sayi gibi sunulmaz.
+        return {"olculdu": False, "kod": kod, "neden": neden,
+                "ses_gecis": ses_gecis, "tam": False, "ducking": ducking}
+
+    if not isinstance(jl_raporu, dict) or not jl_raporu:
+        return _red(KOD_JL_OLCULMEDI,
+                    "J/L raporu enjekte edilmedi (render sonrasi olcum yok)")
+    _kaynak = str(jl_raporu.get("kaynak") or "")
+    if _kaynak != "render-sonrasi":
+        return _red(KOD_JL_BAYAT,
+                    f"olcum kaynagi {_kaynak!r} — render sonrasi degil")
+    _ozet = str(jl_raporu.get("artefakt_sha256") or "")
+    if not _ozet:
+        return _red(KOD_JL_BAYAT, "olcum bir artefakta bagli degil")
+    if artefakt_sha256 and _ozet != str(artefakt_sha256):
+        return _red(KOD_JL_BAYAT,
+                    f"olcum baska artefakta ait ({_ozet[:12]} != "
+                    f"{str(artefakt_sha256)[:12]})")
     try:
-        import hizli_render as _hr
-        _jl = int((getattr(_hr, "_JL_SON", None) or {}).get("sayi") or 0)
-        _jl_off = float((getattr(_hr, "_JL_SON", None) or {}).get("offset_sn") or 0.0)
-    except Exception:                                        # noqa: BLE001
-        _jl, _jl_off = 0, 0.0
+        _jl = int(jl_raporu.get("sayi") or 0)
+        _jl_off = float(jl_raporu.get("offset_sn") or 0.0)
+    except (TypeError, ValueError) as e:
+        return _red(KOD_JL_OLCULMEDI, f"rapor okunamadi: {type(e).__name__}")
     return {
         "olculdu": True, "kod": "",
         "ses_gecis": ses_gecis,
         "j_l_cut": _jl,
         "jl_offset_sn": _jl_off,
-        "gerekce": (f"{_jl} gecisde ses capraz gecisi goruntununkinden "
-                    f"{_jl_off:.2f} sn KISA -> ses/video siniri AYRISTI"
+        "artefakt_sha256": _ozet,
+        "sinir_farklari_sn": list(jl_raporu.get("sinir_farklari_sn") or [])[:40],
+        "gerekce": (f"{_jl} gecisde ses siniri goruntuden {_jl_off:.2f} sn "
+                    f"AYRISTI (render sonrasi, artefakta bagli olcum)"
                     if _jl else
-                    "bu koşumda J/L secilen gecis olmadi (islev eslesmedi)"),
-        # ⚠ Ducking VERISI YOK -> uydurulmaz.
-        "ducking": {"olculdu": False, "kod": KOD_DUCKING_YOK,
-                    "neden": "gercek zaman cizgisi ducking zarfi tasimiyor"},
-        "tam": bool(_jl),
+                    "olculdu: bu artefaktta J/L secilen gecis yok"),
+        "ducking": ducking,
+        # ⚠ Esik OLCULEN degere uygulanir; olculmemislik `tam` uretemez.
+        "tam": _jl >= JL_EN_AZ,
     }
 
 
-def olc(sahneler: list, *, kare_okuyucu: Optional[Callable] = None) -> dict:
+def olc(sahneler: list, *, kare_okuyucu: Optional[Callable] = None,
+        jl_raporu: Optional[dict] = None, artefakt_sha256: str = "",
+        ducking_zarfi=None) -> dict:
     """Gercek zaman cizgisinin PRE-QA olcumu + hukmu.
 
     ⚠ Olcum fonksiyonlari DEGISMEDI; yalnizca girdi gercek zaman cizgisi.
@@ -291,7 +349,12 @@ def olc(sahneler: list, *, kare_okuyucu: Optional[Callable] = None) -> dict:
     # Sahte tur URETMEK yerine olcum ACIKCA yapilamadi denir.
     # ── 8b) FAZ R-1d-j: GECIS + SES KURGUSU ──
     gecis = gecis_olcumu(liste)
-    ses_kurgu = ses_kurgu_olcumu(liste)
+    # ⚠ FAZ Y-13a: J/L ve ducking olcumu DISARIDAN gelir. Cagiran render
+    # SONRASI olculmus, artefakta bagli raporu gecirmezse `ses_kurgu`
+    # "olculmedi" doner — 0 UYDURULMAZ.
+    ses_kurgu = ses_kurgu_olcumu(liste, jl_raporu=jl_raporu,
+                                 artefakt_sha256=artefakt_sha256,
+                                 ducking_zarfi=ducking_zarfi)
 
     broll = {"olculdu": False, "neden": KOD_CEKIM_TURU_YOK,
              "video_cekim_sayisi": sum(1 for s in medya

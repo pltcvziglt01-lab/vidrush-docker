@@ -101,8 +101,19 @@ kontrol("gercek_qa J/L sayisini zaman cizgisinden okuyor",
         re.search(r"jl_sayisi|j_l_cut.{0,80}(sahne|liste|say)", _GQ, re.S)
         is not None,
         "olcum yok")
-kontrol("stabil kod: Y6-JL-URETIM olcum tarafinda da belgelendi",
-        "Y6-JL" in _GQ)
+# ⚠ FAZ Y-13a — BU KONTROL BILINCLI OLARAK DEGISTI.
+# ESKI HALI: `"Y6-JL" in _GQ` — yani gercek_qa.py'nin METNINDE bir string
+# arayan bir VARLIK testiydi. Y-13a olcum sozlesmesini degistirdi:
+# gercek_qa ARTIK `hizli_render._JL_SON` global'ini OKUMUYOR (Y-6'nin
+# "olcum tarafi" iddiasi zaten YANLISTI — okunan deger render'dan once
+# alindigi icin hicbir zaman o ise ait degildi). Kontrol artik yeni karar
+# kodunu ve DAVRANISI olcuyor.
+kontrol("stabil kod: Y13-OLCUM-NIYETI-OKUYOR olcum tarafinda belgelendi",
+        "Y13-OLCUM-NIYETI-OKUYOR" in _GQ,
+        "olcum sozlesmesi kodda belgelenmemis")
+kontrol("olcum artik render modulunun global'ini OKUMUYOR",
+        "import hizli_render" not in _GQ,
+        "bayat global hala okunuyor")
 
 
 blok("Y-6/3 — METADATA: j_cut_sn / l_cut_sn plana yaziliyor")
