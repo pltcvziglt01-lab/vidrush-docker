@@ -5099,9 +5099,18 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             komut.append(f"--browser-executable={os.environ['REMOTION_BROWSER_EXECUTABLE']}")
         if os.environ.get("REMOTION_GL"):
             komut.append(f"--gl={os.environ['REMOTION_GL']}")
-        # Render suresi videoya gore olcekli: min 30dk, video dakikasi basina ~12dk duvar.
-        # Tavan 13 saat (60 dk hikaye eski 2 vCPU'da ~10-12 saatti; hizli motor bunu asmaz zaten).
-        render_timeout = int(min(46800, max(1800, sure_dk * 720)))
+        # ⚠ FAZ Y-2 / Y2-RENDER-TIMEOUT — BUTCE 1080p30 GERCEGINE GORE.
+        # OLCULEN KUSUR (is job_1786784567124_ui8120_aea2e9): icerik TAM
+        # hedefteydi (footage 17/17, gercek_video=1.0, AI gorsel 0, magnific
+        # 0) ama render 30 dk butcesine sigmadi ve video KAYBEDILDI:
+        #     RuntimeError: Render zaman aşımına uğradı (30 dk)
+        # Eski formul (`sure_dk * 720`, min 1800) 24 fps donemine aitti.
+        # UI-8 ile render 30 fps'e cikti (POST-QA ile hizalanmak icin) ve
+        # kare sayisi ~%25 artti; 17 segmentlik 1080p30 kompozisyon 30 dk'ya
+        # SIGMIYOR. Butce: min 60 dk, video dakikasi basina ~25 dk duvar.
+        # ⚠ Kalite kapilari GEVSETILMEDI; yalnizca zaman butcesi buyudu.
+        # Tavan 13 saat AYNEN korunuyor (sonsuz bekleme YOK).
+        render_timeout = int(min(46800, max(3600, sure_dk * 1500)))
         try:
             sonuc = subprocess.run(komut, cwd=STUDYO, capture_output=True, text=True,
                                    timeout=render_timeout)
