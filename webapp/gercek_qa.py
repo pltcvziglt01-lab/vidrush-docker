@@ -47,6 +47,12 @@ KOD_CEKIM_TURU_YOK = "GERCEK-TIMELINE-CEKIM-TURU-YOK"
 KOD_PROVENANS_YOK = "GERCEK-TIMELINE-PROVENANS-YOK"
 KOD_SAHNE_YOK = "GERCEK-TIMELINE-SAHNE-YOK"
 KOD_GECIS_YOK = "GERCEK-TIMELINE-GECIS-YOK"
+# ⚠ FAZ Y-15 (`Y15-GECIS-TUR-OLCUMU-YOK`): `imza_dagilimi` uretiliyordu ama
+# TUR SAYISI ve ESIK yoktu; hicbir kapi ">=3 gecis turu" sartini
+# denetlemiyordu.
+KOD_GECIS_TUR_AZ = "GERCEK-TIMELINE-GECIS-TUR-AZ"
+# ⚠ Esik TEK KAYNAKTAN okunur — kabul kriteri ve hat ile AYNI deger.
+GECIS_TURU_ASGARI = 3
 KOD_DUCKING_YOK = "GERCEK-TIMELINE-DUCKING-VERISI-YOK"
 # ⚠ FAZ Y-14b: yapilandirma degeri KANIT DEGIL — gercek gain
 # reduction olculmediginde bu kod doner.
@@ -147,8 +153,10 @@ def gecis_olcumu(sahneler: list) -> dict:
     liste = [x for x in (sahneler or []) if isinstance(x, dict)]
     gecis = max(0, len(liste) - 1)
     if gecis < 1:
+        # ⚠ Olculmemis deger SAYI olarak sunulmaz (`tur_sayisi` YOK).
         return {"olculdu": False, "kod": KOD_GECIS_YOK,
-                "neden": "en az iki sahne gerekir", "gecis": gecis}
+                "neden": "en az iki sahne gerekir", "gecis": gecis,
+                "esik": GECIS_TURU_ASGARI, "esik_karsilandi": False}
     # Gecis, GELEN sahnenin imzasiyla belirlenir (ilk sahnenin gecisi yoktur).
     gelenler = liste[1:]
     imzalar = [_s(x.get("gecis_imza")) for x in gelenler]
@@ -157,10 +165,19 @@ def gecis_olcumu(sahneler: list) -> dict:
     for i in imzalar:
         if i:
             dagilim[i] = dagilim.get(i, 0) + 1
-    return {"olculdu": True, "kod": "", "gecis": gecis, "hard_cut": hard,
+    # ⚠ FAZ Y-15: TUR SAYISI = farkli imza sayisi + (varsa) hard-cut.
+    # Hard-cut da bir gecis TURUDUR (2 karelik fade = gozle sert kesme).
+    tur_sayisi = len(dagilim) + (1 if hard else 0)
+    esik_ok = tur_sayisi >= GECIS_TURU_ASGARI
+    return {"olculdu": True,
+            "kod": "" if esik_ok else KOD_GECIS_TUR_AZ,
+            "gecis": gecis, "hard_cut": hard,
             "efektli": gecis - hard,
             "hard_cut_orani": round(hard / gecis, 3),
-            "imza_dagilimi": dagilim}
+            "imza_dagilimi": dagilim,
+            "tur_sayisi": tur_sayisi,
+            "esik": GECIS_TURU_ASGARI,
+            "esik_karsilandi": esik_ok}
 
 
 def _ducking_olcumu(ducking_zarfi, ducking_olcum=None) -> dict:

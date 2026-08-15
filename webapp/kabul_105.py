@@ -60,7 +60,7 @@ KAYNAK_TAVANI_SN = 8.0         # global: ayni kaynak <= 8 sn
 KAYNAK_SES_TAVANI_DB = -60.0   # "mutlak 0" — sessizlik tabani
 FACT_KAPSAM_ASGARI = 1.0       # her cekim 1 kabul edilmis primary_fact_id
 KAPANIS_ASGARI = 0.60
-GECIS_TURU_ASGARI = 3
+GECIS_TURU_ASGARI = 3      # ⚠ FAZ Y-15: hat ve olcum ile AYNI deger
 JL_ASGARI = 2
 SFX_ASGARI = 1
 DUCKING_TAVANI_DB = -3.0       # gercek ducking en az 3 dB bastirmali

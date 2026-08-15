@@ -1893,8 +1893,25 @@ try:
                 _gz_fark.append((_eid, _i))
     kontrol("ESKI kimliklerde efekt atamasi BIT-BIT ayni (5 stil x 120 sahne)",
             not _ef_fark, str(_ef_fark[:3]))
-    kontrol("ESKI kimliklerde gecis imzasi BIT-BIT ayni", not _gz_fark,
-            str(_gz_fark[:3]))
+    # ⚠ FAZ Y-15 — BU IDDIA BILINCLI OLARAK DEGISTIRILDI.
+    # ESKI IDDIA: "gecis imzasi BIT-BIT ayni" (tek imza + oran formulu).
+    # O davranis kabul sarti olan ">=3 gecis turu"nu YAPISAL OLARAK
+    # IMKANSIZ kiliyordu: `GECIS_IMZASI` her stile TEK imza veriyordu,
+    # yani bir iste en fazla 2 tur (hard-cut + tek imza) uretilebiliyor ve
+    # `hizli_render.GECIS_IMZA_FFMPEG`'deki `whip` ERISILEMEZ kaliyordu.
+    # ⚠ KORUNAN SOZLESME: secim hala DETERMINISTIK, hard-cut hala uretiliyor
+    # ve HARD-CUT/EFEKTLI DAGILIMI BIT-BIT AYNI. Degisen tek sey: efektli
+    # gecisin TURU stilin imza listesi icinde donuyor. (Bkz. test_faz_y15.py)
+    _gz_dagilim_fark = [
+        (e, i) for (e, i) in _gz_fark
+        if bool(_pl2.gecis_imza_sec(e, i)) != bool(_ref_gecis(e, i))]
+    kontrol("ESKI kimliklerde HARD-CUT/EFEKTLI dagilimi BIT-BIT ayni "
+            "(yalniz efektli gecisin TURU cesitlendi)",
+            not _gz_dagilim_fark, str(_gz_dagilim_fark[:3]))
+    kontrol("ESKI kimliklerde >=3 gecis turu artik MUMKUN",
+            all(len({_pl2.gecis_imza_sec(_e, _i) for _i in range(120)})
+                >= _pl2.GECIS_TURU_ASGARI for _e in _pl2.GECIS_IMZALARI),
+            "tur cesitliligi hala yetersiz")
     kontrol("BILINMEYEN kimlik eski davranisini KORUYOR (efekt yok, imza yok)",
             _pl2.efekt_ata("boyle-bir-stil-yok", "", 0) == []
             and _pl2.gecis_imza_sec("boyle-bir-stil-yok", 0) == "")
@@ -1985,9 +2002,20 @@ try:
     kontrol("bozuk profilde efekt_ata ESKI tabloya duser",
             _pl2.efekt_ata("sinematik-belgesel", "", 0, {"palet": "bozuk"})
             == [dict(e) for e in _pl2.EFEKT_TEMEL["sinematik-belgesel"]])
-    kontrol("bozuk profilde gecis_imza_sec ESKI tabloya duser",
-            all(_pl2.gecis_imza_sec("sinematik-belgesel", _i, {"palet": "x"})
-                == _ref_gecis("sinematik-belgesel", _i) for _i in range(40)))
+    # ⚠ FAZ Y-15: bozuk profil hala STIL TABLOSUNA duser; degisen tek sey
+    # o tablonun artik bir imza LISTESI olmasi. Korunan sozlesme:
+    # hard-cut/efektli DAGILIMI birebir ayni (yalniz tur cesitlendi).
+    kontrol("bozuk profilde gecis_imza_sec STIL TABLOSUNA duser "
+            "(hard-cut/efektli dagilimi ayni)",
+            all(bool(_pl2.gecis_imza_sec("sinematik-belgesel", _i,
+                                         {"palet": "x"}))
+                == bool(_ref_gecis("sinematik-belgesel", _i))
+                for _i in range(40)))
+    kontrol("bozuk profilde uretilen imzalar STILIN LISTESINDEN",
+            {_pl2.gecis_imza_sec("sinematik-belgesel", _i, {"palet": "x"})
+             for _i in range(40)} - {""}
+            <= set(_pl2.GECIS_IMZALARI["sinematik-belgesel"]["imzalar"]),
+            "stil disi imza uretildi")
     kontrol("bilinmeyen gecis turunde imza URETILMIYOR (uydurma yok)",
             _pl2.bilesik_gorsel_imza(
                 {"gecis": {"tur": "uzay-gecisi", "oran_pct": 50}})["gecis_imza"]

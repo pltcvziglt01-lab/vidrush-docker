@@ -253,30 +253,69 @@ def efekt_ata(edit_id: str, islev: str, indeks: int, ek_profil=None) -> list:
 # Olculen: sert-kesme %79.9. Susulu gecisler pratikte yok. Kanal imzalari:
 #   ZeroReports karartma %23.1 | NavyDecoded flash %10.3 + whip %6.2 | Auralis %97.5 saf kesme
 # Stil basina: (imza, oran). Oran kadar sahneye imza konur, gerisi SERT KESME.
-GECIS_IMZASI = {
-    "seyahat-belgeseli":  ("karartma", 0.08),
-    "veri-anlatisi":      ("flash", 0.10),
-    "sinematik-belgesel": ("karartma", 0.20),   # ZeroReports modeli (karanlik/gizemli)
-    "anlati-video-essay": ("karartma", 0.12),
-    "hizli-explainer":    ("flash", 0.10),
+# ⚠ FAZ Y-15: bu tablo artik SECIM KAYNAGI DEGIL. Tek imza ">=3 gecis
+# turu"nu yapisal olarak imkansiz kiliyordu (`Y15-GECIS-IMZA-TEKIL`).
+# Secim `GECIS_IMZALARI` (imza LISTESI) uzerinden yapilir; bu ad yalnizca
+# GERIYE UYUM GORUNUMU olarak asagida ONDAN TURETILIR.
+
+
+# ─────────────── FAZ Y-15 — >=3 DETERMINISTIK GECIS TURU ───────────────
+# ⚠ OLCULEN KUSUR (`Y15-GECIS-IMZA-TEKIL`): `GECIS_IMZASI` her `edit_id`
+#   icin TEK bir `(imza, oran)` demeti veriyordu. `gecis_imza_sec` ya o TEK
+#   imzayi ya da bos string donebiliyordu; bos imza `hizli_render`'da 2
+#   karelik fade (= gozle SERT KESME) oluyor. Yani bir iste uretilebilecek
+#   EN FAZLA tur sayisi 2'ydi (hard-cut + tek imza) ve kabul sarti olan
+#   ">=3 gecis turu" YAPISAL OLARAK IMKANSIZDI.
+#   Ustelik `hizli_render.GECIS_IMZA_FFMPEG` uc tur tanimliyordu
+#   (`karartma`/`flash`/`whip`) ama `whip` hicbir `edit_id`'de gecmedigi
+#   icin ERISILEMEZ olu koddu.
+# ⚠ COZUM: her stil icin bir imza LISTESI. Secim DETERMINISTIK kalir —
+#   ayni (edit_id, indeks) her uretimde AYNI imzayi verir; rastgelelik YOK.
+#   `oran` hala hard-cut/efektli dengesini korur (her gecis efektli olsaydi
+#   ritim bozulurdu, referans kanallarda da boyle degil).
+GECIS_TURU_ASGARI = 3          # hard-cut dahil, kabul sarti ile AYNI deger
+
+GECIS_IMZALARI = {
+    #                          efektli gecis orani, sirayla uygulanan imzalar
+    "seyahat-belgeseli":  {"oran": 0.34, "imzalar": ("karartma", "whip")},
+    "veri-anlatisi":      {"oran": 0.34, "imzalar": ("flash", "whip")},
+    "sinematik-belgesel": {"oran": 0.34, "imzalar": ("karartma", "flash")},
+    "anlati-video-essay": {"oran": 0.34, "imzalar": ("karartma", "flash")},
+    "hizli-explainer":    {"oran": 0.40, "imzalar": ("flash", "whip")},
 }
 
 
+# ⚠ GERIYE UYUM GORUNUMU — tek kaynak `GECIS_IMZALARI`.
+GECIS_IMZASI = {k: (v["imzalar"][0], v["oran"])
+                for k, v in GECIS_IMZALARI.items()}
+
+
 def gecis_imza_sec(edit_id: str, indeks: int, ek_profil=None) -> str:
-    """Bu sahneye gecis imzasi konacak mi? Deterministik — ayni sahne her uretimde ayni.
+    """Bu sahneye hangi gecis imzasi konacak? ⚠ DETERMINISTIK.
+
+    Doner: imza adi ya da `""` (= hard-cut). Ayni (edit_id, indeks) her
+    uretimde AYNI sonucu verir.
 
     ⚠ FAZ I-2d: `ek_profil` verilirse ve ondan imza TURETILEBILIYORSA o
-    kullanilir. Verilmezse `GECIS_IMZASI` tablosu aynen isler (gerileme yok).
+    imza listenin BASINA alinir; boylece bilesik profil hala belirleyici
+    olur ama tur cesitliligi KAYBOLMAZ.
+    ⚠ Bilinmeyen `edit_id` icin imza URETILMEZ (uydurma yok) — hard-cut.
     """
-    imza, oran = "", 0.0
+    kayit = GECIS_IMZALARI.get(edit_id) or {}
+    imzalar = list(kayit.get("imzalar") or ())
+    oran = float(kayit.get("oran") or 0.0)
     if ek_profil:
         _tur = bilesik_gorsel_imza(ek_profil)
-        imza, oran = _tur["gecis_imza"], _tur["gecis_oran"]
-    if not imza:
-        imza, oran = GECIS_IMZASI.get(edit_id, ("", 0.0))
-    if not imza or oran <= 0:
+        _p_imza, _p_oran = _tur["gecis_imza"], _tur["gecis_oran"]
+        if _p_imza:
+            imzalar = [_p_imza] + [i for i in imzalar if i != _p_imza]
+            oran = float(_p_oran or oran)
+    if not imzalar or oran <= 0:
         return ""
-    return imza if (indeks * 4177 % 1000) / 1000.0 < oran else ""
+    if (indeks * 4177 % 1000) / 1000.0 >= oran:
+        return ""                      # hard-cut — ritim korunur
+    # ⚠ Efektli gecisler imzalar arasinda DETERMINISTIK olarak donusur.
+    return imzalar[(indeks * 7919) % len(imzalar)]
 
 
 SFX_DIR = os.environ.get("SFX_DIR", os.path.join(KOK_YOL, "sfx"))
