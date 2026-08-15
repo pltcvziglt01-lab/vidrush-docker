@@ -4420,50 +4420,28 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                 print(f"  sahne {n}: UI-7 kapisi klip TEKRARI", file=sys.stderr)
                 _kopru_yaz(_vy)
                 return ("video", f"isler/{is_adi}/sahne_{n}.mp4")
-            # ⚠ FAZ UI-8 / UI8-SURE-KORUNDU — SAHNE DUSMESIN, SURE KISALMASIN.
-            # OLCULEN KUSUR: 6 sahne dusunce 120 sn hedefli video 71.15 sn
-            # oldu (17 sahne planlandi, 11 kaldi). Video-only akista sahne
-            # dusmesi sureyi DETERMINISTIK olarak kisaltiyordu.
-            # ⚠ SON CARE: BU ISTE ZATEN INDIRILMIS GERCEK klipler yeniden
-            # kullanilir. Bu, "%100 gercek video" sozlesmesini BOZMAZ (hala
-            # lisansli stok video) ve `_kaynak_tavani_uygula` ayni kaynagin
-            # <=8 sn tavanini AYRICA uygular. Secim DETERMINISTIK (modulo).
-            import glob as _glob
-            _mevcut = sorted(_glob.glob(os.path.join(
-                PUBLIC, "isler", is_adi, "sahne_*.mp4")))
-            _mevcut = [p for p in _mevcut if os.path.basename(p) != f"sahne_{n}.mp4"
-                       and os.path.getsize(p) > 10000]
-            if _mevcut:
-                _sec = _mevcut[n % len(_mevcut)]
-                try:
-                    shutil.copy(_sec, _vy)
-                    # ⚠ Lisans/provenans KAYBOLMAZ: kaynak klibin kaydi tasinir.
-                    _pv = kaynak.stok_provenans_al(_sec) or {}
-                    if _pv:
-                        # ⚠ Lisans/atif KAYBOLMAZ: kaynak klibin provenansi
-                        # AYNEN tasinir (kare_dogrulandi bayragi da o klibin
-                        # GERCEK degeridir — uydurulmaz).
-                        kaynak.stok_provenans_kaydet(
-                            _vy, saglayici=str(_pv.get("saglayici") or ""),
-                            asset_id=str(_pv.get("asset_id") or ""),
-                            url=str(_pv.get("url") or ""),
-                            baslik=str(_pv.get("baslik") or ""),
-                            sorgu=str(_pv.get("sorgu") or ""),
-                            genislik=int(_pv.get("genislik") or 0),
-                            yukseklik=int(_pv.get("yukseklik") or 0),
-                            sure_sn=float(_pv.get("sure_sn") or 0.0),
-                            kare_dogrulandi=bool(_pv.get("kare_dogrulandi")))
-                    _atif2 = kaynak.atif_al(_vy)
-                    if _atif2.get("kanal"):
-                        s["kaynakYazi"] = _atif2["kanal"]
-                    print(f"  sahne {n}: UI8-SURE-KORUNDU — indirilmis gercek "
-                          f"klip yeniden kullanildi ({os.path.basename(_sec)})",
-                          file=sys.stderr)
-                    _kopru_yaz(_vy)
-                    return ("video", f"isler/{is_adi}/sahne_{n}.mp4")
-                except Exception as _e:                      # noqa: BLE001
-                    print(f"  sahne {n}: yeniden kullanim basarisiz: "
-                          f"{str(_e)[:90]}", file=sys.stderr)
+            # ⚠ FAZ Y-5 / Y5-YENIDEN-KULLANIM-TAVANI-DELIYOR — KLIP YENIDEN
+            # KULLANIMI KALDIRILDI.
+            # UI-8'de buraya "sureyi korumak" icin, bu iste ZATEN INDIRILMIS
+            # bir klibi kopyalayan bir son care konmustu. O yol GLOBAL
+            # "ayni kaynak <= 8 sn" sozlesmesini MATEMATIKSEL OLARAK ihlal
+            # ediyor: tavan 8.0 sn (medya/saglayici_motoru), belgesel sahne
+            # suresi ~5.5-7 sn; ayni klip IKI sahnede kullanilirsa toplam
+            # ~11-14 sn > 8 sn.
+            # ⚠ Tavan UYGULAMASI sahne bazindadir (`_kaynak_tavani_uygula`
+            # her sahnenin KENDI suresine bakar; sahneler arasi kullanim
+            # akumulatoru YOKTUR). Gercek global mantik
+            # `kaynak_tavani.bolme_plani` icinde ama uretimde CAGRILMIYOR.
+            # Global ihlali yalnizca `gercek_qa` post-hoc yakalar
+            # (`GERCEK-KAYNAK-TAVANI` fail) — yani yeniden kullanim, isi
+            # QA'da FAIL'e dusuren bir TUZAKTI.
+            # ⚠ OLCUM: bu yol son IKI gercek iste HIC devreye girmedi
+            # (sayac 0; footage 17/17 ve 12/12) — UI-8'in INGILIZCE sorgu
+            # duzeltmesi sahneleri zaten kurtariyor. Fayda saglamadan risk
+            # tasiyordu.
+            # ⚠ AYRICA duzeltildi: provenans `_pv.get("url")` ile okunuyordu;
+            # `stok_provenans_al` sozlugunde o anahtar YOK (dogrusu
+            # `orijinal_url`) — kaynak URL'i her seferinde BOS yaziliyordu.
             print(f"  sahne {n}: {MEDYA_VIDEO_YOK} (UI7-GORSEL-YASAK-KAPISI) — "
                   f"hic gercek klip yok; AI/statik gorsele DUSULMUYOR",
                   file=sys.stderr)

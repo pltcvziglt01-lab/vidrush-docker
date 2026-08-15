@@ -12226,12 +12226,13 @@ _MONTAJ41 = _PP41[_PP41.find("props_sahneler.append({"):
 kontrol("⭐ I-41 KIRMIZI: props montaji `_kaynak_yazi_props`u CAGIRIYOR",
         "**_kaynak_yazi_props(s)" in _MONTAJ41,
         "props_sahneler.append blogunda yok")
-# ⚠ FAZ UI-7/UI-8: kunye ATAN yol sayisi 3 -> 5 oldu.
-#   +1 `UI7-GORSEL-YASAK-KAPISI` gercek klip bulunca
-#   +1 `UI8-SURE-KORUNDU` indirilmis klibi yeniden kullaninca
-# Sozlesme AYNEN korunuyor: kunye HICBIR yolda kaybolmuyor.
-kontrol("I-41: kunye KAYNAGI korundu (pipeline 5 noktada hala ATIYOR)",
-        _PP41.count('s["kaynakYazi"] = ') == 5,
+# ⚠ FAZ UI-7: kunye ATAN yol sayisi 3 -> 4 oldu
+#   (+1 `UI7-GORSEL-YASAK-KAPISI` gercek klip bulunca).
+# ⚠ FAZ Y-5: UI-8'de eklenen 5. yol (`UI8-SURE-KORUNDU` klip yeniden
+# kullanimi) KALDIRILDI — global "ayni kaynak <=8 sn" tavanini deliyordu.
+# Sayi 5 -> 4. Sozlesme AYNEN korunuyor: kunye HICBIR yolda kaybolmuyor.
+kontrol("I-41: kunye KAYNAGI korundu (pipeline 4 noktada hala ATIYOR)",
+        _PP41.count('s["kaynakYazi"] = ') == 4,
         _PP41.count('s["kaynakYazi"] = '))
 from editor import adapter as _adp41                            # noqa: E402
 kontrol("I-41: `kaynakYazi` kayipsizlik sozlesmesinde ZATEN vardi",

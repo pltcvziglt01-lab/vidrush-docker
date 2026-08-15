@@ -152,8 +152,8 @@ kontrol("GERILEME YOK: UI-8 fps 30 duruyor",
         'os.environ.get("VIDEO_FPS", "30")' in _P)
 kontrol("GERILEME YOK: UI-8 magnific kapali duruyor",
         _P.count("UI8-MAGNIFIC-KAPALI") >= 1)
-kontrol("GERILEME YOK: UI-8 sure koruma duruyor",
-        "UI8-SURE-KORUNDU" in _P)
+kontrol("GERILEME YOK: Y-5 — yeniden kullanim yolu geri GELMEDI",
+        "UI8-SURE-KORUNDU" not in _P)
 kontrol("GERILEME YOK: UI-7 gorsel yasak kapisi duruyor",
         "UI7-GORSEL-YASAK-KAPISI" in _P)
 kontrol("GERILEME YOK: %100 video profilleri duruyor",

@@ -79,26 +79,21 @@ kontrol("stabil kod: UI8-TURKCE-SORGU-YOK belgelendi",
         "karar kodda belgelenmemis")
 
 
-blok("UI-8/2 — SURE DETERMINISTIK KORUNUR (sahne dusmez)")
+blok("UI-8/2 — SURE KORUMA YOLU (FAZ Y-5'TE KALDIRILDI)")
 
-kontrol("stabil kod: UI8-SURE-KORUNDU",
-        "UI8-SURE-KORUNDU" in _P,
-        "sure koruma yolu yok")
-kontrol("son care: bu iste INDIRILMIS gercek klip YENIDEN KULLANILIR",
-        ("sahne_*.mp4" in _KAPI or "sahne_" in _KAPI) and "glob" in _KAPI,
-        "yeniden kullanim yolu yok")
-kontrol("yeniden kullanim DETERMINISTIK (modulo secim)",
-        re.search(r"%\s*len\(_mevcut\)", _KAPI) is not None,
-        "secim deterministik degil")
-kontrol("yeniden kullanimda PROVENANS/lisans tasiniyor",
-        "stok_provenans" in _KAPI,
-        "lisans kaydi tasinmiyor")
-kontrol("MEDYA-VIDEO-YOK ARTIK yalnizca HIC klip yoksa "
-        "(yeniden kullanim denemesinden SONRA)",
-        re.search(r"if _mevcut:[\s\S]{0,2600}MEDYA_VIDEO_YOK", _KAPI)
-        is not None,
-        "klip varken de sahne dusuyor")
-
+# ⚠ FAZ Y-5: UI-8'in "indirilmis klibi yeniden kullan" son caresi KALDIRILDI.
+# Gerekce: global "ayni kaynak <= 8 sn" tavanini MATEMATIKSEL OLARAK
+# deliyordu (tavan 8.0 sn, sahne suresi ~5.5-7 sn; ayni klip iki sahnede
+# ~11-14 sn eder). Olcum: yol son iki gercek iste HIC devreye girmedi.
+# Bu blok artik yolun GERI GELMEDIGINI kilitler; asil sozlesme
+# test_faz_y5.py'de.
+kontrol("Y-5: yeniden kullanim yolu geri GELMEDI",
+        "UI8-SURE-KORUNDU" not in _P,
+        "yeniden kullanim geri gelmis — global tavan riski")
+kontrol("Y-5: deterministik modulo secimi YOK",
+        "_mevcut[n % len(_mevcut)]" not in _P)
+kontrol("Y-5: video bulunamayan sahne MEDYA-VIDEO-YOK ile bos kalir",
+        "MEDYA_VIDEO_YOK" in _KAPI and "return None" in _KAPI)
 
 blok("UI-8/3 — VIDEO-ONLY AKISTA MAGNIFIC CAGRISI YOK")
 
