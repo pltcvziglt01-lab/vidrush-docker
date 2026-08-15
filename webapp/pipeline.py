@@ -292,18 +292,136 @@ SFX_ISLEV = {
 }
 SFX_SEYREKLIK = float(os.environ.get("SFX_SEYREKLIK", "0.75"))   # ayni islevde bile hepsine degil
 
+# ─────────────────── FAZ Y-14 — GERCEK SIDECHAIN DUCKING ───────────────────
+# ⚠ OLCULEN KUSUR (`Y14-DUCKING-FILTRE-YOK`): `grep -rn sidechaincompress
+#   webapp/` SIFIR eslesme veriyordu. "Ducking" hicbir ffmpeg zincirinde
+#   YOKTU:
+#     · `sfx_bindir` SFX'i anlatinin uzerine duz `amix=normalize=0` ile
+#       bindiriyordu; anlati bastirilmiyor, efekt anlatinin UZERINE biniyordu.
+#     · `editor/ses.py` `ducking_zarfi` yalnizca bir PLAN nesnesiydi; hicbir
+#       komuta donusmuyordu.
+#     · `stil_profili` her profil icin `ducking_db` beyan ediyordu (-4…-12);
+#       bu deger HICBIR filtreye ulasmiyordu (sessiz kalite kaybi).
+#     · `gercek_qa` durustce `{"olculdu": False}` donuyordu ama hukumsuzdu.
+# ⚠ OLCULEN KUSUR (`Y14-SFX-OLCUM-KAYIP`): bindirilen SFX sayisi YALNIZCA
+#   stderr'e basiliyordu; hicbir olcum sozlugune yazilmiyordu.
+SFX_DUCKING_DB = float(os.environ.get("SFX_DUCKING_DB", "-9.0"))
+KOD_SFX_DIZIN_YOK = "SFX-DIZIN-YOK"
+KOD_SFX_BINDIRME_BASARISIZ = "SFX-BINDIRME-BASARISIZ"
+KOD_SFX_NOKTA_YOK = "SFX-NOKTA-YOK"
 
-def sfx_bindir(video: str, sahneler: list, is_dizini: str) -> str:
-    """Sahne baslangiclarina ses efekti bindirir. Basarisiz olursa GIRDIYI aynen dondurur
-    (video asla kaybolmaz).
 
-    Neden seyrek: olculen referans kanallarda her kesmede ses yok; her kesmeye ses koymak
-    "tik-tak" eden amatör bir is cikarir. Islev eslesen sahnelerin %75'ine, ve ust uste
-    iki sahneye konmaz.
+def _sfx_sure_oku(yol: str) -> float:
+    """SFX dosyasinin GERCEK suresi (ffprobe). Okunamazsa 0.0."""
+    try:
+        r = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=nw=1:nk=1", yol],
+            capture_output=True, text=True, timeout=20)
+        return float((r.stdout or "0").strip() or 0.0)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return 0.0
+
+
+def _ducking_orani(ducking_db: float) -> float:
+    """Hedef bastirma derinliginden `sidechaincompress` orani.
+
+    ⚠ Yaklasik ve BELGELI: esik -26 dBFS civarinda, anlati tepe seviyesi
+    esigi ~`d` dB asiyor kabul edilir; `ratio` buna gore secilir. Deger
+    UYDURMA degil, uygulanan parametredir — zarf bunu raporlar.
     """
+    d = abs(float(ducking_db or 0.0))
+    if d <= 0:
+        return 1.0
+    return round(min(20.0, max(1.5, 1.0 + d * 0.9)), 2)
+
+
+def sfx_filtre_kur(parcalar: list, *, ducking_db: float = None) -> dict:
+    """SFX + GERCEK ducking filtre zincirini kur. ⚠ ffmpeg CALISTIRMAZ.
+
+    Zincir:
+      [0:a]asplit -> anlati (mikse) + anlati (sidechain ANAHTARI)
+      [n:a]adelay -> her SFX kendi baslangicina
+      SFX'ler amix -> TEK bir SFX katmani
+      [sfx][anahtar]sidechaincompress -> anlati konusurken SFX BASTIRILIR
+      [anlati][sfx_duck]amix -> nihai [mix]
+
+    ⚠ Saf fonksiyon: testler ffmpeg/medya olmadan zinciri dogrulayabilir.
+    """
+    db = SFX_DUCKING_DB if ducking_db is None else float(ducking_db)
+    if not parcalar:
+        return {"filtre": [], "ducking_db": db, "parametreler": {}}
+    oran = _ducking_orani(db)
+    par = {"threshold": 0.05, "ratio": oran, "attack": 5, "release": 250,
+           "makeup": 1, "level_sc": 1}
+    filt = ["[0:a]asplit=2[anlati][anahtar]"]
+    etiketler = []
+    for n, (bas, _y) in enumerate(parcalar, start=1):
+        ms = int(round(float(bas) * 1000))
+        etiketler.append(f"[s{n}]")
+        filt.append(f"[{n}:a]adelay={ms}|{ms},volume=0.8[s{n}]")
+    if len(parcalar) == 1:
+        filt.append("[s1]anull[sfx]")
+    else:
+        filt.append(f"{''.join(etiketler)}amix=inputs={len(parcalar)}"
+                    f":duration=longest:dropout_transition=0:normalize=0[sfx]")
+    filt.append(
+        f"[sfx][anahtar]sidechaincompress=threshold={par['threshold']}"
+        f":ratio={par['ratio']}:attack={par['attack']}:release={par['release']}"
+        f":makeup={par['makeup']}:level_sc={par['level_sc']}[sfxduck]")
+    filt.append("[anlati][sfxduck]amix=inputs=2:duration=first"
+                ":dropout_transition=0:normalize=0[mix]")
+    return {"filtre": filt, "ducking_db": db, "parametreler": par}
+
+
+def sfx_zarfi_kur(parcalar: list, *, ducking_db: float = None,
+                  sure_okuyucu=None) -> list:
+    """UYGULANAN ducking zarfi: `[(bas_sn, bit_sn, db), ...]`.
+
+    ⚠ UYDURMA YOK: her aralik gercekten bindirilen bir SFX'in baslangici ve
+    OLCULEN suresidir. Sure okunamazsa (0) o aralik YAZILMAZ — "olculemedi"
+    bir aralik uretmez.
+    ⚠ `db` UYGULANAN filtre derinligidir; akustik olcum iddiasi DEGILDIR.
+    """
+    db = SFX_DUCKING_DB if ducking_db is None else float(ducking_db)
+    oku = sure_okuyucu or _sfx_sure_oku
+    zarf = []
+    for bas, yol in (parcalar or []):
+        sure = float(oku(yol) or 0.0)
+        if sure <= 0:
+            continue
+        zarf.append((round(float(bas), 3), round(float(bas) + sure, 3), db))
+    return zarf
+
+
+def sfx_bindir(video: str, sahneler: list, is_dizini: str, *,
+               ducking_db: float = None, sure_okuyucu=None) -> tuple:
+    """Sahne baslangiclarina ses efekti bindirir + GERCEK ducking uygular.
+
+    Doner: `(video_yolu, olcum)`.
+    ⚠ Y14-SFX-OLCUM-KAYIP: sayac artik yalnizca stderr'e degil, `olcum`
+    sozlugune yazilir; `gercek_qa` ducking zarfini oradan alir.
+    ⚠ Basarisiz olursa GIRDIYI aynen dondurur (video asla kaybolmaz) ve
+    `olculdu: False` + STABIL KOD yazar — sessiz atlama YOK.
+
+    Neden seyrek: olculen referans kanallarda her kesmede ses yok; her kesmeye
+    ses koymak "tik-tak" eden amatör bir is cikarir. Islev eslesen sahnelerin
+    %75'ine, ve ust uste iki sahneye konmaz.
+    """
+    db = SFX_DUCKING_DB if ducking_db is None else float(ducking_db)
+
+    def _bos(kod, **ek):
+        d = {"bindirilen": 0, "olculdu": False, "kod": kod,
+             "ducking_zarfi": [], "ducking_db": db, "islev_dagilimi": {}}
+        d.update(ek)
+        return video, d
+
     if not sahneler:
-        return video
-    parcalar, t, onceki_var = [], 0.0, False
+        return _bos(KOD_SFX_NOKTA_YOK, neden="sahne yok")
+    if not os.path.isdir(SFX_DIR):
+        return _bos(KOD_SFX_DIZIN_YOK, neden=f"SFX_DIR yok: {SFX_DIR}")
+
+    parcalar, dagilim, t, onceki_var = [], {}, 0.0, False
     for i, sh in enumerate(sahneler):
         islev = str(sh.get("islev") or "")
         ad = SFX_ISLEV.get(islev, "")
@@ -312,34 +430,51 @@ def sfx_bindir(video: str, sahneler: list, is_dizini: str) -> str:
         if (ad and i > 0 and not onceki_var and os.path.exists(yol)
                 and (i * 7919 % 100) / 100.0 < SFX_SEYREKLIK):
             parcalar.append((t, yol))
+            dagilim[islev] = dagilim.get(islev, 0) + 1
             onceki_var = True
         else:
             onceki_var = False
         t += float(sh.get("sure") or 0)
     if not parcalar:
-        return video
+        return _bos(KOD_SFX_NOKTA_YOK, neden="islev eslesen sahne yok")
+
     parcalar = parcalar[:40]        # filter_complex girdi sinirini asmamak icin
     girdi = ["-i", video]
     for _, y in parcalar:
         girdi += ["-i", y]
-    filt = []
-    etiketler = []
-    for n, (bas, _) in enumerate(parcalar, start=1):
-        etiketler.append(f"[s{n}]")
-        filt.append(f"[{n}:a]adelay={int(bas * 1000)}|{int(bas * 1000)},volume=0.8[s{n}]")
-    filt.append(f"[0:a]{''.join(etiketler)}amix=inputs={len(parcalar) + 1}"
-                f":duration=first:dropout_transition=0:normalize=0[mix]")
+    _z = sfx_filtre_kur(parcalar, ducking_db=db)
     cikti = os.path.join(is_dizini, "sesli.mp4")
-    r = subprocess.run(
-        ["ffmpeg", "-y", "-loglevel", "error"] + girdi
-        + ["-filter_complex", ";".join(filt), "-map", "0:v", "-map", "[mix]",
-           "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", cikti],
-        capture_output=True, text=True, timeout=1800)
-    if r.returncode != 0 or not os.path.exists(cikti) or os.path.getsize(cikti) < 1024:
-        print(f"  sfx bindirme basarisiz: {r.stderr[-200:]}", file=sys.stderr)
-        return video
-    print(f"  ses efekti: {len(parcalar)} nokta bindirildi", file=sys.stderr)
-    return cikti
+    try:
+        r = subprocess.run(
+            ["ffmpeg", "-y", "-loglevel", "error"] + girdi
+            + ["-filter_complex", ";".join(_z["filtre"]),
+               "-map", "0:v", "-map", "[mix]",
+               "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
+               cikti],
+            capture_output=True, text=True, timeout=1800)
+    except (OSError, subprocess.SubprocessError) as e:
+        return _bos(KOD_SFX_BINDIRME_BASARISIZ,
+                    neden=f"{type(e).__name__}: {str(e)[:120]}")
+    if r.returncode != 0 or not os.path.exists(cikti) \
+            or os.path.getsize(cikti) < 1024:
+        print(f"  {KOD_SFX_BINDIRME_BASARISIZ}: {r.stderr[-200:]}",
+              file=sys.stderr)
+        return _bos(KOD_SFX_BINDIRME_BASARISIZ, neden=r.stderr[-160:])
+
+    zarf = sfx_zarfi_kur(parcalar, ducking_db=db, sure_okuyucu=sure_okuyucu)
+    print(f"  ses efekti: {len(parcalar)} nokta bindirildi, "
+          f"ducking {db:.1f} dB (sidechaincompress ratio="
+          f"{_z['parametreler']['ratio']}), zarf={len(zarf)} aralik",
+          file=sys.stderr)
+    return cikti, {
+        "bindirilen": len(parcalar),
+        "olculdu": True,
+        "kod": "",
+        "islev_dagilimi": dagilim,
+        "ducking_db": db,
+        "ducking_parametreleri": _z["parametreler"],
+        "ducking_zarfi": zarf,
+    }
 
 
 CIKTI_DIR = os.environ.get("CIKTI_DIR", os.path.join(KOK_YOL, "webapp", "ciktilar"))
@@ -5163,11 +5298,18 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # ALTINDA kalmali; ustune cikarsa amatör durur.
     # Efekt HER kesmeye konmaz — referans kanallarda da yok. Anlatim islevine bagli
     # ve seyrek: vurgu -> impact, liste -> kisa whoosh, gecmis -> projektor, sonuc -> riser.
-    if os.path.isdir(SFX_DIR):
-        try:
-            ham = sfx_bindir(ham, props_sahneler, is_dizini)
-        except Exception as e:
-            print(f"  sfx atlandi: {str(e)[:150]}", file=sys.stderr)
+    # ⚠ FAZ Y-14: `sfx_bindir` artik (video, olcum) doner. Olcum ducking
+    # zarfini tasir ve render sonrasi ses olcumune GECIRILIR — eskiden
+    # bindirilen SFX sayisi yalnizca stderr'e basiliyordu (Y14-SFX-OLCUM-KAYIP).
+    _sfx_olcum = {"bindirilen": 0, "olculdu": False,
+                  "kod": KOD_SFX_DIZIN_YOK, "ducking_zarfi": []}
+    try:
+        ham, _sfx_olcum = sfx_bindir(ham, props_sahneler, is_dizini)
+    except Exception as e:
+        _sfx_olcum = {"bindirilen": 0, "olculdu": False,
+                      "kod": KOD_SFX_BINDIRME_BASARISIZ,
+                      "ducking_zarfi": [], "neden": str(e)[:150]}
+        print(f"  sfx atlandi: {str(e)[:150]}", file=sys.stderr)
 
     bildir("Ses seviyesi ayarlanıyor...", 96)
     son_video = os.path.join(CIKTI_DIR, f"{is_adi}.mp4")
@@ -5439,13 +5581,15 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                 provenans_okuyucu=kaynak.stok_provenans_al,
                 olgu_raporu=_fact_rapor),
             jl_raporu=_jl_rapor or None,
-            artefakt_sha256=_artefakt_ozet)
+            artefakt_sha256=_artefakt_ozet,
+            ducking_zarfi=(_sfx_olcum or {}).get("ducking_zarfi"))
         if isinstance(_render_qa, dict):
             _render_qa["ses"] = _ses_son
             _olc = _render_qa.get("olcumler")
             if isinstance(_olc, dict):
                 _olc["ses"] = _ses_son
         sonuc["artefakt_sha256"] = _artefakt_ozet
+        sonuc["sfx"] = dict(_sfx_olcum or {})
         print(f"  RENDER-SONRASI SES (nihai artefakt): "
               f"olculdu={_ses_son.get('olculdu')} "
               f"J/L={_ses_son.get('j_l_cut')} tam={_ses_son.get('tam')} "
