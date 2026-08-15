@@ -5401,6 +5401,65 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
         # QA HATTI COKERTMEZ — video yine teslim edilir, ama PASS DENMEZ.
         print(f"  QA kopru hatasi: {str(e)[:120]}", file=sys.stderr)
         sonuc["qa"] = {"durum": "OLCULEMEDI", "not": str(e)[:160]}
+
+    # ── FAZ Y-13b / Y13B-OLCUM-RENDER-SONRASI — SES KURGUSU OLCUMU ──
+    # ⚠ OLCULEN KUSUR: `gercek_qa.olc` (yukarida) RENDER'DAN ONCE kosar —
+    # kapsam/provenans icin bu DOGRUDUR (R-1d-e). Ama J/L-cut RENDER
+    # SIRASINDA uretilir; eski kod onu `hizli_render._JL_SON` modul
+    # global'inden okuyordu ve o an deger HENUZ YAZILMAMISTI. Teslim
+    # raporundaki `ses.j_l_cut` hicbir zaman o ise ait degildi.
+    #
+    # ⚠ Y13B-DAMGA-SON-ARTEFAKT (denetim, 15 Agu): olcumu render'in hemen
+    # ardina koymak da YETMEZ. `ham` dosyasi bu noktadan sonra EN AZ UC KEZ
+    # yeniden yaziliyor:
+    #     1. `sfx_bindir`            (SFX bindirme)
+    #     2. ses normalizasyonu       -> `son_video`
+    #     3. `qa_kopru.denetle`       (ses remaster'i dosyayi YERINDE ezer)
+    # Bu yuzden damga BU NOKTADA, yani TUM post islemler bittikten sonra,
+    # GERCEKTEN TESLIM EDILECEK `son_video` uzerinde yenilenir. Aksi halde
+    # kabul degerlendiricisinin karsilastirdigi sha256, indirilen MP4'un
+    # ozetiyle TUTMAZ ve olcum sessizce baska bir dosyaya ait olur.
+    # ⚠ Video akisi bu adimlarda YENIDEN KODLANMAZ (`-c:v copy`), yani
+    # kesme yapisi ve J/L sayisi DEGISMEZ; degisen yalnizca kapsayici ve
+    # ses akisidir. Damga bu yuzden yenilenebilir — sayi yeniden uretilmez,
+    # yalnizca NIHAI artefakta yeniden BAGLANIR.
+    try:
+        import gercek_qa as _gq_son
+        _jl_rapor, _artefakt_ozet = {}, ""
+        if hizli_ok:
+            import hizli_render as _hr_son
+            # ⚠ NIHAI dosyaya yeniden damgala; basarisizsa rapor damgasiz
+            # kalir ve olcum "olculmedi" doner (fail-closed).
+            _hr_son.jl_damgala(is_adi, son_video)
+            _jl_rapor = _hr_son.jl_raporu(is_adi)
+            _artefakt_ozet = str(_jl_rapor.get("artefakt_sha256") or "")
+        _ses_son = _gq_son.ses_kurgu_olcumu(
+            _gq_son.sahneleri_cevir(
+                props_sahneler, kok_dizin=PUBLIC,
+                provenans_okuyucu=kaynak.stok_provenans_al,
+                olgu_raporu=_fact_rapor),
+            jl_raporu=_jl_rapor or None,
+            artefakt_sha256=_artefakt_ozet)
+        if isinstance(_render_qa, dict):
+            _render_qa["ses"] = _ses_son
+            _olc = _render_qa.get("olcumler")
+            if isinstance(_olc, dict):
+                _olc["ses"] = _ses_son
+        sonuc["artefakt_sha256"] = _artefakt_ozet
+        print(f"  RENDER-SONRASI SES (nihai artefakt): "
+              f"olculdu={_ses_son.get('olculdu')} "
+              f"J/L={_ses_son.get('j_l_cut')} tam={_ses_son.get('tam')} "
+              f"sha={_artefakt_ozet[:12] or '-'} "
+              f"kod={_ses_son.get('kod') or '-'}", file=sys.stderr)
+    except Exception as e:                                   # noqa: BLE001
+        # ⚠ Olcum patlarsa PASS DENMEZ: alan acikca "olculemedi" kalir.
+        if isinstance(_render_qa, dict):
+            _render_qa["ses"] = {
+                "olculdu": False, "tam": False,
+                "kod": "GERCEK-TIMELINE-JL-OLCULMEDI",
+                "neden": f"{type(e).__name__}: {str(e)[:120]}"}
+        print(f"  RENDER-SONRASI SES olculemedi: {type(e).__name__}",
+              file=sys.stderr)
         sonuc["dususler"].append({
             "asama": "qa", "neden": f"{type(e).__name__}",
             "etki": "Kalite ölçümü yapılamadı; PASS olduğu varsayılmıyor."})

@@ -24,6 +24,8 @@ import math
 import shutil
 import subprocess
 import tempfile
+import hashlib      # Faz Y-13b: J/L raporunu artefaktin sha256'sina baglar
+import threading    # Faz Y-13b: rapor sayaci iki isci arasinda korunur
 
 import katman_olcum   # Faz R-1d-h: siyah/donmus kare katman atfi
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -571,8 +573,143 @@ def _kadraj_vf(kod: int, indeks: int) -> str:
 # SINIRLI: 0.12 x 3 = 0.36 sn < `POST-OLU-FINAL` esigi 0.5 sn.
 JL_OFFSET_SN = float(os.environ.get("JL_OFFSET_SN", "0.12"))
 JL_MAKS = int(os.environ.get("JL_MAKS", "3"))
-# Uretilen gercek J/L-cut sayisi — `gercek_qa` OLCUM olarak okur.
-_JL_SON = {"sayi": 0, "offset_sn": JL_OFFSET_SN}
+
+# ─────────────────── FAZ Y-13b — GERCEK J/L RAPORU ───────────────────
+# ⚠ OLCULEN KUSUR 1 (`Y13B-SAYAC-EZILIYOR`): eski kod
+#       _JL_SON["sayi"] = jl_sayisi[0]
+#   bir ATAMAYDI ve `jl_sayisi` her `_xfade_zincir` CAGRISINDA sifirdan
+#   basliyordu. 12'den uzun isler obek obek render edilir ve SON cagri
+#   obek birlestirmesidir (`_xfade_zincir(obekler, birlesik)`,
+#   `sahne_dilimi=None`); orada hicbir J/L secilemez -> sayac 0'a EZILIR.
+#   Yani 12'den uzun HER iste uretim J/L yapmis olsa bile rapor 0'di.
+# ⚠ OLCULEN KUSUR 2 (`Y13B-KOTA-OBEK-BASINA`): `JL_MAKS` her cagrida
+#   yeniden uygulaniyordu; 3 obekli bir iste 9 J/L uretilebilirdi. Oysa
+#   kotanin gerekcesi SES KAYBI BUTCESIDIR (0.12 x 3 = 0.36 sn <
+#   `POST-OLU-FINAL` esigi 0.5 sn) ve o butce IS BASINADIR.
+# ⚠ OLCULEN KUSUR 3 (`Y13B-ARTEFAKT-BAGI-YOK`): sayac hicbir dosyaya
+#   bagli degildi; hangi MP4'un olcusu oldugu bilinmiyordu ve surec omurlu
+#   global oldugu icin baska bir isin degeri kanit yerine geciyordu.
+#
+# ⚠ SOZLESME: rapor DAMGALANMADAN "olculdu" SAYILMAZ. `gercek_qa` (Y-13a)
+# damgasiz ya da baska artefakta ait raporu zaten reddeder.
+# ⚠ OLCULEN KUSUR 4 (`Y13B-TEK-GLOBAL-IZOLASYONSUZ`, denetim 15 Agu):
+#   Ilk yazimda rapor TEK bir modul sozluguydu ve yalnizca bir `Lock` ile
+#   korunuyordu. Kilit ATOMIKLIK verir, IZOLASYON vermez: `server.py`
+#   `ISCI_SAYISI` VARSAYILANI 2'dir, yani iki is AYNI ANDA kosar. A isi
+#   `jl_sifirla` yapip kaydederken B isi `jl_sifirla` yaparsa A'nin sayaci
+#   SIFIRLANIR; B damgalarsa A'nin raporu B'nin MP4'une baglanir.
+#   Bu, `_JL_SON`'un cozmeye calistigi kontaminasyonun ta kendisidir.
+# ⚠ COZUM: rapor IS ANAHTARLI (job-scoped) bir kayit defterinde tutulur.
+#   Her cagri `is_adi` ister; bilinmeyen is icin FAIL-CLOSED bos rapor
+#   doner. Kayit defteri sinirlidir (bellek sizintisi yok).
+_JL_KAYIT: dict = {}
+_JL_KILIT = threading.Lock()
+JL_KAYIT_TAVANI = 32          # es zamanli is sayisinin cok ustunde
+
+
+def _jl_bos(is_adi: str = "") -> dict:
+    return {"is_adi": str(is_adi or ""), "sayi": 0,
+            "offset_sn": JL_OFFSET_SN, "sinir_farklari_sn": [],
+            "artefakt_sha256": "", "kaynak": "", "olculdu": False}
+
+
+def _dosya_ozeti(yol: str) -> str:
+    """Dosyanin sha256'si. Okunamazsa bos string (fail-closed)."""
+    try:
+        h = hashlib.sha256()
+        with open(yol, "rb") as f:
+            for blok in iter(lambda: f.read(1 << 20), b""):
+                h.update(blok)
+        return h.hexdigest()
+    except OSError:
+        return ""
+
+
+def jl_sifirla(is_adi: str) -> None:
+    """Is BASINDA cagrilir. ⚠ YALNIZCA o isin kaydi temizlenir; baska
+    isin sayaci/damgasi ETKILENMEZ."""
+    k = str(is_adi or "")
+    with _JL_KILIT:
+        if len(_JL_KAYIT) >= JL_KAYIT_TAVANI and k not in _JL_KAYIT:
+            # En eski kaydi dusur (bellek sinirli, sessiz buyume yok).
+            _JL_KAYIT.pop(next(iter(_JL_KAYIT)), None)
+        _JL_KAYIT[k] = _jl_bos(k)
+
+
+def jl_kota_kalan(is_adi: str) -> int:
+    """Bu ISTE kalan J/L kotasi. ⚠ Obek basina DEGIL, is basina."""
+    with _JL_KILIT:
+        r = _JL_KAYIT.get(str(is_adi or ""))
+        return max(0, JL_MAKS - int(r["sayi"])) if r else 0
+
+
+def jl_kaydet(is_adi: str, sayi: int, sinir_farklari=None) -> None:
+    """Uretilen J/L'leri BIRIKTIR. ⚠ EZMEZ (`+=`, `=` degil).
+
+    ⚠ Bilinmeyen is icin HICBIR SEY yazilmaz (sessiz global kirlenme yok).
+    """
+    n = max(0, int(sayi or 0))
+    with _JL_KILIT:
+        r = _JL_KAYIT.get(str(is_adi or ""))
+        if r is None:
+            return
+        n = min(n, max(0, JL_MAKS - int(r["sayi"])))
+        r["sayi"] += n
+        r["sinir_farklari_sn"].extend(
+            [round(float(x), 3) for x in (sinir_farklari or [])][:n])
+
+
+def jl_damgala(is_adi: str, yol: str) -> bool:
+    """NIHAI artefakt uretildikten SONRA cagrilir.
+
+    Dosyanin sha256'sini ve `kaynak="render-sonrasi"` damgasini YALNIZCA
+    o isin kaydina yazar.
+    ⚠ Dosya yoksa/okunamazsa ya da is bilinmiyorsa damga YAZILMAZ ve rapor
+    "olculmedi" KALIR (fail-closed): olcum baglanamadiginda PASS uretilemez.
+    """
+    ozet = _dosya_ozeti(yol)
+    if not ozet:
+        print(f"  Y13B-ARTEFAKT-BAGI-YOK: J/L raporu damgalanamadi "
+              f"({is_adi}) -> olcum 'olculmedi' kalir", file=sys.stderr)
+        return False
+    with _JL_KILIT:
+        r = _JL_KAYIT.get(str(is_adi or ""))
+        if r is None:
+            return False
+        r["artefakt_sha256"] = ozet
+        r["kaynak"] = "render-sonrasi"
+        r["olculdu"] = True
+    return True
+
+
+def jl_damga_gecerli_mi(is_adi: str, yol: str) -> bool:
+    """Bu ISIN damgasi HALA `yol`daki dosyaya mi ait?
+
+    ⚠ Y13B-DAMGA-SON-ARTEFAKT: render'dan sonra SFX bindirme, ses
+    normalizasyonu ve QA ses remaster'i MP4'u YENIDEN YAZAR. Eski damga o
+    an BAYATLAR. Kabul degerlendiricisinin karsilastirdigi ozet, GERCEKTEN
+    INDIRILEN dosyanin ozeti olmak zorundadir.
+    """
+    with _JL_KILIT:
+        r = _JL_KAYIT.get(str(is_adi or ""))
+        ozet = str(r["artefakt_sha256"] or "") if r else ""
+        damgali = bool(r["olculdu"]) if r else False
+    if not damgali or not ozet:
+        return False
+    return _dosya_ozeti(yol) == ozet
+
+
+def jl_raporu(is_adi: str) -> dict:
+    """O ISIN raporunun KOPYASI.
+
+    ⚠ Damgalanmadan `olculdu` False'dur. ⚠ Bilinmeyen is icin BOS rapor
+    doner — baska bir isin degeri ASLA sizmaz.
+    """
+    with _JL_KILIT:
+        r = _JL_KAYIT.get(str(is_adi or ""))
+        d = dict(r) if r else _jl_bos(is_adi)
+    d["sinir_farklari_sn"] = list(d["sinir_farklari_sn"])
+    return d
 
 GECIS_SN_TAHMIN = 0.4       # HIZLI_GECIS_SN varsayilani (dip'i onune yerlestirmek icin)
 KARARTMA_DIP_SN = 0.24      # dip'in her yarisi
@@ -875,6 +1012,9 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
     sahneler = props.get("sahneler") or []
     if not sahneler:
         return False
+    # ⚠ FAZ Y-13b: J/L raporu IS BASINDA sifirlanir. Onceki isin sayaci
+    # (surec omurlu modul global'i) bu isin kaniti olarak KULLANILAMAZ.
+    jl_sifirla(is_adi)
     # KAPSAM KONTROLU: video sahneleri artik DESTEKLI (Sora klipleri/footage segment olur).
     # Sadece overlay basligi olan isler Remotion'a gider (kinetik baslik v1'de yok).
     # Overlay engeli KALDIRILDI (4 Agu 2026): drawtext ile ciziliyor.
@@ -975,6 +1115,11 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
             # cunku ic kapsamdan yazilacak; rapora (`_JL_SON`) tasinir ve
             # `gercek_qa` bunu OLCUM olarak okur (uydurmaz).
             jl_sayisi = [0]
+            # ⚠ FAZ Y-13b: bu cagrinin basindaki KALAN is kotasi ve uretilen
+            # gercek ses/goruntu sinir farklari (`ga - g`). Ikisi de cagri
+            # sonunda `jl_kaydet` ile BIRIKTIRILIR — EZILMEZ.
+            _kota_bas = jl_kota_kalan(is_adi)
+            jl_sinirlari = []
             for i, y in enumerate(yollar):
                 girdi += ["-i", y]
             for i in range(1, len(yollar)):
@@ -1013,10 +1158,16 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
                 # (`g > JL_OFFSET_SN + 0.02`) hard-cut'ta hic saglanmiyordu.
                 # Sayi `JL_MAKS` ile sinirli: her J/L ~offset kadar ses
                 # kaybi demek ve toplam olu final esiginin altinda kalmali.
+                # ⚠ FAZ Y-13b / Y13B-KOTA-OBEK-BASINA: kota IS BASINA.
+                # Eskiden `jl_sayisi[0] < JL_MAKS` her CAGRIDA sifirdan
+                # sayiyordu; 3 obekli bir iste 3xJL_MAKS J/L uretilebilir ve
+                # ses kaybi butcesi (0.36 sn < POST-OLU-FINAL 0.5 sn) sessizce
+                # asilirdi. `_kota_bas` bu cagrinin basindaki KALAN kotadir.
                 ga = g
-                if _jl and jl_sayisi[0] < JL_MAKS:
+                if _jl and jl_sayisi[0] < _kota_bas:
                     ga = round(g + JL_OFFSET_SN, 3)
                     jl_sayisi[0] += 1
+                    jl_sinirlari.append(round(ga - g, 3))
                 filt.append(f"[{son_v}][{i}:v]xfade=transition={tur}:duration={g:.3f}:"
                             f"offset={offset:.3f}[{vo}]")
                 filt.append(f"[{son_a}][{i}:a]acrossfade=d={ga:.3f}[{ao}]")
@@ -1027,7 +1178,12 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
             # KIRPILIR. Boylece sinir ayrisir ama senkron BOZULMAZ ve sona
             # sessizlik EKLENMEZ (apad kullanilmaz).
             _toplam_v = round(offset + sureler[-1], 3)
-            _JL_SON["sayi"] = jl_sayisi[0]
+            # ⚠ FAZ Y-13b / Y13B-SAYAC-EZILIYOR: eskiden burada
+            #     _JL_SON["sayi"] = jl_sayisi[0]
+            # yaziyordu — bir ATAMA. Obek birlestirmesi (`sahne_dilimi=None`)
+            # her zaman 0 uretir ve sayaci EZERDI; 12'den uzun her iste rapor
+            # yapisal olarak 0'di. Artik BIRIKTIRILIYOR.
+            jl_kaydet(is_adi, jl_sayisi[0], jl_sinirlari)
             if jl_sayisi[0]:
                 print(f"  Y6-JL-URETIM: {jl_sayisi[0]} gercek J/L-cut "
                       f"(ses siniri {JL_OFFSET_SN:.2f} sn ayristi)",
@@ -1138,7 +1294,15 @@ def ffmpeg_render(is_adi, props, hedef_mp4, ilerle=None):
                       f"-> hizli motor ciktisi TESLIM EDILMEZ",
                       file=sys.stderr)
                 return False
-            return _siyah_donmus_kapisi(yol)
+            if not _siyah_donmus_kapisi(yol):
+                return False
+            # ⚠ FAZ Y-13b / Y13B-ARTEFAKT-BAGI-YOK — J/L raporu ANCAK
+            # BURADA, teslim edilecek NIHAI dosya belli olduktan sonra
+            # damgalanir. Damgasiz rapor `gercek_qa` (Y-13a) tarafindan
+            # reddedilir; boylece "hangi videonun olcusu?" sorusu her zaman
+            # yanitlanabilir.
+            jl_damgala(is_adi, yol)
+            return True
 
         # ── 3) Altyazi (varsa tek gecişte ASS ile gomulur) ──
         stil = str(props.get("altyaziStil", "orta"))
