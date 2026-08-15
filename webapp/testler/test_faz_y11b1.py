@@ -613,6 +613,59 @@ kontrol("karar kodu belgelendi: Y11B1-IC-API",
                                encoding="utf-8").read())
 
 
+blok("Y-11b-1/2h — KAPSAYAN IDDIA BLOGU + SPAN IDDIA MI")
+
+# ⚠ OLCULEN KUSUR (`Y11B1-SABIT-PENCERE-KOR` + `Y11B1-SPAN-IDDIA-DEGIL`,
+# 558ad71 sonrasi denetim): dort in-scope baglam varyanti FAIL-OPEN'di.
+_UZAK = " " + ("industry background filler text here. " * 8)   # >160 karakter
+_VARYANT = (
+    ("(1) span KENDISI soru",
+     "Did the agency record 76,941 cases in 2024?",
+     "Did the agency record 76,941 cases in 2024?",
+     "Did the agency record 76,941 cases in 2024?\n",
+     FB.KOD_SPAN_IDDIA_DEGIL),
+    ("(2) 'FALSE: <quote>'", _PT.onerme, _PT.exact_quote,
+     "FALSE: " + _PT.exact_quote + ".\n", FB.KOD_CEVRE_CURUTUYOR),
+    ("(3) paragrafta 160+ karakter UZAKTA myth/debunk",
+     _PT.onerme, _PT.exact_quote,
+     _PT.exact_quote + "." + _UZAK
+     + "This widely shared myth was debunked last year.\n",
+     FB.KOD_CEVRE_CURUTUYOR),
+    ("(4) 'Officials rejected the claim that <quote>'",
+     _PT.onerme, _PT.exact_quote,
+     "Officials rejected the claim that " + _PT.exact_quote + ".\n",
+     FB.KOD_CEVRE_CURUTUYOR),
+)
+for _ad, _o, _a, _b, _bekle in _VARYANT:
+    _pv = _paket(_o, _a, belge=_b)
+    _rv = FB.allowlist_kur([_pv], belgeler={_pv.source_id: _b})
+    kontrol(f"RED: {_ad}", not _rv["allowlist"], f"{_rv}")
+    kontrol(f"{_ad}: stabil kod",
+            bool(_rv["redler"]) and _rv["redler"][0]["kod"] == _bekle,
+            f"{_rv['redler']}")
+    kontrol(f"{_ad}: olguya DONUSMEZ",
+            AK.paketlerden_olgular([_pv],
+                                   belgeler={_pv.source_id: _b}) == [])
+
+kontrol("CANONICAL true assertion HALA GECER",
+        bool(FB.allowlist_kur([_PT],
+                              belgeler={_PT.source_id: _TEMIZ})["allowlist"]))
+kontrol("cevre SABIT PENCERE ile sinirli DEGIL",
+        "CEVRE_PENCERE" not in open(os.path.join(KOK, "fact_baglama.py"),
+                                    encoding="utf-8").read(),
+        "sabit karakter penceresi hala otorite")
+kontrol("kapsayan blok paragraf temelli",
+        FB.kapsayan_blok(_PT.exact_quote,
+                         "alakasiz paragraf.\n\n" + _TEMIZ).startswith("in 2024"),
+        f"{FB.kapsayan_blok(_PT.exact_quote, _TEMIZ)!r}")
+kontrol("karar kodu belgelendi: Y11B1-SABIT-PENCERE-KOR",
+        "Y11B1-SABIT-PENCERE-KOR" in open(
+            os.path.join(KOK, "fact_baglama.py"), encoding="utf-8").read())
+kontrol("karar kodu belgelendi: Y11B1-SPAN-IDDIA-DEGIL",
+        "Y11B1-SPAN-IDDIA-DEGIL" in open(
+            os.path.join(KOK, "fact_baglama.py"), encoding="utf-8").read())
+
+
 blok("Y-11b-1/3 — allowlist_kur TEK OTORITE")
 
 _agac = ast.parse(_AKK)

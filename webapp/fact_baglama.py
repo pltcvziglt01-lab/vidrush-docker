@@ -88,6 +88,10 @@ KOD_KIMLIK_UYUMSUZ = "FACT-KIMLIK-ICERIKTEN-TUREMIYOR"
 # curutuyor olabilir ("It is false that ...", "VERDICT: FALSE", "myth",
 # "debunked", "retracted", "disputed").
 KOD_CEVRE_CURUTUYOR = "FACT-SPAN-CEVRESI-CURUTUYOR"
+# ⚠ `Y11B1-SPAN-IDDIA-DEGIL`: span'in KENDISI iddia olmayabilir — soru
+# cumlesi ("Did the agency record ...?") TAM ESITLIK sozlesmesini gecer
+# ama HICBIR SEY ONERMEZ.
+KOD_SPAN_IDDIA_DEGIL = "FACT-SPAN-IDDIA-DEGIL"
 
 KODLAR = (KOD_KANIT_EKSIK, KOD_KANIT_BAYAT, KOD_KANIT_ALINAMADI,
           KOD_STANCE_DESTEK_DEGIL, KOD_CELISKI, KOD_BILESIK_CLAIM,
@@ -97,7 +101,7 @@ KODLAR = (KOD_KANIT_EKSIK, KOD_KANIT_BAYAT, KOD_KANIT_ALINAMADI,
           KOD_GROUNDED_BOLUM_KAPSAMI, KOD_ENTAIL_YENI_DEGER,
           KOD_ENTAIL_ILGISIZ, KOD_STATUS_ACCEPTED_DEGIL,
           KOD_ONERME_QUOTE_UYUMSUZ, KOD_REFUTE_COZULMEDI,
-          KOD_KIMLIK_UYUMSUZ, KOD_CEVRE_CURUTUYOR)
+          KOD_KIMLIK_UYUMSUZ, KOD_CEVRE_CURUTUYOR, KOD_SPAN_IDDIA_DEGIL)
 
 # ⚠ Cozulemeyen getirme imzalari — hicbiri FALLBACK uretmez.
 _COZULEMEYEN = ("403", "401", "paywall", "subscribe", "javascript", "js",
@@ -188,35 +192,72 @@ def onerme_quote_uyumu(onerme: str, exact_quote: str,
 
 # Iddia CEVRESINDE gorulurse span'i CURUTEN isaretler.
 _CEVRE_CURUTEN = (
-    "it is false", "is false", "verdict: false", "verdict false", "myth",
-    "debunked", "retracted", "disputed", "denied", "denies", "hoax",
-    "misleading", "unfounded", "no evidence", "rumor", "rumour",
-    "yalanla", "asilsiz", "iddia edildi", "soylenti", "dogrulanmadi",
-    "yalan", "curutuldu", "geri cekildi",
+    "it is false", "is false", "false", "verdict", "myth", "debunk",
+    "retracted", "disputed", "denied", "denies", "deny", "hoax",
+    "misleading", "unfounded", "baseless", "no evidence", "rumor", "rumour",
+    "untrue", "not true", "fake", "reject", "alleged", "allegedly",
+    "purported", "claim that", "claimed that", "yalanla", "asilsiz",
+    "iddia edildi", "iddiasi", "soylenti", "dogrulanmadi", "yalan",
+    "curutuldu", "geri cekildi", "reddetti", "reddedildi",
 )
-CEVRE_PENCERE = 160          # quote'un ONUNDE/ARDINDA taranan karakter
+# ⚠ OLCULEN KUSUR (`Y11B1-SABIT-PENCERE-KOR`, commit-sonrasi denetim):
+# ±160 karakterlik SABIT pencere, ayni paragrafta quote'tan 160+ karakter
+# UZAKTA duran "this myth was debunked" cumlesini GOREMIYORDU. Cevre artik
+# karakter sayisiyla degil, quote'u KAPSAYAN IDDIA BLOGU (paragraf) ile
+# tanimlanir; blok bulunamazsa fail-closed olarak TUM belge taranir.
+_PARAGRAF = re.compile(r"\n\s*\n")
+_CUMLE_SONU = ".?!"
+
+
+def kapsayan_blok(exact_quote: str, belge_metni: str) -> str:
+    """Quote'u KAPSAYAN iddia blogu (paragraf). Bulunamazsa TUM belge."""
+    from arastirma import factpacket as _fp
+    q = _fp.normalize(exact_quote)
+    for parca in _PARAGRAF.split(str(belge_metni or "")):
+        blok = _fp.normalize(parca)
+        if q and q in blok:
+            return blok
+    return _fp.normalize(belge_metni)
+
+
+def iddia_mi(metin: str) -> tuple:
+    """Metnin KENDISI bir iddia mi? `(iddia, neden)`.
+
+    ⚠ `Y11B1-SPAN-IDDIA-DEGIL`: soru cumlesi TAM ESITLIK sozlesmesini
+    gecer ama hicbir sey ONERMEZ; olgu havuzuna giremez.
+    """
+    from arastirma import factpacket as _fp
+    if "?" in _fp.normalize(metin):
+        return False, "metin SORU isareti tasiyor"
+    return True, ""
 
 
 def cevre_curutuyor_mu(exact_quote: str, belge_metni: str) -> tuple:
     """Quote'un BELGEDEKI CEVRESI onu curutuyor mu? `(curuk, kanit)`.
 
     ⚠ `Y11B1-SPAN-CEVRE-BAGLAMI`: TAM ESITLIK sozlesmesi bile span'in
-    CEVRESINI gormez. "It is false that <quote>" ya da "<quote> — VERDICT:
-    FALSE" biciminde bir belgede quote BIREBIR gecer ama iddia
-    DESTEKLENMEZ. Pencere fail-closed taranir.
+    CEVRESINI gormez. "It is false that <quote>", "FALSE: <quote>",
+    "Officials rejected the claim that <quote>" ya da paragrafin ilerisinde
+    duran "this myth was debunked" biciminde belgede quote BIREBIR gecer
+    ama iddia DESTEKLENMEZ. Kapsayan blok fail-closed taranir.
     """
     from arastirma import factpacket as _fp
     q, b = _fp.normalize(exact_quote), _fp.normalize(belge_metni)
-    i = b.find(q)
-    if i < 0:
+    if q not in b:
         return False, ""
-    on = b[max(0, i - CEVRE_PENCERE):i]
-    ard = b[i + len(q): i + len(q) + CEVRE_PENCERE]
-    # Soru cumlesi de iddia DEGILDIR.
-    if ard.lstrip().startswith("?"):
-        return True, "span bir SORU cumlesinin parcasi"
+    blok = kapsayan_blok(exact_quote, belge_metni)
+    i = blok.find(q)
+    if i < 0:
+        return True, "span kapsayan blokta cozulemedi"
+    # Quote'u tasiyan CUMLE soru ise iddia degildir.
+    kalan = blok[i + len(q):]
+    for ch in kalan:
+        if ch in _CUMLE_SONU:
+            if ch == "?":
+                return True, "span bir SORU cumlesinin parcasi"
+            break
     for cue in _CEVRE_CURUTEN:
-        if cue in on or cue in ard:
+        if cue in blok.replace(q, " "):
             return True, f"cevre isareti: {cue!r}"
     return False, ""
 
@@ -244,6 +285,12 @@ def kanit_replay_edilebilir_mi(paket, belge_metni: str = "") -> tuple:
         return False, KOD_KANIT_EKSIK, "source_id canonical_url ile TUTMUYOR"
     if str(getattr(paket, "stance", "")).lower() != "support":
         return False, KOD_STANCE_DESTEK_DEGIL, f"stance={paket.stance!r}"
+    # ⚠ OLCULEN KUSUR (`Y11B1-SPAN-IDDIA-DEGIL`, commit-sonrasi denetim):
+    # span'in KENDISI soru cumlesi olabilir; TAM ESITLIK gecer ama iddia yok.
+    for _alan in ("onerme", "exact_quote"):
+        _iddia, _n = iddia_mi(getattr(paket, _alan, ""))
+        if not _iddia:
+            return False, KOD_SPAN_IDDIA_DEGIL, f"{_alan}: {_n}"
     if bilesik_claim_mi(paket.onerme, paket.exact_quote):
         return False, KOD_BILESIK_CLAIM, "bilesik claim tek span destekliyor"
     # ⚠ ONERME kendi QUOTE'u tarafindan DESTEKLENMELI (uydurma rakam kapisi).
