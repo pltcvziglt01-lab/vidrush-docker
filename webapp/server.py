@@ -20,6 +20,7 @@ from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from PIL import Image
 
 import pipeline
+import fact_baglama  # Faz Y-11b / P0: STRICT grounded profil listesi (SAF modul)
 import anim_studyo
 import imzali_url
 import is_sozlesme   # Faz H: tek tip, geriye donuk uyumlu is sozlesmesi
@@ -689,11 +690,45 @@ def freepik_kota():
     }
 
 
+def _edit_gecerli(edit: str) -> str:
+    """Belgesel edit kimligini COZ. Bilinmeyen -> `VARSAYILAN_EDIT`.
+
+    ⚠ P0 (16 Agu 2026): STRICT grounded profilleri (`belgesel-arastirmaci`,
+    `bilim-anlatisi`) eski `EDIT_STILLERI` sozlugunde YOKTUR; bu yuzden
+    API onlari SESSIZCE varsayilana dusuruyordu ve kullanicinin grounded
+    SECME YOLU HIC YOKTU. Artik acikca kabul edilirler ve `pipeline.
+    profil_coz` onlari `stil_profili` kaydindan cozer.
+    """
+    e = (edit or "").strip()
+    if e in pipeline.EDIT_STILLERI or e in fact_baglama.STRICT_EDIT_PROFILLERI:
+        return e
+    return pipeline.VARSAYILAN_EDIT
+
+
 @app.get("/api/edit-stilleri")
 def edit_listesi():
-    return [{"id": k, "ad": v["ad"], "ozet": v["ozet"],
-             "sahne_sn": v["sahne_sn"], "footage_pct": v["footage_pct"]}
-            for k, v in pipeline.EDIT_STILLERI.items()]
+    liste = [{"id": k, "ad": v["ad"], "ozet": v["ozet"],
+              "sahne_sn": v["sahne_sn"], "footage_pct": v["footage_pct"],
+              "grounded": False}
+             for k, v in pipeline.EDIT_STILLERI.items()]
+    # ── STRICT GROUNDED PROFILLER — ACIKCA SECILEBILIR ──
+    # ⚠ Bu profillerde is FAIL-CLOSED'dir: dogrulanmis kaynak yoksa video
+    # URETILMEZ. Diger stiller best-effort'tur (kaynak varsa kullanilir).
+    for pid in fact_baglama.STRICT_EDIT_PROFILLERI:
+        try:
+            v = pipeline.profil_coz("documentary", pid)
+        except Exception:
+            continue
+        if not isinstance(v, dict) or not v.get("_stil_kimligi"):
+            continue          # kayitta yok -> UYDURMA giris URETILMEZ
+        liste.append({"id": pid, "ad": v.get("ad") or pid,
+                      "ozet": ((v.get("ozet") or "") +
+                               " — KAYNAK ZORUNLU: doğrulanmış olgu "
+                               "bulunamazsa video üretilmez.").strip(),
+                      "sahne_sn": v.get("sahne_sn"),
+                      "footage_pct": v.get("footage_pct"),
+                      "grounded": True})
+    return liste
 
 
 @app.get("/api/animasyon-stilleri")
@@ -1089,7 +1124,7 @@ async def profil_olustur(pid: str = Form(...), ad: str = Form(""),
     if mod == "animasyon":
         eid = edit if edit in pipeline.ANIMASYON_STILLERI else pipeline.VARSAYILAN_ANIM
     else:
-        eid = edit if edit in pipeline.EDIT_STILLERI else pipeline.VARSAYILAN_EDIT
+        eid = _edit_gecerli(edit)
     try:
         for dosya, hedef_ad in ((karakter, "karakter.png"), (stil, "stil.png")):
             if dosya is not None:
@@ -1199,7 +1234,7 @@ async def uret_baslat(istek: Request,
     elif mod == "hikaye":
         edit_id = edit if edit in pipeline.HIKAYE_STILLERI else pipeline.VARSAYILAN_HIKAYE
     else:
-        edit_id = edit if edit in pipeline.EDIT_STILLERI else pipeline.VARSAYILAN_EDIT
+        edit_id = _edit_gecerli(edit)
     try:
         # Sure tavani ture gore: hikaye kanali 60 dk, diger turler 14 dk (pipeline ile ayni)
         sd = max(0.3, min(60.0 if mod == "hikaye" else 14.0, float(sure_dk)))

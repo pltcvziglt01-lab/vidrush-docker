@@ -330,13 +330,17 @@ kontrol("saglikli fixture all-shot raporu TEMIZ",
         not _saglikli_shot["kod"]
         and _saglikli_shot["bagli"] == _saglikli_shot["hedef"] > 0,
         f"{_saglikli_shot}")
-_ok = fb.grounded_kapisi(mod="documentary", arastirma_calisti=True,
+# ⚠ P0 (`Y11B2-STRICT-VARSAYILAN`): STRICT sozlesme ACIKCA secilen
+# arastirma profilinde olculur; kapi kapsami (mod, edit_id) ciftidir.
+_ok = fb.grounded_kapisi(mod="documentary", edit_id="belgesel-arastirmaci",
+                         arastirma_calisti=True,
                          arastirma_hatasi="", allowlist=_izin,
                          cozulemeyen=0, bolum_kapsami={"c01": 2},
                          shot_raporu=_saglikli_shot)
 kontrol("saglikli grounded is GECER", _ok["gecti"] is True, f"{_ok}")
 kontrol("AYNI is shot raporu OLMADAN GECMEZ",
-        fb.grounded_kapisi(mod="documentary", arastirma_calisti=True,
+        fb.grounded_kapisi(mod="documentary", edit_id="belgesel-arastirmaci",
+                           arastirma_calisti=True,
                            arastirma_hatasi="", allowlist=_izin,
                            cozulemeyen=0, bolum_kapsami={"c01": 2},
                            shot_raporu=None)["kod"]
@@ -352,7 +356,8 @@ for ad, kw, kod in (
          fb.KOD_GROUNDED_KANIT_COZULEMEDI),
         ("bolum kapsami yetersiz", {"bolum_kapsami": {"c01": 0}},
          fb.KOD_GROUNDED_BOLUM_KAPSAMI)):
-    _arg = {"mod": "documentary", "arastirma_calisti": True,
+    _arg = {"mod": "documentary", "edit_id": "belgesel-arastirmaci",
+            "arastirma_calisti": True,
             "arastirma_hatasi": "", "allowlist": _izin,
             "cozulemeyen": 0, "bolum_kapsami": {"c01": 2}}
     _arg.update(kw)

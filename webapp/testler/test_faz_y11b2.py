@@ -274,7 +274,10 @@ _bos = FB.shot_fact_dogrula([], allowlist=IZIN)
 kontrol("bos shot listesi PASS DEGIL", bool(_bos["kod"]), f"{_bos}")
 kontrol("bos shot stabil kodu", _bos["kod"] == FB.KOD_SHOT_FACT_YOK,
         f"{_bos}")
-_ORTAK = dict(mod="documentary", arastirma_calisti=True, arastirma_hatasi="",
+# ⚠ P0 (`Y11B2-STRICT-VARSAYILAN`): kapi KAPSAMI artik (mod, edit_id)
+# ciftidir; STRICT sozlesme ACIKCA secilen arastirma profilinde olculur.
+_ORTAK = dict(mod="documentary", edit_id="belgesel-arastirmaci",
+              arastirma_calisti=True, arastirma_hatasi="",
               allowlist=IZIN, cozulemeyen=0, bolum_kapsami={"c1": 2})
 kontrol("shot raporu YOKSA kapi PASS VERMEZ",
         FB.grounded_kapisi(**_ORTAK, shot_raporu=None)["kod"]
@@ -375,10 +378,14 @@ def _say(ad, patla=True):
 
 
 def _kos(sonuc, sahneler, mod="documentary", *, on_kapi=True,
-         plan_gecerli=False):
+         plan_gecerli=False, edit_id="belgesel-arastirmaci"):
     """Hattin ONUNU sahteler, TUM downstream sinirlarini SAYAR.
 
     ⚠ try/finally ile her oznitelik ESKI HALINE geri konur.
+    ⚠ P0 (`Y11B2-STRICT-VARSAYILAN`): STRICT grounded sozlesmesi ACIKCA
+    secilen bir arastirma profiline baglidir. Bu dosya STRICT sozlesmeyi
+    dogruladigi icin varsayilan `edit_id` bir STRICT profildir; VARSAYILAN
+    belgeselin best-effort davranisi `test_faz_p0_grounded.py`de kilitli.
     """
     for k in _SAYAC:
         _SAYAC[k] = 0
@@ -408,7 +415,8 @@ def _kos(sonuc, sahneler, mod="documentary", *, on_kapi=True,
             _yaz(PL, "stil_analiz", lambda *a, **kw: {})
         try:
             asyncio.get_event_loop().run_until_complete(
-                PL.uret("y11b2_test", "konu metni", "", mod=mod, sure_dk=1))
+                PL.uret("y11b2_test", "konu metni", "", mod=mod,
+                        edit_id=edit_id, sure_dk=1))
             return ""
         except Exception as e:                               # noqa: BLE001
             return f"{e}"

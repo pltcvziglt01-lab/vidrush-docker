@@ -51,7 +51,23 @@ import secrets
 import types
 
 # ── Grounded (kaynak-temelli) modlar. Digerleri KAPSAM DISI. ──
+# ⚠ Bu tuple YALNIZCA "grounded UYGUN mod" demektir; TEK BASINA STRICT
+# fail-closed YETKISI DEGILDIR (bkz. `strict_grounded_mi`).
 GROUNDED_MODLAR = ("documentary",)
+
+# ── P0 (16 Agu 2026, CANLI OLCUM): STRICT GROUNDED ACIKCA SECILIR ──
+# ⚠ OLCULEN KUSUR (`Y11B2-STRICT-VARSAYILAN`): strict kapi YALNIZCA
+# `mod == "documentary"` kosuluna baglanmisti. Arayuzde/API'de grounded
+# SECIMI HIC YOKTU, yani belgesel secen HER kullanici — konusu arastirma
+# odakli olmasa da — fail-closed hatta dusuyordu. Canli sonuc: normal bir
+# belgesel isi `GROUNDED-FACT-YOK: kabul edilmis FactPacket YOK (0 yetkili
+# olgu)` ile medya/TTS/render'a HIC gecmeden oldu.
+# Karar: STRICT yalnizca ACIKCA arastirma sozu veren edit profillerinde
+# uygulanir. Digerleri BEST-EFFORT'tur: accepted FactPacket VARSA kullanilir,
+# yoksa is GORUNUR bir uyari ile kullanici metninden non-grounded surer.
+# ⚠ Bu bir GEVSETME DEGIL, KAPSAM TANIMIDIR: strict profilde sozlesmenin
+# TEK BIR MADDESI de gevsetilmedi (0 fact/hata/cozulemeyen kanit -> FAIL).
+STRICT_EDIT_PROFILLERI = ("belgesel-arastirmaci", "bilim-anlatisi")
 
 # Bir chapter'in tasimasi gereken en az KABUL EDILMIS fact sayisi.
 BOLUM_ASGARI_FACT = 1
@@ -843,10 +859,22 @@ def shot_fact_dogrula(shotlar, *, allowlist) -> dict:
             "kod": kod, "neden": neden}
 
 
+def strict_grounded_mi(mod, edit_id) -> bool:
+    """STRICT (fail-closed) grounded sozlesmesi BU IS icin gecerli mi?
+
+    ⚠ SAF: ag/dosya/env/rastgelelik YOK; yalnizca iki degerin fonksiyonu.
+    TEK KURAL: mod grounded UYGUN (`GROUNDED_MODLAR`) **VE** edit profili
+    ACIKCA arastirma sozu veren bir profil (`STRICT_EDIT_PROFILLERI`).
+    Digerleri BEST-EFFORT'tur (`P0-STRICT-VARSAYILAN`).
+    """
+    return (str(mod or "").strip() in GROUNDED_MODLAR
+            and str(edit_id or "").strip() in STRICT_EDIT_PROFILLERI)
+
+
 def grounded_kapisi(*, mod: str, arastirma_calisti: bool,
                     arastirma_hatasi: str, allowlist,
                     cozulemeyen: int = 0, bolum_kapsami=None,
-                    shot_raporu=None) -> dict:
+                    shot_raporu=None, edit_id: str = "") -> dict:
     """Grounded belgesel FAIL-CLOSED kapisi.
 
     ⚠ `Y11B-GROUNDED-FAIL-OPEN`: eski kapi `if _olgular:` blogunun
@@ -854,10 +882,15 @@ def grounded_kapisi(*, mod: str, arastirma_calisti: bool,
     kullanici metniyle SESSIZCE devam ediyordu.
     ⚠ Grounded OLMAYAN yaratici modlar KAPSAM DISIDIR: davranislari
     DEGISMEZ (`gecti=True, kapsam_disi=True`).
+    ⚠ P0 (`Y11B2-STRICT-VARSAYILAN`): STRICT olmayan belgesel de KAPSAM
+    DISIDIR — `edit_id` ACIKCA bir strict profil degilse kapi PASS verir
+    ve karar best-effort akisa birakilir. Kapsam ICINDEKI sozlesme
+    MADDELERI DEGISMEDI.
     """
-    if str(mod or "") not in GROUNDED_MODLAR:
+    if not strict_grounded_mi(mod, edit_id):
         return {"gecti": True, "kapsam_disi": True, "kod": "",
-                "neden": f"mod={mod!r} grounded degil"}
+                "neden": (f"mod={mod!r} edit={edit_id!r} STRICT grounded "
+                          f"degil")}
     izin = set(allowlist or ())
     if not arastirma_calisti:
         return {"gecti": False, "kapsam_disi": False,

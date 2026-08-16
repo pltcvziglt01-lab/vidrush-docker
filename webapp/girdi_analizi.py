@@ -42,6 +42,13 @@ try:
     import stil_profili
 except Exception:  # pragma: no cover - ortam sorunu
     stil_profili = None
+# ⚠ P0: STRICT (fail-closed) grounded profil listesinin TEK KAYNAGI.
+# Yuklenemezse liste BOS kalir ve oneri eskisi gibi verilir — bu modul
+# hicbir kosulda hatti cokertmez.
+try:
+    import fact_baglama
+except Exception:  # pragma: no cover - ortam sorunu
+    fact_baglama = None
 
 # Olculen TTS hizi (pipeline `veri/ses_hizi.json` ile kendini kalibre ediyor;
 # burada yalnizca SURE TAHMINI icin taban deger kullaniliyor)
@@ -300,10 +307,25 @@ def analiz(metin: str, *, kullanici_secimi: dict = None) -> dict:
     # oneri YAZILMAZ: aksi halde hicbir sinyali olmayan her is icin uretim
     # hattinin kendi varsayilanini sessizce baska bir profille degistirmis
     # olurduk. Emin degilsen karisma — eski davranis kalir.
-    if stil.get("kimlik") and stil.get("kaynak") in ("kullanici", "auto",
-                                                     "turetilmis"):
+    # ── P0 (16 Agu 2026): STRICT GROUNDED OTOMATIK SECILMEZ ──
+    # ⚠ `belgesel-arastirmaci` / `bilim-anlatisi` FAIL-CLOSED profillerdir:
+    # dogrulanmis kaynak yoksa video URETILMEZ. Bu, kullanicinin ACIKCA
+    # istemesi gereken bir tavizdir; konsept tahmininden OTOMATIK atanirsa
+    # normal belgesel isleri yine `GROUNDED-FACT-YOK` ile olur
+    # (`Y11B2-STRICT-VARSAYILAN`). Oneri `stil_profili` alaninda GORUNUR
+    # kalir — gizlenmez, yalnizca OTOMATIK UYGULANMAZ.
+    _strict = tuple(getattr(fact_baglama, "STRICT_EDIT_PROFILLERI", ()))
+    _oto_strict = (stil.get("kimlik") in _strict
+                   and stil.get("kaynak") != "kullanici")
+    if stil.get("kimlik") and not _oto_strict and stil.get("kaynak") in (
+            "kullanici", "auto", "turetilmis"):
         _ata("edit", stil["kimlik"],
              stil.get("gerekce") or "bileşik stil profili çözüldü")
+    elif _oto_strict:
+        stil = {**stil, "uyari": list(stil.get("uyari") or []) + [
+            "Bu profil KAYNAK ZORUNLU (fail-closed): doğrulanmış olgu "
+            "bulunamazsa video üretilmez. Otomatik seçilmedi; istiyorsanız "
+            "stil listesinden AÇIKÇA seçin."]}
 
     return {
         "girdi_turu": gtur,

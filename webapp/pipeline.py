@@ -4659,7 +4659,19 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # kabul edilmis paket dondurduyse sonuc ZATEN bellidir; buna ragmen
     # hat LLM plan cagrisini, metin islev analizini ve is dizini
     # olusturmayi YAPIYORDU. Karar arastirma DONER DONMEZ verilir.
-    _grounded = str(mod or "") in fact_baglama.GROUNDED_MODLAR
+    # ⚠ P0 (16 Agu 2026, CANLI): STRICT grounded ACIKCA SECILIR.
+    # OLCULEN KUSUR (`Y11B2-STRICT-VARSAYILAN`, canli is): karar yalnizca
+    # `mod in GROUNDED_MODLAR` idi ve arayuz/API'de grounded SECIMI YOKTU;
+    # yani BELGESEL SECEN HERKES fail-closed hatta dusuyor, arastirma 0
+    # accepted paket dondurunce is `GROUNDED-FACT-YOK` ile medya/TTS/
+    # render'a HIC gecmeden oluyordu. Strict artik yalnizca arastirma sozu
+    # veren edit profillerinde (`fact_baglama.STRICT_EDIT_PROFILLERI`).
+    # ⚠ Strict profilde SOZLESME AYNEN GECERLI: asagidaki dort durus da
+    # BIT-BIT korunmustur.
+    _grounded = fact_baglama.strict_grounded_mi(mod, edit_id)
+    # Best-effort belgeselde GORUNUR uyari (sessiz dusus YASAK): is
+    # sozlugundeki `dususler` listesine cikar.
+    _grounded_dususler = []
     if _grounded:
         if not getattr(arastirma_sonuc, "calisti", False):
             raise RuntimeError(
@@ -4677,6 +4689,29 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             raise RuntimeError(
                 f"{fact_baglama.KOD_GROUNDED_FACT_YOK}: kabul edilmis "
                 f"FactPacket YOK (0 yetkili olgu)")
+    elif str(mod or "") in fact_baglama.GROUNDED_MODLAR:
+        # ── BEST-EFFORT BELGESEL ──
+        # Arastirma bir IYILESTIRMEDIR, on kosul degil: accepted FactPacket
+        # VARSA zenginlestirme/tahsis eskisi gibi kosar; YOKSA is kullanici
+        # metninden non-grounded surer ve NEDENI GORUNUR olur.
+        _be_hata = str(getattr(arastirma_sonuc, "hata", "") or "").strip()
+        _be_olgu = (arastirma_kopru.yetkili_olgular(arastirma_sonuc)
+                    if getattr(arastirma_sonuc, "calisti", False) else [])
+        if not _be_olgu:
+            _neden = (f"arastirma hatasi: {_be_hata[:120]}" if _be_hata
+                      else ("arastirma KOSMADI"
+                            if not getattr(arastirma_sonuc, "calisti", False)
+                            else "kabul edilmis FactPacket YOK (0 yetkili olgu)"))
+            _grounded_dususler.append({
+                "asama": "arastirma",
+                "neden": f"{fact_baglama.KOD_GROUNDED_FACT_YOK}: {_neden}",
+                "etki": ("Video KULLANICI METNINDEN uretildi; anlatim "
+                         "dogrulanmis kaynaga BAGLI DEGIL. Kaynak zorunlulugu "
+                         "isteniyorsa 'Belgesel — Araştırmacı' ya da 'Bilim "
+                         "Anlatısı' stilini secin (strict grounded).")})
+            print(f"  GROUNDED BEST-EFFORT: {_neden} -> non-grounded devam "
+                  f"(strict profil secilmedi: edit={edit_id!r})",
+                  file=sys.stderr)
 
     bildir("Hikaye sahnelere bölünüyor...", 5)
     # UNLU MODU: yalniz hikaye + GEMINI_KEY varken aktif (Gemini benzerlige tolerans).
@@ -4808,19 +4843,32 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
             # ⚠ FACT UYDURULMAZ, KAPI GEVSETILMEZ: `FACT-BAGLANTI-YOK` fail
             # olarak KALIR (qa_on). Bu kapi yalnizca kaybi ERKENE ceker ve
             # NEDENINI stabil kodla soyler.
+            # ⚠ P0: bu durus STRICT sozlesmenin parcasidir. Best-effort
+            # belgeselde havuz yetersizligi isi OLDURMEZ — bagli olgular
+            # KULLANILIR, eksik kapsam GORUNUR uyariya doner.
             _hedef_n = int(_fact_rapor.get("hedef") or 0)
             _bagli_n = int(_fact_rapor.get("baglanan") or 0)
             if _hedef_n > 0:
                 _kapsam = _bagli_n / float(_hedef_n)
                 if _kapsam < FACT_KAPSAM_ESIGI:
-                    raise RuntimeError(
-                        f"ARASTIRMA-HAVUZ-YETERSIZ: {_bagli_n}/{_hedef_n} "
-                        f"sahne dogrulanmis olguya baglanabildi "
-                        f"(%{_kapsam * 100:.0f} < %{FACT_KAPSAM_ESIGI * 100:.0f}). "
-                        f"Dogrulanmis olgu havuzu {len(_olgular)} iddia. "
-                        f"Her cekim dogrulanmis bir olguya baglanmali; "
-                        f"konu daha somut/olgusal yazilmali ya da arastirma "
-                        f"kaynaklari genisletilmeli.")
+                    _hv = (f"ARASTIRMA-HAVUZ-YETERSIZ: {_bagli_n}/{_hedef_n} "
+                           f"sahne dogrulanmis olguya baglanabildi "
+                           f"(%{_kapsam * 100:.0f} < "
+                           f"%{FACT_KAPSAM_ESIGI * 100:.0f}). "
+                           f"Dogrulanmis olgu havuzu {len(_olgular)} iddia.")
+                    if _grounded:
+                        raise RuntimeError(
+                            f"{_hv} Her cekim dogrulanmis bir olguya "
+                            f"baglanmali; konu daha somut/olgusal yazilmali "
+                            f"ya da arastirma kaynaklari genisletilmeli.")
+                    _grounded_dususler.append({
+                        "asama": "arastirma",
+                        "neden": _hv,
+                        "etki": ("Baglanan sahneler dogrulanmis olguya "
+                                 "dayaniyor; kalan sahneler kullanici "
+                                 "metninden uretildi.")})
+                    print(f"  BEST-EFFORT: {_hv} -> uyari ile devam",
+                          file=sys.stderr)
     # ── FAZ Y-11b-2: GROUNDED FAIL-CLOSED KAPISI — KOSULSUZ ──
     # ⚠ OLCULEN KUSUR (`Y11B2-KAPI-CAGRILMIYOR`): `fact_baglama.grounded_kapisi`
     # ve `shot_fact_dogrula` TANIMLIYDI ama `pipeline.py` ikisini de HIC
@@ -4830,11 +4878,14 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     # kullanici metniyle SESSIZCE devam ediyordu (`Y11B-GROUNDED-FAIL-OPEN`).
     # ⚠ Bu kapi medya/TTS/render'dan ONCE kosar; grounded OLMAYAN modlar
     # KAPSAM DISIDIR (davranis BIT-BIT ayni kalir).
+    # ⚠ P0 (`Y11B2-STRICT-VARSAYILAN`): kapsam artik (mod, edit_id) ciftiyle
+    # belirlenir — STRICT profil secilmediyse belgesel de KAPSAM DISIDIR.
     _shot = fact_baglama.shot_fact_dogrula(
         scenes, allowlist=(_fact_rapor or {}).get("allowlist") or set())
     _kapi = fact_baglama.grounded_kapisi(
         shot_raporu=_shot,
         mod=mod,
+        edit_id=edit_id,
         arastirma_calisti=bool(getattr(arastirma_sonuc, "calisti", False)),
         arastirma_hatasi=str(getattr(arastirma_sonuc, "hata", "") or ""),
         allowlist=(_fact_rapor or {}).get("allowlist") or set(),
@@ -6314,6 +6365,11 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                         "yer isabeti bu klipler icin garanti degil."})
     except Exception as e:
         print(f"  kare ozeti okunamadi: {str(e)[:80]}", file=sys.stderr)
+    # ── P0: BEST-EFFORT GROUNDED UYARILARI — SESSIZ DUSUS YASAK ──
+    # Strict profil secilmedigi icin is non-grounded surdurulduyse NEDENI ve
+    # ETKISI is sozlugunden arayuze cikar.
+    for _gd in _grounded_dususler:
+        sonuc["dususler"].append(_gd)
     uyarilar = []
     if plan.get("_eksik_oran"):
         uyarilar.append(f"İçerik planı beklenenden kısa çıktı (~%{int(plan['_eksik_oran']*100)}).")
