@@ -47,3 +47,8 @@ webapp/veri/*_key.txt
 outputs/sample/*.mp4
 outputs/sample/*.png
 cikti/_smoke_editorv2/
+
+# Hayalet sirlari (asla commit edilmez)
+.hayalet/
+hayalet/gizli*
+*.env
