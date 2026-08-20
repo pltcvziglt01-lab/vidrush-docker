@@ -26,30 +26,26 @@ from playwright.sync_api import sync_playwright
 
 from . import ayar
 
-# ── SECICI TABLOSU — Flow arayuzu degisirse YALNIZCA burasi guncellenir ──
+# ── SECICI TABLOSU — 20 Agu 2026 CANLI KALIBRASYON ──
+# Flow'un yeni "agent" arayuzunde olculdu (proje: flow/project/<uuid>):
+#   · Prompt girdisi: alttaki contenteditable DIV (sayfadaki SON tanesi)
+#   · Gonder: "arrow_forward" ikonlu Create dugmesi (SON tanesi)
+#   · Sonuc: genisligi >200px olan <img>/<video>; src
+#     "labs.google/fx/api/trpc/media.getMediaUrlRedirect?..." seklinde
+#   · Indirme: sayfa baglaminda fetch (oturum cerezleri gecerli) — OLCULDU,
+#     773KB PNG indi. Ayri indirme dugmesi GEREKMEZ.
+# ⚠ ON KOSUL (bir kez, elle): proje icinde Agent settings ->
+#   "Confirm before generating: NEVER" + Image x1. Aksi halde ajan HER
+#   promptta onay sorar ve otomasyon takilir (KURULUM.md Adim 5.5).
 SECICILER = {
-    "prompt_girdi": [
-        "textarea[placeholder*='prompt' i]",
-        "textarea[placeholder*='Generate' i]",
-        "textarea[aria-label*='prompt' i]",
-        "div[contenteditable='true']",
-        "textarea",
-    ],
-    "uret_dugme": [
-        "button:has-text('Generate')",
-        "button:has-text('Create')",
-        "button[aria-label*='generate' i]",
-        "button[type='submit']",
-    ],
-    "sonuc_video": ["video[src]", "video source[src]"],
-    "sonuc_gorsel": ["img[src*='blob']", "img[src*='googleusercontent']",
-                     "img[alt*='result' i]"],
-    "indir_dugme": [
-        "button[aria-label*='download' i]",
-        "button:has-text('Download')",
-        "a[download]",
-    ],
+    "prompt_girdi": ["div[contenteditable='true']"],
+    "temizle_dugme": ["button:has-text('Clear prompt')"],
+    "uret_dugme": ["button:has-text('arrow_forward')"],
 }
+
+# Ajan arayuzu TUR bilgisini prompttan alir — onek sozlesmesi:
+TUR_ONEK = {"video": "Generate one video: ",
+            "gorsel": "Generate one image: "}
 
 
 class FlowHatasi(RuntimeError):
@@ -133,12 +129,24 @@ def _dosya_adi(sira: int, tur: str, prompt: str, uzanti: str) -> str:
     return f"{sira:03d}_{tur}_{slug}{uzanti}"
 
 
+def _medya_srcleri(sayfa, tur: str) -> set:
+    """Sayfadaki BUYUK medya src'leri (genislik > 200px)."""
+    etiket = "video" if tur == "video" else "img"
+    return set(sayfa.evaluate(
+        """(et) => [...document.querySelectorAll(et)].filter(e => {
+             const r = e.getBoundingClientRect();
+             return r.width > 200 && (e.currentSrc || e.src || '').length > 30;
+           }).map(e => e.currentSrc || e.src)""", etiket))
+
+
 def uret_ve_indir(prompt: str, tur: str, sira: int, hedef_dizin: Path,
                   bildir=None) -> dict:
-    """TEK prompt -> Flow'da uret -> indir -> klasore yaz.
+    """TEK prompt -> Flow agent'inda uret -> sayfa ici fetch ile indir.
 
+    ⚠ YENI-SRC AYRIMI (kritik): ayni oturumda onceki uretimler DOM'da
+    kalir. Gonderim ONCESI mevcut src kumesi alinir; yalnizca YENI beliren
+    src indirilir. Bu olmadan hep ILK sonuc indirilirdi.
     Doner: {"ok": bool, "dosya": str, "neden": str}
-    ⚠ Hicbir asamada istisna DISARI SIZMAZ: cagiran sirayi surdurebilsin.
     """
     def _bildir(m):
         if bildir:
@@ -151,80 +159,55 @@ def uret_ve_indir(prompt: str, tur: str, sira: int, hedef_dizin: Path,
     try:
         pw, _t, baglam = chrome_baglan()
         sayfa = _flow_sayfasi(baglam)
-        girdi = _ilk_gorunur(sayfa, SECICILER["prompt_girdi"])
-        if girdi is None:
-            return {"ok": False, "dosya": "",
-                    "neden": "prompt alani bulunamadi (kesfet() ile secici "
-                             "tablosunu guncelle)"}
-        girdi.click()
+        onceki = _medya_srcleri(sayfa, tur)
+
+        # temizle + yaz + gonder
         try:
-            girdi.fill("")
+            sayfa.locator(SECICILER["temizle_dugme"][0]).first.click(timeout=2000)
         except Exception:
-            sayfa.keyboard.press("Meta+A")
-            sayfa.keyboard.press("Backspace")
-        girdi.type(prompt, delay=8)
-        dugme = _ilk_gorunur(sayfa, SECICILER["uret_dugme"], 5000)
-        if dugme is None:
-            sayfa.keyboard.press("Enter")
-        else:
-            dugme.click()
+            pass
+        girdi = sayfa.locator(SECICILER["prompt_girdi"][0]).last
+        girdi.click()
+        girdi.type(TUR_ONEK.get(tur, "") + prompt, delay=5)
+        sayfa.locator(SECICILER["uret_dugme"][0]).last.click()
         _bildir(f"[{sira}] uretiliyor: {prompt[:50]}…")
 
-        # ── Sonucu bekle: video ya da gorsel ──
-        aranan = SECICILER["sonuc_video"] if tur == "video" else SECICILER["sonuc_gorsel"]
+        # YENI medya bekle
         bas = time.time()
         kaynak = ""
         while time.time() - bas < ayar.FLOW_URETIM_TAVAN_SN:
-            for s in aranan:
-                try:
-                    o = sayfa.locator(s).last
-                    if o.count() and o.is_visible():
-                        kaynak = o.get_attribute("src") or ""
-                        if kaynak:
-                            break
-                except Exception:
-                    continue
-            if kaynak:
+            time.sleep(5)
+            yeni = _medya_srcleri(sayfa, tur) - onceki
+            if yeni:
+                kaynak = sorted(yeni)[0]
                 break
-            time.sleep(3)
         if not kaynak:
             return {"ok": False, "dosya": "",
-                    "neden": f"{ayar.FLOW_URETIM_TAVAN_SN} sn icinde sonuc "
-                             f"gorunmedi (uretim uzun surmus ya da hata var)"}
+                    "neden": f"{ayar.FLOW_URETIM_TAVAN_SN} sn icinde YENI "
+                             f"{tur} gorunmedi (uretim uzun ya da hata)"}
 
-        # ── Indir: once Flow'un kendi indirme dugmesi, olmazsa src'den cek ──
+        # sayfa baglaminda fetch (oturum cerezleri) — 20 Agu'da OLCULDU
+        b64 = sayfa.evaluate(
+            """async (u) => {
+                const r = await fetch(u);
+                const b = await r.arrayBuffer();
+                let s = ''; const v = new Uint8Array(b);
+                const parca = 0x8000;
+                for (let i = 0; i < v.length; i += parca)
+                    s += String.fromCharCode.apply(null, v.subarray(i, i + parca));
+                return btoa(s);
+            }""", kaynak)
+        import base64 as _b64
+        veri = _b64.b64decode(b64)
+        if len(veri) < 5000:
+            return {"ok": False, "dosya": "",
+                    "neden": f"indirilen dosya supheli kucuk ({len(veri)} bayt)"}
         uzanti = ".mp4" if tur == "video" else ".png"
         hedef = hedef_dizin / _dosya_adi(sira, tur, prompt, uzanti)
-        indirildi = False
-        idug = _ilk_gorunur(sayfa, SECICILER["indir_dugme"], 4000)
-        if idug is not None:
-            try:
-                with sayfa.expect_download(timeout=120000) as bek:
-                    idug.click()
-                bek.value.save_as(str(hedef))
-                indirildi = True
-            except Exception:
-                indirildi = False
-        if not indirildi:
-            # Sayfa baglaminda fetch: oturum cerezleri KORUNUR
-            try:
-                b64 = sayfa.evaluate(
-                    """async (u) => {
-                        const r = await fetch(u);
-                        const b = await r.arrayBuffer();
-                        let s = ''; const v = new Uint8Array(b);
-                        for (let i = 0; i < v.length; i++) s += String.fromCharCode(v[i]);
-                        return btoa(s);
-                    }""", kaynak)
-                import base64
-                hedef.write_bytes(base64.b64decode(b64))
-                indirildi = hedef.stat().st_size > 5000
-            except Exception as e:
-                return {"ok": False, "dosya": "",
-                        "neden": f"indirme basarisiz: {type(e).__name__}: {str(e)[:90]}"}
-        if not indirildi or not hedef.exists():
-            return {"ok": False, "dosya": "", "neden": "dosya diske yazilamadi"}
-        _bildir(f"[{sira}] indi -> {hedef.name}")
+        tmp = str(hedef) + ".tmp"
+        Path(tmp).write_bytes(veri)
+        Path(tmp).rename(hedef)
+        _bildir(f"[{sira}] indi -> {hedef.name} ({len(veri)//1024} KB)")
         return {"ok": True, "dosya": str(hedef), "neden": ""}
     except FlowHatasi as e:
         return {"ok": False, "dosya": "", "neden": str(e)}

@@ -73,7 +73,18 @@ Açılan pencere **temiz bir profildir** (normal Chrome'undan ayrı —
 Giriş **bir keredir** — profil kalıcı, sonraki açılışlarda oturum durur.
 Pencere üretim boyunca açık kalmalı.
 
-### 6) Flow seçici kalibrasyonu (İLK KURULUMDA ŞART)
+### 5.5) Flow Agent ayarları (BİR KEZ — otomasyonun ön koşulu)
+Flow'da bir proje aç (**New project**) ve prompt kutusunun yanındaki
+**ayar (tune)** ikonuna bas:
+1. **Confirm before generating → NEVER** seç
+   ("Agent will generate media and spend credits automatically")
+   — *Always kalırsa ajan her prompt'ta onay sorar ve otomasyon takılır.*
+2. **Image generation default → x1** seç (x2 = her prompt'ta 2 görsel = 2 kat kredi)
+3. Oranlar 16:9 kalsın · **Save**
+
+Bu ayar profile kaydedilir, bir kez yapılır.
+
+### 6) Flow seçici kalibrasyonu (arayüz DEĞİŞİRSE)
 ```bash
 python3 -c "
 import sys; sys.path.insert(0,'.')
@@ -141,6 +152,15 @@ Dosyalar: `~/Desktop/Hayalet/is_<tarih>/videolar|gorseller/`
   ölmeden yenisi açılmış) — Telegram tek dinleyiciye izin verir.
 - **Çözüm:** `pkill -f hayalet.bot` → 2 sn bekle → `python3 -m hayalet.bot`.
   Herkes KENDİ token'ını kullanmalı; token paylaşılırsa botlar birbirini düşürür.
+
+### 5) Ajan her prompt'ta onay soruyor / üretim başlamıyor
+- **Yaşandı:** 20 Ağu 2026, canlı kalibrasyon. Flow'un agent arayüzü
+  varsayılan "Confirm before generating: Always" ile geliyor.
+- **Çözüm:** Adım 5.5 — Agent settings → **Never** + Image **x1** + Save.
+
+### 6) Her prompt'ta 2 görsel üretiliyor (kredi 2x gidiyor)
+- **Kök neden:** Agent settings'te Image default **x2** seçili geliyordu.
+- **Çözüm:** Adım 5.5'teki **x1**.
 
 ### 4) 🛑 "arka arkaya 3 hata — durduruldu"
 - **Kök neden:** Yapısal sorun sinyali: Flow oturumu düşmüş, arayüz değişmiş
