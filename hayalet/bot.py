@@ -203,10 +203,10 @@ async def metin_geldi(update: Update, ctx):
         # PARTI MODU (kullanici istegi): promptlar 10'ar verilir, ciktilar
         # belirdikce indirilir — tek tek gondermekten cok daha hizli.
         vids = await asyncio.to_thread(
-            flow_surucu.parti_uret, videolar, "video", d / "videolar",
+            flow_surucu.parti_uret, videolar, "video", d / "video",
             bildir, iptal_mi)
         gors = await asyncio.to_thread(
-            flow_surucu.parti_uret, gorseller, "gorsel", d / "gorseller",
+            flow_surucu.parti_uret, gorseller, "gorsel", d / "gorsel",
             bildir, iptal_mi)
         is_["sonuclar"] = {"video": vids, "gorsel": gors}
         hatalar = [f"{x['tur']}[{x['sira']}] {x['neden']}"

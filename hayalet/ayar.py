@@ -6,8 +6,8 @@ dosyasindan okunur. Bu dosya git'e GIRMEZ.
 
 Klasor duzeni (her is icin):
   ~/Desktop/Hayalet/<is_adi>/
-      videolar/     Flow'dan inen video klipler (sirali)
-      gorseller/    Flow'dan inen gorseller (sirali)
+      video/        Flow'dan inen video klipler (sirali)
+      gorsel/       Flow'dan inen gorseller (sirali)
       is.json       islem kunyesi (prompt'lar, durum, hatalar)
 
 ⚠ KAPSAM: KURGU/EDIT YOK. Bu ajan yalnizca URETIR, INDIRIR, KLASORLER;
@@ -56,7 +56,7 @@ FLOW_URETIM_TAVAN_SN = int(os.environ.get("HAYALET_FLOW_TAVAN", "900"))
 def is_dizini(is_adi: str) -> Path:
     """Is klasorunu KURAR ve doner."""
     d = KOK / is_adi
-    for alt in ("videolar", "gorseller"):
+    for alt in ("video", "gorsel"):
         (d / alt).mkdir(parents=True, exist_ok=True)
     return d
 

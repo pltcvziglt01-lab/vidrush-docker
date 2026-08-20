@@ -125,7 +125,7 @@ Etiket toleranslıdır (`video 3:`, `Görsel Prompt -` de olur); etiketsiz satı
 mesajıyla gönderilir (canlıda ölçüldü: 3 görsel ~40 sn) — çıktılar belirdikçe
 indirilir; her indirmede ✅ ilerleme, hatada ⚠ neden gelir.
 Parti boyu: `HAYALET_PARTI` (varsayılan 10). `/durum` künye · `/iptal` durdurur.
-Dosyalar: `~/Desktop/Hayalet/is_<tarih>/videolar|gorseller/`
+Dosyalar: `~/Desktop/Hayalet/is_<tarih>/video|gorsel/`
 
 ## YAŞANMIŞ HATALAR (gerçek kurulumlardan — oku, aynısını yaşama)
 
