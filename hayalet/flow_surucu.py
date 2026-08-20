@@ -237,7 +237,7 @@ PARTI_BOYU = int(__import__("os").environ.get("HAYALET_PARTI", "10"))
 
 
 def parti_uret(promptlar: list, tur: str, hedef_dizin: Path, bildir=None,
-               iptal_mi=None) -> list:
+               iptal_mi=None, indi_cb=None) -> list:
     """PROMPTLARI 10'AR VERIP ciktilari BELIRDIKCE indirir (ajan modu).
 
     ⚠ NEDEN PARTI: ajan arayuzu sohbet tabanli — tek mesajda numarali N
@@ -317,11 +317,17 @@ def parti_uret(promptlar: list, tur: str, hedef_dizin: Path, bildir=None,
                         hedef = hedef_dizin / _dosya_adi(sira, tur, prompt, uzanti)
                         hedef.write_bytes(veri)
                         inen[kaynak] = str(hedef)
-                        sonuclar.append({"ok": True, "dosya": str(hedef),
-                                         "neden": "", "prompt": prompt,
-                                         "sira": sira, "tur": tur})
+                        kayit = {"ok": True, "dosya": str(hedef),
+                                 "neden": "", "prompt": prompt,
+                                 "sira": sira, "tur": tur}
+                        sonuclar.append(kayit)
                         _bildir(f"✅ {tur} {len(sonuclar)}/{len(temiz)} indi "
                                 f"— devam ediyorum")
+                        if indi_cb is not None:
+                            try:
+                                indi_cb(kayit)     # SENKRON: medya+cumle teslimi
+                            except Exception:
+                                pass
                     except Exception as e:                   # noqa: BLE001
                         _bildir(f"⚠ indirme hatasi: {type(e).__name__}")
             eksik = beklenen - sum(1 for r in sonuclar

@@ -108,24 +108,29 @@ python3 -m hayalet.bot
 
 ---
 
-## KULLANIM (2 mesaj)
+## KULLANIM — iki mod
 
-1. Botuna `/basla` yaz
-2. Promptları **tek blok** gönder:
-
+### 🎬 `/hikaye` — hazır promptlarını verirsin
+Promptları TEK BLOK gönderirsin:
 ```
 VIDEO PROMPT 1 - şafakta limandan çıkan balıkçı teknesi
-VIDEO PROMPT 2 - dalgalar güverteyi dövüyor
 GÖRSEL PROMPT 1 - yaşlı balıkçının portresi
-GÖRSEL PROMPT 2 - limanda mezat sabahı
 ```
+Çıktılar diske iner; Telegram'a yalnızca ilerleme/hata düşer.
 
-Etiket toleranslıdır (`video 3:`, `Görsel Prompt -` de olur); etiketsiz satır
-önceki promptun devamı sayılır. Üretim **10'arlı partiler** halinde tek ajan
-mesajıyla gönderilir (canlıda ölçüldü: 3 görsel ~40 sn) — çıktılar belirdikçe
-indirilir; her indirmede ✅ ilerleme, hatada ⚠ neden gelir.
-Parti boyu: `HAYALET_PARTI` (varsayılan 10). `/durum` künye · `/iptal` durdurur.
-Dosyalar: `~/Desktop/Hayalet/is_<tarih>/video|gorsel/`
+### 🧠 `/senkron` — metni verirsin, gerisi otomatik
+Anlatım METNİNİ düz metin olarak gönderirsin. Sistem:
+1. Metni analiz eder, HER CÜMLE için sinematik İngilizce prompt üretir
+   (yerel LLM anahtarı gerekir: `~/.hayalet/gizli.env` içine
+   `HAYALET_OPENAI_KEY=sk-...`; yoksa cümlenin kendisi prompt olur)
+2. İlk ~%20 cümle VİDEO, kalanı GÖRSEL olur
+   (`HAYALET_SENKRON_VIDEO_ORANI` ile ayarlanır)
+3. Flow'da üretir, diske indirir VE her çıktıyı **dayandığı cümleyle
+   birlikte Telegram'a atar**:
+   > 🎬 *(video)* — "Bu bitki hiçbir şey istemez."
+
+Ortak: üretim 10'arlı partiler halinde (`HAYALET_PARTI`); `/durum` künye,
+`/iptal` durdurur. Dosyalar: `~/Desktop/Hayalet/is_<tarih>/video|gorsel/`
 
 ## YAŞANMIŞ HATALAR (gerçek kurulumlardan — oku, aynısını yaşama)
 

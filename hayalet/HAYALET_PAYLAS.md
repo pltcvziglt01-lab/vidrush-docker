@@ -1,23 +1,20 @@
 # 👻 HAYALET — Telegram'dan Google Flow Üretim Ajanı (TAM PAKET)
 
 > **NASIL KULLANILIR:** Bu dosyayı Claude Code'a at ve şunu yaz:
-> **"Bu dosyadaki sistemi kur"**. Claude önce aşağıdaki KOD bölümündeki
-> dosyaları aynen oluşturur, sonra KURULUM adımlarını işletim sistemine göre
-> sırayla uygular. Senden sadece 2 şey ister:
-> 1) Kendi Telegram bot token'ın (@BotFather'dan)
-> 2) Açılan Chrome penceresinde **Flow erişimi olan Google hesabınla** giriş
+> **"Bu dosyadaki sistemi kur"**. Claude önce KOD bölümündeki dosyaları
+> aynen oluşturur, sonra KURULUM adımlarını işletim sistemine göre uygular.
+> Senden istenenler: kendi Telegram bot token'ın, Chrome'da Flow girişi,
+> (senkron mod için) bir OpenAI anahtarı.
 
-Bu sistem: Telegram'dan prompt bloğu gönderirsin → bilgisayarındaki
-Chrome'da Google Flow'a girip görselleri/videoları üretir → masaüstünde
-`Hayalet/is_<tarih>/video/` ve `gorsel/` klasörlerine indirir → Telegram'dan
-ilerleme/hata bildirir. Dosyalar Telegram'a gönderilmez, diskte kalır.
-Edit/kurgu yok — montajı kendin yaparsın.
+İki mod: 🎬 `/hikaye` hazır promptlarını Flow'da üretir ve diske klasörler;
+🧠 `/senkron` verdiğin METNİN her cümlesi için promptu kendi üretir,
+Flow'da oluşturur ve her çıktıyı dayandığı cümleyle Telegram'a atar.
 
 ---
 
 # BÖLÜM 1 — KOD (Claude: bu dosyaları AYNEN oluştur)
 
-Proje için boş bir klasör aç (ör. `~/hayalet-ajan`), içine `hayalet/` paketi:
+Boş klasör aç (ör. `~/hayalet-ajan`), içine `hayalet/` paketi:
 
 ## Dosya: `hayalet/__init__.py`
 ```python
@@ -96,6 +93,98 @@ def eksik_ayarlar() -> list:
         eksik.append("HAYALET_TELEGRAM_TOKEN (BotFather'dan alinip "
                      f"{GIZLI_ENV} icine yazilmali)")
     return eksik
+
+```
+
+## Dosya: `hayalet/beyin.py`
+```python
+#!/usr/bin/env python3
+"""BEYIN — SENKRON MOD: metin -> cumle basina Flow promptu.
+
+⚠ URETIM BURADA DEGIL: bu modul yalnizca cumleleri SINEMATIK INGILIZCE
+prompta cevirir; gorsel/video uretimini yine Flow ajani yapar
+(flow_surucu.parti_uret).
+
+KURAL (kullanicinin urun tarifi): ilk ~%20 cumle VIDEO, kalani GORSEL.
+Her cikti Telegram'a DAYANDIGI CUMLEYLE birlikte gonderilir — eslesme
+bu moduldeki sira uzerinden tasinir.
+"""
+from __future__ import annotations
+
+import json
+import math
+import os
+import re
+import urllib.request
+
+from . import ayar  # gizli.env'i yukler (HAYALET_OPENAI_KEY)
+
+OPENAI_KEY = os.environ.get("HAYALET_OPENAI_KEY",
+                            os.environ.get("OPENAI_API_KEY", ""))
+MODEL = os.environ.get("HAYALET_LLM_MODEL", "gpt-4.1-mini")
+VIDEO_ORANI = float(os.environ.get("HAYALET_SENKRON_VIDEO_ORANI", "0.20"))
+
+_CUMLE = re.compile(r"[^.!?…]+[.!?…]+|[^.!?…]+$")
+
+
+def cumlelere_bol(metin: str) -> list:
+    return [c.strip() for c in _CUMLE.findall(metin or "") if c.strip()]
+
+
+def _oai(mesajlar, zaman_asimi=120) -> str:
+    govde = json.dumps({"model": MODEL, "messages": mesajlar,
+                        "response_format": {"type": "json_object"},
+                        "temperature": 0.4}).encode()
+    istek = urllib.request.Request(
+        "https://api.openai.com/v1/chat/completions", data=govde,
+        headers={"Authorization": f"Bearer {OPENAI_KEY}",
+                 "Content-Type": "application/json"})
+    with urllib.request.urlopen(istek, timeout=zaman_asimi) as y:
+        return json.load(y)["choices"][0]["message"]["content"]
+
+
+def plan_kur(metin: str, bildir=None) -> list:
+    """Metin -> [{"sira", "cumle", "tur", "prompt"}].
+
+    ⚠ LLM COKERSE IS OLMEZ: dusus promptu cumlenin kendisi + sinematik
+    sabit sondur; kullanici bunu Telegram'da GORUR (sessiz dusus yok).
+    """
+    cumleler = cumlelere_bol(metin)
+    if not cumleler:
+        return []
+    n_video = max(1, math.ceil(len(cumleler) * VIDEO_ORANI))
+    plan = []
+    if OPENAI_KEY:
+        try:
+            sistem = (
+                "You turn a narration script into Flow generation prompts. "
+                "For EVERY numbered sentence, write ONE cinematic, "
+                "photorealistic ENGLISH prompt that visually depicts that "
+                "exact sentence (setting, subject, light, camera). "
+                "No text/watermark in image. Return JSON: "
+                '{"items":[{"i":<number>,"prompt":"..."}]} with EXACTLY '
+                f"{len(cumleler)} items, same numbering.")
+            girdi = "\n".join(f"{i+1}. {c}" for i, c in enumerate(cumleler))
+            cevap = json.loads(_oai([{"role": "system", "content": sistem},
+                                     {"role": "user", "content": girdi}]))
+            eslesme = {int(x["i"]): str(x.get("prompt", "")).strip()
+                       for x in cevap.get("items", []) if x.get("i")}
+        except Exception as e:                               # noqa: BLE001
+            eslesme = {}
+            if bildir:
+                bildir(f"⚠ LLM plani dusdu ({type(e).__name__}) — "
+                       f"cumleler dogrudan prompt olarak kullanilacak")
+    else:
+        eslesme = {}
+        if bildir:
+            bildir("⚠ LLM anahtari yok — cumleler dogrudan prompt olacak")
+    for i, cumle in enumerate(cumleler, 1):
+        prompt = eslesme.get(i) or (
+            cumle + " — cinematic, photorealistic, natural light, 35mm")
+        plan.append({"sira": i, "cumle": cumle,
+                     "tur": "video" if i <= n_video else "gorsel",
+                     "prompt": prompt})
+    return plan
 
 ```
 
@@ -340,7 +429,7 @@ PARTI_BOYU = int(__import__("os").environ.get("HAYALET_PARTI", "10"))
 
 
 def parti_uret(promptlar: list, tur: str, hedef_dizin: Path, bildir=None,
-               iptal_mi=None) -> list:
+               iptal_mi=None, indi_cb=None) -> list:
     """PROMPTLARI 10'AR VERIP ciktilari BELIRDIKCE indirir (ajan modu).
 
     ⚠ NEDEN PARTI: ajan arayuzu sohbet tabanli — tek mesajda numarali N
@@ -420,11 +509,17 @@ def parti_uret(promptlar: list, tur: str, hedef_dizin: Path, bildir=None,
                         hedef = hedef_dizin / _dosya_adi(sira, tur, prompt, uzanti)
                         hedef.write_bytes(veri)
                         inen[kaynak] = str(hedef)
-                        sonuclar.append({"ok": True, "dosya": str(hedef),
-                                         "neden": "", "prompt": prompt,
-                                         "sira": sira, "tur": tur})
+                        kayit = {"ok": True, "dosya": str(hedef),
+                                 "neden": "", "prompt": prompt,
+                                 "sira": sira, "tur": tur}
+                        sonuclar.append(kayit)
                         _bildir(f"✅ {tur} {len(sonuclar)}/{len(temiz)} indi "
                                 f"— devam ediyorum")
+                        if indi_cb is not None:
+                            try:
+                                indi_cb(kayit)     # SENKRON: medya+cumle teslimi
+                            except Exception:
+                                pass
                     except Exception as e:                   # noqa: BLE001
                         _bildir(f"⚠ indirme hatasi: {type(e).__name__}")
             eksik = beklenen - sum(1 for r in sonuclar
@@ -529,9 +624,9 @@ from pathlib import Path
 from telegram import Update
 from telegram.ext import (Application, CommandHandler, MessageHandler, filters)
 
-from . import ayar, flow_surucu
+from . import ayar, beyin, flow_surucu
 
-_BEKLEYEN = set()    # /basla demis, tek-blok script bekleyen sohbetler
+_BEKLEYEN = {}       # sohbet_id -> "hikaye" | "senkron" (girdi bekleyen kip)
 _CALISAN = set()     # su an uretimde olan sohbetler (cifte /basla engeli)
 _IPTAL = set()
 _SON_IS = {}         # sohbet_id -> son is sozlugu (/durum icin)
@@ -586,31 +681,54 @@ def _izinli(update: Update) -> bool:
 
 async def komut_start(update: Update, _ctx):
     await update.message.reply_text(
-        "👻 *Hayalet* hazır.\n\n"
-        "`/basla` yaz → promptları TEK BLOK gönder:\n\n"
-        "```\nVIDEO PROMPT 1 - şafakta limandan çıkan balıkçı teknesi\nVIDEO PROMPT 2 - dalgalar güverteyi dövüyor\nGÖRSEL PROMPT 1 - yaşlı balıkçının portresi\nGÖRSEL PROMPT 2 - limanda mezat sabahı\n```\n"
-        "Dosyalar bilgisayarına iner; buraya sadece durum düşer.\n"
+        "👻 *Hayalet* hazır — iki mod:\n\n"
+        "🎬 `/hikaye` — hazır promptlarını TEK BLOK gönderirsin\n"
+        "   (`VIDEO PROMPT 1 - ...` / `GÖRSEL PROMPT 1 - ...`)\n\n"
+        "🧠 `/senkron` — METNİ gönderirsin; her cümle için promptu ben\n"
+        "   üretirim, Flow'da oluşturur, çıktıyı CÜMLESİYLE buraya atarım\n\n"
         "`/durum` · `/iptal`", parse_mode="Markdown")
 
 
-async def komut_basla(update: Update, _ctx):
+async def komut_hikaye(update: Update, _ctx):
     if not _izinli(update):
         return
     sohbet = update.effective_chat.id
     if sohbet in _CALISAN:
-        await update.message.reply_text(
-            "⏳ Zaten bir üretim çalışıyor. `/iptal` ile durdurabilirsin.")
+        await update.message.reply_text("⏳ Üretim sürüyor. `/iptal` ile durdur.")
         return
-    _BEKLEYEN.add(sohbet)
+    _BEKLEYEN[sohbet] = "hikaye"
     await update.message.reply_text(
         "📜 Promptları TEK BLOK gönder:\n\n"
-        "```\nVIDEO PROMPT 1 - şafakta limandan çıkan balıkçı teknesi\nVIDEO PROMPT 2 - dalgalar güverteyi dövüyor\nGÖRSEL PROMPT 1 - yaşlı balıkçının portresi\nGÖRSEL PROMPT 2 - limanda mezat sabahı\n```\n"
-        , parse_mode="Markdown")
+        "```\nVIDEO PROMPT 1 - şafakta limandan çıkan tekne\n"
+        "GÖRSEL PROMPT 1 - yaşlı balıkçının portresi\n```",
+        parse_mode="Markdown")
+
+
+async def komut_senkron(update: Update, _ctx):
+    if not _izinli(update):
+        return
+    sohbet = update.effective_chat.id
+    if sohbet in _CALISAN:
+        await update.message.reply_text("⏳ Üretim sürüyor. `/iptal` ile durdur.")
+        return
+    _BEKLEYEN[sohbet] = "senkron"
+    await update.message.reply_text(
+        "🧠 *Senkron mod* — anlatım METNİNİ gönder (düz metin).\n"
+        "Her cümle için prompt üretip Flow'da oluşturacağım; her çıktıyı "
+        "dayandığı cümleyle birlikte buraya atacağım.\n"
+        f"İlk ~%20 cümle VİDEO, kalanı GÖRSEL olur.", parse_mode="Markdown")
+
+
+# Eski akisla uyum: /basla artik kip secim mesaji verir.
+async def komut_basla(update: Update, _ctx):
+    await update.message.reply_text(
+        "İki mod var: 🎬 `/hikaye` (hazır promptlar) · 🧠 `/senkron` (metin ver)",
+        parse_mode="Markdown")
 
 
 async def komut_iptal(update: Update, _ctx):
     sohbet = update.effective_chat.id
-    _BEKLEYEN.discard(sohbet)
+    _BEKLEYEN.pop(sohbet, None)
     if sohbet in _CALISAN:
         _IPTAL.add(sohbet)
         await update.message.reply_text("🛑 İptal istendi — sıradaki prompttan sonra durur.")
@@ -635,46 +753,50 @@ async def metin_geldi(update: Update, ctx):
     if not _izinli(update):
         return
     sohbet = update.effective_chat.id
-    if sohbet not in _BEKLEYEN:
-        await update.message.reply_text("Üretim için `/basla` yaz.")
-        return
-    videolar, gorseller = _blok_coz(update.message.text)
-    if not (videolar or gorseller):
-        await update.message.reply_text("Blok boş görünüyor — tekrar gönder.")
-        return
-    _BEKLEYEN.discard(sohbet)
-
-    # ⚠ ON KONTROL (20 Agu 2026, ilk gercek deneme): Chrome debug portunda
-    # degilken uretim baslatildi; her prompt ayri ayri "baglanilamadi" hatasi
-    # uretti. Kapi BURADA: port kapaliysa is HIC baslamaz, tek mesajla soylenir.
-    import urllib.request as _ur
-    try:
-        _ur.urlopen(ayar.CHROME_CDP + "/json/version", timeout=3)
-    except Exception:
-        _BEKLEYEN.add(sohbet)          # script kaybolmasin: tekrar gonderebilir
+    kip = _BEKLEYEN.get(sohbet)
+    if kip is None:
         await update.message.reply_text(
-            "🔌 *Chrome hazır değil.*\n\n"
-            "Bilgisayarında şunu çalıştır:\n"
-            "`bash hayalet/chrome_baslat.sh`\n\n"
-            "Açılan pencerede Google hesabına girip Flow'u aç:\n"
-            "https://labs.google/fx/tools/flow\n\n"
-            "Sonra scripti TEKRAR gönder — bekliyorum.",
-            parse_mode="Markdown")
+            "Mod seç: 🎬 `/hikaye` · 🧠 `/senkron`", parse_mode="Markdown")
         return
+    _BEKLEYEN.pop(sohbet, None)
+
+    if kip == "senkron":
+        # METIN -> cumle basina plan (beyin) -> uretim
+        await update.message.reply_text("🧠 Metni analiz ediyorum…")
+        plan = await asyncio.to_thread(
+            beyin.plan_kur, update.message.text,
+            lambda m: None)
+        if not plan:
+            await update.message.reply_text("Metin boş görünüyor — `/senkron` ile tekrar.")
+            return
+        videolar = [p["prompt"] for p in plan if p["tur"] == "video"]
+        gorseller = [p["prompt"] for p in plan if p["tur"] == "gorsel"]
+        # prompt -> cumle eslesme haritasi (senkron teslim icin)
+        cumle_map = {p["prompt"]: p["cumle"] for p in plan}
+        await update.message.reply_text(
+            f"📋 Plan: {len(plan)} cümle → 🎬 {len(videolar)} video + "
+            f"🖼 {len(gorseller)} görsel. Başlıyorum.")
+    else:
+        videolar, gorseller = _blok_coz(update.message.text)
+        cumle_map = {}
+        if not (videolar or gorseller):
+            await update.message.reply_text("Blok boş görünüyor — `/hikaye` ile tekrar.")
+            return
 
     ad = f"is_{time.strftime('%Y%m%d_%H%M%S')}"
     d = ayar.is_dizini(ad)
-    is_ = {"ad": ad, "dizin": str(d), "video_promptlari": videolar,
-           "gorsel_promptlari": gorseller, "durum": "uretim",
+    is_ = {"ad": ad, "dizin": str(d), "kip": kip,
+           "video_promptlari": videolar, "gorsel_promptlari": gorseller,
+           "cumleler": cumle_map, "durum": "uretim",
            "sonuclar": {}, "hatalar": []}
     _SON_IS[sohbet] = is_
     _kaydet(is_)
     _CALISAN.add(sohbet)
     _IPTAL.discard(sohbet)
-    await update.message.reply_text(
-        f"🚀 Başlıyorum — 🎬 {len(videolar)} video + 🖼 {len(gorseller)} görsel.\n"
-        f"📁 `{d}`\n(Chrome açık ve Flow'a giriş yapılmış olmalı.)",
-        parse_mode="Markdown")
+    if kip != "senkron":
+        await update.message.reply_text(
+            f"🚀 Başlıyorum — 🎬 {len(videolar)} video + 🖼 {len(gorseller)} görsel.\n"
+            f"📁 `{d}`", parse_mode="Markdown")
 
     kuyruk: asyncio.Queue = asyncio.Queue()
 
@@ -699,15 +821,39 @@ async def metin_geldi(update: Update, ctx):
     def iptal_mi():
         return sohbet in _IPTAL
 
+    dongu = asyncio.get_running_loop()
+
+    def indi_cb(kayit):
+        """SENKRON teslim: cikti Telegram'a DAYANDIGI CUMLEYLE gider."""
+        if kip != "senkron":
+            return
+        cumle = cumle_map.get(kayit.get("prompt", ""), "")
+        yol = kayit.get("dosya", "")
+
+        async def _gonder():
+            try:
+                with open(yol, "rb") as f:
+                    if kayit.get("tur") == "video":
+                        await ctx.bot.send_video(sohbet, f, caption=cumle[:1000])
+                    else:
+                        await ctx.bot.send_photo(sohbet, f, caption=cumle[:1000])
+            except Exception as e:                           # noqa: BLE001
+                try:
+                    await ctx.bot.send_message(
+                        sohbet, f"⚠ dosya gönderilemedi ({type(e).__name__}) "
+                                f"— diskte: {yol}")
+                except Exception:
+                    pass
+        asyncio.run_coroutine_threadsafe(_gonder(), dongu)
+
     try:
-        # PARTI MODU (kullanici istegi): promptlar 10'ar verilir, ciktilar
-        # belirdikce indirilir — tek tek gondermekten cok daha hizli.
+        # PARTI MODU: promptlar 10'ar verilir, ciktilar belirdikce indirilir.
         vids = await asyncio.to_thread(
             flow_surucu.parti_uret, videolar, "video", d / "video",
-            bildir, iptal_mi)
+            bildir, iptal_mi, indi_cb)
         gors = await asyncio.to_thread(
             flow_surucu.parti_uret, gorseller, "gorsel", d / "gorsel",
-            bildir, iptal_mi)
+            bildir, iptal_mi, indi_cb)
         is_["sonuclar"] = {"video": vids, "gorsel": gors}
         hatalar = [f"{x['tur']}[{x['sira']}] {x['neden']}"
                    for x in (vids + gors) if not x["ok"]]
@@ -747,6 +893,7 @@ def calistir():
         raise SystemExit(1)
     app = Application.builder().token(ayar.TELEGRAM_TOKEN).build()
     for ad, fn in (("start", komut_start), ("basla", komut_basla),
+                   ("hikaye", komut_hikaye), ("senkron", komut_senkron),
                    ("durum", komut_durum), ("iptal", komut_iptal)):
         app.add_handler(CommandHandler(ad, fn))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, metin_geldi))
@@ -787,7 +934,6 @@ curl -s --max-time 3 "http://127.0.0.1:$PORT/json/version" >/dev/null 2>&1 \
 ---
 
 # BÖLÜM 2 — KURULUM VE KULLANIM
-
 
 ## CLAUDE İÇİN KURULUM TALİMATLARI
 
@@ -873,24 +1019,29 @@ python3 -m hayalet.bot
 
 ---
 
-## KULLANIM (2 mesaj)
+## KULLANIM — iki mod
 
-1. Botuna `/basla` yaz
-2. Promptları **tek blok** gönder:
-
+### 🎬 `/hikaye` — hazır promptlarını verirsin
+Promptları TEK BLOK gönderirsin:
 ```
 VIDEO PROMPT 1 - şafakta limandan çıkan balıkçı teknesi
-VIDEO PROMPT 2 - dalgalar güverteyi dövüyor
 GÖRSEL PROMPT 1 - yaşlı balıkçının portresi
-GÖRSEL PROMPT 2 - limanda mezat sabahı
 ```
+Çıktılar diske iner; Telegram'a yalnızca ilerleme/hata düşer.
 
-Etiket toleranslıdır (`video 3:`, `Görsel Prompt -` de olur); etiketsiz satır
-önceki promptun devamı sayılır. Üretim **10'arlı partiler** halinde tek ajan
-mesajıyla gönderilir (canlıda ölçüldü: 3 görsel ~40 sn) — çıktılar belirdikçe
-indirilir; her indirmede ✅ ilerleme, hatada ⚠ neden gelir.
-Parti boyu: `HAYALET_PARTI` (varsayılan 10). `/durum` künye · `/iptal` durdurur.
-Dosyalar: `~/Desktop/Hayalet/is_<tarih>/video|gorsel/`
+### 🧠 `/senkron` — metni verirsin, gerisi otomatik
+Anlatım METNİNİ düz metin olarak gönderirsin. Sistem:
+1. Metni analiz eder, HER CÜMLE için sinematik İngilizce prompt üretir
+   (yerel LLM anahtarı gerekir: `~/.hayalet/gizli.env` içine
+   `HAYALET_OPENAI_KEY=sk-...`; yoksa cümlenin kendisi prompt olur)
+2. İlk ~%20 cümle VİDEO, kalanı GÖRSEL olur
+   (`HAYALET_SENKRON_VIDEO_ORANI` ile ayarlanır)
+3. Flow'da üretir, diske indirir VE her çıktıyı **dayandığı cümleyle
+   birlikte Telegram'a atar**:
+   > 🎬 *(video)* — "Bu bitki hiçbir şey istemez."
+
+Ortak: üretim 10'arlı partiler halinde (`HAYALET_PARTI`); `/durum` künye,
+`/iptal` durdurur. Dosyalar: `~/Desktop/Hayalet/is_<tarih>/video|gorsel/`
 
 ## YAŞANMIŞ HATALAR (gerçek kurulumlardan — oku, aynısını yaşama)
 

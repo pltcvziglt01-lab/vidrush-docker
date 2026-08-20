@@ -29,9 +29,9 @@ from pathlib import Path
 from telegram import Update
 from telegram.ext import (Application, CommandHandler, MessageHandler, filters)
 
-from . import ayar, flow_surucu
+from . import ayar, beyin, flow_surucu
 
-_BEKLEYEN = set()    # /basla demis, tek-blok script bekleyen sohbetler
+_BEKLEYEN = {}       # sohbet_id -> "hikaye" | "senkron" (girdi bekleyen kip)
 _CALISAN = set()     # su an uretimde olan sohbetler (cifte /basla engeli)
 _IPTAL = set()
 _SON_IS = {}         # sohbet_id -> son is sozlugu (/durum icin)
@@ -86,31 +86,54 @@ def _izinli(update: Update) -> bool:
 
 async def komut_start(update: Update, _ctx):
     await update.message.reply_text(
-        "👻 *Hayalet* hazır.\n\n"
-        "`/basla` yaz → promptları TEK BLOK gönder:\n\n"
-        "```\nVIDEO PROMPT 1 - şafakta limandan çıkan balıkçı teknesi\nVIDEO PROMPT 2 - dalgalar güverteyi dövüyor\nGÖRSEL PROMPT 1 - yaşlı balıkçının portresi\nGÖRSEL PROMPT 2 - limanda mezat sabahı\n```\n"
-        "Dosyalar bilgisayarına iner; buraya sadece durum düşer.\n"
+        "👻 *Hayalet* hazır — iki mod:\n\n"
+        "🎬 `/hikaye` — hazır promptlarını TEK BLOK gönderirsin\n"
+        "   (`VIDEO PROMPT 1 - ...` / `GÖRSEL PROMPT 1 - ...`)\n\n"
+        "🧠 `/senkron` — METNİ gönderirsin; her cümle için promptu ben\n"
+        "   üretirim, Flow'da oluşturur, çıktıyı CÜMLESİYLE buraya atarım\n\n"
         "`/durum` · `/iptal`", parse_mode="Markdown")
 
 
-async def komut_basla(update: Update, _ctx):
+async def komut_hikaye(update: Update, _ctx):
     if not _izinli(update):
         return
     sohbet = update.effective_chat.id
     if sohbet in _CALISAN:
-        await update.message.reply_text(
-            "⏳ Zaten bir üretim çalışıyor. `/iptal` ile durdurabilirsin.")
+        await update.message.reply_text("⏳ Üretim sürüyor. `/iptal` ile durdur.")
         return
-    _BEKLEYEN.add(sohbet)
+    _BEKLEYEN[sohbet] = "hikaye"
     await update.message.reply_text(
         "📜 Promptları TEK BLOK gönder:\n\n"
-        "```\nVIDEO PROMPT 1 - şafakta limandan çıkan balıkçı teknesi\nVIDEO PROMPT 2 - dalgalar güverteyi dövüyor\nGÖRSEL PROMPT 1 - yaşlı balıkçının portresi\nGÖRSEL PROMPT 2 - limanda mezat sabahı\n```\n"
-        , parse_mode="Markdown")
+        "```\nVIDEO PROMPT 1 - şafakta limandan çıkan tekne\n"
+        "GÖRSEL PROMPT 1 - yaşlı balıkçının portresi\n```",
+        parse_mode="Markdown")
+
+
+async def komut_senkron(update: Update, _ctx):
+    if not _izinli(update):
+        return
+    sohbet = update.effective_chat.id
+    if sohbet in _CALISAN:
+        await update.message.reply_text("⏳ Üretim sürüyor. `/iptal` ile durdur.")
+        return
+    _BEKLEYEN[sohbet] = "senkron"
+    await update.message.reply_text(
+        "🧠 *Senkron mod* — anlatım METNİNİ gönder (düz metin).\n"
+        "Her cümle için prompt üretip Flow'da oluşturacağım; her çıktıyı "
+        "dayandığı cümleyle birlikte buraya atacağım.\n"
+        f"İlk ~%20 cümle VİDEO, kalanı GÖRSEL olur.", parse_mode="Markdown")
+
+
+# Eski akisla uyum: /basla artik kip secim mesaji verir.
+async def komut_basla(update: Update, _ctx):
+    await update.message.reply_text(
+        "İki mod var: 🎬 `/hikaye` (hazır promptlar) · 🧠 `/senkron` (metin ver)",
+        parse_mode="Markdown")
 
 
 async def komut_iptal(update: Update, _ctx):
     sohbet = update.effective_chat.id
-    _BEKLEYEN.discard(sohbet)
+    _BEKLEYEN.pop(sohbet, None)
     if sohbet in _CALISAN:
         _IPTAL.add(sohbet)
         await update.message.reply_text("🛑 İptal istendi — sıradaki prompttan sonra durur.")
@@ -135,46 +158,50 @@ async def metin_geldi(update: Update, ctx):
     if not _izinli(update):
         return
     sohbet = update.effective_chat.id
-    if sohbet not in _BEKLEYEN:
-        await update.message.reply_text("Üretim için `/basla` yaz.")
-        return
-    videolar, gorseller = _blok_coz(update.message.text)
-    if not (videolar or gorseller):
-        await update.message.reply_text("Blok boş görünüyor — tekrar gönder.")
-        return
-    _BEKLEYEN.discard(sohbet)
-
-    # ⚠ ON KONTROL (20 Agu 2026, ilk gercek deneme): Chrome debug portunda
-    # degilken uretim baslatildi; her prompt ayri ayri "baglanilamadi" hatasi
-    # uretti. Kapi BURADA: port kapaliysa is HIC baslamaz, tek mesajla soylenir.
-    import urllib.request as _ur
-    try:
-        _ur.urlopen(ayar.CHROME_CDP + "/json/version", timeout=3)
-    except Exception:
-        _BEKLEYEN.add(sohbet)          # script kaybolmasin: tekrar gonderebilir
+    kip = _BEKLEYEN.get(sohbet)
+    if kip is None:
         await update.message.reply_text(
-            "🔌 *Chrome hazır değil.*\n\n"
-            "Bilgisayarında şunu çalıştır:\n"
-            "`bash hayalet/chrome_baslat.sh`\n\n"
-            "Açılan pencerede Google hesabına girip Flow'u aç:\n"
-            "https://labs.google/fx/tools/flow\n\n"
-            "Sonra scripti TEKRAR gönder — bekliyorum.",
-            parse_mode="Markdown")
+            "Mod seç: 🎬 `/hikaye` · 🧠 `/senkron`", parse_mode="Markdown")
         return
+    _BEKLEYEN.pop(sohbet, None)
+
+    if kip == "senkron":
+        # METIN -> cumle basina plan (beyin) -> uretim
+        await update.message.reply_text("🧠 Metni analiz ediyorum…")
+        plan = await asyncio.to_thread(
+            beyin.plan_kur, update.message.text,
+            lambda m: None)
+        if not plan:
+            await update.message.reply_text("Metin boş görünüyor — `/senkron` ile tekrar.")
+            return
+        videolar = [p["prompt"] for p in plan if p["tur"] == "video"]
+        gorseller = [p["prompt"] for p in plan if p["tur"] == "gorsel"]
+        # prompt -> cumle eslesme haritasi (senkron teslim icin)
+        cumle_map = {p["prompt"]: p["cumle"] for p in plan}
+        await update.message.reply_text(
+            f"📋 Plan: {len(plan)} cümle → 🎬 {len(videolar)} video + "
+            f"🖼 {len(gorseller)} görsel. Başlıyorum.")
+    else:
+        videolar, gorseller = _blok_coz(update.message.text)
+        cumle_map = {}
+        if not (videolar or gorseller):
+            await update.message.reply_text("Blok boş görünüyor — `/hikaye` ile tekrar.")
+            return
 
     ad = f"is_{time.strftime('%Y%m%d_%H%M%S')}"
     d = ayar.is_dizini(ad)
-    is_ = {"ad": ad, "dizin": str(d), "video_promptlari": videolar,
-           "gorsel_promptlari": gorseller, "durum": "uretim",
+    is_ = {"ad": ad, "dizin": str(d), "kip": kip,
+           "video_promptlari": videolar, "gorsel_promptlari": gorseller,
+           "cumleler": cumle_map, "durum": "uretim",
            "sonuclar": {}, "hatalar": []}
     _SON_IS[sohbet] = is_
     _kaydet(is_)
     _CALISAN.add(sohbet)
     _IPTAL.discard(sohbet)
-    await update.message.reply_text(
-        f"🚀 Başlıyorum — 🎬 {len(videolar)} video + 🖼 {len(gorseller)} görsel.\n"
-        f"📁 `{d}`\n(Chrome açık ve Flow'a giriş yapılmış olmalı.)",
-        parse_mode="Markdown")
+    if kip != "senkron":
+        await update.message.reply_text(
+            f"🚀 Başlıyorum — 🎬 {len(videolar)} video + 🖼 {len(gorseller)} görsel.\n"
+            f"📁 `{d}`", parse_mode="Markdown")
 
     kuyruk: asyncio.Queue = asyncio.Queue()
 
@@ -199,15 +226,39 @@ async def metin_geldi(update: Update, ctx):
     def iptal_mi():
         return sohbet in _IPTAL
 
+    dongu = asyncio.get_running_loop()
+
+    def indi_cb(kayit):
+        """SENKRON teslim: cikti Telegram'a DAYANDIGI CUMLEYLE gider."""
+        if kip != "senkron":
+            return
+        cumle = cumle_map.get(kayit.get("prompt", ""), "")
+        yol = kayit.get("dosya", "")
+
+        async def _gonder():
+            try:
+                with open(yol, "rb") as f:
+                    if kayit.get("tur") == "video":
+                        await ctx.bot.send_video(sohbet, f, caption=cumle[:1000])
+                    else:
+                        await ctx.bot.send_photo(sohbet, f, caption=cumle[:1000])
+            except Exception as e:                           # noqa: BLE001
+                try:
+                    await ctx.bot.send_message(
+                        sohbet, f"⚠ dosya gönderilemedi ({type(e).__name__}) "
+                                f"— diskte: {yol}")
+                except Exception:
+                    pass
+        asyncio.run_coroutine_threadsafe(_gonder(), dongu)
+
     try:
-        # PARTI MODU (kullanici istegi): promptlar 10'ar verilir, ciktilar
-        # belirdikce indirilir — tek tek gondermekten cok daha hizli.
+        # PARTI MODU: promptlar 10'ar verilir, ciktilar belirdikce indirilir.
         vids = await asyncio.to_thread(
             flow_surucu.parti_uret, videolar, "video", d / "video",
-            bildir, iptal_mi)
+            bildir, iptal_mi, indi_cb)
         gors = await asyncio.to_thread(
             flow_surucu.parti_uret, gorseller, "gorsel", d / "gorsel",
-            bildir, iptal_mi)
+            bildir, iptal_mi, indi_cb)
         is_["sonuclar"] = {"video": vids, "gorsel": gors}
         hatalar = [f"{x['tur']}[{x['sira']}] {x['neden']}"
                    for x in (vids + gors) if not x["ok"]]
@@ -247,6 +298,7 @@ def calistir():
         raise SystemExit(1)
     app = Application.builder().token(ayar.TELEGRAM_TOKEN).build()
     for ad, fn in (("start", komut_start), ("basla", komut_basla),
+                   ("hikaye", komut_hikaye), ("senkron", komut_senkron),
                    ("durum", komut_durum), ("iptal", komut_iptal)):
         app.add_handler(CommandHandler(ad, fn))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, metin_geldi))
