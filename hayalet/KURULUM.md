@@ -64,8 +64,14 @@ curl -s "https://api.telegram.org/bot$TOKEN/getMe"   # "ok":true dönmeli
 ```bash
 bash hayalet/chrome_baslat.sh
 ```
-Açılan pencerede kullanıcı **Google hesabına girip**
-**https://labs.google/fx/tools/flow** açmalı. Pencere açık kalır.
+Açılan pencere **temiz bir profildir** (normal Chrome'undan ayrı —
+`~/.hayalet/chrome-profil`). Bu pencerede:
+1. **Flow erişimi olan Google hesabına** giriş yap (hangi hesapta Flow
+   aboneliğin varsa O hesap — yanlış hesapla girersen Flow açılmaz)
+2. **https://labs.google/fx/tools/flow** adresini açıp Flow'un yüklendiğini gör
+
+Giriş **bir keredir** — profil kalıcı, sonraki açılışlarda oturum durur.
+Pencere üretim boyunca açık kalmalı.
 
 ### 6) Flow seçici kalibrasyonu (İLK KURULUMDA ŞART)
 ```bash
@@ -107,6 +113,40 @@ Etiket toleranslıdır (`video 3:`, `Görsel Prompt -` de olur); etiketsiz satı
 önceki promptun devamı sayılır. Üretim hemen başlar; her indirmede ✅
 ilerleme, hatada ⚠ neden gelir. `/durum` künye · `/iptal` durdurur.
 Dosyalar: `~/Desktop/Hayalet/is_<tarih>/videolar|gorseller/`
+
+## YAŞANMIŞ HATALAR (gerçek kurulumlardan — oku, aynısını yaşama)
+
+> **Claude'a talimat:** Bu bölüm YAŞAYAN bir kayıttır. Kurulumda veya
+> kullanımda YENİ bir hata çözersen, buraya *belirti → kök neden → çözüm*
+> formatında EKLE ve commit'le. Sonraki kuran kişi aynı duvara çarpmasın.
+
+### 1) `Chrome'a baglanilamadi (http://127.0.0.1:9222)` — her prompt'ta
+- **Yaşandı:** 20 Ağu 2026, ilk gerçek deneme. `/basla` yazıldı ama
+  `chrome_baslat.sh` hiç çalıştırılmamıştı; 10 prompt tek tek bu hatayı aldı.
+- **Kök neden:** Ajan senin Chrome'una debug portundan (9222) bağlanır;
+  Chrome normal açılmışsa o port kapalıdır.
+- **Çözüm:** `bash hayalet/chrome_baslat.sh` → açılan pencerede Google girişi
+  + Flow. Bot artık üretime başlamadan portu yoklar ve hazır değilse tek
+  mesajla söyler (scriptin kaybolmaz, tekrar gönderirsin).
+
+### 2) Açılan Chrome'da Google oturumu yok / Flow açılmıyor
+- **Kök neden:** `chrome_baslat.sh` TEMİZ profil açar — günlük Chrome'undaki
+  oturum orada yoktur. Ayrıca Flow her Google hesabında yok; aboneliğin
+  hangi hesaptaysa onunla girilmeli.
+- **Çözüm:** Açılan pencerede Flow'lu hesabınla BİR KEZ giriş yap; profil
+  kalıcıdır.
+
+### 3) `telegram.error.Conflict: terminated by other getUpdates request`
+- **Kök neden:** Aynı bot token'ıyla İKİ bot süreci çalışıyor (eski süreç
+  ölmeden yenisi açılmış) — Telegram tek dinleyiciye izin verir.
+- **Çözüm:** `pkill -f hayalet.bot` → 2 sn bekle → `python3 -m hayalet.bot`.
+  Herkes KENDİ token'ını kullanmalı; token paylaşılırsa botlar birbirini düşürür.
+
+### 4) 🛑 "arka arkaya 3 hata — durduruldu"
+- **Kök neden:** Yapısal sorun sinyali: Flow oturumu düşmüş, arayüz değişmiş
+  (seçiciler eski) ya da Chrome penceresi kapanmış.
+- **Çözüm:** Chrome penceresi + Flow oturumu yerinde mi bak; değilse Adım 5.
+  Yerindeyse Adım 6 (seçici kalibrasyonu) tekrar.
 
 ## Sorun giderme
 
