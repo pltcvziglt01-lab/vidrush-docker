@@ -123,8 +123,9 @@ Anlatım METNİNİ düz metin olarak gönderirsin (HER DİLDE olabilir — Türk
 1. Metni analiz eder, HER CÜMLE için sinematik İngilizce prompt üretir
    (yerel LLM anahtarı gerekir: `~/.hayalet/gizli.env` içine
    `HAYALET_OPENAI_KEY=sk-...`; yoksa cümlenin kendisi prompt olur)
-2. İlk ~%20 cümle VİDEO, kalanı GÖRSEL olur
-   (`HAYALET_SENKRON_VIDEO_ORANI` ile ayarlanır)
+2. Metnin GİRİŞİ — ilk ~4-5k karakter — TAMAMEN VİDEO olur
+   (`HAYALET_ACILIS_KARAKTER`, varsayılan 4500); sonrası cümleden cümleye
+   değişir: hareket şartsa video, değilse görsel (LLM seçer)
 3. Flow'da üretir, diske indirir VE her çıktıyı **dayandığı cümleyle
    birlikte Telegram'a atar**:
    > 🎬 *(video)* — "Bu bitki hiçbir şey istemez."

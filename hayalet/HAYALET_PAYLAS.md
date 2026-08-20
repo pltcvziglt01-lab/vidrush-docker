@@ -8,7 +8,9 @@
 
 İki mod: 🎬 `/hikaye` hazır promptlarını Flow'da üretir ve diske klasörler;
 🧠 `/senkron` verdiğin METNİN (her dilde) her cümlesi için promptu kendi
-üretir, Flow'da oluşturur ve her çıktıyı dayandığı cümleyle Telegram'a atar.
+üretir — girişin ilk ~4-5k karakteri TAMAMEN video, sonrası cümleye göre
+video/görsel — Flow'da oluşturur ve her çıktıyı dayandığı cümleyle
+Telegram'a atar.
 
 ---
 
@@ -112,7 +114,6 @@ bu moduldeki sira uzerinden tasinir.
 from __future__ import annotations
 
 import json
-import math
 import os
 import re
 import urllib.request
@@ -122,7 +123,11 @@ from . import ayar  # gizli.env'i yukler (HAYALET_OPENAI_KEY)
 OPENAI_KEY = os.environ.get("HAYALET_OPENAI_KEY",
                             os.environ.get("OPENAI_API_KEY", ""))
 MODEL = os.environ.get("HAYALET_LLM_MODEL", "gpt-4.1-mini")
-VIDEO_ORANI = float(os.environ.get("HAYALET_SENKRON_VIDEO_ORANI", "0.20"))
+# ⚠ URUN KURALI (20 Agu 2026): metnin GIRISI — ilk ~4-5k karakter —
+# TAMAMEN VIDEO olur (kanal acilisi yogun hareket ister); sonrasi cumleden
+# cumleye degisebilir: LLM her cumle icin video/gorsel secer (hareket
+# sartsa video, degilse gorsel). LLM yoksa giris-sonrasi hepsi gorsel.
+ACILIS_KARAKTER = int(os.environ.get("HAYALET_ACILIS_KARAKTER", "4500"))
 
 _CUMLE = re.compile(r"[^.!?…。！？؟]+[.!?…。！？؟]+|[^.!?…。！？؟]+$")
 
@@ -152,7 +157,14 @@ def plan_kur(metin: str, bildir=None) -> list:
     cumleler = cumlelere_bol(metin)
     if not cumleler:
         return []
-    n_video = max(1, math.ceil(len(cumleler) * VIDEO_ORANI))
+    # GIRIS SINIRI: kumulatif karakter ACILIS_KARAKTER'i gecene kadar VIDEO.
+    # En az ILK cumle her zaman videodur.
+    giris_video = set()
+    topl = 0
+    for i, c in enumerate(cumleler, 1):
+        if i == 1 or topl < ACILIS_KARAKTER:
+            giris_video.add(i)
+        topl += len(c) + 1
     plan = []
     if OPENAI_KEY:
         try:
@@ -160,16 +172,20 @@ def plan_kur(metin: str, bildir=None) -> list:
                 "You turn a narration script into Flow generation prompts. "
                 "The script may be in ANY language (Turkish, English, "
                 "Spanish, Arabic, ...); UNDERSTAND it, do not translate it "
-                "back to the user. For EVERY numbered sentence, write ONE "
+                "back to the user. For EVERY numbered sentence: write ONE "
                 "cinematic, photorealistic ENGLISH prompt that visually "
                 "depicts that exact sentence (setting, subject, light, "
-                "camera). No text/watermark in image. Return JSON: "
-                '{"items":[{"i":<number>,"prompt":"..."}]} with EXACTLY '
+                "camera), and choose type: \"video\" if motion is "
+                "essential to depict it, else \"image\". "
+                "No text/watermark. Return JSON: "
+                '{"items":[{"i":<number>,"type":"video"|"image",'
+                '"prompt":"..."}]} with EXACTLY '
                 f"{len(cumleler)} items, same numbering.")
             girdi = "\n".join(f"{i+1}. {c}" for i, c in enumerate(cumleler))
             cevap = json.loads(_oai([{"role": "system", "content": sistem},
                                      {"role": "user", "content": girdi}]))
-            eslesme = {int(x["i"]): str(x.get("prompt", "")).strip()
+            eslesme = {int(x["i"]): (str(x.get("prompt", "")).strip(),
+                                     str(x.get("type", "")).strip().lower())
                        for x in cevap.get("items", []) if x.get("i")}
         except Exception as e:                               # noqa: BLE001
             eslesme = {}
@@ -181,11 +197,16 @@ def plan_kur(metin: str, bildir=None) -> list:
         if bildir:
             bildir("⚠ LLM anahtari yok — cumleler dogrudan prompt olacak")
     for i, cumle in enumerate(cumleler, 1):
-        prompt = eslesme.get(i) or (
+        prompt, llm_tur = (eslesme.get(i) or ("", ""))
+        prompt = prompt or (
             cumle + " — cinematic, photorealistic, natural light, 35mm")
-        plan.append({"sira": i, "cumle": cumle,
-                     "tur": "video" if i <= n_video else "gorsel",
-                     "prompt": prompt})
+        if i in giris_video:
+            tur = "video"                       # giris: KOSULSUZ video
+        elif llm_tur in ("video", "image"):
+            tur = "video" if llm_tur == "video" else "gorsel"
+        else:
+            tur = "gorsel"                      # LLM yoksa: giris-sonrasi gorsel
+        plan.append({"sira": i, "cumle": cumle, "tur": tur, "prompt": prompt})
     return plan
 
 ```
@@ -1036,8 +1057,9 @@ Anlatım METNİNİ düz metin olarak gönderirsin (HER DİLDE olabilir — Türk
 1. Metni analiz eder, HER CÜMLE için sinematik İngilizce prompt üretir
    (yerel LLM anahtarı gerekir: `~/.hayalet/gizli.env` içine
    `HAYALET_OPENAI_KEY=sk-...`; yoksa cümlenin kendisi prompt olur)
-2. İlk ~%20 cümle VİDEO, kalanı GÖRSEL olur
-   (`HAYALET_SENKRON_VIDEO_ORANI` ile ayarlanır)
+2. Metnin GİRİŞİ — ilk ~4-5k karakter — TAMAMEN VİDEO olur
+   (`HAYALET_ACILIS_KARAKTER`, varsayılan 4500); sonrası cümleden cümleye
+   değişir: hareket şartsa video, değilse görsel (LLM seçer)
 3. Flow'da üretir, diske indirir VE her çıktıyı **dayandığı cümleyle
    birlikte Telegram'a atar**:
    > 🎬 *(video)* — "Bu bitki hiçbir şey istemez."
