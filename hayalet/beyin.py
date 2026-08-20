@@ -24,7 +24,7 @@ OPENAI_KEY = os.environ.get("HAYALET_OPENAI_KEY",
 MODEL = os.environ.get("HAYALET_LLM_MODEL", "gpt-4.1-mini")
 VIDEO_ORANI = float(os.environ.get("HAYALET_SENKRON_VIDEO_ORANI", "0.20"))
 
-_CUMLE = re.compile(r"[^.!?…]+[.!?…]+|[^.!?…]+$")
+_CUMLE = re.compile(r"[^.!?…。！？؟]+[.!?…。！？؟]+|[^.!?…。！？؟]+$")
 
 
 def cumlelere_bol(metin: str) -> list:
@@ -58,10 +58,12 @@ def plan_kur(metin: str, bildir=None) -> list:
         try:
             sistem = (
                 "You turn a narration script into Flow generation prompts. "
-                "For EVERY numbered sentence, write ONE cinematic, "
-                "photorealistic ENGLISH prompt that visually depicts that "
-                "exact sentence (setting, subject, light, camera). "
-                "No text/watermark in image. Return JSON: "
+                "The script may be in ANY language (Turkish, English, "
+                "Spanish, Arabic, ...); UNDERSTAND it, do not translate it "
+                "back to the user. For EVERY numbered sentence, write ONE "
+                "cinematic, photorealistic ENGLISH prompt that visually "
+                "depicts that exact sentence (setting, subject, light, "
+                "camera). No text/watermark in image. Return JSON: "
                 '{"items":[{"i":<number>,"prompt":"..."}]} with EXACTLY '
                 f"{len(cumleler)} items, same numbering.")
             girdi = "\n".join(f"{i+1}. {c}" for i, c in enumerate(cumleler))

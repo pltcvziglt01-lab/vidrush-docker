@@ -7,8 +7,8 @@
 > (senkron mod için) bir OpenAI anahtarı.
 
 İki mod: 🎬 `/hikaye` hazır promptlarını Flow'da üretir ve diske klasörler;
-🧠 `/senkron` verdiğin METNİN her cümlesi için promptu kendi üretir,
-Flow'da oluşturur ve her çıktıyı dayandığı cümleyle Telegram'a atar.
+🧠 `/senkron` verdiğin METNİN (her dilde) her cümlesi için promptu kendi
+üretir, Flow'da oluşturur ve her çıktıyı dayandığı cümleyle Telegram'a atar.
 
 ---
 
@@ -124,7 +124,7 @@ OPENAI_KEY = os.environ.get("HAYALET_OPENAI_KEY",
 MODEL = os.environ.get("HAYALET_LLM_MODEL", "gpt-4.1-mini")
 VIDEO_ORANI = float(os.environ.get("HAYALET_SENKRON_VIDEO_ORANI", "0.20"))
 
-_CUMLE = re.compile(r"[^.!?…]+[.!?…]+|[^.!?…]+$")
+_CUMLE = re.compile(r"[^.!?…。！？؟]+[.!?…。！？؟]+|[^.!?…。！？؟]+$")
 
 
 def cumlelere_bol(metin: str) -> list:
@@ -158,10 +158,12 @@ def plan_kur(metin: str, bildir=None) -> list:
         try:
             sistem = (
                 "You turn a narration script into Flow generation prompts. "
-                "For EVERY numbered sentence, write ONE cinematic, "
-                "photorealistic ENGLISH prompt that visually depicts that "
-                "exact sentence (setting, subject, light, camera). "
-                "No text/watermark in image. Return JSON: "
+                "The script may be in ANY language (Turkish, English, "
+                "Spanish, Arabic, ...); UNDERSTAND it, do not translate it "
+                "back to the user. For EVERY numbered sentence, write ONE "
+                "cinematic, photorealistic ENGLISH prompt that visually "
+                "depicts that exact sentence (setting, subject, light, "
+                "camera). No text/watermark in image. Return JSON: "
                 '{"items":[{"i":<number>,"prompt":"..."}]} with EXACTLY '
                 f"{len(cumleler)} items, same numbering.")
             girdi = "\n".join(f"{i+1}. {c}" for i, c in enumerate(cumleler))
@@ -1030,7 +1032,7 @@ GÖRSEL PROMPT 1 - yaşlı balıkçının portresi
 Çıktılar diske iner; Telegram'a yalnızca ilerleme/hata düşer.
 
 ### 🧠 `/senkron` — metni verirsin, gerisi otomatik
-Anlatım METNİNİ düz metin olarak gönderirsin. Sistem:
+Anlatım METNİNİ düz metin olarak gönderirsin (HER DİLDE olabilir — Türkçe, İngilizce, İspanyolca…). Sistem:
 1. Metni analiz eder, HER CÜMLE için sinematik İngilizce prompt üretir
    (yerel LLM anahtarı gerekir: `~/.hayalet/gizli.env` içine
    `HAYALET_OPENAI_KEY=sk-...`; yoksa cümlenin kendisi prompt olur)

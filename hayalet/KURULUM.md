@@ -119,7 +119,7 @@ GÖRSEL PROMPT 1 - yaşlı balıkçının portresi
 Çıktılar diske iner; Telegram'a yalnızca ilerleme/hata düşer.
 
 ### 🧠 `/senkron` — metni verirsin, gerisi otomatik
-Anlatım METNİNİ düz metin olarak gönderirsin. Sistem:
+Anlatım METNİNİ düz metin olarak gönderirsin (HER DİLDE olabilir — Türkçe, İngilizce, İspanyolca…). Sistem:
 1. Metni analiz eder, HER CÜMLE için sinematik İngilizce prompt üretir
    (yerel LLM anahtarı gerekir: `~/.hayalet/gizli.env` içine
    `HAYALET_OPENAI_KEY=sk-...`; yoksa cümlenin kendisi prompt olur)
