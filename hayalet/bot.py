@@ -144,6 +144,24 @@ async def metin_geldi(update: Update, ctx):
         return
     _BEKLEYEN.discard(sohbet)
 
+    # ⚠ ON KONTROL (20 Agu 2026, ilk gercek deneme): Chrome debug portunda
+    # degilken uretim baslatildi; her prompt ayri ayri "baglanilamadi" hatasi
+    # uretti. Kapi BURADA: port kapaliysa is HIC baslamaz, tek mesajla soylenir.
+    import urllib.request as _ur
+    try:
+        _ur.urlopen(ayar.CHROME_CDP + "/json/version", timeout=3)
+    except Exception:
+        _BEKLEYEN.add(sohbet)          # script kaybolmasin: tekrar gonderebilir
+        await update.message.reply_text(
+            "🔌 *Chrome hazır değil.*\n\n"
+            "Bilgisayarında şunu çalıştır:\n"
+            "`bash hayalet/chrome_baslat.sh`\n\n"
+            "Açılan pencerede Google hesabına girip Flow'u aç:\n"
+            "https://labs.google/fx/tools/flow\n\n"
+            "Sonra scripti TEKRAR gönder — bekliyorum.",
+            parse_mode="Markdown")
+        return
+
     ad = f"is_{time.strftime('%Y%m%d_%H%M%S')}"
     d = ayar.is_dizini(ad)
     is_ = {"ad": ad, "dizin": str(d), "video_promptlari": videolar,
