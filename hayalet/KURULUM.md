@@ -91,24 +91,15 @@ python3 -m hayalet.bot
 
 ---
 
-## KULLANIM (2 adım)
+## KULLANIM (3 mesaj)
 
 1. Botuna `/basla` yaz
-2. Scripti **tek mesajda** gönder:
+2. Bot **video** promptlarını ister → her satır bir prompt gönder (video yoksa `-`)
+3. Bot **görsel** promptlarını ister → gönder → üretim başlar
 
-```
-video:
-şafakta limandan çıkan balıkçı teknesi
-dalgalar güverteyi dövüyor
-gorsel:
-yaşlı balıkçının yakın plan portresi
-limanda mezat sabahı
-```
-
-- `video:` altındakiler video, `gorsel:` altındakiler görsel promptu.
-- Başlık koymazsan **hepsi görsel** sayılır.
-- Üretim hemen başlar; her indirmede ✅ ilerleme, hatada ⚠ neden gelir.
-- `/durum` künye · `/iptal` durdurur. Dosyalar: `~/Desktop/Hayalet/is_<tarih>/`
+Başlık/etiket yazmazsın; sıralamayı bot yönetir. Her indirmede ✅ ilerleme,
+hatada ⚠ neden gelir. `/durum` künye · `/iptal` durdurur.
+Dosyalar: `~/Desktop/Hayalet/is_<tarih>/videolar|gorseller/`
 
 ## Sorun giderme
 

@@ -31,33 +31,23 @@ from telegram.ext import (Application, CommandHandler, MessageHandler, filters)
 
 from . import ayar, flow_surucu
 
-_BEKLENEN = set()    # /basla demis, script bekleyen sohbetler
+_BEKLEME = {}        # sohbet_id -> {"asama": "video"|"gorsel", "video": [...]}
 _CALISAN = set()     # su an uretimde olan sohbetler (cifte /basla engeli)
 _IPTAL = set()
 _SON_IS = {}         # sohbet_id -> son is sozlugu (/durum icin)
 
 
-def _script_coz(metin: str) -> tuple:
-    """Script -> (video_promptlari, gorsel_promptlari).
+def _satirlar(metin: str) -> list:
+    """Mesaj -> prompt listesi. '-' / 'yok' = bos liste (o tur atlanir).
 
-    ⚠ Baslik yoksa hepsi GORSEL: kullanici cogu zaman yalniz gorsel uretir;
-    bos video listesi sorun degil, YANLIS SINIFLAMA sorundur.
+    ⚠ BASLIK YOK (kullanici karari): bot once VIDEO promptlarini, sonra
+    GORSEL promptlarini AYRI MESAJLARDA ister; siniflandirmayi akis yapar,
+    kullanici etiket yazmaz.
     """
-    videolar, gorseller = [], []
-    hedef = gorseller
-    for satir in (metin or "").splitlines():
-        s = satir.strip()
-        if not s:
-            continue
-        b = s.lower().rstrip(":")
-        if b in ("video", "videolar"):
-            hedef = videolar
-            continue
-        if b in ("gorsel", "görsel", "gorseller", "görseller", "image", "images"):
-            hedef = gorseller
-            continue
-        hedef.append(s)
-    return videolar, gorseller
+    satirlar = [x.strip() for x in (metin or "").splitlines() if x.strip()]
+    if satirlar and satirlar[0].lower() in ("-", "yok", "hayir", "hayır", "skip"):
+        return []
+    return satirlar
 
 
 def _kaydet(is_: dict) -> None:
@@ -74,9 +64,8 @@ def _izinli(update: Update) -> bool:
 async def komut_start(update: Update, _ctx):
     await update.message.reply_text(
         "👻 *Hayalet* hazır.\n\n"
-        "`/basla` yaz → scripti iste­diğimde tek mesajda gönder:\n\n"
-        "```\nvideo:\nprompt 1\nprompt 2\ngorsel:\nprompt 3\nprompt 4\n```\n"
-        "Başlık koymazsan hepsini *görsel* sayarım.\n"
+        "`/basla` yaz → önce *video* promptlarını, sonra *görsel* "
+        "promptlarını isterim (her satır bir prompt, olmayan tür için `-`).\n"
         "Dosyalar bilgisayarına iner; buraya sadece durum düşer.\n"
         "`/durum` · `/iptal`", parse_mode="Markdown")
 
@@ -89,21 +78,20 @@ async def komut_basla(update: Update, _ctx):
         await update.message.reply_text(
             "⏳ Zaten bir üretim çalışıyor. `/iptal` ile durdurabilirsin.")
         return
-    _BEKLENEN.add(sohbet)
+    _BEKLEME[sohbet] = {"asama": "video", "video": []}
     await update.message.reply_text(
-        "📜 Scripti gönder (tek mesaj):\n\n"
-        "```\nvideo:\nprompt 1\nprompt 2\ngorsel:\nprompt 3\n```\n"
-        "Başlık yoksa hepsi görsel sayılır.", parse_mode="Markdown")
+        "🎬 *Video* promptlarını gönder — her satır bir prompt.\n"
+        "Video yoksa `-` yaz.", parse_mode="Markdown")
 
 
 async def komut_iptal(update: Update, _ctx):
     sohbet = update.effective_chat.id
-    _BEKLENEN.discard(sohbet)
+    _BEKLEME.pop(sohbet, None)
     if sohbet in _CALISAN:
         _IPTAL.add(sohbet)
         await update.message.reply_text("🛑 İptal istendi — sıradaki prompttan sonra durur.")
     else:
-        await update.message.reply_text("🛑 Bekleyen iş yok, script isteği iptal edildi.")
+        await update.message.reply_text("🛑 Bekleyen iş yok, istek iptal edildi.")
 
 
 async def komut_durum(update: Update, _ctx):
@@ -123,15 +111,27 @@ async def metin_geldi(update: Update, ctx):
     if not _izinli(update):
         return
     sohbet = update.effective_chat.id
-    if sohbet not in _BEKLENEN:
+    bek = _BEKLEME.get(sohbet)
+    if bek is None:
         await update.message.reply_text("Üretim için `/basla` yaz.")
         return
-    _BEKLENEN.discard(sohbet)
 
-    videolar, gorseller = _script_coz(update.message.text)
+    if bek["asama"] == "video":
+        bek["video"] = _satirlar(update.message.text)
+        bek["asama"] = "gorsel"
+        await update.message.reply_text(
+            f"🎬 {len(bek['video'])} video promptu alındı.\n"
+            f"🖼 Şimdi *görsel* promptlarını gönder — her satır bir prompt "
+            f"(yoksa `-`).", parse_mode="Markdown")
+        return
+
+    # asama == "gorsel" -> uretim baslar
+    videolar = bek["video"]
+    gorseller = _satirlar(update.message.text)
+    _BEKLEME.pop(sohbet, None)
     if not (videolar or gorseller):
-        _BEKLENEN.add(sohbet)          # bos mesaj: beklemeye devam
-        await update.message.reply_text("Script boş görünüyor — tekrar gönder.")
+        await update.message.reply_text(
+            "İkisi de boş — `/basla` ile yeniden başla.")
         return
 
     ad = f"is_{time.strftime('%Y%m%d_%H%M%S')}"
