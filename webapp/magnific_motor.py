@@ -30,12 +30,26 @@ import time
 
 import requests
 
-# kaynak.py ile AYNI anahtar zinciri: FREEPIK_KEYS > MAGNIFIC_KEY.
+# kaynak.py ile AYNI anahtar zinciri: FREEPIK_KEYS > (dosya > MAGNIFIC_KEY).
+# ⚠ Tek-anahtar yolunda DOSYA env'i YENER (kaynak._magnific_anahtar ile ayni
+# karar): Config.Env'e gomulu anahtar panelden silindi; rotasyon mount'lu
+# veri/magnific_key.txt uzerinden, konteyner yeniden yaratmadan yapilir.
 def _anahtarlar() -> list:
     coklu = [a.strip() for a in os.environ.get("FREEPIK_KEYS", "").split(",")
              if a.strip()]
-    tek = os.environ.get("MAGNIFIC_KEY", "").strip()
-    return coklu or ([tek] if tek else [])
+    if coklu:
+        return coklu
+    tek = ""
+    try:
+        _kok = os.environ.get("VIDRUSH_KOK", "/opt/vidrush")
+        _d = os.environ.get("ANAHTAR_DIZIN",
+                            os.path.join(_kok, "webapp", "veri"))
+        with open(os.path.join(_d, "magnific_key.txt")) as f:
+            tek = f.read().strip()
+    except Exception:
+        pass
+    tek = tek or os.environ.get("MAGNIFIC_KEY", "").strip()
+    return [tek] if tek else []
 
 
 TABAN = os.environ.get("MAG_API_TABAN", "https://api.freepik.com/v1/ai")

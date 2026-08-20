@@ -49,7 +49,24 @@ def _anahtar_oku(env_ad: str, dosya_ad: str) -> str:
         return ""
 
 
-MAGNIFIC_KEY = os.environ.get("MAGNIFIC_KEY", "")
+# ⚠ MAGNIFIC ROTASYONU DOSYA-ONCE (20 Agu 2026). Konteynerin Config.Env'ine
+# gomulu MAGNIFIC_KEY panelden SILINDI (olculdu: eski "app" anahtari Deleted);
+# env'i degistirmek konteyneri yeniden yaratmayi gerektirir ve calisan isi
+# oldururdu. `magnific_key.txt` mount'lu veri/ dizininde yasar: once dosya,
+# yoksa env. Diger anahtarlar (_anahtar_oku) env-once kalir — onlarin env'i
+# curumedi.
+def _magnific_anahtar() -> str:
+    try:
+        with open(os.path.join(ANAHTAR_DIZIN, "magnific_key.txt")) as f:
+            d = f.read().strip()
+            if d:
+                return d
+    except Exception:
+        pass
+    return os.environ.get("MAGNIFIC_KEY", "")
+
+
+MAGNIFIC_KEY = _magnific_anahtar()
 
 # ── COKLU FREEPIK ANAHTARI + GUNLUK KOTA TAKIBI (5 Agu 2026) ──
 # Neden: Freepik API'sinde stok indirme Premium/Premium+/Pro planlarda KREDI HARCAMAZ ama
