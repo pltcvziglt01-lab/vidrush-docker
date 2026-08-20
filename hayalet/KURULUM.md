@@ -91,21 +91,24 @@ python3 -m hayalet.bot
 
 ---
 
-## KULLANIM
+## KULLANIM (2 adım)
 
-| Telegram komutu | Ne yapar |
-|---|---|
-| `/yeni proje_adi` | Yeni klasör açar |
-| `/video` | Sonraki mesajlar video promptları (her satır = 1 prompt) |
-| `/gorsel` | Sonraki mesajlar görsel promptları |
-| `/basla` | Üretim + indirme başlar |
-| `/durum` | Künye: kaç prompt, kaç hata, klasör yolu |
-| `/iptal` | Sıradaki prompttan sonra durur |
+1. Botuna `/basla` yaz
+2. Scripti **tek mesajda** gönder:
 
-**Takip mesajları:** her indirmede ✅ ilerleme; hatada ⚠ neden; art arda
-3 hata olursa 🛑 durur ("oturum düştü / seçici kırıldı" demektir — Adım 6'yı tekrarla).
+```
+video:
+şafakta limandan çıkan balıkçı teknesi
+dalgalar güverteyi dövüyor
+gorsel:
+yaşlı balıkçının yakın plan portresi
+limanda mezat sabahı
+```
 
----
+- `video:` altındakiler video, `gorsel:` altındakiler görsel promptu.
+- Başlık koymazsan **hepsi görsel** sayılır.
+- Üretim hemen başlar; her indirmede ✅ ilerleme, hatada ⚠ neden gelir.
+- `/durum` künye · `/iptal` durdurur. Dosyalar: `~/Desktop/Hayalet/is_<tarih>/`
 
 ## Sorun giderme
 
