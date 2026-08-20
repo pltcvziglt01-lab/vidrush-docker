@@ -130,13 +130,24 @@ def _dosya_adi(sira: int, tur: str, prompt: str, uzanti: str) -> str:
 
 
 def _medya_srcleri(sayfa, tur: str) -> set:
-    """Sayfadaki BUYUK medya src'leri (genislik > 200px)."""
-    etiket = "video" if tur == "video" else "img"
+    """Sayfadaki medya src'leri.
+
+    ⚠ OLCULEN KUSUR (20 Agu 2026, ilk video testi): uretilen <video>
+    elementi DOM'da 0 PIKSEL genislikte durabiliyor (gorunmez kapsayici);
+    ">200px" filtresi onu ELEYIP testi timeout'a dusurdu — video aslinda
+    URETILMISTI. Video icin boyut filtresi YOK, src varligi yeter.
+    Gorselde filtre durur: kucuk ikon/avatar img'leri elemek icin.
+    """
+    if tur == "video":
+        return set(sayfa.evaluate(
+            """() => [...document.querySelectorAll('video')]
+                 .map(e => e.currentSrc || e.src || '')
+                 .filter(u => u.length > 30)"""))
     return set(sayfa.evaluate(
-        """(et) => [...document.querySelectorAll(et)].filter(e => {
+        """() => [...document.querySelectorAll('img')].filter(e => {
              const r = e.getBoundingClientRect();
              return r.width > 200 && (e.currentSrc || e.src || '').length > 30;
-           }).map(e => e.currentSrc || e.src)""", etiket))
+           }).map(e => e.currentSrc || e.src)"""))
 
 
 def uret_ve_indir(prompt: str, tur: str, sira: int, hedef_dizin: Path,
@@ -220,6 +231,122 @@ def uret_ve_indir(prompt: str, tur: str, sira: int, hedef_dizin: Path,
                 pw.stop()
             except Exception:
                 pass
+
+
+PARTI_BOYU = int(__import__("os").environ.get("HAYALET_PARTI", "10"))
+
+
+def parti_uret(promptlar: list, tur: str, hedef_dizin: Path, bildir=None,
+               iptal_mi=None) -> list:
+    """PROMPTLARI 10'AR VERIP ciktilari BELIRDIKCE indirir (ajan modu).
+
+    ⚠ NEDEN PARTI: ajan arayuzu sohbet tabanli — tek mesajda numarali N
+    prompt verilebilir; ajan SIRAYLA uretir. Tek tek gondermeye gore cok
+    daha hizli (her prompt icin ayri baglanti+bekleme yok).
+    ⚠ ESLEME SINIRI (durust): cikti->prompt eslesmesi BELIRME SIRASIYLA
+    yapilir; ajan sirayi bozarsa dosya adi yanlis prompta denk gelebilir.
+    Icerik DOGRU iner; yalnizca adlandirma kayabilir. is.json'da parti
+    kaydi tutulur.
+    """
+    def _bildir(m):
+        if bildir:
+            try:
+                bildir(m)
+            except Exception:
+                pass
+
+    temiz = [(i + 1, (p or "").strip()) for i, p in enumerate(promptlar)
+             if (p or "").strip()]
+    if not temiz:
+        return []
+    sonuclar = []
+    partiler = [temiz[i:i + PARTI_BOYU] for i in range(0, len(temiz), PARTI_BOYU)]
+    pw = None
+    try:
+        pw, _t, baglam = chrome_baglan()
+        sayfa = _flow_sayfasi(baglam)
+        for p_no, parti in enumerate(partiler, 1):
+            if iptal_mi is not None and iptal_mi():
+                _bildir("🛑 iptal edildi")
+                break
+            onceki = _medya_srcleri(sayfa, tur)
+            tur_ad = "videos" if tur == "video" else "images"
+            mesaj = (f"Generate {len(parti)} separate {tur_ad}, one for each "
+                     f"numbered prompt below. Do not ask questions, do not "
+                     f"combine them, generate all:\n"
+                     + "\n".join(f"{i}. {p}" for i, p in parti))
+            try:
+                sayfa.locator(SECICILER["temizle_dugme"][0]).first.click(timeout=2000)
+            except Exception:
+                pass
+            girdi = sayfa.locator(SECICILER["prompt_girdi"][0]).last
+            girdi.click()
+            # type() cok satirda Enter'i GONDER sanabilir -> panoya benzer insert
+            sayfa.keyboard.insert_text(mesaj)
+            sayfa.locator(SECICILER["uret_dugme"][0]).last.click()
+            _bildir(f"📦 parti {p_no}/{len(partiler)}: {len(parti)} prompt gonderildi")
+
+            beklenen = len(parti)
+            inen = {}
+            bas = time.time()
+            tavan = ayar.FLOW_URETIM_TAVAN_SN * max(1, beklenen // 3)
+            while len(inen) < beklenen and time.time() - bas < tavan:
+                if iptal_mi is not None and iptal_mi():
+                    break
+                time.sleep(6)
+                yeniler = sorted(_medya_srcleri(sayfa, tur) - onceki
+                                 - set(inen))
+                for kaynak in yeniler:
+                    sira, prompt = parti[min(len(inen), beklenen - 1)]
+                    try:
+                        b64 = sayfa.evaluate(
+                            """async (u) => {
+                                const r = await fetch(u);
+                                const b = await r.arrayBuffer();
+                                let s = ''; const v = new Uint8Array(b);
+                                const k = 0x8000;
+                                for (let i = 0; i < v.length; i += k)
+                                    s += String.fromCharCode.apply(null, v.subarray(i, i + k));
+                                return btoa(s);
+                            }""", kaynak)
+                        import base64 as _b64
+                        veri = _b64.b64decode(b64)
+                        if len(veri) < 5000:
+                            continue
+                        uzanti = ".mp4" if tur == "video" else ".png"
+                        hedef = hedef_dizin / _dosya_adi(sira, tur, prompt, uzanti)
+                        hedef.write_bytes(veri)
+                        inen[kaynak] = str(hedef)
+                        sonuclar.append({"ok": True, "dosya": str(hedef),
+                                         "neden": "", "prompt": prompt,
+                                         "sira": sira, "tur": tur})
+                        _bildir(f"✅ {tur} {len(sonuclar)}/{len(temiz)} indi "
+                                f"— devam ediyorum")
+                    except Exception as e:                   # noqa: BLE001
+                        _bildir(f"⚠ indirme hatasi: {type(e).__name__}")
+            eksik = beklenen - sum(1 for r in sonuclar
+                                   if r["sira"] in [x[0] for x in parti])
+            for sira, prompt in parti:
+                if not any(r["sira"] == sira and r["tur"] == tur
+                           for r in sonuclar):
+                    sonuclar.append({"ok": False, "dosya": "",
+                                     "neden": "parti tavaninda uretilmedi",
+                                     "prompt": prompt, "sira": sira,
+                                     "tur": tur})
+            if eksik > 0:
+                _bildir(f"⚠ parti {p_no}: {eksik} cikti gelmedi (kayitli)")
+    except FlowHatasi as e:
+        for sira, prompt in temiz:
+            if not any(r["sira"] == sira for r in sonuclar):
+                sonuclar.append({"ok": False, "dosya": "", "neden": str(e),
+                                 "prompt": prompt, "sira": sira, "tur": tur})
+    finally:
+        if pw is not None:
+            try:
+                pw.stop()
+            except Exception:
+                pass
+    return sonuclar
 
 
 def toplu_uret(promptlar: list, tur: str, hedef_dizin: Path, bildir=None,
