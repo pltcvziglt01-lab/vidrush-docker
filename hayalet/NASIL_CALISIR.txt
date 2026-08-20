@@ -1,0 +1,41 @@
+HAYALET - NASIL CALISIR
+
+Baslamadan once (bir kez):
+  bash hayalet/chrome_baslat.sh   -> acilan Chrome'da Flow'a giris yap
+  python3 -m hayalet.bot          -> bot calisir, Telegram'dan yaz
+
+
+HIKAYE MODU  (/hikaye)
+----------------------
+Promptlari SEN yazarsin, bot uretir ve bilgisayara indirir.
+
+1) Telegram'da /hikaye yaz
+2) Promptlari tek blok gonder:
+     VIDEO PROMPT 1 - safakta limandan cikan tekne
+     VIDEO PROMPT 2 - dalgalar guverteyi dovuyor
+     GORSEL PROMPT 1 - yasli balikcinin portresi
+3) Bot Flow'da uretir, Masaustu/Hayalet/is_<tarih>/video ve /gorsel
+   klasorlerine indirir. Telegram'a sadece ilerleme/hata duser.
+
+
+SENKRON MODU  (/senkron)
+------------------------
+METNI verirsin, promptlari BOT uretir, ciktiyi cumlesiyle atar.
+
+1) Telegram'da /senkron yaz
+2) Anlatim metnini duz metin gonder (her dilde olabilir)
+3) Bot her cumle icin prompt uretir:
+   - Ilk ~4-5k karakter (giris) -> TAMAMEN VIDEO
+   - Sonrasi cumleye gore: hareket sartsa video, degilse gorsel
+4) Flow'da uretir, diske indirir VE her ciktiyi Telegram'a
+   dayandigi cumleyle atar:
+     [video]  "Bu bitki hicbir sey istemez."
+     [foto]   "Kokleri yuz metre derine iner."
+
+
+ORTAK
+-----
+/durum  -> is kunyesi (kac prompt, kac hata, klasor)
+/iptal  -> siradaki prompttan sonra durdurur
+Hata olursa bot nedenini Telegram'a yazar; art arda 3 hatada durur
+(Chrome/Flow oturumunu kontrol et demektir).
