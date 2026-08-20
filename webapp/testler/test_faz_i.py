@@ -1300,8 +1300,8 @@ CSS_ST = _oku_st("app.css")
 # ── Varsayilan deneyim: metin + stil + TEK ana eylem ──
 kontrol("basit.js modulu var", len(BASIT) > 1000)
 kontrol("varsayilan mod BASIT", "mod: 'basit'" in DURUM_JS)
-kontrol("wizard basit modu cagiriyor",
-        "basitGovde" in WZ_JS and "basitKur" in WZ_JS)
+kontrol("wizard basit modu cagiriyor",  # ⚠ TEK AKIS PIVOTU (20 Agu 2026): kilit yeni akisa tasindi
+        "wizardCiz" in WZ_JS and "uretimBaslat" in WZ_JS)
 kontrol("metin alani var", 'id="bsMetin"' in BASIT)
 kontrol("stil secimi var (Otomatik dahil)", "stilBolumu({" in BASIT)
 kontrol("sure secici KORUNDU", 'id: \'bsSure\'' in BASIT
@@ -1318,14 +1318,15 @@ for ad, iz in [("ses kutuphanesi", "sesBolumu({"), ("marka kiti", "markaBolumu({
                ("hizli tercihler", "hizliTercihler({"),
                ("profesyonel ayarlar", "proPanel({")]:
     kontrol(f"basit modda korundu: {ad}", iz in BASIT)
+# ⚠ TEK AKIS PIVOTU (20 Agu 2026): adim/mod/unlu URUNDEN kalkti.
 kontrol("secim kontrolleri TEK yerden baglaniyor (cift baglama yok)",
-        BASIT.count("radyoBagla") == 0 and "adim3Kur({" in WZ_JS)
-kontrol("adim adim wizard KALDIRILMADI",
-        len(re.findall(r"\{no: \d, ad: '", WZ_JS)) == 5)
-kontrol("iki mod arasinda gidip gelinebiliyor",
-        "modCipleri" in BASIT and "modCipleri" in WZ_JS
-        and "data-grup=\"mod\"" in BASIT)
-kontrol("unlu modu HALA uretiliyor", "d.unlu = t.unlu ? '1' : '0'" in WZ_JS)
+        WZ_JS.count("function olaylariBagla") == 1)
+kontrol("adim adim wizard KALDIRILMADI",  # pivot: kaldirilmasi ARTIK dogru
+        "ADIMLAR" not in WZ_JS)
+kontrol("iki mod arasinda gidip gelinebiliyor",  # pivot: tek mod kaldi
+        "modCipleri" not in WZ_JS)
+kontrol("unlu modu HALA uretiliyor",  # pivot: unlu arayuzden kalkti
+        "d.unlu" not in WZ_JS)
 kontrol("Grok/maliyet alanlarina dokunulmadi (gorsel model secimi duruyor)",
         "wzModel" in SD_JS)
 
@@ -1338,13 +1339,13 @@ _yeni_alan = set(re.findall(r"d\.(\w+)\s*=", _gd)) - {
     "isik", "gorsel_model", "acilis", "sora", "unlu", "karakter", "stil",
     "sahne_ref"}
 kontrol("Auto sozlesmeye YENI ALAN EKLEMIYOR", not _yeni_alan, str(_yeni_alan))
+# ⚠ TEK AKIS PIVOTU: Auto stil secimi kalkti; edit SABIT "akis".
 kontrol("Auto stili MEVCUT `edit` alaniyla tasiniyor",
-        "autoStilKimligi(_analiz, t.tur)" in WZ_JS
-        and "d.edit = stil || otoStil" in WZ_JS)
-kontrol("kullanicinin acik stili Auto'yu YENIYOR",
-        "stil ? '' : autoStilKimligi" in WZ_JS)
-kontrol("kullanicinin acik TUR secimi isaretleniyor",
-        "turKaynak: 'kullanici'" in WZ_JS and "turKaynak" in DURUM_JS)
+        "edit: 'akis'" in WZ_JS or "edit: AKIS.edit" in WZ_JS)
+kontrol("kullanicinin acik stili Auto'yu YENIYOR",  # pivot: secim yok
+        "autoStilKimligi" not in WZ_JS)
+kontrol("kullanicinin acik TUR secimi isaretleniyor",  # pivot: tur sabit
+        "tur: 'documentary'" in WZ_JS)
 
 # ── Auto sonucu GORUNUR ve ANLASILIR ──
 kontrol("konsept ekranda gosteriliyor", "'Konu türü'" in BASIT)
@@ -1815,10 +1816,13 @@ kontrol("server.py referans_parmak'i HENUZ import etmiyor (baglanti sonraki adim
         "referans_parmak" not in _SRV)
 kontrol("pipeline.py referans_parmak'i HENUZ import etmiyor",
         "referans_parmak" not in oku(KOK, "pipeline.py"))
-kontrol("basit mod KORUNDU", "basitGovde" in oku(KOK, "static/js/wizard.js"))
-kontrol("sure secici KORUNDU", "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js"))
-kontrol("unlu modu KORUNDU",
-        "d.unlu = t.unlu ? '1' : '0'" in oku(KOK, "static/js/wizard.js"))
+kontrol("basit mod KORUNDU",  # ⚠ TEK AKIS PIVOTU (20 Agu 2026): kilit yeni akisa tasindi
+        "tur: 'documentary'" in oku(KOK, "static/js/wizard.js")
+        and "edit: 'akis'" in oku(KOK, "static/js/wizard.js"))
+kontrol("sure secici KORUNDU",  # tek akis kendi sure girdisini tasir
+        'id="akSure"' in oku(KOK, "static/js/wizard.js"))
+kontrol("unlu modu KORUNDU",  # pivot: unlu ARAYUZDEN kalkti, API alani durur
+        "'unlu'" in oku(KOK, "static/js/api.js"))
 kontrol("ses kutuphanesi KORUNDU",
         "sesBolumu({" in oku(KOK, "static/js/basit.js"))
 kontrol("deploy.sh ezme korumasi KORUNDU",
@@ -2047,9 +2051,9 @@ except Exception as e:
 kontrol("22 alanlik generate sozlesmesi HALA degismedi",
         len(set(re.findall(r"\{ad: '(\w+)'",
                            oku(KOK, "static/js/api.js")))) == 22)
-kontrol("UI bu adimda DEGISMEDI (basit mod + sure secici duruyor)",
-        "basitGovde" in oku(KOK, "static/js/wizard.js")
-        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js"))
+kontrol("UI bu adimda DEGISMEDI (basit mod + sure secici duruyor)",  # ⚠ TEK AKIS PIVOTU (20 Agu 2026): kilit yeni akisa tasindi
+        "tur: 'documentary'" in oku(KOK, "static/js/wizard.js")
+        and "edit: 'akis'" in oku(KOK, "static/js/wizard.js"))
 kontrol("referans olcum motoru bu adimda BAGLANMADI",
         "referans_parmak" not in _PP2)
 kontrol("pipeline.py derleniyor (I-2d sonrasi)",
@@ -2320,9 +2324,9 @@ kontrol("avci konsepti sorgu planina ve puanlamaya GECIRIYOR",
 kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
         len(set(re.findall(r"\{ad: '(\w+)'",
                            oku(KOK, "static/js/api.js")))) == 22)
-kontrol("UI bu adimda DEGISMEDI",
-        "basitGovde" in oku(KOK, "static/js/wizard.js")
-        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js"))
+kontrol("UI bu adimda DEGISMEDI",  # ⚠ TEK AKIS PIVOTU (20 Agu 2026): kilit yeni akisa tasindi
+        "tur: 'documentary'" in oku(KOK, "static/js/wizard.js")
+        and "edit: 'akis'" in oku(KOK, "static/js/wizard.js"))
 kontrol("referans parmak izi modulu BAGLANMADI",
         "referans_parmak" not in _AV and "referans_parmak" not in _SR_KAYNAK)
 kontrol("hikaye/animasyon motoruna dokunulmadi",
@@ -2611,10 +2615,9 @@ kontrol("server.py medya_avcisi alanini OKUMUYOR (UI'dan gelemez)",
 kontrol("UI medya_avcisi GONDERMIYOR",
         all("medya_avcisi" not in oku(KOK, f"static/js/{f}")
             for f in ("api.js", "wizard.js", "basit.js")))
-kontrol("UI ozellikleri KORUNDU",
-        "basitGovde" in oku(KOK, "static/js/wizard.js")
-        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js")
-        and "d.unlu = t.unlu ? '1' : '0'" in oku(KOK, "static/js/wizard.js"))
+kontrol("UI ozellikleri KORUNDU",  # ⚠ TEK AKIS PIVOTU (20 Agu 2026): kilit yeni akisa tasindi
+        "tur: 'documentary'" in oku(KOK, "static/js/wizard.js")
+        and "edit: 'akis'" in oku(KOK, "static/js/wizard.js"))
 kontrol("lisans/SSRF/kare kapisi modulleri DOKUNULMADI",
         all("medya_kopru" not in oku(KOK, f) for f in
             ("medya/lisans.py", "medya/guvenlik.py", "medya/indirme.py",
@@ -2850,9 +2853,9 @@ kontrol("modul ozet()'i `acik` bayragini tasimaya devam ediyor",
 kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
         len(set(re.findall(r"\{ad: '(\w+)'",
                            oku(KOK, "static/js/api.js")))) == 22)
-kontrol("UI DEGISMEDI",
-        "basitGovde" in oku(KOK, "static/js/wizard.js")
-        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js"))
+kontrol("UI DEGISMEDI",  # ⚠ TEK AKIS PIVOTU (20 Agu 2026): kilit yeni akisa tasindi
+        "tur: 'documentary'" in oku(KOK, "static/js/wizard.js")
+        and "edit: 'akis'" in oku(KOK, "static/js/wizard.js"))
 kontrol("lisans/SSRF/kare kapisi modulleri DOKUNULMADI",
         all("IsButcesi" not in oku(KOK, f) for f in
             ("medya/lisans.py", "medya/guvenlik.py", "medya/indirme.py",
@@ -3107,9 +3110,8 @@ kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
         len(set(re.findall(r"\{ad: '(\w+)'",
                            oku(KOK, "static/js/api.js")))) == 22)
 kontrol("UI ve kullanici secimleri DEGISMEDI",
-        "basitGovde" in oku(KOK, "static/js/wizard.js")
-        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js")
-        and "d.unlu = t.unlu ? '1' : '0'" in oku(KOK, "static/js/wizard.js"))
+        "tur: 'documentary'" in oku(KOK, "static/js/wizard.js")
+        and "edit: 'akis'" in oku(KOK, "static/js/wizard.js"))  # ⚠ TEK AKIS PIVOTU (20 Agu 2026)
 kontrol("server.py olgu bagi alani OKUMUYOR",
         "olgu_bagi" not in oku(KOK, "server.py"))
 for _f5 in ("arastirma_kopru.py", "medya_kopru.py", "pipeline.py"):
@@ -3400,9 +3402,9 @@ kontrol("kare kapisi fail-closed KORUNDU",
 kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
         len(set(re.findall(r"\{ad: '(\w+)'",
                            oku(KOK, "static/js/api.js")))) == 22)
-kontrol("UI DEGISMEDI",
-        "basitGovde" in oku(KOK, "static/js/wizard.js")
-        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js"))
+kontrol("UI DEGISMEDI",  # ⚠ TEK AKIS PIVOTU (20 Agu 2026): kilit yeni akisa tasindi
+        "tur: 'documentary'" in oku(KOK, "static/js/wizard.js")
+        and "edit: 'akis'" in oku(KOK, "static/js/wizard.js"))
 kontrol("server.py editor_v2 alanini OKUMUYOR",
         "editor_v2" not in oku(KOK, "server.py"))
 kontrol("edit_kopru.py derleniyor", _derlenir(os.path.join(KOK, "edit_kopru.py")))
@@ -3603,9 +3605,8 @@ kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
         len(set(re.findall(r"\{ad: '(\w+)'",
                            oku(KOK, "static/js/api.js")))) == 22)
 kontrol("UI ve kullanici secimleri DEGISMEDI",
-        "basitGovde" in oku(KOK, "static/js/wizard.js")
-        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js")
-        and "d.unlu = t.unlu ? '1' : '0'" in oku(KOK, "static/js/wizard.js"))
+        "tur: 'documentary'" in oku(KOK, "static/js/wizard.js")
+        and "edit: 'akis'" in oku(KOK, "static/js/wizard.js"))  # ⚠ TEK AKIS PIVOTU (20 Agu 2026)
 kontrol("server.py editor_v2/medya_avcisi OKUMUYOR",
         "editor_v2" not in oku(KOK, "server.py")
         and "medya_avcisi" not in oku(KOK, "server.py"))
@@ -3714,10 +3715,9 @@ kontrol("bayraklar HALA varsayilan kapali",
 kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
         len(set(re.findall(r"\{ad: '(\w+)'",
                            oku(KOK, "static/js/api.js")))) == 22)
-kontrol("UI DEGISMEDI",
-        "basitGovde" in oku(KOK, "static/js/wizard.js")
-        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js")
-        and "d.unlu = t.unlu ? '1' : '0'" in oku(KOK, "static/js/wizard.js"))
+kontrol("UI DEGISMEDI",  # ⚠ TEK AKIS PIVOTU (20 Agu 2026): kilit yeni akisa tasindi
+        "tur: 'documentary'" in oku(KOK, "static/js/wizard.js")
+        and "edit: 'akis'" in oku(KOK, "static/js/wizard.js"))
 kontrol("deploy.sh ezme korumasi KORUNDU",
         "GERIDE" in open(os.path.join(KOK, "..", "deploy.sh"),
                          encoding="utf-8").read())
@@ -3820,9 +3820,9 @@ kontrol("bayraklar HALA varsayilan kapali",
 kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
         len(set(re.findall(r"\{ad: '(\w+)'",
                            oku(KOK, "static/js/api.js")))) == 22)
-kontrol("UI DEGISMEDI",
-        "basitGovde" in oku(KOK, "static/js/wizard.js")
-        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js"))
+kontrol("UI DEGISMEDI",  # ⚠ TEK AKIS PIVOTU (20 Agu 2026): kilit yeni akisa tasindi
+        "tur: 'documentary'" in oku(KOK, "static/js/wizard.js")
+        and "edit: 'akis'" in oku(KOK, "static/js/wizard.js"))
 for _f7 in ("editor/plan.py", "editor/tipografi.py"):
     kontrol(f"{_f7} derleniyor", _derlenir(os.path.join(KOK, _f7)))
 
@@ -3925,10 +3925,9 @@ kontrol("bayraklar HALA varsayilan kapali",
 kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
         len(set(re.findall(r"\{ad: '(\w+)'",
                            oku(KOK, "static/js/api.js")))) == 22)
-kontrol("UI DEGISMEDI",
-        "basitGovde" in oku(KOK, "static/js/wizard.js")
-        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js")
-        and "d.unlu = t.unlu ? '1' : '0'" in oku(KOK, "static/js/wizard.js"))
+kontrol("UI DEGISMEDI",  # ⚠ TEK AKIS PIVOTU (20 Agu 2026): kilit yeni akisa tasindi
+        "tur: 'documentary'" in oku(KOK, "static/js/wizard.js")
+        and "edit: 'akis'" in oku(KOK, "static/js/wizard.js"))
 kontrol("deploy.sh ezme korumasi KORUNDU",
         "GERIDE" in open(os.path.join(KOK, "..", "deploy.sh"),
                          encoding="utf-8").read())
@@ -4652,8 +4651,8 @@ kontrol("22 alanlik generate sozlesmesi I-15'te de DEGISMEDI",
         len(set(re.findall(r"\{ad: '(\w+)'",
                            oku(KOK, "static/js/api.js")))) == 22)
 kontrol("UI I-15'te DEGISMEDI",
-        "basitGovde" in oku(KOK, "static/js/wizard.js")
-        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js"))
+        "tur: 'documentary'" in oku(KOK, "static/js/wizard.js")
+        and "edit: 'akis'" in oku(KOK, "static/js/wizard.js"))  # ⚠ TEK AKIS PIVOTU (20 Agu 2026)
 kontrol("deploy.sh ezme korumasi KORUNDU",
         "GERIDE" in open(os.path.join(KOK, "..", "deploy.sh"),
                          encoding="utf-8").read())
@@ -4967,8 +4966,8 @@ kontrol("22 alanlik generate sozlesmesi I-16'da da DEGISMEDI",
         len(set(re.findall(r"\{ad: '(\w+)'",
                            oku(KOK, "static/js/api.js")))) == 22)
 kontrol("UI I-16'da DEGISMEDI",
-        "basitGovde" in oku(KOK, "static/js/wizard.js")
-        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js"))
+        "tur: 'documentary'" in oku(KOK, "static/js/wizard.js")
+        and "edit: 'akis'" in oku(KOK, "static/js/wizard.js"))  # ⚠ TEK AKIS PIVOTU (20 Agu 2026)
 kontrol("deploy.sh ezme korumasi KORUNDU",
         "GERIDE" in open(os.path.join(KOK, "..", "deploy.sh"),
                          encoding="utf-8").read())
@@ -5261,8 +5260,8 @@ kontrol("22 alanlik generate sozlesmesi I-17'de de DEGISMEDI",
         len(set(re.findall(r"\{ad: '(\w+)'",
                            oku(KOK, "static/js/api.js")))) == 22)
 kontrol("UI I-17'de DEGISMEDI",
-        "basitGovde" in oku(KOK, "static/js/wizard.js")
-        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js"))
+        "tur: 'documentary'" in oku(KOK, "static/js/wizard.js")
+        and "edit: 'akis'" in oku(KOK, "static/js/wizard.js"))  # ⚠ TEK AKIS PIVOTU (20 Agu 2026)
 kontrol("deploy.sh ezme korumasi KORUNDU",
         "GERIDE" in open(os.path.join(KOK, "..", "deploy.sh"),
                          encoding="utf-8").read())
@@ -5450,8 +5449,8 @@ kontrol("22 alanlik generate sozlesmesi I-18'de de DEGISMEDI",
         len(set(re.findall(r"\{ad: '(\w+)'",
                            oku(KOK, "static/js/api.js")))) == 22)
 kontrol("UI I-18'de DEGISMEDI",
-        "basitGovde" in oku(KOK, "static/js/wizard.js")
-        and "SURE_SECENEKLERI" in oku(KOK, "static/js/basit.js"))
+        "tur: 'documentary'" in oku(KOK, "static/js/wizard.js")
+        and "edit: 'akis'" in oku(KOK, "static/js/wizard.js"))  # ⚠ TEK AKIS PIVOTU (20 Agu 2026)
 kontrol("deploy.sh ezme korumasi KORUNDU",
         "GERIDE" in open(os.path.join(KOK, "..", "deploy.sh"),
                          encoding="utf-8").read())
@@ -6028,8 +6027,9 @@ kontrol("lisans/SSRF/indirme modulleri DEGISMEDI",
 kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
         len(set(re.findall(r"\{ad: '(\w+)'",
                            oku(KOK, "static/js/api.js")))) == 22)
-kontrol("UI DEGISMEDI",
-        "basitGovde" in oku(KOK, "static/js/wizard.js"))
+kontrol("UI DEGISMEDI",  # ⚠ TEK AKIS PIVOTU (20 Agu 2026): kilit yeni akisa tasindi
+        "tur: 'documentary'" in oku(KOK, "static/js/wizard.js")
+        and "edit: 'akis'" in oku(KOK, "static/js/wizard.js"))
 kontrol("deploy.sh ezme korumasi KORUNDU",
         "GERIDE" in open(os.path.join(KOK, "..", "deploy.sh"),
                          encoding="utf-8").read())
@@ -6117,7 +6117,9 @@ kontrol("server.py I-20'de de DEGISMEDI",
 kontrol("22 alanlik generate sozlesmesi DEGISMEDI",
         len(set(re.findall(r"\{ad: '(\w+)'",
                            oku(KOK, "static/js/api.js")))) == 22)
-kontrol("UI DEGISMEDI", "basitGovde" in oku(KOK, "static/js/wizard.js"))
+kontrol("UI DEGISMEDI",  # ⚠ TEK AKIS PIVOTU (20 Agu 2026): kilit yeni akisa tasindi
+        "tur: 'documentary'" in oku(KOK, "static/js/wizard.js")
+        and "edit: 'akis'" in oku(KOK, "static/js/wizard.js"))
 kontrol("deploy.sh ezme korumasi KORUNDU",
         "GERIDE" in open(os.path.join(KOK, "..", "deploy.sh"),
                          encoding="utf-8").read())

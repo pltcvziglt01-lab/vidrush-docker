@@ -137,8 +137,9 @@ def js_dizeleri(kaynak_metin):
 blok("modul yapisi: wizard sismedi")
 kontrol("js/secim-deneyimi.js var", bool(SD), "yeni modul zorunlu")
 kontrol("secim-deneyimi.js anlamli boyutta", len(SD) > 8000, f"{len(SD)} bayt")
-kontrol("wizard.js secim-deneyimi'ni import ediyor",
-        "from './secim-deneyimi.js'" in WZ)
+# ⚠ TEK AKIS PIVOTU (20 Agu 2026): eski cok-secimli wizard KALKTI.
+kontrol("tek akis: wizard secim-deneyimi'ni IMPORT ETMEZ (asamali sokum)",
+        "from './secim-deneyimi.js'" not in WZ)
 kontrol("wizard.js KUCULDU (Faz F: 780 satir)",
         WZ.count("\n") <= 780, f"{WZ.count(chr(10))} satir")
 kontrol("secim cizimi wizard'da DEGIL modulde",
@@ -214,7 +215,9 @@ kontrol("ayni anda tek ses calar", "export function sesDurdur" in SD
 kontrol("calmazsa DURUST hata", "Örnek kayıt çalınamadı." in SD)
 kontrol("hata aria-live ile bildirilir", 'id="sbSesNot"' in SD
         and 'aria-live="polite"' in SD)
-kontrol("adim degisince calan ses susturulur", "sesDurdur();" in WZ)
+# ⚠ TEK AKIS PIVOTU (20 Agu 2026): eski cok-secimli wizard KALKTI.
+kontrol("tek akis: ses onizleme calari YOK (sesDurdur gereksiz)",
+        "sesDurdur" not in WZ)
 # ═══ HARICI SES KATALOGU — GERCEKTEN BAGLI MI ═══
 # ⚠ BAGIMSIZ QA BULGUSU: onceki surumde `UCLAR`/`getirSessiz` import ediliyor
 # ama HIC KULLANILMIYORDU; "Tum sesler" yalnizca yerel listeyi aciyordu.
@@ -360,30 +363,24 @@ uretilen = set(re.findall(r"d\.(\w+)\s*=", _gd)) | \
     set(re.findall(r"^\s{4}(\w+):", _gd, re.M))
 kontrol("wizard sozlesme disina cikmiyor", uretilen <= on_alanlar,
         f"sozlesme disi: {sorted(uretilen - on_alanlar)}")
-for zorunlu in ("session", "story", "tur", "edit", "sure_dk", "gecis", "zoom",
-                "profil", "altyazi", "altyazi_sablon", "palet", "palet_ozel",
-                "acilis", "sora", "arkaplan", "ses", "isik", "gorsel_model",
-                "karakter", "stil", "sahne_ref"):
-    kontrol(f"alan uretiliyor/korunuyor: {zorunlu}",
-            zorunlu in uretilen or zorunlu in ("session", "story", "tur",
-                                               "sure_dk", "gecis", "zoom",
-                                               "altyazi"),
+# ⚠ TEK AKIS PIVOTU (20 Agu 2026): eski cok-secimli wizard KALKTI.
+# Tek akis YALNIZCA cekirdek alanlari gonderir; geri kalan secimler
+# urunden kalkti (backend sozlesmesi API'de ayni duruyor — ustteki kontrol).
+for zorunlu in ("story", "tur", "edit", "sure_dk", "gecis", "zoom",
+                "altyazi", "ses"):
+    kontrol(f"tek akis alani uretiliyor: {zorunlu}", zorunlu in uretilen,
             "generateDegerleri icinde bulunmali")
+for kalkan in ("palet", "isik", "sora", "gorsel_model", "karakter"):
+    kontrol(f"tek akis alan GONDERMEZ: {kalkan}", kalkan not in uretilen)
 # Her alanin bir UI kaynagi var mi (select/input/kart)
 # ⚠ Kartlarda grup adi SABLONDAN geliyor (`data-grup="${kac(grup)}"`), bu
 # yuzden literal `grup="stil"` aranamaz; uretici cagrisina bakiliyor.
-UI_KAYNAK = {
-    "edit": "grup: 'stil'", "ses": "grup: 'ses'", "profil": "grup=\"marka\"",
-    "palet": "data-grup=\"palet\"", "palet_ozel": "wzHex", "isik": "wzIsik",
-    "arkaplan": "wzArkaplan", "acilis": "wzAcilis", "sora": "wzSora",
-    "gorsel_model": "wzModel", "altyazi_sablon": "wzAltSablon",
-    "karakter": "wzKarGirdi", "stil": "wzStilGirdi", "sahne_ref": "wzRefGirdi",
-    "gecis": "wzGecis", "zoom": "wzZoom", "altyazi": "wzAltyazi",
-    "sure_dk": "wzSure",
-}
+# ⚠ TEK AKIS PIVOTU (20 Agu 2026): eski cok-secimli wizard KALKTI.
+# Tek akis ekranindaki HER girdinin gercek bir UI kontrolu var:
+UI_KAYNAK = {"story": "akMetin", "sure_dk": "akSure", "ses": "akSes",
+             "altyazi": "akAltyazi"}
 for alan_ad, iz in UI_KAYNAK.items():
-    kontrol(f"UI kontrolu duruyor: {alan_ad}", iz in SD or iz in WZ,
-            f"'{iz}' bulunamadi")
+    kontrol(f"UI kontrolu duruyor: {alan_ad}", iz in WZ, f"'{iz}' bulunamadi")
 
 # ═══════════ 8) ERISILEBILIRLIK ═══════════
 blok("erisilebilirlik ve radio semantics")
@@ -494,8 +491,8 @@ kontrol("radyoBagla ayni dugmeye ikinci dinleyici eklemez",
         "if (b.dataset.bagli === '1') return;" in SD)
 kontrol("ozet baglamasi tek fonksiyonda", "function ozetBagla(" in SD
         and SD.count("function ozetBagla(") == 1)
-kontrol("adim3 baglamasi yalnizca adim 3'te",
-        "if (adim === 3) {" in WZ and "adim3Kur({" in WZ)
+# ⚠ TEK AKIS PIVOTU (20 Agu 2026): eski cok-secimli wizard KALKTI.
+kontrol("tek akis: adim3 baglamasi YOK", "adim3Kur" not in WZ)
 
 # ═══════════ 12) SOZDIZIMI ═══════════
 blok("sozdizimi (node --check)")

@@ -144,47 +144,33 @@ kontrol("ekran id'leri beklenen",
                                      "ayarlar"], str(ekranlar))
 kontrol("Animasyon/Hikaye/Belgesel AYRI EKRAN DEGIL",
         not any(e[0] in ("animasyon", "hikaye", "documentary") for e in ekranlar))
-kontrol("tur, Yeni Proje icinde kart olarak",
-        "TURLER" in JS["api.js"] and "grup: 'tur'" in JS["wizard.js"])
-turler = re.findall(r"id: '(documentary|hikaye|animasyon)'", JS["api.js"])
-kontrol("3 tur korundu", sorted(turler) == ["animasyon", "documentary", "hikaye"],
-        str(turler))
+# ⚠ TEK AKIS PIVOTU (20 Agu 2026, kullanici karari): eski 5 adimli wizard
+# KALDIRILDI — "tek yeni akis, eskiler kalksin". Tur/stil/palet secimleri
+# arayuzden cikti; uretim SABIT (tur=documentary, edit=akis) gider.
+# Asagidaki kontroller eski urun kararlarini degil YENI akisi kilitler.
+kontrol("tek akis: tur/edit SABIT (secim ekrani YOK)",
+        "tur: 'documentary'" in JS["wizard.js"]
+        and "edit: 'akis'" in JS["wizard.js"])
 kontrol("alt nav 4 oge (altnav: true)", APP.count("altnav: true") == 4,
         str(APP.count("altnav: true")))
-kontrol("wizard 5 adim", len(re.findall(r"\{no: \d, ad: '", JS["wizard.js"])) == 5)
-kontrol("adim 1 tur secmeden gecilemez", "sebep: 'Bir tür seç.'" in JS["wizard.js"])
-kontrol("adim 2 en az 20 karakter zorunlu", "20 karakter" in JS["wizard.js"])
-kontrol("ANIMASYONDA referans kare ZORUNLU",
-        "t.tur === 'animasyon' && dosyalar.sahneRef.length === 0"
-        in JS["wizard.js"])
-kontrol("diger turlerde referans OPSIYONEL",
-        "referans: 'opsiyonel'" in JS["api.js"])
-kontrol("geri/ileri serbest (adim dugmeleri tiklanabilir)",
-        "data-adim=" in JS["wizard.js"] and "hedef < adim" in JS["wizard.js"])
+kontrol("wizard TEK ekran (adim listesi YOK)",
+        "ADIMLAR" not in JS["wizard.js"])
+kontrol("en az 20 karakter zorunlu", "20 karakter" in JS["wizard.js"])
+kontrol("tur secim kartlari KALKTI",
+        "grup: 'tur'" not in JS["wizard.js"])
 kontrol("taslak localStorage'da", "bedosaho_taslak_v1" in JS["durum.js"])
 kontrol("taslak dosyalari SAKLAMIYOR (durustce)",
         "Dosyalar (File nesneleri) saklanamaz" in JS["durum.js"])
 
-# Eski gelismis kontroller kayboldu mu
-blok("eski ozellikler korundu (kayip yok)")
-for ad, iz in [("Sora (hikaye)", "wzSora"), ("acilis", "wzAcilis"),
-               ("ses kutuphanesi ucu", "sesKutuphane"),
-               ("altyazi sablonu", "wzAltSablon"),
-               ("altyazi punto", "wzAltBoyut"), ("altyazi konum", "wzAltKonum"),
-               ("altyazi renk", "wzAltRenk"), ("altyazi kontur", "wzAltKontur"),
-               ("buyuk harf", "wzAltBuyuk"), ("golge", "wzAltGolge"),
-               ("palet", "grup=\"palet\""), ("ozel hex", "wzHex"),
-               ("isik duzeyi", "wzIsik"), ("arkaplan", "wzArkaplan"),
-               ("marka kiti/profil", 'data-grup="marka"'), ("gorsel model", "wzModel"),
-               ("karakter gorseli", "wzKarGirdi"), ("stil gorseli", "wzStilGirdi"),
-               ("referans kare", "wzRefGirdi"), ("anim analiz", "animAnaliz"),
-               ("anim sorular", "animSorular")]:
-    # ⚠ Faz G'de secim bilesenleri `js/secim-deneyimi.js` modulune tasindi.
-    # Kuralin NIYETI "kontrol hala var mi", "wizard.js'te mi" DEGIL — bu yuzden
-    # arama TUM on yuz modullerinde yapiliyor; ileride tasinsa da kirilmaz.
-    kontrol(f"korundu: {ad}", any(iz in m for m in JS.values()) or iz in APP)
-# ⚠ Faz G: tek dev "Gelismis" yigini yerine 4 hedef odakli PROFESYONEL
-# bolum geldi. Kural "teknik ayarlar temel akista degil" — bu hala gecerli.
+# ⚠ TEK AKIS PIVOTU (20 Agu 2026): "eski ozellik kaybi yasak" kurali
+# BILEREK KALDIRILDI — kullanici karari "tek yeni akis, eskiler kalksin".
+# Sora/palet/isik/altyazi-sablonu/karakter-stil gorseli secimleri artik
+# URUNUN PARCASI DEGIL; wizard onlari TASIMAZ (asagida negatif kilit).
+blok("tek akis: eski secimler wizard'da YOK")
+for ad, iz in [("Sora", "wzSora"), ("palet", 'grup="palet"'),
+               ("isik", "wzIsik"), ("karakter gorseli", "wzKarGirdi"),
+               ("referans kare", "wzRefGirdi"), ("gorsel model", "wzModel")]:
+    kontrol(f"wizard'dan kalkti: {ad}", iz not in JS["wizard.js"])
 kontrol("teknik ayarlar ayri profesyonel bolumlerde",
         JS["secim-deneyimi.js"].count("PRO_BOLUMLER") >= 2
         and 'data-pro-ac=' in JS["secim-deneyimi.js"],
@@ -192,26 +178,12 @@ kontrol("teknik ayarlar ayri profesyonel bolumlerde",
 
 # ═══════════ 4) ADIM 4: SAHTE SAYI YOK ═══════════
 blok("adim 4: uydurma sayi yasagi")
-kontrol("'Üretim sırasında hesaplanacak' sabiti var",
-        "const HESAPLANACAK = 'Üretim sırasında hesaplanacak'" in JS["wizard.js"])
-hesap = re.findall(r"ozetSatir\('([^']+)', HESAPLANACAK", JS["wizard.js"])
-# ⚠ 12 Agu 2026 (Faz H4): Adim 4 artik GERCEK bir on-kontrol ucuna sahip
-# (`POST /api/analiz`, LLM'siz ve ucretsiz). Olculebilir olanlar — girdi
-# turu, dil, icerik turu, donem, varliklar, onerilen sure — URETIMDEN ONCE
-# gosteriliyor; "Render süresi" ve "Lisans durumu" satirlari kaldirildi
-# cunku onlar da olculmeden gosterilemezdi ve listeyi sisiriyordu.
-# GERIYE KALANLAR gercekten yalnizca uretim sirasinda olculebilenler.
-kontrol("uretim oncesi OLCULEMEYEN alanlar hesaplanacak isaretli",
-        len(hesap) >= 5, str(hesap))
-for alan_ad in ("Güvenilir kaynak sayısı", "Doğrulanmış iddia",
-                "Kullanılabilir medya", "Tahmini maliyet", "Sahne sayısı"):
-    kontrol(f"hesaplanacak: {alan_ad}", alan_ad in hesap)
-# Ve artik GERCEKTEN hesaplanan alanlar UYDURULMUYOR, ucdan geliyor
-kontrol("adim 4 gercek analiz ucunu cagiriyor",
-        "UCLAR.analiz" in JS["wizard.js"] and "analizCalistir" in JS["wizard.js"])
-kontrol("analiz hatasi SESSIZ GECILMIYOR",
-        "Analiz alınamadı" in JS["wizard.js"])
-# Sabit para/oran/sayi uydurmasi
+# ⚠ TEK AKIS PIVOTU (20 Agu 2026, kullanici karari): eski 5 adimli wizard
+# KALDIRILDI — "tek yeni akis, eskiler kalksin". Tur/stil/palet secimleri
+# arayuzden cikti; uretim SABIT (tur=documentary, edit=akis) gider.
+# Asagidaki kontroller eski urun kararlarini degil YENI akisi kilitler.
+kontrol("uydurma tahmin YOK (uretim sirasinda hesaplanir yazisi)",
+        "tahmin gösterilmez" in JS["wizard.js"])
 kontrol("sabit dolar tutari YOK",
         not re.search(r"\$\s?\d", TUM_JS_KOD), "maliyet uydurulmamali")
 kontrol("sabit 'kaynak: N' sayisi YOK",
@@ -283,18 +255,15 @@ kontrol("her <nav> aria-label tasiyor",
         _navlar and all('aria-label=' in n for n in _navlar),
         str([n for n in _navlar if 'aria-label=' not in n]))
 kontrol("aktif ekran aria-current", "aria-current" in APP)
-# QA maddesi 2: adim dugmelerinin ERISILEBILIR ADI
-kontrol("adim dugmelerinde sabit aria-label",
-        'aria-label="Adım ${a.no}: ${kac(a.ad)}' in JS["wizard.js"])
-kontrol("adim dugmesi durum bilgisi tasiyor",
-        "şu anki adım" in JS["wizard.js"] and "tamamlandı" in JS["wizard.js"])
-kontrol("adim ikonu/yazisi aria-hidden (ad'i bozmasin)",
-        'class="adim-no" aria-hidden="true"' in JS["wizard.js"])
-# QA maddesi 3: aria-live temizligi
-kontrol("uyariTemizle fonksiyonu var", "function uyariTemizle()" in JS["wizard.js"])
-kontrol("basarili gecişte uyari temizlenir",
-        "uyariTemizle();                 // eski hata" in JS["wizard.js"]
-        or "uyariTemizle();" in JS["wizard.js"])
+# ⚠ TEK AKIS PIVOTU (20 Agu 2026, kullanici karari): eski 5 adimli wizard
+# KALDIRILDI — "tek yeni akis, eskiler kalksin". Tur/stil/palet secimleri
+# arayuzden cikti; uretim SABIT (tur=documentary, edit=akis) gider.
+# Asagidaki kontroller eski urun kararlarini degil YENI akisi kilitler.
+# Tek ekranda adim dugmesi YOK; form alanlarinin erisilebilir adi var.
+kontrol("form alanlari label tasiyor (tek akis)",
+        'for="akMetin"' in JS["wizard.js"] and 'for="akSure"' in JS["wizard.js"]
+        and 'for="akSes"' in JS["wizard.js"])
+kontrol("uretim durumu aria-live", 'aria-live="polite"' in JS["wizard.js"])
 kontrol("her cizimde duyuru temizlenir",
         "duyur('');" in JS["wizard.js"])
 # QA maddesi 4: her form ogesinin adi
@@ -304,10 +273,9 @@ _tum_on = "\n".join(JS.values()) + APP
 kontrol("renk girdilerine gizli label",
         'class="gorunmez" for="wzAltRenk"' in _tum_on
         and 'class="gorunmez" for="wzHex' in _tum_on)
-kontrol("dosya girdilerine gizli label",
-        'for="wzRefGirdi"' in _tum_on and 'for="wzKarGirdi"' in _tum_on)
-kontrol("birak alanlarina aria-label",
-        'aria-label="Karakter görseli seç"' in _tum_on)
+# ⚠ TEK AKIS: dosya (karakter/stil/referans) girdileri ARAYUZDEN KALKTI.
+kontrol("dosya girdileri kalkti (tek akis)",
+        'wzRefGirdi' not in JS["wizard.js"] and 'wzKarGirdi' not in JS["wizard.js"])
 kontrol("anahtar gercek checkbox (klavye)",
         'type="checkbox"' in JS["bilesenler.js"])
 # ⚠ Faz G: ozel div+aria yerine NATIVE <progress> kullaniliyor; rol ve
@@ -499,9 +467,10 @@ for red in ("../server.py", "js/../../server.py", "index.html",
 blok("yanlis bilgi duzeltmeleri (UX_DENETIM.md §8)")
 kontrol("Magnific CALISMIYOR olarak yazili",
         "ÇALIŞMIYOR" in JS["gorunumler.js"])
-kontrol("belgeselde AI gorsel YASAK oldugu yazili",
-        "görsel üretilmez" in JS["wizard.js"]
-        or "görsel üretilmez" in JS["gorunumler.js"])
+# ⚠ TEK AKIS: AI gorsel yolu ACIK (stok bulunamazsa) — eski "belgeselde
+# gorsel uretilmez" metni bu akista YANLIS olurdu; wizard onu TASIMAZ.
+kontrol("tek akis AI gorseli DURUSTCE anlatiyor",
+        "AI görsel" in JS["wizard.js"])
 kontrol("YouTube yalnizca CC",
         "YALNIZCA Creative Commons" in JS["gorunumler.js"])
 # ⚠ Ilk surum yorumlari da tariyordu; "Telifli indirme SUNULMUYOR" aciklamasi

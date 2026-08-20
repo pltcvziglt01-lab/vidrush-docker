@@ -36,9 +36,9 @@ export async function anaSayfa(kap) {
         t.tur ? ` · ${kac(t.tur)}` : ''}</a>` : ''}
     </div>
     <ul class="kahraman-adim">
-      <li><span class="kahraman-no">1</span><span>Türü ve konuyu ver</span></li>
-      <li><span class="kahraman-no">2</span><span>Görsel yönü seç</span></li>
-      <li><span class="kahraman-no">3</span><span>Özeti onayla, üretim başlasın</span></li>
+      <li><span class="kahraman-no">1</span><span>Metni ya da konuyu ver</span></li>
+      <li><span class="kahraman-no">2</span><span>Her cümle 5-7 sn sahneye dönüşür — stok video ya da AI görsel</span></li>
+      <li><span class="kahraman-no">3</span><span>Sinematik geçişlerle hazır video</span></li>
     </ul>
   </section>
 

@@ -1,651 +1,143 @@
 /**
- * YENI PROJE — 5 ADIMLI WIZARD
- *   1 Tur  ->  2 Konu/Icerik  ->  3 Gorsel yon  ->  4 Uretim ozeti  ->  5 Onay
+ * YENI PROJE — TEK AKIS (20 Agu 2026, urun pivotu).
  *
- * ⚠ ESKI OZELLIK KAYBI YASAK. Eski `view-studio` ("Yeni Video") ekranindaki
- * TUM kontroller burada yasiyor:
- *   sure_dk, edit/animasyon stili, profil (marka kiti), ses + ses kutuphanesi
- *   (saglayici filtresi + arama + ornek dinleme), palet + ozel hex, arkaplan,
- *   isik, gecis, zoom, altyazi + altyazi_sablon (font/boyut/renk/kontur/konum/
- *   aralik/agirlik/buyuk-harf/golge/arka), acilis (hikaye), sora (hikaye),
- *   gorsel_model, karakter + stil gorseli, sahne_ref (animasyon).
- * Teknik olanlar "Gelismis" altinda; temel akis sade kaliyor.
+ * ⚠ ESKI 5 ADIMLI WIZARD KALDIRILDI (kullanici karari: "tek yeni akis,
+ * eskiler kalksin"). Tur/stil/palet/isik/arkaplan secimleri ARTIK YOK;
+ * uretim hattinin tek yolu var:
  *
- * ⚠ ADIM 4 KURALI: backend ucu OLMAYAN degerler (guvenilir kaynak sayisi,
- * kullanilabilir medya, tahmini maliyet) UYDURULMAZ. "Uretim sirasinda
- * hesaplanacak" diye acikca yazilir.
+ *   metin -> cumle basina 5-7 sn sahne -> her sahne icin ONCE gercek stok
+ *   video, bulunamazsa Magnific (nano-banana) 16:9 AI gorseli + sinematik
+ *   Remotion gecisleri; AI video klipler sunucu tavanina kadar (MAG_KLIP_MAKS).
+ *
+ * Backend sozlesmesi DEGISMEDI: ayni /api/generate, tur=documentary,
+ * edit=akis sabit gonderilir. `basit.js` / `secim-deneyimi.js` artik bu
+ * ekrandan IMPORT EDILMEZ (asamali sokum; dosyalar eski testlerin kaydi
+ * olarak duruyor).
+ *
+ * ⚠ UYDURMA DEGER YOK: maliyet/kaynak sayisi gibi backend'in olcmedigi
+ * hicbir sey ekranda tahmin olarak gosterilmez.
  */
-import {GENERATE_ALANLARI, TURLER, UCLAR, getirSessiz, isKimligiCoz, oturumId,
-        uretimBaslat, yol} from './api.js';
-import {dosyalar, dosyalariTemizle, taslak, taslakSil, taslakYaz,
+import {UCLAR, getirSessiz, isKimligiCoz, uretimBaslat} from './api.js';
+import {dosyalariTemizle, taslak, taslakSil, taslakYaz,
         yerelIsEkle} from './durum.js';
-import {$, $$, alan, anahtar, duyur, etiket, gelismis, grupBagla, kac,
-        ozetSatir, secKart, secimAlani, uyariKutu, yukleniyor} from './bilesenler.js';
-import {ikon, ikonlariBagla} from './ikon.js';
-import {adim3Govde, adim3Kur, bosDurum, sesDurdur} from './secim-deneyimi.js';
-import {autoPaneli, autoStilKimligi, autoTuru, basitGovde, basitKur,
-        modCipleri} from './basit.js';
+import {$, duyur, kac, yukleniyor} from './bilesenler.js';
+import {ikonlariBagla} from './ikon.js';
 
-/** Uzun yer tutucu metinleri — sablon dizesi ICINDE kesme isareti kullanmak
- *  kacis sorunu yaratiyor, bu yuzden ayri sabit. */
-const YERTUTUCU = {
-  senaryo: 'Hazır anlatım metnini buraya yapıştır…',
-  konu: 'Örnek: Apollo 11 inişindeki kritik son dakikalar — 1202 program ' +
-        'alarmı, yarı-elle kontrol, Tranquility Base.',
-};
+const YERTUTUCU =
+  'Konuyu bir paragrafla anlat ya da hazır anlatım metnini yapıştır…\n\n' +
+  'Örnek: Apollo 11 inişindeki kritik son dakikalar — 1202 program alarmı, ' +
+  'yarı-elle kontrol, Tranquility Base.';
 
-const ADIMLAR = [
-  {no: 1, ad: 'Tür', tam: 'Ne üretiyorsun?'},
-  {no: 2, ad: 'İçerik', tam: 'Konu ve içerik'},
-  {no: 3, ad: 'Görsel', tam: 'Görsel yön'},
-  {no: 4, ad: 'Özet', tam: 'Üretim özeti'},
-  {no: 5, ad: 'Onay', tam: 'Onay ve başlat'},
-];
+/** Tek akisin SABIT uretim parametreleri — kullanici secimi DEGIL. */
+const AKIS = {tur: 'documentary', edit: 'akis'};
 
-let adim = 1;
-let kaynak = {};
-let _yenidenCiz = null;   // ozet panelinden tam cizim tetigi          // sunucudan gelen listeler
-let sesOynatici = null;
+let kaynak = {};          // {sesler: [...]} — bir kez yuklenir
+let adim = 1;             // eski export sozlesmesi icin (tek ekran = hep 1)
 
-/* ════════════════ YARDIMCILAR ════════════════ */
+/* ════════════════ ESKI EXPORT SOZLESMESI ════════════════ */
 
-function turBilgi(id) {
-  return TURLER.find((t) => t.id === id) || null;
+/** Tek ekran: yalnizca metin zorunlu. (Eski cok-adimli imza korunuyor.) */
+export function adimGecerli(_n) {
+  const konu = (taslak().konu || '').trim();
+  return konu.length >= 20
+    ? {ok: true}
+    : {ok: false, sebep: 'Metin en az 20 karakter olmalı.'};
 }
 
-/** Adim gecilebilir mi? Eksik zorunlu alan varsa sebebiyle birlikte doner. */
-export function adimGecerli(n) {
-  const t = taslak();
-  if (n === 1) {
-    return t.tur ? {ok: true} : {ok: false, sebep: 'Bir tür seç.'};
-  }
-  if (n === 2) {
-    const konu = (t.konu || '').trim();
-    if (konu.length < 20) {
-      return {ok: false, sebep: 'Konu/metin en az 20 karakter olmalı.'};
-    }
-    // ⚠ Animasyonda referans kare ZORUNLU: sunucu aksi halde 400 donuyor.
-    if (t.tur === 'animasyon' && dosyalar.sahneRef.length === 0) {
-      return {ok: false, sebep: 'Animasyon için en az 1 referans kare gerekli.'};
-    }
-    return {ok: true};
-  }
-  return {ok: true};
-}
+export function wizardAdim() { return adim; }
+export function wizardKaynakHatalari() { return kaynak.hatalar || []; }
 
-function ilerlemeDurumu() {
-  return ADIMLAR.map((a) => ({...a, bitti: a.no < adim && adimGecerli(a.no).ok}));
-}
-
-/* ════════════════ ADIM 1 — TUR ════════════════ */
-
-function adim1() {
-  const t = taslak();
-  return `<h2>Ne üretiyorsun?</h2>
-  <p class="kucuk orta adim-giris">
-    Tür, üretim akışının bir ayarı. Sonraki adımlarda değiştirebilirsin.</p>
-  <div class="izgara izgara-3" role="radiogroup" aria-label="Video türü">
-    ${TURLER.map((x) => secKart({
-      id: x.id, ad: x.ad, acik: x.acik, ikonAd: x.ikon,
-      etiketler: x.etiketler, secili: t.tur === x.id, grup: 'tur',
-    })).join('')}
-  </div>
-  ${uyariKutu('Belgeselde yapay zekâ ile <strong>görsel üretilmez</strong>; ' +
-    'yalnızca gerçek arşiv ve stok görüntüsü kullanılır.', 'bilgi')}`;
-}
-
-/* ════════════════ ADIM 2 — KONU / ICERIK ════════════════ */
-
-function adim2() {
-  const t = taslak();
-  const anim = t.tur === 'animasyon';
-  const yontemler = [
-    {id: 'konu', ad: 'Konu ver'},
-    {id: 'senaryo', ad: 'Metin yapıştır'},
-  ];
-  return `<h2>Konu ve içerik</h2>
-  <p class="kucuk orta adim-giris">
-    Konuyu bir paragrafla anlat ya da hazır metnini yapıştır.</p>
-
-  <div class="cipler yontem-cip" role="radiogroup" aria-label="Giriş yöntemi">
-    ${yontemler.map((y) => `<button type="button" class="cip" data-grup="yontem"
-      data-deger="${y.id}" aria-pressed="${t.girisYontemi === y.id}">${
-      kac(y.ad)}</button>`).join('')}
-  </div>
-
-  ${alan({
-    id: 'wzKonu',
-    ad: t.girisYontemi === 'senaryo' ? 'Metin' : 'Konu',
-    ipucu: 'En az 20 karakter. Ne kadar somut olursa araştırma o kadar isabetli olur.',
-    ic: `<textarea class="metinalan" id="wzKonu" required minlength="20"
-      aria-describedby="wzKonu-ipucu"
-      placeholder="${t.girisYontemi === 'senaryo' ? YERTUTUCU.senaryo : YERTUTUCU.konu}"
-      >${kac(t.konu)}</textarea>`,
-  })}
-
-  ${secimAlani({
-    id: 'wzSure', ad: 'Hedef süre', deger: String(t.sureDk),
-    ipucu: 'Anlatım uzunluğu buna göre hesaplanır.',
-    secenekler: [
-      {id: '1', ad: '1 dakika'}, {id: '2', ad: '2 dakika'},
-      {id: '3', ad: '3 dakika'}, {id: '5', ad: '5 dakika'},
-      {id: '8', ad: '8 dakika'}, {id: '10', ad: '10 dakika'},
-      {id: '15', ad: '15 dakika'}, {id: '20', ad: '20 dakika'},
-    ],
-  })}
-
-  <div class="alan">
-    <span class="alan-ad" id="wzRefBaslik">Referans kareler${
-      anim ? ' <span class="etiket etiket-hata">zorunlu</span>'
-           : ' <span class="etiket">opsiyonel</span>'}</span>
-    <div class="birak" id="wzRefBirak" role="button" tabindex="0"
-      aria-describedby="wzRefBaslik">
-      ${ikon('yukle', {boyut: 24})}
-      <div class="birak-ad">Kare ekle</div>
-      <div class="kucuk sessiz">Sürükle-bırak ya da tıkla · PNG/JPG</div>
-      <label class="gorunmez" for="wzRefGirdi">Referans kare dosyaları</label>
-      <input type="file" id="wzRefGirdi" accept="image/*" multiple class="gorunmez">
-    </div>
-    <div class="onizler" id="wzRefOnizler"></div>
-    <span class="alan-ipucu">${anim
-      ? 'Animasyon stilini bu karelerden öğrenir. En az 1 kare gerekli.'
-      : 'Bu türde referans zorunlu değil; verirsen renk ve doku yönü için kullanılır.'}</span>
-  </div>
-
-  ${t.tur === 'animasyon' ? gelismis('Referans analizi (gelişmiş)', `
-    <p class="kucuk orta">Kareleri yükledikten sonra stil analizi
-      çalıştırabilirsin. Analiz, üretimde aynı karelerle birlikte kullanılır.</p>
-    <div class="anim-eylem">
-      <button type="button" class="dugme" id="wzAnimAnaliz">
-        ${ikon('cip', {boyut: 17})} Stil analizi yap</button>
-      <button type="button" class="dugme dugme-hayalet" id="wzAnimSorular">
-        ${ikon('bilgi', {boyut: 17})} Netleştirme soruları</button>
-    </div>
-    <div id="wzAnimSonuc" class="kucuk orta anim-sonuc"></div>
-  `) : ''}`;
-}
-
-/* ════════════════ ADIM 3 — GORSEL YON ════════════════ */
-/**
- * ⚠ FAZ G: bu adim eskiden "her seyi ayni anda gosteren kontrol paneli"ydi
- * (select yigini + tek dev "Gelismis" bloku). Kullanici geri bildirimi:
- * "stil seciyoruz, cok kotu ve karmakarisik". Yeni model:
- *   Hizli secim (Otomatik + en fazla 3 oneri)  ->  hizli tercihler  ->
- *   profesyonel ayarlar (tek acik akordeon)    ->  canli secim ozeti
- * Butun cizim `secim-deneyimi.js` icinde; burada yalnizca durum ve baglama var.
- */
-
-/** Adim 3'un yerel gorunum durumu (taslakta saklanmaz — gecici UI durumu). */
-const a3 = bosDurum();   // adim 3'un gecici UI durumu (taslakta saklanmaz)
-
-function adim3() {
-  return adim3Govde({t: taslak(), kaynak, durum: a3, dosyalar});
-}
-
-/* ════════════════ ADIM 4 — URETIM OZETI ════════════════ */
-
-const HESAPLANACAK = 'Üretim sırasında hesaplanacak';
-
-/** Adim 4'un analiz sonucu — `/api/analiz` doldurur (bkz. analizCalistir). */
-let _analiz = null;
-
-/**
- * ⚠ FAZ H: Adim 4 eskiden 7 satirin hepsine "Üretim sırasında hesaplanacak"
- * yaziyordu ve o alanlarin ON-KONTROL UCU YOKTU — vaat karsiliksizdi.
- * Artik olculebilir olanlar `/api/analiz` ile URETIMDEN ONCE geliyor
- * (LLM cagrisi yok, ucretsiz). Olculemeyenler HALA durustce "üretim
- * sirasinda" diyor; uydurma sayi YOK.
- */
-async function analizCalistir(yenidenCiz) {
-  const t = taslak();
-  const metin = (t.konu || '').trim();
-  if (metin.length < 20) { _analiz = null; return; }
-  const fd = new FormData();
-  fd.append('story', metin);
-  if (t.tur) fd.append('tur', t.tur);
-  if (t.sureDk) fd.append('sure_dk', String(t.sureDk));
-  if (t.ses) fd.append('ses', t.ses);
-  try {
-    const r = await fetch(yol(UCLAR.analiz), {method: 'POST', body: fd});
-    _analiz = r.ok ? await r.json() : {_hata: `HTTP ${r.status}`};
-  } catch (e) {
-    _analiz = {_hata: String(e.message || e)};
-  }
-  if (yenidenCiz) yenidenCiz();
-}
-
-const ANALIZ_ADI = {
-  konu: 'Konu başlığı (anlatım üretilecek)',
-  'tam-metin': 'Hazır anlatım metni',
-};
-
-function adim4() {
-  const t = taslak();
-  const tb = turBilgi(t.tur);
-  const a = _analiz;
-  const kelime = Math.round(Number(t.sureDk || 2) * 139);  // olculen TTS hizi
-  return `<h2>Üretim özeti</h2>
-  <p class="kucuk orta adim-giris">
-    Bunlar senin seçtiklerin. Araştırma ve medya sayıları üretim sırasında
-    ölçülür — burada tahmin göstermiyoruz.</p>
-
-  <div class="ozet-izgara">
-    <section class="kart">
-      <h3 class="ozet-kart-bas">Seçimlerin</h3>
-      ${ozetSatir('Tür', tb ? tb.ad : '—')}
-      ${ozetSatir('Hedef süre', `${t.sureDk} dk`)}
-      ${ozetSatir('Anlatım (yaklaşık)', `${kelime.toLocaleString('tr-TR')} kelime`)}
-      ${ozetSatir('Edit şablonu', (t.tur === 'animasyon' ? t.animStili : t.editStili) || 'Varsayılan')}
-      ${ozetSatir('Ses', t.ses || 'Otomatik')}
-      ${ozetSatir('Marka kiti', t.profil || 'Yok')}
-      ${ozetSatir('Altyazı', t.altyazi ? 'Açık (gömülü)' : 'Kapalı')}
-      ${ozetSatir('Kamera hareketi', t.zoom ? 'Açık' : 'Kapalı')}
-      ${ozetSatir('Geçişler', t.gecis ? 'Açık' : 'Sert kesme')}
-      ${t.tur === 'hikaye'
-        ? ozetSatir('Ünlü hikâyesi', t.unlu ? 'Açık' : 'Kapalı') : ''}
-      ${ozetSatir('Referans kare', String(dosyalar.sahneRef.length))}
-    </section>
-
-    <section class="kart">
-      <h3 class="ozet-kart-bas">Metin analizi</h3>
-      ${a && !a._hata ? `
-        ${ozetSatir('Girdi türü', ANALIZ_ADI[a.girdi_turu] || a.girdi_turu)}
-        ${ozetSatir('Kelime sayısı', String(a.kelime_sayisi))}
-        ${ozetSatir('Dil', a.dil ? a.dil.toUpperCase() : 'belirsiz')}
-        ${ozetSatir('İçerik türü', a.icerik_turu)}
-        ${ozetSatir('Dönem', a.varliklar?.donem || '—')}
-        ${ozetSatir('Kişi/yer adları',
-          (a.varliklar?.ozel_adlar || []).slice(0, 3).join(', ') || '—')}
-      ` : a && a._hata
-        ? uyariKutu(`Analiz alınamadı (${kac(a._hata)}). Üretim yine çalışır.`,
-          'uyari')
-        : '<p class="kucuk orta">Analiz çalışıyor…</p>'}
-    </section>
-
-    <section class="kart">
-      <h3 class="ozet-kart-bas">Sistemin otomatik seçtikleri</h3>
-      ${a && a.otomatik_secimler && Object.keys(a.otomatik_secimler).length
-        ? Object.entries(a.otomatik_secimler).map(([k, v]) =>
-          `<div class="ozet-satir"><span class="ad">${kac(k)}</span>
-           <span class="deg tekfont">${kac(String(v.deger))}</span></div>
-           <p class="kucuk sessiz">${kac(v.gerekce)}</p>`).join('')
-        : '<p class="kucuk orta">Otomatik seçim yok — hepsini sen belirledin.</p>'}
-      ${a && a.korunan_secimler && Object.keys(a.korunan_secimler).length
-        ? `<p class="kucuk orta ust-bosluk-kucuk">Senin açık seçimlerin
-           korundu: ${kac(Object.keys(a.korunan_secimler).join(', '))}</p>` : ''}
-    </section>
-
-    <section class="kart">
-      <h3 class="ozet-kart-bas">Üretimde ölçülecek</h3>
-      <!-- ⚠ Bunlarin ON-KONTROL ucu YOK; sayi UYDURULMAZ. -->
-      ${ozetSatir('Güvenilir kaynak sayısı', HESAPLANACAK, {hesaplanacak: true})}
-      ${ozetSatir('Doğrulanmış iddia', HESAPLANACAK, {hesaplanacak: true})}
-      ${ozetSatir('Kullanılabilir medya', HESAPLANACAK, {hesaplanacak: true})}
-      ${ozetSatir('Sahne sayısı', HESAPLANACAK, {hesaplanacak: true})}
-      ${ozetSatir('Tahmini maliyet', HESAPLANACAK, {hesaplanacak: true})}
-      ${ozetSatir('Kalite ölçümü (QA)', HESAPLANACAK, {hesaplanacak: true})}
-    </section>
-  </div>
-
-  ${a && (a.riskler || []).length ? `<div class="ozet-bilgi">${uyariKutu(
-    'Bu konu hassas alan içeriyor: <strong>' +
-    kac((a.riskler || []).map((r) => r.tur).join(', ')) +
-    '</strong>. Üretim engellenmiyor; anlatımın doğruluğunu kontrol et.',
-    'uyari')}</div>` : ''}
-
-  <div class="ozet-bilgi">
-    ${uyariKutu('Yukarıdaki analiz üretimden <strong>önce</strong> ve ' +
-      'ücretsiz yapıldı (yapay zekâ çağrısı yok). Alt bölümdeki değerler ' +
-      'ancak üretim sırasında ölçülebilir.', 'bilgi')}
-  </div>`;
-}
-
-/* ════════════════ ADIM 5 — ONAY ════════════════ */
-
-function adim5() {
-  const t = taslak();
-  const tb = turBilgi(t.tur);
-  return `<h2>Onay</h2>
-  <p class="kucuk orta adim-giris">
-    Üretim başlatılınca sunucu kuyruğuna alınır; ilerlemeyi Projeler
-    ekranından izleyebilirsin.</p>
-
-  <section class="kart">
-    <div class="iskart-satir onay-etiket">
-      ${etiket(tb ? tb.ad : '—', 'vurgu')}${etiket(`${t.sureDk} dk`)}
-      ${t.altyazi ? etiket('Altyazili') : ''}
-    </div>
-    <p class="kucuk orta onay-metin">${
-      kac((t.konu || '').slice(0, 600))}${(t.konu || '').length > 600 ? '…' : ''}</p>
-  </section>
-
-  <div class="onay-bilgi">
-    ${uyariKutu('Çıktı dosyaları: video, kapak görseli ve kullanılan ' +
-      'kaynakların listesi.', 'bilgi')}
-  </div>
-
-  <div id="wzUretimDurum" class="kucuk onay-durum" role="status"
-       aria-live="polite"></div>`;
-}
-
-/* ════════════════ KAYNAK YUKLEME ════════════════ */
-
-async function kaynaklariYukle() {
-  const istekler = {
-    editStilleri: UCLAR.editStilleri,
-    animStilleri: UCLAR.animasyonStilleri,
-    sesler: UCLAR.sesler,
-    profiller: UCLAR.profiller,
-    paletler: UCLAR.paletler,
-    isikDuzeyleri: UCLAR.isikDuzeyleri,
-    arkaplanlar: UCLAR.arkaplanlar,
-    altyaziSablonlari: UCLAR.altyaziSablonlari,
-  };
-  const cikti = {hatalar: []};
-  await Promise.all(Object.entries(istekler).map(async ([ad, uc]) => {
-    const s = await getirSessiz(uc);
-    if (s.ok) {
-      // Sunucu bazen {liste:[...]} bazen [...] donuyor — ikisini de kabul et
-      const v = s.veri;
-      cikti[ad] = Array.isArray(v) ? v
-        : Array.isArray(v?.liste) ? v.liste
-          : Array.isArray(v?.stiller) ? v.stiller
-            : Array.isArray(v?.sesler) ? v.sesler
-              : Array.isArray(v?.profiller) ? v.profiller : [];
-    } else {
-      cikti[ad] = [];
-      cikti.hatalar.push({ad, hata: s.hata});
-    }
-  }));
-  return cikti;
-}
-
-/* ════════════════ CIZIM + OLAYLAR ════════════════ */
-
-function adimGovdesi() {
-  return [adim1, adim2, adim3, adim4, adim5][adim - 1]();
-}
-
-function ilerlemeCubugu() {
-  const d = ilerlemeDurumu();
-  return `<nav class="adimlar" aria-label="Proje adımları">
-    ${d.map((a, i) => {
-      const durum = a.no === adim ? 'şu anki adım'
-        : a.bitti ? 'tamamlandı' : 'henüz tamamlanmadı';
-      return `${i ? '<span class="adim-ayirac" aria-hidden="true"></span>' : ''}
-      <span class="adim-oge"><button type="button" class="adim-dugme"
-        data-adim="${a.no}" data-bitti="${a.bitti ? 1 : 0}"
-        aria-label="Adım ${a.no}: ${kac(a.ad)} — ${durum}"
-        ${a.no === adim ? 'aria-current="step"' : ''}>
-        <span class="adim-no" aria-hidden="true">${a.bitti && a.no !== adim
-          ? ikon('onay', {boyut: 12}) : a.no}</span>
-        <span class="adim-ad" aria-hidden="true">${kac(a.ad)}</span>
-      </button></span>`;
-    }).join('')}
-  </nav>`;
-}
-
-export function wizardHtml() {
-  return `<div class="sayfa-bas">
-    <div class="sayfa-bas-yazi">
-      <h1>Yeni Proje</h1>
-      <p>Adım ${adim}/5 — ${kac(ADIMLAR[adim - 1].tam)}</p>
-    </div>
-    ${modCipleri('adim')}
-    <button type="button" class="dugme dugme-hayalet" id="wzSifirla">
-      ${ikon('cop', {boyut: 17})} Taslağı sil</button>
-  </div>
-  ${ilerlemeCubugu()}
-  <div class="wz-govde" id="wzGovde">${adimGovdesi()}</div>
-  <div class="wz-alt">
-    <button type="button" class="dugme dugme-hayalet" id="wzGeri"
-      ${adim === 1 ? 'disabled' : ''}>${ikon('geri', {boyut: 17})} Geri</button>
-    <span class="bosluk"></span>
-    <span id="wzUyari" class="kucuk wz-uyari"></span>
-    ${adim < 5
-      ? `<button type="button" class="dugme dugme-ana" id="wzDevam">Devam
-          ${ikon('ok', {boyut: 17})}</button>`
-      : `<button type="button" class="dugme dugme-ana dugme-buyuk" id="wzUret">
-          ${ikon('onay', {boyut: 18})} Projeyi oluştur</button>`}
-  </div>`;
-}
-
-function onizlemeleriCiz() {
-  const kap = $('#wzRefOnizler');
-  if (!kap) return;
-  kap.innerHTML = dosyalar.sahneRef.map((f, i) =>
-    `<img src="${URL.createObjectURL(f)}" alt="Referans kare ${i + 1}">`).join('');
-}
-
-function dosyaAlaniBagla(birakId, girdiId, coklu, geri) {
-  const birak = $(birakId);
-  const girdi = $(girdiId);
-  if (!birak || !girdi) return;
-  const ac = () => girdi.click();
-  birak.addEventListener('click', ac);
-  birak.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ac(); }
-  });
-  ['dragenter', 'dragover'].forEach((t) => birak.addEventListener(t, (e) => {
-    e.preventDefault(); birak.classList.add('uzerinde');
-  }));
-  ['dragleave', 'drop'].forEach((t) => birak.addEventListener(t, (e) => {
-    e.preventDefault(); birak.classList.remove('uzerinde');
-  }));
-  birak.addEventListener('drop', (e) => {
-    const f = Array.from(e.dataTransfer?.files || [])
-      .filter((x) => x.type.startsWith('image/'));
-    if (f.length) geri(coklu ? f : f[0]);
-  });
-  girdi.addEventListener('change', () => {
-    const f = Array.from(girdi.files || []);
-    if (f.length) geri(coklu ? f : f[0]);
-  });
-}
-
-function olaylariBagla(yenidenCiz) {
-  const t = taslak();
-
-  $$('.adim-dugme').forEach((b) => b.addEventListener('click', () => {
-    const hedef = Number(b.dataset.adim);
-    if (hedef < adim) { adim = hedef; yenidenCiz(); return; }
-    // Ileri atlarken aradaki adimlar gecerli olmali
-    for (let n = 1; n < hedef; n++) {
-      const g = adimGecerli(n);
-      if (!g.ok) { adim = n; yenidenCiz(); uyariGoster(g.sebep); return; }
-    }
-    adim = hedef; yenidenCiz();
-  }));
-
-  const geri = $('#wzGeri');
-  if (geri) geri.addEventListener('click', () => {
-    if (adim > 1) { uyariTemizle(); adim--; yenidenCiz(); }
-  });
-
-  const devam = $('#wzDevam');
-  if (devam) devam.addEventListener('click', () => {
-    const g = adimGecerli(adim);
-    if (!g.ok) { uyariGoster(g.sebep); return; }
-    uyariTemizle();                 // eski hata sonraki adimda okunmasin
-    sesDurdur();                    // adim degisti: calan ornek sussun
-    adim = Math.min(5, adim + 1);
-    yenidenCiz();
-  });
-
-  const sifirla = $('#wzSifirla');
-  if (sifirla) sifirla.addEventListener('click', () => {
-    taslakSil(); dosyalariTemizle(); adim = 1; yenidenCiz();
-    duyur('Taslak silindi');
-  });
-
-  grupBagla(document, 'tur', (v) => {
-    // ⚠ Kullanicinin ACIK secimi isaretlenir; Auto bir daha turu EZMEZ.
-    taslakYaz({tur: v, turKaynak: 'kullanici'});
-    // Tur degisince stil secimi karismasin
-    taslakYaz(v === 'animasyon' ? {editStili: ''} : {animStili: ''});
-  });
-  grupBagla(document, 'yontem', (v) => taslakYaz({girisYontemi: v}));
-  // Stil/palet/marka/ses ARTIK adim3Bagla() icinde radio semantics ile
-  // baglaniyor — burada TEKRAR baglamak cift islem yapardi.
-
-  const konu = $('#wzKonu');
-  if (konu) konu.addEventListener('input', () => {
-    taslakYaz({konu: konu.value});
-    _analiz = null;          // metin degisti -> eski analiz gecersiz
-    konu.setAttribute('aria-invalid', konu.value.trim().length < 20);
-  });
-
-  const sure = $('#wzSure');
-  if (sure) sure.addEventListener('change', () => taslakYaz({sureDk: sure.value}));
-
-  dosyaAlaniBagla('#wzRefBirak', '#wzRefGirdi', true, (f) => {
-    dosyalar.sahneRef = dosyalar.sahneRef.concat(f).slice(0, 8);
-    onizlemeleriCiz();
-    duyur(`${dosyalar.sahneRef.length} referans kare seçildi`);
-  });
-  onizlemeleriCiz();
-
-  const analiz = $('#wzAnimAnaliz');
-  if (analiz) analiz.addEventListener('click', () => animAkis(UCLAR.animAnaliz));
-  const sorular = $('#wzAnimSorular');
-  if (sorular) sorular.addEventListener('click', () => animAkis(UCLAR.animSorular));
-
-  const uret = $('#wzUret');
-  if (uret) uret.addEventListener('click', () => uretimiBaslat(uret));
-
-  // Adim 4'e girildiyse analizi BIR KEZ calistir (ucretsiz, LLM yok)
-  if (adim === 4 && _analiz === null) {
-    analizCalistir(yenidenCiz);
-  }
-
-  // Adim 3'un secim deneyimi — yalnizca o adimda bagla
-  // Adim 3'un TUM secim mantigi `secim-deneyimi.js` icinde — wizard yalnizca
-  // durumu ve `generate` sozlesmesini yonetiyor.
-  if (adim === 3) {
-    adim3Kur({
-      kap: $('#wzGovde'), durum: a3, taslak, taslakYaz, kaynak, dosyalar,
-      dosyaAlaniBagla, duyur, yenidenCiz,
-    });
-  }
-}
-
-function uyariGoster(metin) {
-  const el = $('#wzUyari');
-  if (el) { el.textContent = metin; duyur(metin); }
-}
-
-/** Uyariyi ve ekran okuyucu duyurusunu TEMIZLE (basarili gecişte zorunlu). */
-function uyariTemizle() {
-  const el = $('#wzUyari');
-  if (el) el.textContent = '';
-  duyur('');
-}
-
-async function animAkis(uc) {
-  const kutu = $('#wzAnimSonuc');
-  if (!kutu) return;
-  if (!dosyalar.sahneRef.length) {
-    kutu.textContent = 'Önce en az 1 referans kare ekle.';
-    return;
-  }
-  kutu.textContent = 'Çalışıyor…';
-  const fd = new FormData();
-  fd.append('session', oturumId());
-  dosyalar.sahneRef.forEach((f) => fd.append('kare', f));
-  try {
-    const r = await fetch(yol(uc), {method: 'POST', body: fd});
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    const d = await r.json();
-    kutu.textContent = typeof d === 'string' ? d
-      : (d.ozet || d.metin || JSON.stringify(d).slice(0, 400));
-  } catch (e) {
-    kutu.textContent = `Çalıştırılamadı: ${e.message}. ` +
-      'Referans kareler üretimde yine kullanılır.';
-  }
-}
-
-/* ════════════════ URETIM ════════════════ */
-
+/** /api/generate degerleri — GENERATE_ALANLARI adlariyla birebir. */
 function generateDegerleri() {
   const t = taslak();
   const d = {
-    session: oturumId(),
     story: (t.konu || '').trim(),
-    tur: t.tur || 'documentary',
-    sure_dk: String(t.sureDk || '2'),
-    gecis: t.gecis ? '1' : '0',
-    zoom: t.zoom ? '1' : '0',
-    altyazi: t.altyazi ? '1' : '0',
+    tur: AKIS.tur,
+    edit: AKIS.edit,
+    sure_dk: String(t.sure || 2),
+    gecis: '1',
+    zoom: '1',
+    altyazi: t.altyazi === false ? '0' : '1',
   };
-  const stil = t.tur === 'animasyon' ? t.animStili : t.editStili;
-  // ⚠ FAZ I-3 — AUTO KOPRUSU, YENI ALAN EKLEMEDEN.
-  // Kullanici acik bir stil sectiyse o kazanir (degismeyen davranis).
-  // Secmediyse ve `/api/analiz` GUVENILIR bir bilesik profil cozduyse o
-  // kimlik MEVCUT `edit` alaniyla gonderilir; 22 alanlik sozlesme buyumez.
-  // `autoStilKimligi()` yalnizca uretim hattinin GERCEKTEN cozebilecegi
-  // kimlikleri gecirir (melez ve varsayilan durumlar elenir) — aksi halde
-  // "stil uygulandi" demek yalan olurdu.
-  const otoStil = stil ? '' : autoStilKimligi(_analiz, t.tur);
-  if (stil || otoStil) d.edit = stil || otoStil;
-  if (t.profil) d.profil = t.profil;
-  if (t.altyazi && t.altyaziSablon) {
-    d.altyazi_sablon = JSON.stringify(t.altyaziSablon);
-  }
-  if (t.palet === 'ozel') {
-    d.palet = 'ozel';
-    d.palet_ozel = t.paletOzel.join(',');
-  } else if (t.palet) {
-    d.palet = t.palet;
-  }
-  if (t.arkaplan) d.arkaplan = t.arkaplan;
   if (t.ses) d.ses = t.ses;
-  if (t.isik) d.isik = t.isik;
-  if (t.gorselModel) d.gorsel_model = t.gorselModel;
-  if (t.tur === 'hikaye') {
-    if (t.acilis) d.acilis = t.acilis;
-    d.sora = t.sora ? '1' : '0';
-    // 22. alan (main, 12 Agu): unlu modu — yalnizca hikayede anlamli
-    d.unlu = t.unlu ? '1' : '0';
-  }
-  if (dosyalar.karakter) d.karakter = dosyalar.karakter;
-  if (dosyalar.stil) d.stil = dosyalar.stil;
-  if (dosyalar.sahneRef.length) d.sahne_ref = dosyalar.sahneRef;
   return d;
 }
-
-// Test/denetim icin disari aciliyor: alan adlarinin sozlesmeye uydugu
-// dogrulanabilsin.
 export {generateDegerleri};
 
-async function uretimiBaslat(dugme, durumSecici = '#wzUretimDurum') {
-  const durum = $(durumSecici);
-  const basitMi = durumSecici !== '#wzUretimDurum';
-  for (const n of [1, 2]) {
-    const g = adimGecerli(n);
-    if (!g.ok) {
-      if (durum) durum.textContent = g.sebep;
-      // ⚠ Basit modda ADIM YOK; kullaniciyi gormedigi bir adima atlatmayiz.
-      // Eksik olan sey ekranda zaten gorunur (metin alani) ya da yalnizca
-      // adim adim modda ayarlanabilir (animasyon referans karesi).
-      if (!basitMi) adim = n;
-      return;
-    }
+/* ════════════════ EKRAN ════════════════ */
+
+export function wizardHtml() {
+  const t = taslak();
+  const sesler = kaynak.sesler || [];
+  return `<div class="sayfa-bas"><div class="sayfa-bas-yazi">
+    <h1>Yeni Video</h1>
+    <p>Metni ver — her cümle 5-7 saniyelik bir sahneye dönüşür: gerektiğinde
+       gerçek stok video, gerektiğinde AI görsel, sinematik geçişlerle.</p>
+  </div></div>
+
+  <section class="kart akis-kart">
+    <label class="alan-etiket" for="akMetin">Konu ya da anlatım metni</label>
+    <textarea id="akMetin" class="alan akis-metin" rows="10"
+      placeholder="${kac(YERTUTUCU)}">${kac(t.konu || '')}</textarea>
+
+    <div class="akis-ayarlar">
+      <div class="alan-grup">
+        <label class="alan-etiket" for="akSure">Süre (dakika)</label>
+        <input id="akSure" class="alan" type="number" min="1" max="30"
+               step="1" value="${Number(t.sure) || 2}">
+      </div>
+      <div class="alan-grup">
+        <label class="alan-etiket" for="akSes">Anlatıcı sesi</label>
+        <select id="akSes" class="alan">
+          <option value="">Otomatik (dile göre)</option>
+          ${sesler.map((s) => `<option value="${kac(s.id)}"
+            ${t.ses === s.id ? 'selected' : ''}>${kac(s.ad)}${
+            s.ucret ? ` — ${kac(s.ucret)}` : ''}</option>`).join('')}
+        </select>
+      </div>
+      <div class="alan-grup">
+        <label class="alan-etiket" for="akAltyazi">Altyazı</label>
+        <select id="akAltyazi" class="alan">
+          <option value="1" ${t.altyazi === false ? '' : 'selected'}>Açık</option>
+          <option value="0" ${t.altyazi === false ? 'selected' : ''}>Kapalı</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="bilgi-kutu" role="note">
+      <p class="kucuk">Akış her sahne için <strong>önce gerçek stok video</strong>
+      arar; bulunamazsa <strong>AI görsel (16:9, 2K)</strong> üretir.
+      AI video klipler sunucu tavanına kadar otomatik eklenir.
+      Kaynak sayısı ve sahne dökümü üretim sırasında hesaplanır — burada
+      tahmin gösterilmez.</p>
+    </div>
+
+    <div class="akis-alt">
+      <button id="akBaslat" class="dugme dugme-ana dugme-buyuk" type="button">
+        Videoyu Üret
+      </button>
+      <span id="wzUretimDurum" class="kucuk" role="status" aria-live="polite"></span>
+    </div>
+  </section>`;
+}
+
+async function uretimiBaslat(dugme) {
+  const durum = $('#wzUretimDurum');
+  const g = adimGecerli(1);
+  if (!g.ok) {
+    if (durum) durum.textContent = g.sebep;
+    return;
   }
   dugme.disabled = true;
   if (durum) durum.textContent = 'Üretim başlatılıyor…';
   try {
     const cevap = await uretimBaslat(generateDegerleri());
-    // ⚠ FAZ H: sunucu `job_id` donduruyor. Eski satir bu adi OKUMUYORDU
-    // (`cevap.job || cevap.is_id || cevap.id`) -> kimlik hep bos kaliyor,
-    // onay ekraninda bos <strong> gorunuyor ve localStorage'a is_id:"" gidiyordu.
     const isId = isKimligiCoz(cevap);
-    if (!isId) {
-      throw new Error('Sunucu iş kimliği döndürmedi; üretim izlenemez.');
-    }
+    if (!isId) throw new Error('Sunucu iş kimliği döndürmedi; üretim izlenemez.');
     yerelIsEkle({
       is_id: isId,
       ad: (taslak().konu || '').slice(0, 60) || isId,
-      tur: taslak().tur,
+      tur: AKIS.tur,
       durum: 'kuyrukta',
       olusturma: new Date().toISOString(),
     });
@@ -667,111 +159,35 @@ async function uretimiBaslat(dugme, durumSecici = '#wzUretimDurum') {
   }
 }
 
-/* ════════════════ GIRIS NOKTASI ════════════════ */
-
-/* ════════════════ BASIT MOD ════════════════ */
-
-/** Analiz istegini geciktirici — her tusa basista uc cagirmayalim. */
-let _analizZaman = null;
-
-/**
- * Auto panelini YERINDE tazele. Tum ekrani yeniden cizmek metin alanindaki
- * imleci kaybettirirdi; yalnizca `#bsAuto` govdesi degisir.
- */
-function autoPaneliniTazele(kap) {
-  const kutu = $('#bsAuto', kap);
-  if (!kutu) return;
-  // ⚠ Auto'nun OLCTUGU uretim hattini uygula — kullanici turu kendisi
-  // secmediyse. Aksi halde acik bir hikaye metni belgesel hattinda uretilirdi.
-  const oneriTur = autoTuru(_analiz, taslak());
-  if (oneriTur) taslakYaz({tur: oneriTur});
-  const bas = kutu.querySelector('.ozet-kart-bas');
-  const t = taslak();
-  kutu.innerHTML = `${bas ? bas.outerHTML : ''}${
-    autoPaneli(_analiz, t.tur || 'documentary',
-      {metinVar: (t.konu || '').trim().length >= 20})}`;
-  ikonlariBagla(kutu);
-}
-
-function basitCizim(kap) {
-  const ciz = () => {
-    kap.innerHTML = basitGovde({
-      t: taslak(), kaynak, analiz: _analiz, durum: a3, dosyalar,
-    });
-    ikonlariBagla(kap);
-    modCipleriniBagla(kap);
-    // Stil/ses/marka/palet/pro kontrollerinin TAMAMI adim3Kur icinde
-    // baglanir — burada tekrar baglanmaz (cift baglama olurdu).
-    adim3Kur({
-      kap, durum: a3, taslak, taslakYaz, kaynak, dosyalar,
-      dosyaAlaniBagla, duyur, yenidenCiz: ciz,
-    });
-    basitKur({
-      kok: kap, taslak, taslakYaz, yenidenCiz: ciz,
-      analizTazele: ({hemen} = {}) => {
-        _analiz = null;
-        autoPaneliniTazele(kap);
-        if (_analizZaman) clearTimeout(_analizZaman);
-        _analizZaman = setTimeout(() => {
-          analizCalistir(() => autoPaneliniTazele(kap));
-        }, hemen ? 0 : 700);
-      },
-      uret: (dugme) => uretimiBaslat(dugme, '#bsUretimDurum'),
-    });
-    duyur('');
-  };
-  _yenidenCiz = ciz;
-  ciz();
-  // Ilk cizimde analizi BIR KEZ calistir (ucretsiz, LLM cagrisi YOK)
-  if (_analiz === null && (taslak().konu || '').trim().length >= 20) {
-    analizCalistir(() => autoPaneliniTazele(kap));
+function olaylariBagla(kap) {
+  const metin = $('#akMetin', kap);
+  if (metin) metin.addEventListener('input', () => taslakYaz({konu: metin.value}));
+  const sure = $('#akSure', kap);
+  if (sure) {
+    sure.addEventListener('change', () => taslakYaz(
+      {sure: Math.max(1, Math.min(30, Number(sure.value) || 2))}));
   }
-}
-
-function modCipleriniBagla(kap) {
-  grupBagla(kap, 'mod', (v) => {
-    taslakYaz({mod: v === 'adim' ? 'adim' : 'basit'});
-    sesDurdur();
-    if (_ekranKap) ekraniCiz(_ekranKap);
-  });
-}
-
-/* ════════════════ GIRIS NOKTASI ════════════════ */
-
-let _ekranKap = null;
-
-function ekraniCiz(kap) {
-  if (taslak().mod === 'adim') {
-    const ciz = () => {
-      kap.innerHTML = wizardHtml();
-      ikonlariBagla(kap);
-      modCipleriniBagla(kap);
-      olaylariBagla(ciz);
-      // Yeni adim cizildi: onceki adimin hata duyurusu artik gecerli degil
-      duyur('');
-    };
-    _yenidenCiz = ciz;
-    ciz();
-    return;
+  const ses = $('#akSes', kap);
+  if (ses) ses.addEventListener('change', () => taslakYaz({ses: ses.value}));
+  const alt = $('#akAltyazi', kap);
+  if (alt) {
+    alt.addEventListener('change', () => taslakYaz({altyazi: alt.value !== '0'}));
   }
-  basitCizim(kap);
+  const baslat = $('#akBaslat', kap);
+  if (baslat) baslat.addEventListener('click', () => uretimiBaslat(baslat));
 }
 
-export async function wizardCiz(kap, {adimNo} = {}) {
-  // Hash'te adim numarasi varsa (or. #/yeni/3) ADIM ADIM mod istenmis demektir
-  if (adimNo) {
-    adim = Math.max(1, Math.min(5, Number(adimNo)));
-    taslakYaz({mod: 'adim'});
-  }
+export async function wizardCiz(kap, _secenek = {}) {
   kap.innerHTML = `<div class="sayfa-bas"><div class="sayfa-bas-yazi">
-    <h1>Yeni Proje</h1><p>Seçenekler yükleniyor…</p></div></div>
-    ${yukleniyor(3, 84)}`;
+    <h1>Yeni Video</h1><p>Yükleniyor…</p></div></div>${yukleniyor(2, 84)}`;
   if (!kaynak.yuklendi) {
-    kaynak = {...(await kaynaklariYukle()), yuklendi: true};
+    const sesler = await getirSessiz(UCLAR.sesler);
+    kaynak = {sesler: Array.isArray(sesler) ? sesler : [],
+              hatalar: Array.isArray(sesler) ? [] : ['sesler yüklenemedi'],
+              yuklendi: true};
   }
-  _ekranKap = kap;
-  ekraniCiz(kap);
+  kap.innerHTML = wizardHtml();
+  ikonlariBagla(kap);
+  olaylariBagla(kap);
+  duyur('');
 }
-
-export function wizardAdim() { return adim; }
-export function wizardKaynakHatalari() { return kaynak.hatalar || []; }

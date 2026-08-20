@@ -235,12 +235,14 @@ kontrol(f"server.py {ALAN_SAYISI} Form/File alani tanimliyor",
 kontrol("22. alan `unlu` iki tarafta da var",
         "unlu" in alanlar_js and "unlu" in alanlar_py,
         f"js={'unlu' in alanlar_js} py={'unlu' in alanlar_py}")
-kontrol("wizard unlu'yu hikayede gonderiyor", "d.unlu" in WIZARD)
+# ⚠ TEK AKIS PIVOTU (20 Agu 2026): hikaye/unlu ARAYUZDEN kalkti; alan
+# sozlesmesi API'de durur (ustteki iki kontrol), wizard onu GONDERMEZ.
+kontrol("tek akis: wizard unlu GONDERMEZ", "d.unlu" not in WIZARD)
 kontrol("alan adlari BIREBIR ayni", set(alanlar_js) == set(alanlar_py),
         f"fark: {set(alanlar_js) ^ set(alanlar_py)}")
-kontrol("wizard tum alanlari uretebiliyor",
-        all(f"d.{a}" in WIZARD or f"'{a}'" in WIZARD or f"{a}:" in WIZARD
-            for a in ("session", "story", "tur", "sure_dk", "gecis", "zoom")))
+kontrol("tek akis cekirdek alanlari uretiyor",
+        all(f"'{a}'" in WIZARD or f"{a}:" in WIZARD
+            for a in ("story", "tur", "edit", "sure_dk", "gecis", "zoom")))
 
 # ── SES KUTUPHANESI SAGLAYICI SENKRONU (main, 12 Agu) ──
 # Arayuzdeki liste ile server.py'nin dogrulamasi ayrisirsa kullanicinin
@@ -578,12 +580,13 @@ kontrol("analiz LLM CAGIRMIYOR (ucretsiz)",
 
 kontrol("server /api/analiz ucunu tanimliyor", '"/api/analiz"' in SERVER)
 kontrol("api.js analiz ucunu taniyor", "analiz:" in API_JS)
-kontrol("wizard adim4 gercek analizi kullaniyor",
-        "analizCalistir" in WIZARD and "otomatik_secimler" in WIZARD)
-kontrol("olculemeyenler HALA durustce 'hesaplanacak'",
-        "HESAPLANACAK" in WIZARD and "Üretimde ölçülecek" in WIZARD)
-kontrol("metin degisince analiz gecersiz kilaniyor",
-        "_analiz = null;          // metin degisti" in WIZARD)
+# ⚠ TEK AKIS PIVOTU (20 Agu 2026): 5 adimli wizard ve Adim-4 ozet paneli
+# KALKTI. Uydurma-sayi yasagi tek akista da GECERLI: ekran hicbir tahmini
+# sayi gostermez, "uretim sirasinda hesaplanir" durustce yazilidir.
+kontrol("tek akis uydurma sayi gostermez",
+        "tahmin gösterilmez" in WIZARD)
+kontrol("analiz ucu API sozlesmesinde DURUYOR (backend kaybi yok)",
+        "analiz:" in API_JS and '"/api/analiz"' in SERVER)
 
 # ═══════════════ 7. DERIN SAGLIK ═══════════════
 blok("7. Derin saglik (gercek olcum, anahtar sizmaz)")

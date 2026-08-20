@@ -35,6 +35,7 @@ import fact_baglama          # Faz Y-11b: grounded fail-closed kapi + tahsis
 import qa_kopru         # Faz H: render sonrasi kalite kapisi (bkz. modul basligi)
 import medya_kopru      # Faz I-6: Faz B medya avcisi (OPT-IN, varsayilan KAPALI)
 import edit_kopru       # Faz I-10: EditorV2 plan orkestrasyonu (OPT-IN, KAPALI)
+import magnific_motor   # Tek akis (20 Agu 2026): nano-banana gorsel + i2v klip
 import kaynak_tavani    # Faz R-1d-g: ayni kaynak <=8 sn bolme plani
 
 # ⚠ FAZ I-2c — BILESIK STIL PROFILI KOPRUSU (OPSIYONEL, HATTI COKERTMEZ).
@@ -1150,6 +1151,23 @@ FACT_KAPSAM_ESIGI = max(FACT_KAPSAM_TABANI,
 # motion -> Remotion Video.tsx gecis modu; footage_pct -> gercek footage sahne orani;
 # overlay -> kinetik baslik yogunlugu; gorsel_ek -> AI art-direction; mag -> Magnific profili.
 EDIT_STILLERI = {
+    # ── TEK AKIS (20 Agu 2026, urun pivotu) — ARAYUZUN TEK YOLU ──
+    # Kural: cumle = sahne, 5-7 sn. Her sahne icin ONCE gercek stok video
+    # aranir; bulunamazsa Magnific (nano-banana) 16:9 AI gorseli + Remotion
+    # motion. AI gorsel yolu ACIK (gorsel_yasak=False) — UI-5'in video-only
+    # karari ESKI belgesel stillerinde durur, bu akista degil.
+    # `mag: None` cunku nano-banana zaten 2K uretir; upscale adimi GEREKSIZ.
+    "akis": {
+        "ad": "Akış",
+        "ozet": "Cümle başına 5-7 sn — gerektiğinde stok video, gerektiğinde AI görsel + sinematik geçişler",
+        "gorsel_yasak": False,
+        "sahne_sn": 6, "maks_sahne_sn": 7, "kelime": 15, "footage_pct": 60,
+        "overlay": "az", "altyazi": "orta", "motion": "sinematik", "mag": None,
+        "bolumler": True,
+        "gorsel_ek": ("cinematic documentary still, photorealistic, shot on a cinema camera, "
+                      "natural light, high dynamic range, shallow depth of field, "
+                      "absolutely no text, no graphics, no illustration, no watermark"),
+    },
     "sinematik-belgesel": {
         "ad": "Sinematik Belgesel",
         "ozet": "BBC Earth / Nat Geo — yavaş, hard-cut, gerçek footage, orkestral",
@@ -4168,6 +4186,20 @@ def referansli_gorsel(scene_prompt: str, kar_yol: str, hedef: str,
                    "and never cover the image with words. Single full-bleed illustration: do NOT split "
                    "the image into panels, grids, frames, borders or comic strips.")
 
+    # ── MAGNIFIC YOLU (tek akis, 20 Agu 2026) ──
+    # Nano Banana Pro Flash: tek cagrida NATIVE 16:9 ~2752x1536 (olculdu).
+    # 1536x1024 uretip kirpma + upscale zinciri bu yolda GEREKMEZ.
+    # ⚠ Basarisizsa (kredi bitti / 5xx / zaman asimi) asagidaki OpenAI
+    # yoluna DUSER — is olmez, yalnizca o sahnenin kaynagi degisir ve
+    # dusus magnific_motor stderr'inde gorunur.
+    if (saglayici or SAGLAYICI) == "magnific" and magnific_motor.var():
+        refler = [y for y in (capa_yol if capa_var else None,
+                              kar_yol if (kar_var and not capa_var) else None,
+                              stil_yol if stil_gor else None) if y]
+        if magnific_motor.gorsel_uret(prompt, hedef, referanslar=refler):
+            return True
+        print("  magnific gorsel dusdu -> OpenAI yoluna devam", file=sys.stderr)
+
     # GROK yolu (unlu modu): referans desteklemez, prompt tek basina gider — unlu ismin
     # kendisi tutarlilik cipasidir. Basarisizsa asagidaki yollara DUSMEZ (stil karismasin).
     if saglayici == "grok" and XAI_KEY:
@@ -4505,6 +4537,15 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
     if kanal and not altyazi_sablon:
         altyazi_sablon = kanal.get("altyazi_sablon", "")   # kanal profili sablonu hatirlar
     mag_profil = prof.get("mag")
+    # ── TEK AKIS (20 Agu 2026): Magnific gorsel + tavanli AI video klip ──
+    # ⚠ Butce IS BASINA kurulur (modul duzeyi paylasilan sayac YOK —
+    # medya_kopru.is_butcesi_kur dersinin aynisi). Klip tavani MAG_KLIP_MAKS.
+    _akis_modu = (edit_id == "akis")
+    _akis_butce = magnific_motor.IsButcesi(is_adi) if _akis_modu else None
+    if _akis_modu:
+        print(f"  TEK AKIS: magnific gorsel={magnific_motor.GORSEL_MODEL} "
+              f"klip={magnific_motor.VIDEO_MODEL} tavan={magnific_motor.KLIP_MAKS}",
+              file=sys.stderr)
     footage_acik = prof.get("footage_pct", 0) > 0
     # Maliyet/kalite: animasyon (duz vektor) ucuz mini, documentary (foto-gercekci) gpt-image-2
     gorsel_model = GORSEL_MODEL_ANIM if mod == "animasyon" else GORSEL_MODEL_DOC
@@ -5246,7 +5287,8 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                                          kar_kilit=kar_kilit, stil_yol=stil_yol,
                                          capa_yol=capa_yol, stil_kilit=stil_kilit,
                                          model=gorsel_model, cerceve=cerceve_ek,
-                                         saglayici=unlu_motor if unlu_aktif else "")
+                                         saglayici=("magnific" if _akis_modu else
+                                                    (unlu_motor if unlu_aktif else "")))
         except BakiyeHatasi:
             # Bakiye/limit doldu: DAHA FAZLA PARA HARCAMA; diger isciler de yeni istek acmaz.
             bakiye_bitti = True
@@ -5299,6 +5341,22 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                 time.sleep(gorsel_bekle)
                 return ("video", f"isler/{is_adi}/sahne_{n}_sora.mp4")
             print(f"  sahne {n}: video klip olmadi, efektli fotografla devam", file=sys.stderr)
+        # ── TEK AKIS: AI gorseli KISA VIDEO klibe cevir (tavanli) ──
+        # ⚠ PAHALI yol (~gorselin 3-5 kati) — MAG_KLIP_MAKS iki kapida da
+        # tutulur (burada VE magnific_motor.klip_uret icinde). Tavan dolunca
+        # ya da klip basarisiz olunca gorsel+motion ile devam: is OLMEZ.
+        if (_akis_modu and _akis_butce is not None
+                and _akis_butce.klip_hakki_var()
+                and not bakiye_bitti and not uretim_durdu):
+            _kvyol = os.path.join(PUBLIC, "isler", is_adi, f"sahne_{n}_klip.mp4")
+            if magnific_motor.klip_uret(gyol_full, _kvyol, prompt=sp,
+                                        sure_sn=int(prof.get("sahne_sn") or 6),
+                                        butce=_akis_butce):
+                print(f"  sahne {n}: magnific klip uretildi "
+                      f"({_akis_butce.klip}/{magnific_motor.KLIP_MAKS})",
+                      file=sys.stderr)
+                _kopru_yaz(_kvyol)
+                return ("video", f"isler/{is_adi}/sahne_{n}_klip.mp4")
         # Hiz limiti: her ISCI kendi isteginden sonra bekler (toplam hiz = paralel/(uretim+bekleme))
         time.sleep(gorsel_bekle)
         # ⚠ FAZ R-1d-d: uretilen gorsel de avci butcesine YAZILIR; aksi halde
@@ -5761,7 +5819,8 @@ async def uret(is_adi: str, story: str, kar_yol: str, stil_yol: str = "",
                              kar_kilit=kar_kilit, stil_yol=stil_yol, capa_yol=capa_yol,
                              stil_kilit=stil_kilit, yazi_yasak=False,
                              model=GORSEL_MODEL_DOC,
-                             saglayici=unlu_motor if unlu_aktif else ""):   # kapak: en iyi model
+                             saglayici=("magnific" if _akis_modu else
+                                        (unlu_motor if unlu_aktif else ""))):   # kapak: en iyi model
             # ⚠ FAZ UI-8 / UI8-MAGNIFIC-KAPALI: video-only akista kapak da
             # Magnific'e GITMEZ — kredi denemesi olmamalidir.
             if mag_profil and not prof.get("gorsel_yasak"):

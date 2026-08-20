@@ -108,7 +108,13 @@ def _stil_blogu(sid: str) -> str:
     saf veridir; metinden okumak kanit degerini dusurmez — uzak kosum
     (konteyner) ayrica gercek nesneyi de dogrular.
     """
-    m = re.search(r'\n    "%s": \{([\s\S]*?)\n    \},' % re.escape(sid), _PIPE)
+    # ⚠ 20 Agu 2026 duzeltmesi: eski arama TUM dosyada ilk eslesmeyi aliyordu
+    # ve `GECIS_IMZALARI` sozlugundeki ayni isimli anahtara takiliyordu —
+    # araya yeni bir stil ("akis") girince YANLIS blogu yakaladigi olculdu.
+    # Arama artik EDIT_STILLERI govdesine CAPALI.
+    _i = _PIPE.find("EDIT_STILLERI = {")
+    _seg = _PIPE[_i:_PIPE.find("\nVARSAYILAN_EDIT", _i)] if _i >= 0 else _PIPE
+    m = re.search(r'\n    "%s": \{([\s\S]*?)\n    \},' % re.escape(sid), _seg)
     return m.group(1) if m else ""
 
 

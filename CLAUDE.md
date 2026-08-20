@@ -20,6 +20,7 @@ SSH anahtarı: `~/.ssh/bedosaho_hetzner` (repo'da DEĞİL; sahibinden alınır).
 - `.env` gizli anahtarları içerir, git'te DEĞİL, sadece sunucuda. Asla commit etme, loga yazdırma.
 
 ## Mimari
+- **TEK AKIŞ (20 Ağu 2026 pivotu)**: arayüzün tek yolu `tur=documentary, edit=akis` — cümle başına 5-7 sn sahne; önce stok video, bulunamazsa Magnific (nano-banana) 16:9 AI görseli; AI video klipler `MAG_KLIP_MAKS` tavanına kadar (`webapp/magnific_motor.py`). Eski animasyon/hikaye stilleri backend'de duruyor ama UI'dan kalktı.
 - `webapp/server.py` — FastAPI: `/api/generate` (kuyruk), `/api/job/{id}`, `/api/animasyon-stilleri`, `/api/edit-stilleri`. Tek-işçi kuyruk (1 video/seferde).
 - `webapp/pipeline.py` — üretim hattı. Önemli:
   - `uret()` ana akış: plan → sahne görselleri → seslendirme → props → Remotion render
@@ -35,7 +36,8 @@ SSH anahtarı: `~/.ssh/bedosaho_hetzner` (repo'da DEĞİL; sahibinden alınır).
 ## Ayarlanabilir env (konteynerde /root/bedosaho/.env)
 `AI_SAGLAYICI` (openai/gemini), `IMAGE_QUALITY` (medium), `IMAGE_MODEL*`, `GEMINI_*`,
 `ANIM_SAHNE_SN` (5), `TTS_RATE`, `RENDER_CRF` (18), `PEXELS_KEY`, `PIXABAY_KEY`,
-`VIDEO_FPS` (24), `HIKAYE_SAHNE_SN` (6), `HIKAYE_ACILIS_SN` (150).
+`VIDEO_FPS` (24), `HIKAYE_SAHNE_SN` (6), `HIKAYE_ACILIS_SN` (150),
+`MAG_KLIP_MAKS` (10, video başı AI klip tavanı), `MAG_VIDEO_MODEL` (minimax-hailuo-02-768p), `MAG_GORSEL_MODEL` (nano-banana-pro-flash).
 
 ## Kural
 - Değişikliği **gerçek 1 dk'lık videoyla** test et (tahminle "çalışır" deme). Kareleri ffmpeg ile çıkarıp gözle bak.
