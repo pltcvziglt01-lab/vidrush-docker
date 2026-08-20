@@ -20,7 +20,9 @@ from . import ayar  # gizli.env'i yukler (HAYALET_OPENAI_KEY)
 
 OPENAI_KEY = os.environ.get("HAYALET_OPENAI_KEY",
                             os.environ.get("OPENAI_API_KEY", ""))
-MODEL = os.environ.get("HAYALET_LLM_MODEL", "gpt-4.1-mini")
+# Kalite karari (20 Agu 2026): prompt yazimi videonun GORUNUMUNU belirler;
+# gpt-4.1 farki video basina ~$0.05 — varsayilan tam model.
+MODEL = os.environ.get("HAYALET_LLM_MODEL", "gpt-4.1")
 # ⚠ URUN KURALI (20 Agu 2026): metnin GIRISI — ilk ~4-5k karakter —
 # TAMAMEN VIDEO olur (kanal acilisi yogun hareket ister); sonrasi cumleden
 # cumleye degisebilir: LLM her cumle icin video/gorsel secer (hareket
@@ -67,30 +69,43 @@ def plan_kur(metin: str, bildir=None) -> list:
     if OPENAI_KEY:
         try:
             sistem = (
-                "You turn a narration script into Flow generation prompts. "
-                "The script may be in ANY language (Turkish, English, "
-                "Spanish, Arabic, ...); UNDERSTAND it, do not translate it "
-                "back to the user. For EVERY numbered sentence: write ONE "
-                "cinematic, photorealistic ENGLISH prompt that visually "
-                "depicts that exact sentence (setting, subject, light, "
-                "camera), and choose type: \"video\" if motion is "
-                "essential to depict it, else \"image\". "
-                "No text/watermark. Return JSON: "
-                '{"items":[{"i":<number>,"type":"video"|"image",'
-                '"prompt":"..."}]} with EXACTLY '
-                f"{len(cumleler)} items, same numbering.")
+                "You are a film director turning a narration script into "
+                "Google Flow generation prompts. The script may be in ANY "
+                "language; UNDERSTAND it fully first.\n\n"
+                "STEP 1 — STYLE BIBLE: from the whole script derive ONE "
+                "consistent visual identity: era, location feel, color "
+                "palette, light character, lens (e.g. 35mm anamorphic), "
+                "film texture (e.g. Kodachrome grain), mood. If a person "
+                "recurs, define them ONCE (age, face, clothing) and reuse "
+                "that exact description in every prompt they appear in — "
+                "this keeps the character consistent across shots.\n\n"
+                "STEP 2 — PER SENTENCE: write ONE ENGLISH prompt that "
+                "depicts THAT sentence, structured as: [shot type] + "
+                "subject + action + setting + lighting + lens/film + mood, "
+                "and ALWAYS ending with the style bible tokens so every "
+                "shot matches. For type=video prompts ADD a camera move "
+                "(slow dolly-in, tracking, aerial rise, handheld drift...). "
+                "Photorealistic; no text, no watermark, no captions in "
+                "frame. Choose type per sentence: \"video\" if motion is "
+                "essential, else \"image\".\n\n"
+                'Return JSON: {"style":"<style bible, one line>",'
+                '"items":[{"i":<n>,"type":"video"|"image","prompt":"..."}]} '
+                f"with EXACTLY {len(cumleler)} items, same numbering.")
             girdi = "\n".join(f"{i+1}. {c}" for i, c in enumerate(cumleler))
             cevap = json.loads(_oai([{"role": "system", "content": sistem},
                                      {"role": "user", "content": girdi}]))
+            stil = str(cevap.get("style", "")).strip()
             eslesme = {int(x["i"]): (str(x.get("prompt", "")).strip(),
                                      str(x.get("type", "")).strip().lower())
                        for x in cevap.get("items", []) if x.get("i")}
         except Exception as e:                               # noqa: BLE001
+            stil = ""
             eslesme = {}
             if bildir:
                 bildir(f"⚠ LLM plani dusdu ({type(e).__name__}) — "
                        f"cumleler dogrudan prompt olarak kullanilacak")
     else:
+        stil = ""
         eslesme = {}
         if bildir:
             bildir("⚠ LLM anahtari yok — cumleler dogrudan prompt olacak")
@@ -104,5 +119,6 @@ def plan_kur(metin: str, bildir=None) -> list:
             tur = "video" if llm_tur == "video" else "gorsel"
         else:
             tur = "gorsel"                      # LLM yoksa: giris-sonrasi gorsel
-        plan.append({"sira": i, "cumle": cumle, "tur": tur, "prompt": prompt})
+        plan.append({"sira": i, "cumle": cumle, "tur": tur, "prompt": prompt,
+                     "stil": stil})
     return plan
