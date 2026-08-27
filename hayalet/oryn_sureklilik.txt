@@ -1,0 +1,40 @@
+CHARACTER CONTINUITY — these details are fixed and must be identical in every
+frame and from every camera angle:
+- SKIN: smooth pale blue-grey, matte, without pores, wrinkles or blemishes,
+  always brightly and evenly lit so it reads as luminous rather than dark.
+  Never green, never purple, never human-toned.
+- HEAD: high elongated hairless cranium. No hair, no eyebrows, no eyelashes,
+  no ears of human shape — only small smooth openings where ears would be.
+- EYES: very large almond-shaped eyes, deep indigo, with a slow drifting
+  field of tiny stars inside each iris. The stars are always present and
+  always moving slowly. The eyes are never flat black and never human.
+- MOUTH: small, delicate, human-proportioned, so that speech reads clearly.
+- LIGHT-LINES: faint pale-gold geometric lines beneath the skin along the
+  temples, the sides of the neck and the collarbones. They are always
+  present, and pulse slightly brighter in time with its speech.
+- GARMENT: a structured high-collared tunic of pale silver-grey and ivory
+  fabric with visible shoulder seams, long sleeves and clean panel lines,
+  loose enough to hide the shape of the body. One vertical seam of soft white
+  light runs down the centre of the chest. It is NEVER skin-tight, never a
+  bodysuit, never body-contouring, and never suggests a nude figure. No robe,
+  no hood, no cape, no armour, no patterns, no insignia, no text.
+- ORBITING LIGHTS: exactly three distinct glowing white orbs, each about the
+  size of a walnut, floating in a slow triangle behind its head. They are
+  sharply defined and clearly separate from any background light or bokeh.
+  Never more than three, never fewer, never a scattered field of sparkles.
+- HANDS: long and narrow, six slender fingers on each hand, always six.
+- PROPORTION: tall and slender, long neck, narrow shoulders.
+
+ANGLE RULE: whatever part of it the framing includes, every feature above
+that falls inside that framing must be present and unchanged. A close-up on
+the face shows the star-field eyes, the light-lines at the temples and the
+orbiting lights behind the head. A framing that includes the hands shows six
+fingers on each hand.
+
+MOTION RULE: it moves very little and very slowly — small head turns, slow
+blinks, one unhurried hand gesture at most. It never gestures quickly, never
+leans, never shifts weight, never smiles broadly. Stillness is the character.
+
+SCENE PHYSICS: light particles drift slowly and continuously and never
+freeze. Reflections and glow stay consistent from shot to shot. Nothing
+appears out of nowhere, nothing vanishes, nothing duplicates.

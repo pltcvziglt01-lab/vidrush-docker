@@ -1,0 +1,29 @@
+# "THE FIRST DOOR" — 4 klip × 8 sn = 32 sn · SESSIZ (kelime yok, tepki sesi var)
+# Mekan: magara agzi, DISARIDAN gorunum, gunduz
+# Motor: icat gercekten calisir, ve tam calistigi icin ise yaramaz.
+# OOG hakli (kapi kusursuz) · Gerceklik hakli (adam disarida kaldi)
+# NUK bu bolumde YOK — tek karakter, model kapasitesi tutarliliga kalsin.
+
+KLIP 1 — INSA (tek eylem: levhayi yerine dikmek)
+  1. OOG buyuk duz tas levhayi zorlanarak magara agzina suruklerv
+  2. Levhayi dikine kaldirir, levha sallanir, oturur
+  3. Geri cekilir, elleriyle olcer, agzina tam uyuyor — sirtir
+  SES: zorlanma homurtulari · tas surtunmesi · agir TUMP · gururlu nefes
+
+KLIP 2 — CALISIYOR (tek eylem: kapiyi acip kapamak)
+  1. Levhayi iter, agzi kapatir — agir BOOM, toz
+  2. Geri iter, acilir — icerideki karanlik gorunur, OOG buyulenir
+  3. Iki kez daha hizlica acar kapar, sonra gogsune vurur
+  SES: BOOM · tas kaymasi · hayret nefesi · davul gibi gogus vurusu
+
+KLIP 3 — HAYRANLIK VE FARK EDIS (tek eylem: oturup anlamak)
+  1. Kapi kapali. OOG geri cekilir, hayranlikla bakar, yere oturur
+  2. Uzun memnun ic cekis. Sonra kapiya bakar. Ellerine bakar.
+  3. Etrafina bakinir. Sirit yavasca solar. Gozleri buyur.
+  SES: memnun ohh · ortam · sonra ses cekilir, sadece ruzgar · tek kalp atisi
+
+KLIP 4 — SORUN (tek eylem: acamamak) + BUTON
+  1. Firlar, levhayi iter — kipirdamaz. Ayaklari kayar.
+  2. Tum gucuyle iter, damar, hicbir sey. Birakir, nefes nefese.
+  3. YAGMUR baslar. Yukari bakar. Sonra duz duz kameraya bakar.
+  SES: zorlanma · ayak kaymasi · pes etme nefesi · ilk damlalar · saganak

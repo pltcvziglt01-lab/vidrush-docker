@@ -2,40 +2,164 @@ HAYALET - NASIL CALISIR
 
 Baslamadan once (bir kez):
   bash hayalet/chrome_baslat.sh   -> acilan Chrome'da Flow'a giris yap
+     (Bu adim SADECE GIRIS icindir. Uretimde Chrome'u Playwright kendisi
+      baslatir; gerekirse bu pencereyi kapatip yeniden acar. Giris kalici
+      profilde durdugu icin oturum kaybolmaz.)
+  ⚠ PROJE ADRESI SART: prompt kutusu Flow'un giris sayfasinda DEGIL, bir
+     projenin icindedir. Bir kez ~/.hayalet/gizli.env icine ekle:
+       HAYALET_FLOW_URL=https://labs.google/fx/tools/flow/project/<uuid>
   python3 -m hayalet.bot          -> bot calisir, Telegram'dan yaz
+
+
+SENKRON MODU  (/senkron)   ***ANA AKIS***
+------------------------------------------
+METIN + SESLENDIRME verirsin, CAPCUT PROJESI cikar.
+
+1) Telegram'da /senkron yaz
+2) ANA KARAKTER ver ya da "yok" de:
+      Elif: 8 yasinda, kizil orgulu sacli, yesil parkali bir kiz
+   -> Promptunda "Elif" yazdigin yere GORUNUS TARIFINI koyar.
+   ⚠ SADECE GORUNUS YAZ. Buraya tam bir prompt yapistirma ("referans
+     sayfasi", "uc gorunus", "sahne yok", "STYLE/COLOUR", "16:9"...) —
+     bu metin sahne promptunu ELE GECIRIR ve referans sayfasi uretilir.
+     Uzun/prompt-benzeri metni bot otomatik sadelestirir ve ENJEKTE
+     EDECEGI hali sana gosterir; yanlissa oradan gorursun.
+   -> Adsiz verirsen promptta "@karakter" yazdigin yere koyar.
+   -> Atif yoksa prompt AYNEN kalir (manzara kareleri bozulmaz).
+   (Flow onceki kareyi hatirlamaz; sadece "Elif" demek ISE YARAMAZ.)
+3) Anlatim METNINI gonder -> parca parca YA DA .txt dosyasi olarak.
+   Bitince /tamam yaz. Bot kac cumle oldugunu soyler.
+4) VARSAYILAN TUR sec:
+      Ilk %30 video   -> belgesel/anlati (varsayilan)
+      Tamami gorsel   -> ANIMASYON KANALLARI ICIN
+      Tamami video    -> en pahali
+5) PROMPTLARI gonder — HER SATIR BIR CUMLE, sirayla:
+      1. Karli sokak, wide shot, kalin konturlu 2D cizgi film
+      2. video: Elif kapiyi aciyor, medium shot
+      3. Bos sokak, kus bakisi
+   -> Satir basi numarasi istege bagli.
+   -> "video:" / "gorsel:" oneki o satirin turunu EZER.
+   ⚠ PROMPT SAYISI CUMLE SAYISINA ESIT OLMALI. Bir satir kayarsa sonraki
+     TUM cumleler yanlis goruntuye baglanir.
+
+   ⚠ 80+ PROMPT TEK MESAJA SIGMAZ (Telegram siniri 4096 karakter):
+       a) PARCA PARCA gonder -> bot sayar ("45/81 alindi"), tamamlaninca
+          kendiliginden ses adimina gecer
+       b) .txt DOSYASI olarak at -> en pratigi, tek seferde alinir
+          (UTF-8 duz metin, en fazla 2 MB)
+     Fazla prompt gelirse bot KESMEZ — hangisi fazla bilemez, hepsini
+     temizler ve bastan ister. /sifirla ile de elle temizleyebilirsin.
+6) SESLENDIRMEYI gonder (ses dosyasi ya da sesli mesaj)
+     -> UZUNSA PARCALARA BOLUP SIRAYLA gonder, bot birlestirir
+     -> bitince /hazir yaz
+7) Gerisi otomatik: Flow'da uretim -> indirme
+     -> cumle sinirlarini SESTEN cikarma -> CapCut'a dizme
+8) "HAZIR" mesaji gelince CapCut'i KAPAT-AC, proje listede.
+
+⚠ STIL SORUSU YOK: promptlari sen yaziyorsun, stil zaten onlarin icinde.
+⚠ Karakter betimlemesi METINDIR, fotograf degil.
+
+Cumle sinirlari nasil bulunur (sirayla, hangisi kullanildi hep yazilir):
+  1) cumle basina ayri ses dosyasi  -> KESIN
+  2) ASR kelime zaman damgalari     -> COK IYI  (OpenAI anahtari gerekir)
+  3) silencedetect duraklamalari    -> IYI      (sayi tutarsa)
+  4) karakter orantisi              -> YAKLASIK (uyarir)
+
+⚠ Bir cumlenin bile medyasi uretilemezse CapCut dizilimi YAPILMAZ —
+   eksik klip sirayi kaydirip sessizce yanlis senkron uretir. Bot durur
+   ve hangi cumlelerin eksik oldugunu soyler.
+⚠ Telegram bot indirmesi 20MB (BOTUN INDIRMESI; senin gonderme sinirin
+   degil). Bot dosyayi KENDISI BOLEMEZ — dosya Telegram sunucusunda durur,
+   bot ona hic erisemez. Iki cikis yolu:
+     a) sikistir:  ffmpeg -i ses.mp3 -ac 1 -b:a 64k kucuk.mp3   (30dk~14MB)
+     b) bol, sirayla gonder, /hazir yaz — bot birlestirir:
+        ffmpeg -i ses.mp3 -f segment -segment_time 900 -c copy p_%02d.mp3
+   Sesli mesaj olarak gonderirsen zaten ~7MB olur, hic ugrasma.
 
 
 HIKAYE MODU  (/hikaye)
 ----------------------
-Promptlari SEN yazarsin, bot uretir ve bilgisayara indirir.
+Promptlari SEN yazarsin, bot uretir ve indirir. Kurgu YOK.
 
 1) Telegram'da /hikaye yaz
 2) Promptlari tek blok gonder:
      VIDEO PROMPT 1 - safakta limandan cikan tekne
-     VIDEO PROMPT 2 - dalgalar guverteyi dovuyor
      GORSEL PROMPT 1 - yasli balikcinin portresi
-3) Bot Flow'da uretir, Masaustu/Hayalet/is_<tarih>/video ve /gorsel
-   klasorlerine indirir. Telegram'a sadece ilerleme/hata duser.
+3) Bot Flow'da uretir, is_<tarih>/video ve /gorsel klasorlerine iner.
 
 
-SENKRON MODU  (/senkron)
+KURGU'YU ELLE CALISTIRMA
 ------------------------
-METNI verirsin, promptlari BOT uretir, ciktiyi cumlesiyle atar.
+Dosyalar zaten diskteyse Telegram'a gerek yok:
 
-1) Telegram'da /senkron yaz
-2) Anlatim metnini duz metin gonder (her dilde olabilir)
-3) Bot her cumle icin prompt uretir:
-   - Ilk ~4-5k karakter (giris) -> TAMAMEN VIDEO
-   - Sonrasi cumleye gore: hareket sartsa video, degilse gorsel
-4) Flow'da uretir, diske indirir VE her ciktiyi Telegram'a
-   dayandigi cumleyle atar:
-     [video]  "Bu bitki hicbir sey istemez."
-     [foto]   "Kokleri yuz metre derine iner."
+  python3 -m hayalet.kurgu --metin metin.txt --ses seslendirme.m4a \
+      --medya ~/Desktop/Hayalet/is_xxx --cikti final.mp4 \
+      --capcut "PROJE_ADI"
+
+--ses KLASOR ise (cumle basina ayri dosya) senkron KESIN olur.
+Hangi medya hangi cumleye:
+  a) dosya adi basindaki sayi: 001_, 002_   (varsayilan)
+  b) medya klasorune eslesme.json: {"1": "video/a.mp4", ...}
+--capcut vermezsen sadece duz final.mp4 uretir.
+
+⚠ CapCut KAPALIYKEN calistir, sonra ac (acik CapCut ustune yazabilir).
+⚠ Klipler taslagin icine kopyalanir (Resources/hayalet/) — CapCut'in
+   ~/Desktop iznine ihtiyaci olmasin diye.
+⚠ Sema CapCut'in KENDI projelerinden kopyalanir. Hic projen yoksa once
+   CapCut'ta bir video + bir ses koyup kaydet.
+⚠ --altyazi: ffmpeg'de libass yoksa altyazi YAKILAMAZ, gomulu iz olarak
+   eklenir. Yazilari CapCut'ta eklemek zaten daha iyi.
+
+
+SAHNE TEMPOSU
+-------------
+Cumle basina bir gorsel konursa goruntu 1-2 saniyede bir degisir ve
+izlemesi yorucu olur. Bu yuzden KISA CUMLELER ONCEKI SAHNEYE KATILIR;
+sahne en az HAYALET_EN_KISA_SAHNE saniye (varsayilan 5) olur.
+Ses HIC KAYMAZ — sureler toplanir, toplam degismez.
+  3 sn -> daha hareketli    5 sn -> dengeli (varsayilan)    8 sn -> sakin
+Degistirmek icin ~/.hayalet/gizli.env icine:  HAYALET_EN_KISA_SAHNE=7
+
+
+EKSIK MEDYA
+-----------
+Uretilemeyen promptlar once TEKRAR denenir (HAYALET_TEKRAR=2 ek tur).
+Yine olmazsa is DURMAZ: o cumlenin suresi ONCEKI SAHNEYE eklenir, onceki
+goruntu ekranda daha uzun kalir (2 sn yerine 7.6 sn gibi). Ses hic kaymaz.
+final_kurgu.json icinde medyasiz_cumleler ve uzatilan_cumle yazar.
+
+
+HIZ
+---
+Her prompt AYRI gonderilir (HAYALET_PARTI=1). Toplu gonderim denendi ve
+Flow ajani parti basina yalnizca 1 cikti uretti — hizlandirmiyor, kilitliyor.
+Olculen hiz: gorsel basina ~30 saniye.
+
+
+CIKTI TURU VE ORANI
+-------------------
+Hem TUR (gorsel/video) hem ORAN, PROMPTTA DEGIL, Flow projesinin
+ayarindadir. Bot her partiden once ikisini de ayarlar:
+  gorsel partisi -> Image sekmesi,  video partisi -> Video sekmesi
+Oran (varsayilani 9:16 dikey
+olabilir). Bot her partiden ONCE orani kontrol edip 16:9'a getirir.
+Degistirmek icin ~/.hayalet/gizli.env icine:  HAYALET_ORAN=9:16
 
 
 ORTAK
 -----
-/durum  -> is kunyesi (kac prompt, kac hata, klasor)
+/hazir  -> ses parcalari tamam, uretime basla
+/cumleler -> metin kac cumleye bolundu, gor
+/tamam  -> metin bitti, sonraki adima gec
+/sifirla -> biriken promptlari (ya da metni) temizle
+/durum  -> is kunyesi (kac prompt, kac hata, klasor, CapCut projesi)
 /iptal  -> siradaki prompttan sonra durdurur
 Hata olursa bot nedenini Telegram'a yazar; art arda 3 hatada durur
 (Chrome/Flow oturumunu kontrol et demektir).
+
+
+BELGE URETIMI
+-------------
+HAYALET_PAYLAS.md ELLE DUZENLENMEZ. Kod/kurulum degisince:
+  python3 -m hayalet.paylas_uret            # yeniden uretir
+  python3 -m hayalet.paylas_uret --kontrol  # guncel mi?

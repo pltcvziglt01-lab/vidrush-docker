@@ -1,0 +1,9 @@
+STYLE: flat 2D cartoon characters with bold black outlines and a slight brush
+taper — thicker at the bottom of each shape, thinner at the top — flat
+cel-shaded fills with no gradient and no texture on the characters, placed
+inside a photorealistic 3D-rendered interior. The room is warm, detailed and
+realistically lit; the characters stay completely flat and cartoon. Vertical 9:16.
+NEGATIVE: no clothes on the characters, no realistic shading on the
+characters, no 3D render on the characters, no extra characters, no camera
+shake, no whip pans, no spinning, no watermark, no on-screen text, no
+captions.

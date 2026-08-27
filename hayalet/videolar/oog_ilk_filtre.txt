@@ -1,0 +1,54 @@
+# "THE FIRST FILTER" — 4 klip × 8 sn = 32 sn
+# Mekan: magara duvari, gunduz, disaridan giren isik + kucuk ates
+# Prensip: ikisi de hakli. Cizim gercekten kotu (NUK hakli), ama o gercekten
+# OOG (OOG hakli). Final geri doner: cizim guzellesir, OOG ayni kalir.
+
+YAPI DUZELTILDI (26 Agu): her klipte TEK ana eylem, girecek karakter
+start frame'de YOK, klip basina 3 beat.
+
+KLIP 1 — OOG TEK BASINA. Resmi bitirir, suratina boya sicrar, geri cekilip
+  hayran olur, gogsune vurup bagirir, kuslar ucar. NUK KADRAJDA YOK.
+  OOG: "OOG!"   Biter: gururla resme sirittigi kare.
+
+KLIP 2 — NUK GIRER VE GECER. Start frame: OOG tek basina sirtiyor.
+  NUK sagdan girer, durmadan yarim saniye bakar, "hm." der, cikar.
+  OOG'un siriti donar, sac tutami duser.
+  OOG (kameraya): "...oog?"
+
+KLIP 3 — OOG DUVARA SALDIRIR. Tek basina. Uc hizli darbe: kas, boy, sac.
+  Toz, kirilan komur. Sonra 1 sn donma, geri cekilip esere bakar.
+
+KLIP 4 — NUK DONER. Start frame: OOG yeni resmin yaninda bekliyor.
+  NUK girer, yeni resmi gorur, "OOOOH!" der. Sonra gercek OOG'a bakar.
+  Resme. OOG'a. Kafasi karisir. OOG kameraya bakar.
+
+--- eski beat listesi (referans) ---
+KLIP 1 — KURULUM + KENDI ESPRISI (hizli)
+  OOG son firca darbesini vurur, kirmizi boya kendi suratina sicrar, fark etmez.
+  Elini kurkune siler, karnina kirmizi el izi kalir. Doner, gogsune vurur.
+  OOG: "OOG!"  (magara yankilanir, tavandan yarasa/kuslar firlar)
+  NUK girer, DURMADAN yarim saniye duvara bakar, gecerken duz bir homurtu atar.
+  NUK: "hm."  (kadraj disina yururken)
+  OOG'un sirit donar, tepe sacı duser.
+  OOG (kameraya, kucuk sesle): "...oog?"
+  ESPRI: red degil, UMURSAMAMA. Durup bakmak degil, gecip gitmek komik.
+  SFX: firca · boya sicramasi · gogus vurusu · yanki · kanat sesi · ayak sesi
+
+KLIP 2 — RED (yavas, agir)
+  NUK cizime bakar, OOG'a bakar, cizime bakar. Uzun sessizlik.
+  NUK: "...nuh."  (basini iki yana sallar)
+  OOG'un tepe tutami duser, omuzlari coker.
+  SFX: TAM SESSIZLIK, sadece ates · tek damla su · tutam dusme sesi
+
+KLIP 3 — PATLAMA (cok hizli)
+  OOG duvara saldirir. Uc hizli darbe: kaslar, boy, kocaman sac.
+  Toz, komur kirilir, kivilcimlar. Sonra ANI DONMA.
+  OOG: (homurtular, nefes nefese)
+  SFX: hizli cizik x3 · komur kirilmasi · toz · sonra CAT sessizlik
+
+KLIP 4 — TERS KOSE (hizli sonra donma)
+  NUK yeni cizime bakar, agzi acilir.
+  NUK: "OOOOH!"  (tek uzun hayranlik sesi)
+  Sonra gercek OOG'a bakar. Cizime. OOG'a. Cizime. Kafasi karisir.
+  OOG kameraya bakar, hicbir sey demez.
+  SFX: NUK'un adimlari · cizime dokunus · sonra sessizlik · ates

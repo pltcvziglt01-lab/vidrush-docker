@@ -1,0 +1,9 @@
+SPEECH RULE:
+- BOBO speaks TO THE CAMERA. When he comments on what is happening, he turns
+  his head and looks straight into the lens, deadpan, and says his line to the
+  viewer. He is the only one who does this.
+- BIBI never looks at the camera and never knows it is there. She only speaks
+  to BOBO.
+- Lines are short. Nobody makes a speech. The joke is in the gap between what
+  she says and what he sees.
+- Both voices are locked. Use the voice blocks word for word in every prompt.

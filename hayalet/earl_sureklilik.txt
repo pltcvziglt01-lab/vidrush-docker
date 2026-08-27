@@ -1,0 +1,41 @@
+CHARACTER CONTINUITY — these details are fixed and must be identical in every
+frame and from every camera angle:
+- BEARD: a full pure white beard, neatly trimmed, roughly four inches long,
+  covering his chin and jawline and reaching down to the base of his neck,
+  with a white moustache trimmed level with his upper lip. The beard never
+  gets shorter, longer, patchy or absent, and it is never hidden or cropped
+  away — if any part of his neck or chest is in frame, the beard is in frame.
+- EYEBROWS: thick and white.
+- GLASSES: round, thin gold-rimmed, on his face at all times.
+- HAT: pale mustard-yellow straw with a medium brim and a slightly frayed
+  edge, on his head at all times.
+- WATCH: an old silver watch on a worn brown leather strap, always on his
+  LEFT wrist, never the right, and clearly visible whenever his left forearm
+  or left hand is in frame.
+- RING: a plain gold wedding band, always on his LEFT ring finger.
+- SHIRT: red-and-white plaid flannel, sleeves rolled to just below the elbow
+  on both arms, never unrolled and never a different pattern.
+- OVERALLS: dark blue faded denim bib overalls with brass buckles, worn over
+  a wide brown leather belt with a large metal buckle. The overalls are plain
+  — no brand patch, no tag, no label, no printing anywhere on them.
+- HANDS: large, tanned, heavily veined, thick knuckles, short clean nails.
+
+ANGLE RULE: whatever part of him the framing includes, every one of the
+features above that falls inside that framing must be present and unchanged.
+Chest-up framing shows the hat, glasses, eyebrows and the full beard.
+Table-level framing on his hands shows the tip of his beard, the bib straps
+of his overalls and his silver wristwatch along the top edge of the frame.
+
+OBJECT PHYSICS — objects must behave like real physical objects:
+- An object moves only when one of his hands moves it, and it travels along
+  a visible continuous path. Nothing slides or drifts on its own.
+- Nothing appears out of nowhere. Anything new enters from a named edge of
+  the frame, carried or pushed in by a hand.
+- Nothing disappears. Once an object has been used it stays exactly where it
+  was set down and remains visible for the rest of the shot.
+- Every object keeps the same shape, size, colour and fill level from moment
+  to moment. Nothing duplicates, shrinks, grows or changes material.
+- Powders and liquids only decrease in the container they are poured from
+  and only increase in the container they are poured into.
+- All objects are completely plain and unmarked — no label, no text, no logo,
+  no printing of any kind.

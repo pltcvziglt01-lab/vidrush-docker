@@ -1,0 +1,29 @@
+# "FIVE MINUTES" — 4 klip × 8 sn = 32 sn
+# Her klipte HER IKI karakter de is yapar. Bos saniye yok.
+
+KLIP 1 — KURULUM
+  BIBI: "Five minutes! I promise!"
+  BOBO: "Okay."
+  BOBO (kameraya): "She said five."
+  SFX: anahtar sangirtisi · kapi klik · bank gicirtisi · duvar saati tik tak
+  ALTYAZI: kurguda
+
+KLIP 2 — ILK TUR
+  BIBI (kapi ardindan): "Almost done!"
+  BOBO: "Mm-hm."
+  BOBO (kameraya): "She's narrowing it down."
+  SFX: 3x kapi carpmasi + ugultu (HIZLI) sonra TAM SESSIZLIK, sadece saat
+  ALTYAZI: kurguda
+
+KLIP 3 — ZAMAN COKUSU
+  BIBI (kapi ardindan): "Two more minutes!"
+  BOBO (kameraya, catlak sesle): "It's dark outside."
+  SFX: cirtir bocegi · uzak kopek · BOBO'nun boynu catirdar · toz
+  ALTYAZI: kurguda
+
+KLIP 4 — TERS KOSE
+  BIBI: "Ready! See? Five minutes."
+  BOBO (duz): "Five."
+  BIBI: "...Why are you dusty?"
+  SFX: kapi acilir parlama · kivilcim cini · toz bulutu · sessizlik
+  ALTYAZI: kurguda

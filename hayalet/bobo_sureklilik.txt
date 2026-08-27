@@ -1,0 +1,36 @@
+CHARACTER CONTINUITY — fixed and identical in every frame and from every angle:
+- Both characters are PURE WHITE with no clothes, ever. No shirts, no dresses,
+  no shoes beyond their white oval feet.
+- PROPORTION: each character's head is noticeably LARGER than their torso —
+  roughly one and a half times as wide as the body — and stays that way in
+  every frame, sitting, standing or walking. The body is a short rounded bulb,
+  never long, never thin, never realistically proportioned. The limbs stay
+  thin black lines of the same weight throughout.
+- EYES: three white highlight dots in each eye, never two, never four.
+- BOBO has NO hair and NO eyelashes. BIBI always has her dark brown
+  shoulder-length hair with a blunt fringe, and three eyelashes per eye.
+- MOUTH: black outline with a soft red tongue inside. The red tongue is the
+  only red on the characters.
+- HANDS AND FEET: white oval mittens with a thumb notch, white oval shoe
+  feet. No fingers, ever.
+- SHADOW: under each character sits the same simple soft LIGHT GREY
+  semi-transparent elliptical contact shadow, pale and gentle. It is never
+  black, never solid, never opaque, and never looks like a hole in the floor.
+  Both characters get the same shadow treatment.
+- LINE: bold black outline with a slight brush taper. Flat cel fill, no
+  gradient, no noise, no shading on the white bodies.
+- Only BOBO and BIBI appear. Any other person in the scene is a plain grey
+  faceless silhouette.
+
+STAGING RULE: the two characters are staged in the room and turned toward
+each other, with real distance between them — never posed side by side
+facing the camera. Feed BOBO and BIBI to Flow as TWO SEPARATE reference
+images; a single image containing both makes Flow copy that side-by-side
+pose into the scene.
+
+SCENE RULE: the room around them is photorealistic and detailed, with real
+light and real shadows, but the two characters stay flat 2D cartoon and are
+never rendered realistically. They cast only their simple grey ellipse shadow.
+
+MOTION RULE: exaggerated cartoon squash-and-stretch on the characters, static
+camera. No injuries, no blood, no violence — physical comedy only.

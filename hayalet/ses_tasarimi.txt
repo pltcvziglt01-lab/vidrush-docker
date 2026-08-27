@@ -1,0 +1,50 @@
+SOUND DESIGN — four layers. A clip with only room ambience is dry and dead.
+Every layer below must be present in every clip.
+
+LAYER 1 — NON-VERBAL VOICE. The character makes sound almost constantly, even
+when he says nothing. This is where the emotion lives. Write the exact sounds:
+  · concentrating — slow breathing through the nose, a low absent hum
+  · pleased with himself — a warm satisfied "mmm", a proud exhale through
+    the nose, a small chuckle under the breath
+  · excited — a sharp intake of breath, an eager little grunt
+  · surprised — a short gasp
+  · deflating — the air going out of him, a long descending whine, a small
+    disappointed sniff
+  · straining — teeth-gritted effort grunts
+Never let a character sit through a beat in total vocal silence.
+
+LAYER 2 — CARTOON SFX ON EVERY PHYSICAL ACTION. Every movement makes a sound,
+exaggerated and comic, not realistic:
+  · a soft POP as each sparkle appears
+  · a hollow wooden THUMP THUMP for chest beats, like a drum
+  · a wet SLAP for pigment hitting rock, a light SPLAT for the splatter
+  · a rising WHOOSH for a fast turn or a thrown object
+  · a springy BOING for a squash-and-stretch bounce
+  · a dry THUD when something lands
+  · a soft descending SLIDE WHISTLE when something droops or falls
+  · light quick footstep TAPS, pitched to the character's size
+
+LAYER 3 — EMOTIONAL STINGERS. A short musical accent on the emotional beat,
+telling the viewer how to feel:
+  · pride or success — a bright ascending three-note chime, warm and short
+  · realisation or reveal — a single soft shimmering bell
+  · disappointment — two or three descending notes, gentle and comic, never
+    a harsh sad-trombone
+  · anticipation before a burst — a short quiet rising tone
+Each stinger is two seconds at most and sits under the action, never over it.
+
+LAYER 4 — AMBIENCE BED. The real sound of the place, quiet and continuous,
+never dropping to true silence. Birds and wind, a fire crackling, a distant
+drip. A "silent" beat means the ambience bed alone, not nothing.
+
+BALANCE: voice loudest, cartoon SFX next, stingers underneath, ambience
+quietest. Nothing ever fully stops.
+
+IN FLOW vs IN THE EDIT:
+  · Flow renders layers 1, 2 and 4 — they are tied to the action and must be
+    in sync, so they are written into the prompt.
+  · Layer 3 stingers and the background music track go in the EDIT, so the
+    music stays identical across all four clips. Flow would score each clip
+    differently and the cuts would clash.
+  · Transitions between clips — a whoosh, a quick white flash, a match cut on
+    a matching shape — are also edit work.

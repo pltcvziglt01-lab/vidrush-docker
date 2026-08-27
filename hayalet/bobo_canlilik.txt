@@ -1,0 +1,85 @@
+LIVELINESS — every shot must move, react and breathe. A flat, static shot is
+a failed shot.
+
+CAMERA: the camera is never locked off for a whole shot. Over eight seconds it
+does at least two of these, slowly and smoothly:
+- a slow push in toward a character as the beat builds
+- a slow pull back to reveal the room or the distance between them
+- a gentle drift sideways following a character as they move
+It never shakes, never whip-pans and never spins. On the emotional beat of the
+shot it pushes in close on the reacting character's face.
+
+CARTOON EFFECTS — drawn in the same flat 2D style as the characters, with the
+same bold black outlines. Use the ones that fit the beat, never more than two
+at a time:
+- short curved motion lines trailing a moving hand, head or body
+- a small puff of white dust where feet land or where someone sits down hard
+- one large sweat drop at the side of the head for stress or awkwardness
+- small white steam puffs from the ears for anger
+- a small cross-shaped anger vein mark on the forehead
+- a few floating hearts for affection
+- a tiny dark rain cloud hovering above the head for disappointment
+- a burst of thin white radiating lines behind the head for shock or realisation
+- small yellow four-pointed sparkles for delight or pride
+- a slow wobble of the whole body for exhaustion or defeat
+The room stays photorealistic; only the characters and their effects are flat
+2D cartoon.
+
+FACE: the face carries the joke. Eyes go wide, squeeze shut, roll, droop or
+narrow. Eyebrows move on every beat. The mouth opens fully when reacting. Use
+squash-and-stretch on the head, not just the body.
+
+BEAT RHYTHM: something visible must change every two to three seconds — a
+camera move, a pose change, an effect appearing, the light shifting. In an
+eight second shot there are at least three such changes.
+
+AMBIENCE: the real room sound of the scene, quiet and continuous — a clock,
+distant traffic, a fridge hum, birds outside. No music.
+
+RHYTHM — the single most important rule. A shot at one constant speed is dead.
+
+SHOW, NEVER REFERENCE: if a line mentions "the third one", the viewer must have
+watched the first and the second happen on screen. Never build a joke on
+something that happened off-frame. If it matters, it is shown.
+
+BURST AND HOLD: every shot contains at least one tempo change.
+- BURST: three fast events inside two to three seconds, each with its own sharp
+  sound and its own motion lines. The events escalate — faster, closer, louder.
+- HOLD: immediately after the burst, one and a half to two seconds of almost
+  total stillness. The character does not move at all. The ambience drops to
+  just a ticking clock. This silence is the laugh; it only works because the
+  burst came first.
+- The deadpan line to camera comes AFTER the hold, never during the burst.
+
+SPEED IS A CHARACTER TRAIT: BIBI's world is fast — doors banging, things flying,
+quick cuts of motion. BOBO's world is slow — he barely moves. The comedy is the
+collision of those two speeds inside one frame, so never let them share a tempo.
+EDITING AND RHYTHM — applies to every comedy clip. Read this before writing any
+shot. A clip that only sets something up is a failed clip.
+
+EVERY CLIP IS ITS OWN JOKE: each eight second clip must have a beginning, a
+middle and a small payoff of its own. It may set up the next clip as well, but
+it can never be pure setup. If a viewer watched only this one clip, they must
+still get something.
+
+NO DEAD AIR: something must happen every single second — an action, a reaction,
+a sound, an effect, a change of expression. Two characters standing still doing
+nothing is dead air, never comedy. Count the seconds and fill each one.
+
+A HOLD IS ONE SECOND, NOT TWO: a pause only works when it lands right after a
+fast burst and sits on ONE face that is visibly processing something. Anything
+longer, or a pause on two motionless characters, is dead.
+
+STACK SMALL GAGS: the main joke is not the only joke. Layer cheap visual gags
+underneath it — paint splattered on his own face and not noticed, a handprint
+left on his own belly, birds bursting out of the cave at a shout. Two or three
+of these per clip cost nothing and fill every second.
+
+DISMISSAL BEATS CONFRONTATION: a character who glances, grunts and walks
+straight past is funnier than one who stops and stares. Reaction should be
+under-sized, quick and mobile. Never park two characters in front of each other
+to "react".
+
+END ON A FACE, NOT A TABLEAU: close the clip on one character's expression
+changing — a grin freezing, a tuft of hair drooping, eyes flicking to camera —
+not on a wide shot of everyone standing there.

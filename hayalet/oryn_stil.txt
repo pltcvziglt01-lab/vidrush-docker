@@ -1,0 +1,14 @@
+AMBIENCE: a soft continuous low hum, very quiet, with a faint high shimmer
+underneath. No music, no sound effects, no wind.
+LIGHT AND PALETTE: bright and luminous, never dark. A warm ivory-white and
+pale gold environment filled with soft light, with cool silver-blue accents
+only on the being itself. Strong clear key light on its face from the front
+so every feature is easy to read. High contrast between the being and the
+background so the silhouette is instantly clear on a small phone screen.
+Airy, glowing, high-key — like standing inside sunlight rather than in space.
+No heavy shadows, no black areas, no murky corners, no night, no starfield
+background.
+Soft volumetric light shafts, slow floating golden motes, shallow depth of
+field, cinematic photorealistic render, 50mm lens, slight film grain.
+Vertical 9:16. No on-screen text, no captions, no subtitles, no watermark,
+no logos.

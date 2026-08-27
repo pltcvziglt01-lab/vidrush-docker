@@ -1,0 +1,33 @@
+CHARACTER CONTINUITY — fixed and identical in every frame and from every angle:
+- PROPORTION: clean cartoon proportions — the head is a little wider than the
+  torso but never oversized, the limbs are slim and full, never thin stick
+  lines. NUK stays clearly SHORTER and STOCKIER than OOG in every shot.
+- SKIN: pale cream-white on both characters, flat cel fill, never grey, never
+  tanned, never realistically shaded.
+- OOG always has his thick messy mop of dark brown hair covering the top of
+  his head and hanging low over his forehead, a shaggy brown fur loincloth
+  tied with a thin cord, and one thin dark strap diagonally across his bare
+  chest.
+- NUK always has flat straight hair in a blunt fringe into his eyes, lowered
+  doubtful eyebrows, and a ragged fur cape over both shoulders.
+- HANDS AND FEET: simple rounded hands, bare cream-white feet. Never detailed,
+  never realistic.
+- SHADOW: under each character sits the same simple soft LIGHT GREY
+  semi-transparent elliptical contact shadow, pale and gentle. Never black,
+  never solid, never opaque, never like a hole in the ground.
+- LINE: bold black outline with a slight brush taper. Flat cel fill, no
+  gradient, no noise, no shading on the bodies.
+- Only OOG and NUK appear. Any other figure is a plain grey silhouette.
+
+WORLD RULE: the entire image is a hand-drawn 2D cartoon — characters, cave,
+rocks, fur, fire and landscape all share the same bold black outlines and flat
+cel shading. Nothing in the frame is photorealistic or 3D rendered.
+
+STAGING RULE: feed OOG and NUK to Flow as TWO SEPARATE reference images. A
+single image containing both makes Flow copy that side-by-side pose into the
+scene. Stage them apart and turned toward each other, never posed side by
+side facing the camera.
+
+SPEECH RULE: neither character speaks any real language, ever. Only grunts,
+hoots and OOG's own name. OOG looks straight into the camera when he wants
+the viewer to agree with him; NUK never looks at the camera.
